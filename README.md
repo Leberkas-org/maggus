@@ -4,7 +4,7 @@
 
 This will be your best and worst co-worker at the same time. A stupid junior developer that will just work and only ask questions when the work itself is unclear.
 
-Provide him a `IMPLEMENTATION_PLAN.md` and he will work. To create this plan you can use the **iplan** skill.
+Provide him a `IMPLEMENTATION_PLAN.md` and he will work. To create this plan you can use the **maggus-plan** skill.
 
 ### Planned Features
 
