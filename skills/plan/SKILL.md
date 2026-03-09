@@ -1,5 +1,5 @@
 ---
-name: iplan
+name: maggus-plan
 description: "Generate a Implementation for one or more new features. Use when planning a feature, starting a new project, or when asked to create implementation plan. Triggers on: create a plan, write plan for, plan this feature"
 user-invocable: true
 ---
