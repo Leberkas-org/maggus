@@ -88,11 +88,11 @@ Adopt the battle-tested prompt structure and workflow from `ralph.sh` into the `
 **Description:** As a user, I want to see a clear banner at startup showing what Maggus is about to do, with a brief pause to abort.
 
 **Acceptance Criteria:**
-- [ ] Before starting the loop, Maggus prints a banner with: iteration count, branch, run ID, run directory, permissions mode
-- [ ] Maggus prints "WARNING: Running with --dangerously-skip-permissions"
-- [ ] Maggus prints "Press Ctrl+C within 3 seconds to abort..." and waits 3 seconds
-- [ ] Ctrl+C during the pause cleanly exits without errors
-- [ ] Typecheck/lint passes
+- [x] Before starting the loop, Maggus prints a banner with: iteration count, branch, run ID, run directory, permissions mode
+- [x] Maggus prints "WARNING: Running with --dangerously-skip-permissions"
+- [x] Maggus prints "Press Ctrl+C within 3 seconds to abort..." and waits 3 seconds
+- [x] Ctrl+C during the pause cleanly exits without errors
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

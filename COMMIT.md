@@ -1,9 +1,6 @@
-TASK-005: Wire everything together in the work loop
+TASK-006: Add startup banner and safety pause
 
-Add iteration banner (`========== Iteration <i> of <N> ==========`) before
-each iteration and print remaining incomplete tasks (title only, max 5) after
-the loop. The full ralph-style flow is now wired end-to-end: detect branch →
-create run dir → loop (find task → build prompt → invoke claude → git commit)
-→ print summary.
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Display a startup banner showing iteration count, branch, run ID, run
+directory, and permissions mode before the work loop begins. Print a
+warning about --dangerously-skip-permissions and wait 3 seconds so the
+user can abort with Ctrl+C.

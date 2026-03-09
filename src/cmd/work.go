@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
@@ -77,6 +80,37 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("create run tracker: %w", err)
 		}
+
+		// Startup banner
+		fmt.Println()
+		fmt.Println("══════════════════════════════════════════")
+		fmt.Println("  Maggus Work Session")
+		fmt.Println("══════════════════════════════════════════")
+		fmt.Printf("  Iterations:   %d\n", count)
+		fmt.Printf("  Branch:       %s\n", run.Branch)
+		fmt.Printf("  Run ID:       %s\n", run.ID)
+		fmt.Printf("  Run Dir:      %s\n", run.RelativeDir(dir))
+		fmt.Printf("  Permissions:  --dangerously-skip-permissions\n")
+		fmt.Println("══════════════════════════════════════════")
+		fmt.Println()
+		fmt.Println("WARNING: Running with --dangerously-skip-permissions")
+		fmt.Println()
+		fmt.Println("Press Ctrl+C within 3 seconds to abort...")
+
+		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer pauseCancel()
+
+		select {
+		case <-pauseCtx.Done():
+			pauseCancel()
+			// Reset signal handling so future Ctrl+C works normally
+			fmt.Println("\nAborted.")
+			return nil
+		case <-time.After(3 * time.Second):
+			pauseCancel()
+		}
+
+		fmt.Println()
 
 		completed := 0
 		for i := 0; i < count; i++ {
