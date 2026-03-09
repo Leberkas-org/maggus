@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +13,9 @@ import (
 
 	"golang.org/x/term"
 )
+
+// ErrInterrupted is returned when the user presses Ctrl+C.
+var ErrInterrupted = fmt.Errorf("interrupted by user")
 
 // ANSI color codes
 const (
@@ -244,13 +248,14 @@ func (d *display) setOutput(o string) {
 }
 
 // RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
-func RunClaude(prompt string) error {
+// The context can be used to kill the claude process (e.g., on Ctrl+C).
+func RunClaude(ctx context.Context, prompt string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
 	}
 
-	cmd := exec.Command(path,
+	cmd := exec.CommandContext(ctx, path,
 		"-p", prompt,
 		"--output-format", "stream-json",
 		"--verbose",
@@ -258,6 +263,14 @@ func RunClaude(prompt string) error {
 	)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	// On Windows, CommandContext sends a kill signal. Set Cancel to send interrupt first.
+	cmd.Cancel = func() error {
+		// Kill the process tree
+		if cmd.Process != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -332,8 +345,13 @@ func RunClaude(prompt string) error {
 	fmt.Print("\033[?25h")
 	fmt.Println()
 
+	if ctx.Err() != nil {
+		d.setStatus("Interrupted")
+		cmd.Wait() // clean up
+		return ErrInterrupted
+	}
+
 	if err := cmd.Wait(); err != nil {
-		fmt.Print("\033[?25h") // restore cursor on error
 		return fmt.Errorf("claude exited with error: %w", err)
 	}
 

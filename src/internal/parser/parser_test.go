@@ -205,3 +205,94 @@ func TestFindNextIncomplete_OrderAcrossFiles(t *testing.T) {
 		t.Errorf("expected TASK-010, got %s", next.ID)
 	}
 }
+
+func TestBlockedCriterion(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### TASK-001: Blocked task
+**Description:** Has a blocked criterion.
+
+**Acceptance Criteria:**
+- [x] Done thing
+- [x] ⚠️ BLOCKED: Can't do this — needs human input
+
+### TASK-002: Open task
+**Description:** This one is workable.
+
+**Acceptance Criteria:**
+- [ ] Do the thing
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// TASK-001 is complete (all checked) but blocked
+	if !tasks[0].IsComplete() {
+		t.Error("TASK-001 should be complete (all criteria checked)")
+	}
+	if !tasks[0].IsBlocked() {
+		t.Error("TASK-001 should be blocked")
+	}
+	if tasks[0].IsWorkable() {
+		t.Error("TASK-001 should not be workable")
+	}
+
+	// TASK-002 is workable
+	if !tasks[1].IsWorkable() {
+		t.Error("TASK-002 should be workable")
+	}
+
+	// FindNextIncomplete should skip blocked TASK-001 (it's complete anyway)
+	// and return TASK-002
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+func TestBlockedIncompleteTask_Skipped(t *testing.T) {
+	// Task has unchecked criteria AND a blocked criterion — should be skipped
+	tasks := []Task{
+		{
+			ID: "TASK-001",
+			Criteria: []Criterion{
+				{Text: "Done", Checked: true},
+				{Text: "⚠️ BLOCKED: Needs API key", Checked: true, Blocked: true},
+				{Text: "Not done yet", Checked: false},
+			},
+		},
+		{
+			ID:       "TASK-002",
+			Criteria: []Criterion{{Text: "Do it", Checked: false}},
+		},
+	}
+
+	// TASK-001 is incomplete (has unchecked) AND blocked
+	if tasks[0].IsComplete() {
+		t.Error("TASK-001 should not be complete")
+	}
+	if !tasks[0].IsBlocked() {
+		t.Error("TASK-001 should be blocked")
+	}
+	if tasks[0].IsWorkable() {
+		t.Error("TASK-001 should not be workable")
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}

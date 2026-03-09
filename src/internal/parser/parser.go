@@ -15,6 +15,7 @@ var taskHeadingRe = regexp.MustCompile(`^###\s+TASK-(\d+):\s+(.+)$`)
 type Criterion struct {
 	Text    string
 	Checked bool
+	Blocked bool // marked as [x] ⚠️ BLOCKED: ...
 }
 
 type Task struct {
@@ -35,6 +36,21 @@ func (t *Task) IsComplete() bool {
 		}
 	}
 	return true
+}
+
+// IsBlocked returns true if any criterion is marked as blocked.
+func (t *Task) IsBlocked() bool {
+	for _, c := range t.Criteria {
+		if c.Blocked {
+			return true
+		}
+	}
+	return false
+}
+
+// IsWorkable returns true if the task is incomplete and not blocked.
+func (t *Task) IsWorkable() bool {
+	return !t.IsComplete() && !t.IsBlocked()
 }
 
 // ParseFile parses a single plan markdown file and returns all tasks found in it.
@@ -116,9 +132,12 @@ func ParseFile(path string) ([]Task, error) {
 		if inCriteria {
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "- [x] ") {
+				text := strings.TrimPrefix(trimmed, "- [x] ")
+				blocked := strings.Contains(text, "BLOCKED:")
 				current.Criteria = append(current.Criteria, Criterion{
-					Text:    strings.TrimPrefix(trimmed, "- [x] "),
+					Text:    text,
 					Checked: true,
+					Blocked: blocked,
 				})
 			} else if strings.HasPrefix(trimmed, "- [ ] ") {
 				current.Criteria = append(current.Criteria, Criterion{
@@ -142,10 +161,10 @@ func ParseFile(path string) ([]Task, error) {
 	return tasks, nil
 }
 
-// FindNextIncomplete returns the first incomplete task from the given list, or nil if all are complete.
+// FindNextIncomplete returns the first workable task (incomplete and not blocked), or nil if none.
 func FindNextIncomplete(tasks []Task) *Task {
 	for i := range tasks {
-		if !tasks[i].IsComplete() {
+		if tasks[i].IsWorkable() {
 			return &tasks[i]
 		}
 	}

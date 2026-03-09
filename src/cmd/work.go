@@ -64,9 +64,15 @@ Examples:
 			return nil
 		}
 
-		// Check for protected branch and create feature branch if needed
+		// Check if there are any incomplete tasks
 		nextTask := parser.FindNextIncomplete(tasks)
-		if nextTask != nil {
+		if nextTask == nil {
+			fmt.Println("All tasks are complete! Nothing to do.")
+			return nil
+		}
+
+		// Check for protected branch and create feature branch if needed
+		{
 			branch, msg, err := gitbranch.EnsureFeatureBranch(dir, nextTask.ID)
 			if err != nil {
 				return fmt.Errorf("ensure feature branch: %w", err)
@@ -112,8 +118,18 @@ Examples:
 
 		fmt.Println()
 
+		// Set up Ctrl+C handling for the work loop
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+
 		completed := 0
 		for i := 0; i < count; i++ {
+			// Check if interrupted between iterations
+			if ctx.Err() != nil {
+				fmt.Println("\nInterrupted. Stopping loop.")
+				break
+			}
+
 			next := parser.FindNextIncomplete(tasks)
 			if next == nil {
 				fmt.Println("All tasks are complete!")
@@ -132,7 +148,11 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(p); err != nil {
+			if err := runner.RunClaude(ctx, p); err != nil {
+				if err == runner.ErrInterrupted {
+					fmt.Println("\nInterrupted. Stopping loop.")
+					break
+				}
 				return fmt.Errorf("task %s failed: %w", next.ID, err)
 			}
 

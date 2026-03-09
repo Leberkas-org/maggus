@@ -79,6 +79,9 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
 	b.WriteString("Do NOT scan plan files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")
+	b.WriteString("If a criterion cannot be completed (missing dependency, needs human input, external blocker), mark it as:\n")
+	b.WriteString("  `- [x] ⚠️ BLOCKED: <original criterion text> — <reason>`\n")
+	b.WriteString("This tells Maggus to skip this task in future runs.\n\n")
 
 	// Stage files but do NOT commit
 	b.WriteString("When you are done:\n")
