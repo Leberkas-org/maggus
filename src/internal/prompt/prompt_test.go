@@ -7,32 +7,137 @@ import (
 	"github.com/dirnei/maggus/internal/parser"
 )
 
-func TestBuild(t *testing.T) {
-	task := &parser.Task{
+func newTestTask() *parser.Task {
+	return &parser.Task{
 		ID:          "TASK-042",
 		Title:       "Implement the thing",
 		Description: "As a dev, I want the thing so it works.",
+		SourceFile:  ".maggus/plan_2.md",
 		Criteria: []parser.Criterion{
 			{Text: "First criterion", Checked: false},
 			{Text: "Second criterion", Checked: true},
 		},
 	}
+}
 
-	result := Build(task)
+func newTestOpts() Options {
+	return Options{
+		RunID:     "20260309-120000",
+		RunDir:    ".maggus/runs/20260309-120000",
+		Iteration: 3,
+		IterLog:   ".maggus/runs/20260309-120000/iteration-03.md",
+	}
+}
+
+func TestBuild_ContainsAllSections(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	result := Build(task, opts)
 
 	checks := []string{
+		// Bootstrap
+		"# Bootstrap",
+		"CLAUDE.md",
+		"AGENTS.md",
+		"PROJECT_CONTEXT.md",
+		"TOOLING.md",
+
+		// Run metadata
+		"# Run Metadata",
+		"RUN_ID:** 20260309-120000",
+		"RUN_DIR:** .maggus/runs/20260309-120000",
+		"ITERATION:** 3",
+		"ITER_LOG:** .maggus/runs/20260309-120000/iteration-03.md",
+
+		// Task
 		"TASK-042",
 		"Implement the thing",
 		"As a dev, I want the thing so it works.",
 		"- [ ] First criterion",
 		"- [x] Second criterion",
-		"Focus only on this task",
+
+		// Instructions
+		"Work ONLY on TASK-042: Implement the thing",
+		"Do NOT scan plan files to find a different task",
 		"verify that every acceptance criterion",
+		"Stage all changed files",
+		"do NOT commit",
+		"COMMIT.md",
+		"Update the plan file",
+		".maggus/plan_2.md",
+		"Write an iteration log",
+		"iteration-03.md",
+		"Task selected",
+		"Commands run",
+		"deviations or skips",
 	}
 
 	for _, want := range checks {
 		if !strings.Contains(result, want) {
 			t.Errorf("prompt missing %q\n\nGot:\n%s", want, result)
 		}
+	}
+}
+
+func TestBuild_NoBootstrap_OmitsBootstrapSection(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	opts.NoBootstrap = true
+	result := Build(task, opts)
+
+	// Should NOT contain bootstrap section
+	bootstrapMarkers := []string{
+		"# Bootstrap",
+		"CLAUDE.md",
+		"AGENTS.md",
+		"PROJECT_CONTEXT.md",
+		"TOOLING.md",
+	}
+
+	for _, marker := range bootstrapMarkers {
+		if strings.Contains(result, marker) {
+			t.Errorf("--no-bootstrap prompt should not contain %q\n\nGot:\n%s", marker, result)
+		}
+	}
+
+	// Should still contain everything else
+	requiredSections := []string{
+		"# Run Metadata",
+		"TASK-042",
+		"Work ONLY on TASK-042",
+		"COMMIT.md",
+	}
+
+	for _, want := range requiredSections {
+		if !strings.Contains(result, want) {
+			t.Errorf("--no-bootstrap prompt missing required section %q\n\nGot:\n%s", want, result)
+		}
+	}
+}
+
+func TestBuild_SectionOrder(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	result := Build(task, opts)
+
+	// Verify sections appear in correct order
+	sections := []string{
+		"# Bootstrap",
+		"# Run Metadata",
+		"# Task",
+		"# Instructions",
+	}
+
+	lastIdx := -1
+	for _, section := range sections {
+		idx := strings.Index(result, section)
+		if idx == -1 {
+			t.Errorf("section %q not found", section)
+			continue
+		}
+		if idx <= lastIdx {
+			t.Errorf("section %q appears before previous section (idx %d <= %d)", section, idx, lastIdx)
+		}
+		lastIdx = idx
 	}
 }

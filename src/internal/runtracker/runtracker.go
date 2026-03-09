@@ -55,6 +55,25 @@ func (r *Run) IterationLogPath(iteration int) string {
 	return filepath.Join(r.Dir, fmt.Sprintf("iteration-%02d.md", iteration))
 }
 
+// RelativeDir returns the run directory as a relative path from the working directory (forward slashes).
+func (r *Run) RelativeDir(workDir string) string {
+	rel, err := filepath.Rel(workDir, r.Dir)
+	if err != nil {
+		return filepath.ToSlash(r.Dir)
+	}
+	return filepath.ToSlash(rel)
+}
+
+// RelativeIterationLogPath returns the iteration log path relative to the working directory (forward slashes).
+func (r *Run) RelativeIterationLogPath(workDir string, iteration int) string {
+	abs := r.IterationLogPath(iteration)
+	rel, err := filepath.Rel(workDir, abs)
+	if err != nil {
+		return filepath.ToSlash(abs)
+	}
+	return filepath.ToSlash(rel)
+}
+
 // Finalize appends end-of-run metadata to run.md.
 func (r *Run) Finalize(workDir string) error {
 	endTime := time.Now()
