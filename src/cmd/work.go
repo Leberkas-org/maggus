@@ -5,15 +5,21 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dirnei/maggus/internal/gitbranch"
+	"github.com/dirnei/maggus/internal/gitcommit"
 	"github.com/dirnei/maggus/internal/parser"
 	"github.com/dirnei/maggus/internal/prompt"
 	"github.com/dirnei/maggus/internal/runner"
+	"github.com/dirnei/maggus/internal/runtracker"
 	"github.com/spf13/cobra"
 )
 
 const defaultTaskCount = 5
 
-var countFlag int
+var (
+	countFlag       int
+	noBootstrapFlag bool
+)
 
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
@@ -55,6 +61,23 @@ Examples:
 			return nil
 		}
 
+		// Check for protected branch and create feature branch if needed
+		nextTask := parser.FindNextIncomplete(tasks)
+		if nextTask != nil {
+			branch, msg, err := gitbranch.EnsureFeatureBranch(dir, nextTask.ID)
+			if err != nil {
+				return fmt.Errorf("ensure feature branch: %w", err)
+			}
+			fmt.Println(msg)
+			_ = branch
+		}
+
+		// Create run tracker
+		run, err := runtracker.New(dir, "claude", count)
+		if err != nil {
+			return fmt.Errorf("create run tracker: %w", err)
+		}
+
 		completed := 0
 		for i := 0; i < count; i++ {
 			next := parser.FindNextIncomplete(tasks)
@@ -63,11 +86,31 @@ Examples:
 				break
 			}
 
-			fmt.Printf("[%d/%d] Working on %s: %s...\n", i+1, count, next.ID, next.Title)
+			fmt.Printf("========== Iteration %d of %d ==========\n", i+1, count)
+			fmt.Printf("Working on %s: %s...\n", next.ID, next.Title)
 
-			p := prompt.Build(next)
+			opts := prompt.Options{
+				NoBootstrap: noBootstrapFlag,
+				RunID:       run.ID,
+				RunDir:      run.RelativeDir(dir),
+				Iteration:   i + 1,
+				IterLog:     run.RelativeIterationLogPath(dir, i+1),
+			}
+
+			p := prompt.Build(next, opts)
 			if err := runner.RunClaude(p); err != nil {
 				return fmt.Errorf("task %s failed: %w", next.ID, err)
+			}
+
+			// Commit using COMMIT.md
+			commitResult, err := gitcommit.CommitIteration(dir)
+			if err != nil {
+				return fmt.Errorf("commit after %s: %w", next.ID, err)
+			}
+			if commitResult.Committed {
+				fmt.Printf("Committed: %s\n", commitResult.Message)
+			} else {
+				fmt.Println(commitResult.Message)
 			}
 
 			// Re-parse to pick up any changes the agent made
@@ -79,20 +122,43 @@ Examples:
 			completed++
 		}
 
-		// Count remaining incomplete tasks
-		remaining := 0
+		// Finalize run log
+		if err := run.Finalize(dir); err != nil {
+			fmt.Printf("Warning: could not finalize run log: %v\n", err)
+		}
+
+		// Print summary banner
+		run.PrintSummary(dir)
+
+		// Collect remaining incomplete tasks
+		var remaining []string
 		for _, t := range tasks {
 			if !t.IsComplete() {
-				remaining++
+				remaining = append(remaining, t.Title)
 			}
 		}
 
-		fmt.Printf("Completed %d/%d tasks. %d tasks remaining.\n", completed, count, remaining)
+		if len(remaining) > 0 {
+			fmt.Println("Remaining incomplete tasks:")
+			limit := len(remaining)
+			if limit > 5 {
+				limit = 5
+			}
+			for _, title := range remaining[:limit] {
+				fmt.Printf("  - %s\n", title)
+			}
+			if len(remaining) > 5 {
+				fmt.Printf("  ... and %d more\n", len(remaining)-5)
+			}
+		}
+
+		fmt.Printf("Completed %d/%d tasks. %d tasks remaining.\n", completed, count, len(remaining))
 		return nil
 	},
 }
 
 func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
+	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	rootCmd.AddCommand(workCmd)
 }
