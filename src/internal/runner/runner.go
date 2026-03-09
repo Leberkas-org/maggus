@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -263,13 +265,18 @@ func RunClaude(ctx context.Context, prompt string) error {
 	)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	// On Windows, CommandContext sends a kill signal. Set Cancel to send interrupt first.
+	// Kill the entire process tree on cancel so child processes don't keep stdout open.
 	cmd.Cancel = func() error {
-		// Kill the process tree
-		if cmd.Process != nil {
-			return cmd.Process.Kill()
+		if cmd.Process == nil {
+			return nil
 		}
-		return nil
+		if runtime.GOOS == "windows" {
+			// taskkill /T kills the process tree, /F forces termination
+			kill := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid))
+			kill.Stderr = os.Stderr
+			return kill.Run()
+		}
+		return cmd.Process.Kill()
 	}
 
 	stdout, err := cmd.StdoutPipe()
