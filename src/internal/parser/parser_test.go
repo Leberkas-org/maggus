@@ -1,0 +1,207 @@
+package parser
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+const testPlan = `# Plan: Test
+
+## Introduction
+
+Some intro text.
+
+## User Stories
+
+### TASK-001: First task
+**Description:** As a dev, I want to do thing one so that it works.
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+- [ ] Criterion B
+
+### TASK-002: Second task
+**Description:** As a dev, I want to do thing two so that it also works.
+
+**Acceptance Criteria:**
+- [x] Done criterion
+- [ ] Open criterion
+
+### TASK-003: Completed task
+**Description:** As a dev, I want thing three done.
+
+**Acceptance Criteria:**
+- [x] All done A
+- [x] All done B
+
+## Non-Goals
+
+Nothing here.
+`
+
+func writeTempPlan(t *testing.T, dir, filename, content string) {
+	t.Helper()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(maggusDir, filename), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseFile(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", testPlan)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	// TASK-001
+	if tasks[0].ID != "TASK-001" {
+		t.Errorf("task 0 ID = %q, want TASK-001", tasks[0].ID)
+	}
+	if tasks[0].Title != "First task" {
+		t.Errorf("task 0 Title = %q, want 'First task'", tasks[0].Title)
+	}
+	if tasks[0].Description != "As a dev, I want to do thing one so that it works." {
+		t.Errorf("task 0 Description = %q", tasks[0].Description)
+	}
+	if len(tasks[0].Criteria) != 2 {
+		t.Fatalf("task 0 criteria count = %d, want 2", len(tasks[0].Criteria))
+	}
+	if tasks[0].Criteria[0].Checked || tasks[0].Criteria[1].Checked {
+		t.Error("task 0 criteria should all be unchecked")
+	}
+
+	// TASK-002 — partially done
+	if len(tasks[1].Criteria) != 2 {
+		t.Fatalf("task 1 criteria count = %d, want 2", len(tasks[1].Criteria))
+	}
+	if !tasks[1].Criteria[0].Checked {
+		t.Error("task 1 criterion 0 should be checked")
+	}
+	if tasks[1].Criteria[1].Checked {
+		t.Error("task 1 criterion 1 should be unchecked")
+	}
+
+	// TASK-003 — all done
+	if !tasks[2].IsComplete() {
+		t.Error("task 2 should be complete")
+	}
+}
+
+func TestIsComplete(t *testing.T) {
+	complete := Task{Criteria: []Criterion{{Checked: true}, {Checked: true}}}
+	if !complete.IsComplete() {
+		t.Error("expected complete")
+	}
+
+	incomplete := Task{Criteria: []Criterion{{Checked: true}, {Checked: false}}}
+	if incomplete.IsComplete() {
+		t.Error("expected incomplete")
+	}
+
+	empty := Task{}
+	if empty.IsComplete() {
+		t.Error("task with no criteria should not be complete")
+	}
+}
+
+func TestParsePlans(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", testPlan)
+	writeTempPlan(t, dir, "plan_2.md", `# Plan 2
+
+### TASK-010: Extra task
+**Description:** Another task from a second file.
+
+**Acceptance Criteria:**
+- [ ] Something
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 4 {
+		t.Fatalf("expected 4 tasks, got %d", len(tasks))
+	}
+
+	// Tasks from plan_1 come before plan_2
+	if tasks[0].ID != "TASK-001" {
+		t.Errorf("first task should be TASK-001, got %s", tasks[0].ID)
+	}
+	if tasks[3].ID != "TASK-010" {
+		t.Errorf("last task should be TASK-010, got %s", tasks[3].ID)
+	}
+}
+
+func TestFindNextIncomplete(t *testing.T) {
+	tasks := []Task{
+		{ID: "TASK-001", Criteria: []Criterion{{Checked: true}, {Checked: true}}},
+		{ID: "TASK-002", Criteria: []Criterion{{Checked: true}, {Checked: false}}},
+		{ID: "TASK-003", Criteria: []Criterion{{Checked: false}}},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+func TestFindNextIncomplete_AllDone(t *testing.T) {
+	tasks := []Task{
+		{ID: "TASK-001", Criteria: []Criterion{{Checked: true}}},
+		{ID: "TASK-002", Criteria: []Criterion{{Checked: true}, {Checked: true}}},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next != nil {
+		t.Errorf("expected nil, got %s", next.ID)
+	}
+}
+
+func TestFindNextIncomplete_OrderAcrossFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+
+### TASK-001: Done task
+**Description:** Already done.
+
+**Acceptance Criteria:**
+- [x] Done
+`)
+	writeTempPlan(t, dir, "plan_2.md", `# Plan 2
+
+### TASK-010: Open task
+**Description:** Not done yet.
+
+**Acceptance Criteria:**
+- [ ] Not done
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-010" {
+		t.Errorf("expected TASK-010, got %s", next.ID)
+	}
+}
