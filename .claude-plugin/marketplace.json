@@ -1,0 +1,17 @@
+{
+  "name": "maggus",
+  "description": "Maggus - Your best and worst co-worker. A junior developer that just works and only asks questions when the work itself is unclear.",
+  "owner": {
+    "name": "Leberkas-org",
+    "url": "https://github.com/Leberkas-org"
+  },
+  "repository": "https://github.com/Leberkas-org/maggus",
+  "plugins": [
+    {
+      "name": "maggus",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Maggus skills - implementation planning and more"
+    }
+  ]
+}
