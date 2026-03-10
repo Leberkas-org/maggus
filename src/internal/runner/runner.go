@@ -263,7 +263,10 @@ func RunClaude(ctx context.Context, prompt string) error {
 		"--verbose",
 		"--dangerously-skip-permissions",
 	)
-	cmd.Stderr = os.Stderr
+
+	// Capture stderr for diagnostics while still showing it on terminal.
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrWriter{tee: os.Stderr, buf: &stderrBuf}
 	cmd.Stdin = os.Stdin
 	// Kill the entire process tree on cancel so child processes don't keep stdout open.
 	cmd.Cancel = func() error {
@@ -296,6 +299,7 @@ func RunClaude(ctx context.Context, prompt string) error {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
+	eventCount := 0
 	for scanner.Scan() {
 		line := scanner.Bytes()
 
@@ -303,6 +307,8 @@ func RunClaude(ctx context.Context, prompt string) error {
 		if err := json.Unmarshal(line, &event); err != nil {
 			continue
 		}
+
+		eventCount++
 
 		switch event.Type {
 		case "assistant":
@@ -358,11 +364,45 @@ func RunClaude(ctx context.Context, prompt string) error {
 		return ErrInterrupted
 	}
 
+	// Check for scanner errors (e.g., stdout closed unexpectedly)
+	if scanErr := scanner.Err(); scanErr != nil {
+		cmd.Wait() // clean up
+		return fmt.Errorf("reading claude output: %w", scanErr)
+	}
+
 	if err := cmd.Wait(); err != nil {
+		stderr := strings.TrimSpace(stderrBuf.String())
+		if stderr != "" {
+			return fmt.Errorf("claude exited with error: %w\nstderr: %s", err, stderr)
+		}
 		return fmt.Errorf("claude exited with error: %w", err)
 	}
 
+	// Detect silent failures: Claude started and exited cleanly but produced no events
+	if eventCount == 0 {
+		stderr := strings.TrimSpace(stderrBuf.String())
+		msg := "claude produced no output (0 events received). Possible causes:\n" +
+			"  - Claude CLI not authenticated (run 'claude' interactively to check)\n" +
+			"  - Claude CLI version mismatch (run 'claude --version')\n" +
+			"  - API key or network issue on this machine"
+		if stderr != "" {
+			msg += fmt.Sprintf("\n  stderr: %s", stderr)
+		}
+		return fmt.Errorf(msg)
+	}
+
 	return nil
+}
+
+// stderrWriter tees writes to both the terminal and a buffer for diagnostics.
+type stderrWriter struct {
+	tee *os.File
+	buf *strings.Builder
+}
+
+func (w *stderrWriter) Write(p []byte) (n int, err error) {
+	w.buf.Write(p)
+	return w.tee.Write(p)
 }
 
 func describeToolUse(tool string, input toolInput) string {
