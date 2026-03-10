@@ -1,5 +1,7 @@
-feat: add model alias resolution for short names (TASK-302)
+feat: pass selected model to Claude CLI (TASK-303)
 
-Add ResolveModel function to config package that maps short aliases
-(sonnet, opus, haiku) to full Claude model IDs. Unknown strings and
-empty strings pass through unchanged.
+- Add model parameter to runner.RunClaude; when non-empty, appends
+  --model flag to the claude command arguments
+- Load config and resolve model alias in the work command
+- Display resolved model name (or "default") in the startup banner
+- Pass resolved model name to run tracker instead of hardcoded "claude"

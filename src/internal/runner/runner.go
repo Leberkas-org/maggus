@@ -251,18 +251,24 @@ func (d *display) setOutput(o string) {
 
 // RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
 // The context can be used to kill the claude process (e.g., on Ctrl+C).
-func RunClaude(ctx context.Context, prompt string) error {
+// If model is non-empty, --model <model> is added to the command arguments.
+func RunClaude(ctx context.Context, prompt string, model string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
 	}
 
-	cmd := exec.CommandContext(ctx, path,
+	args := []string{
 		"-p", prompt,
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
-	)
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+
+	cmd := exec.CommandContext(ctx, path, args...)
 
 	// Capture stderr for diagnostics while still showing it on terminal.
 	var stderrBuf strings.Builder
@@ -388,7 +394,7 @@ func RunClaude(ctx context.Context, prompt string) error {
 		if stderr != "" {
 			msg += fmt.Sprintf("\n  stderr: %s", stderr)
 		}
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	return nil

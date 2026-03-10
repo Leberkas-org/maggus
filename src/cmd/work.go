@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dirnei/maggus/internal/config"
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
 	"github.com/dirnei/maggus/internal/gitignore"
@@ -55,6 +56,15 @@ Examples:
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
+		// Load config
+		cfg, err := config.Load(dir)
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		// Resolve model from config
+		resolvedModel := config.ResolveModel(cfg.Model)
+
 		// Ensure .gitignore has required entries
 		added, err := gitignore.EnsureEntries(dir)
 		if err != nil {
@@ -92,7 +102,11 @@ Examples:
 		}
 
 		// Create run tracker
-		run, err := runtracker.New(dir, "claude", count)
+		modelDisplay := resolvedModel
+		if modelDisplay == "" {
+			modelDisplay = "default"
+		}
+		run, err := runtracker.New(dir, modelDisplay, count)
 		if err != nil {
 			return fmt.Errorf("create run tracker: %w", err)
 		}
@@ -102,6 +116,7 @@ Examples:
 		fmt.Println("══════════════════════════════════════════")
 		fmt.Println("  Maggus Work Session")
 		fmt.Println("══════════════════════════════════════════")
+		fmt.Printf("  Model:        %s\n", modelDisplay)
 		fmt.Printf("  Iterations:   %d\n", count)
 		fmt.Printf("  Branch:       %s\n", run.Branch)
 		fmt.Printf("  Run ID:       %s\n", run.ID)
@@ -158,7 +173,7 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, p); err != nil {
+			if err := runner.RunClaude(ctx, p, resolvedModel); err != nil {
 				if err == runner.ErrInterrupted {
 					fmt.Println("\nInterrupted. Stopping loop.")
 					break

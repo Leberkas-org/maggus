@@ -51,11 +51,11 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want maggus to pass the selected model to the Claude CLI so that my tasks run on the chosen model.
 
 **Acceptance Criteria:**
-- [ ] `runner.RunClaude` accepts a model parameter (empty string means no `--model` flag)
-- [ ] When model is non-empty, `--model <resolved-model-id>` is added to the claude command arguments
-- [ ] When model is empty, no `--model` flag is passed (Claude CLI picks its default)
-- [ ] The startup banner displays the resolved model name (or "default" if empty)
-- [ ] The run tracker receives the resolved model name instead of hardcoded "claude"
+- [x] `runner.RunClaude` accepts a model parameter (empty string means no `--model` flag)
+- [x] When model is non-empty, `--model <resolved-model-id>` is added to the claude command arguments
+- [x] When model is empty, no `--model` flag is passed (Claude CLI picks its default)
+- [x] The startup banner displays the resolved model name (or "default" if empty)
+- [x] The run tracker receives the resolved model name instead of hardcoded "claude"
 
 ### TASK-304: CLI Flag for Model Override
 
