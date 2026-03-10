@@ -55,6 +55,34 @@ include:
 	}
 }
 
+func TestResolveModel_KnownAliases(t *testing.T) {
+	cases := map[string]string{
+		"sonnet": "claude-sonnet-4-6",
+		"opus":   "claude-opus-4-6",
+		"haiku":  "claude-haiku-4-5-20251001",
+	}
+	for alias, want := range cases {
+		if got := ResolveModel(alias); got != want {
+			t.Errorf("ResolveModel(%q) = %q, want %q", alias, got, want)
+		}
+	}
+}
+
+func TestResolveModel_UnknownPassthrough(t *testing.T) {
+	inputs := []string{"claude-sonnet-4-6", "gpt-4", "my-custom-model"}
+	for _, input := range inputs {
+		if got := ResolveModel(input); got != input {
+			t.Errorf("ResolveModel(%q) = %q, want %q", input, got, input)
+		}
+	}
+}
+
+func TestResolveModel_EmptyString(t *testing.T) {
+	if got := ResolveModel(""); got != "" {
+		t.Errorf("ResolveModel(\"\") = %q, want \"\"", got)
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

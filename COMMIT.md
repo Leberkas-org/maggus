@@ -1,7 +1,5 @@
-feat: add config file parsing for .maggus/config.yml (TASK-301)
+feat: add model alias resolution for short names (TASK-302)
 
-Add internal/config package that reads Model and Include settings
-from .maggus/config.yml. Returns zero-value Config when file is
-missing, and a descriptive error for invalid YAML.
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Add ResolveModel function to config package that maps short aliases
+(sonnet, opus, haiku) to full Claude model IDs. Unknown strings and
+empty strings pass through unchanged.

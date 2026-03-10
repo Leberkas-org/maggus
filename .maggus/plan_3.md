@@ -38,13 +38,13 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want to use short names like `sonnet` or `opus` instead of full model IDs so that configuration is convenient.
 
 **Acceptance Criteria:**
-- [ ] New function `config.ResolveModel(input string) string` that maps short aliases to full model IDs
-- [ ] Supported aliases: `sonnet` → `claude-sonnet-4-6`, `opus` → `claude-opus-4-6`, `haiku` → `claude-haiku-4-5-20251001`
-- [ ] If the input is not a known alias, return it unchanged (allows full model IDs like `claude-sonnet-4-6`)
-- [ ] Empty string input returns empty string (means "use CLI default")
-- [ ] Unit test: known aliases resolve correctly
-- [ ] Unit test: unknown strings pass through unchanged
-- [ ] Unit test: empty string returns empty string
+- [x] New function `config.ResolveModel(input string) string` that maps short aliases to full model IDs
+- [x] Supported aliases: `sonnet` → `claude-sonnet-4-6`, `opus` → `claude-opus-4-6`, `haiku` → `claude-haiku-4-5-20251001`
+- [x] If the input is not a known alias, return it unchanged (allows full model IDs like `claude-sonnet-4-6`)
+- [x] Empty string input returns empty string (means "use CLI default")
+- [x] Unit test: known aliases resolve correctly
+- [x] Unit test: unknown strings pass through unchanged
+- [x] Unit test: empty string returns empty string
 
 ### TASK-303: Pass Model to Claude CLI
 

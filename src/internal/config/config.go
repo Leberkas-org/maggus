@@ -36,3 +36,20 @@ func Load(dir string) (Config, error) {
 
 	return cfg, nil
 }
+
+// modelAliases maps short alias names to full model IDs.
+var modelAliases = map[string]string{
+	"sonnet": "claude-sonnet-4-6",
+	"opus":   "claude-opus-4-6",
+	"haiku":  "claude-haiku-4-5-20251001",
+}
+
+// ResolveModel maps a short alias to its full model ID.
+// If the input is not a known alias, it is returned unchanged.
+// An empty string returns an empty string.
+func ResolveModel(input string) string {
+	if id, ok := modelAliases[input]; ok {
+		return id
+	}
+	return input
+}
