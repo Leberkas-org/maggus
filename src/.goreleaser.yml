@@ -1,5 +1,9 @@
 version: 2
 
+before:
+  hooks:
+    - go-winres make --product-version={{.Version}} --file-version={{.Version}}
+
 builds:
   - id: maggus
     binary: maggus
