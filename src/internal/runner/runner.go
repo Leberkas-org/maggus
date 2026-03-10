@@ -68,6 +68,7 @@ type display struct {
 	toolHistory []string // last N tools used
 	output      string
 	extras      string // skills + MCPs
+	model       string
 	toolCount   int
 	skills      []string
 	mcps        []string
@@ -86,10 +87,14 @@ func termWidth() int {
 	return w
 }
 
-func newDisplay() *display {
+func newDisplay(model string) *display {
+	if model == "" {
+		model = "default"
+	}
 	d := &display{
 		status:    "Starting...",
 		output:    "-",
+		model:     model,
 		startTime: time.Now(),
 		done:      make(chan struct{}),
 	}
@@ -167,6 +172,7 @@ func (d *display) renderLocked() {
 	}
 
 	lines = append(lines, fmt.Sprintf("    %sExtras:%s  %s%s%s", colorBold, colorReset, colorCyan, truncate(extrasStr, contentWidth), colorReset))
+	lines = append(lines, fmt.Sprintf("    %sModel:%s   %s%s%s", colorBold, colorReset, colorGray, d.model, colorReset))
 	lines = append(lines, fmt.Sprintf("    %sElapsed:%s %s%s%s", colorBold, colorReset, colorGray, elapsed, colorReset))
 
 	// Move cursor up to overwrite previous block
@@ -291,6 +297,9 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 		}
 		return cmd.Process.Kill()
 	}
+	// After Cancel runs, wait up to 5s then forcibly close I/O pipes so
+	// cmd.Wait() doesn't hang on orphaned grandchild processes.
+	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -304,7 +313,7 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 	// Hide cursor during display
 	fmt.Print("\033[?25l")
 
-	d := newDisplay()
+	d := newDisplay(model)
 
 	// Read stdout in a goroutine so we can also watch for context cancellation.
 	type scanResult struct {

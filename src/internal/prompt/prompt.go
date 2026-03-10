@@ -51,6 +51,7 @@ func writeBootstrap(b *strings.Builder, includes []string) {
 	b.WriteString("- AGENTS.md\n")
 	b.WriteString("- PROJECT_CONTEXT.md\n")
 	b.WriteString("- TOOLING.md\n")
+	b.WriteString("- .maggus/MEMORY.md\n")
 	b.WriteString("\nThese files contain project conventions, architecture context, and tooling instructions. Follow them.\n\n")
 
 	for _, path := range includes {
@@ -96,11 +97,12 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 
 	// Stage files but do NOT commit
 	b.WriteString("When you are done:\n")
-	b.WriteString("1. Stage all changed files with `git add` but do NOT commit.\n")
-	b.WriteString("2. Write a commit message to `COMMIT.md` in the repository root. Include the task ID in the message.\n")
 
 	// Update plan checkboxes
-	fmt.Fprintf(b, "3. Update the plan file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
+	fmt.Fprintf(b, "1. Update the plan file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
+
+	b.WriteString("2. Stage all changed files with `git add *` but do NOT commit.\n")
+	b.WriteString("3. Write a commit message to `COMMIT.md` in the repository root. Include the task ID in the message.\n")
 
 	// Write iteration log
 	fmt.Fprintf(b, "4. Write an iteration log to `%s` before finishing. The log must include:\n", opts.IterLog)
@@ -109,7 +111,7 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("   - Any deviations or skips from the acceptance criteria\n")
 
 	// Update project memory
-	b.WriteString("5. Crete or update `.maggus/MEMORY.md` with any project knowledge gained during this task. ")
+	b.WriteString("5. Create or update `.maggus/MEMORY.md` with any project knowledge gained during this task. ")
 	b.WriteString("This file serves as a portable project memory for consistency across machines. ")
 	b.WriteString("Include: project structure changes, build/tooling changes, new conventions, ")
 	b.WriteString("architectural decisions, and important file paths. ")

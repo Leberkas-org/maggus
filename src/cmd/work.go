@@ -126,7 +126,7 @@ Examples:
 		// Startup banner
 		fmt.Println()
 		fmt.Println("══════════════════════════════════════════")
-		fmt.Println("  Maggus Work Session")
+		fmt.Printf("  Maggus Work Session (v%s)\n", Version)
 		fmt.Println("══════════════════════════════════════════")
 		fmt.Printf("  Model:        %s\n", modelDisplay)
 		fmt.Printf("  Iterations:   %d\n", count)
