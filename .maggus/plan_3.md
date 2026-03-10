@@ -18,20 +18,20 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want maggus to read settings from `.maggus/config.yml` so that I can configure model and includes persistently.
 
 **Acceptance Criteria:**
-- [ ] New package `internal/config` with a `Config` struct containing `Model string` and `Include []string` fields
-- [ ] `config.Load(dir string)` reads `.maggus/config.yml` from the given directory
-- [ ] If the file does not exist, return a zero-value Config (no error)
-- [ ] If the file exists but is invalid YAML, return a descriptive error
-- [ ] Config file uses this format:
+- [x] New package `internal/config` with a `Config` struct containing `Model string` and `Include []string` fields
+- [x] `config.Load(dir string)` reads `.maggus/config.yml` from the given directory
+- [x] If the file does not exist, return a zero-value Config (no error)
+- [x] If the file exists but is invalid YAML, return a descriptive error
+- [x] Config file uses this format:
   ```yaml
   model: sonnet
   include:
     - ARCHITECTURE.md
     - docs/PATTERNS.md
   ```
-- [ ] Unit test: missing file returns empty config
-- [ ] Unit test: valid YAML parses correctly
-- [ ] Unit test: invalid YAML returns error
+- [x] Unit test: missing file returns empty config
+- [x] Unit test: valid YAML parses correctly
+- [x] Unit test: invalid YAML returns error
 
 ### TASK-302: Model Alias Resolution
 
