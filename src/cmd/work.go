@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"time"
@@ -90,6 +91,11 @@ Examples:
 			return nil
 		}
 
+		// Mark any fully completed plan files before checking for work
+		if err := parser.MarkCompletedPlans(dir); err != nil {
+			fmt.Printf("Warning: could not mark completed plans: %v\n", err)
+		}
+
 		// Check if there are any incomplete tasks
 		nextTask := parser.FindNextIncomplete(tasks)
 		if nextTask == nil {
@@ -135,15 +141,14 @@ Examples:
 		fmt.Println("Press Ctrl+C within 3 seconds to abort...")
 
 		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer pauseCancel()
 
 		select {
 		case <-pauseCtx.Done():
 			pauseCancel()
-			// Reset signal handling so future Ctrl+C works normally
 			fmt.Println("\nAborted.")
 			return nil
 		case <-time.After(3 * time.Second):
+			// Stop intercepting signals so the next NotifyContext can take over
 			pauseCancel()
 		}
 
@@ -205,6 +210,11 @@ Examples:
 				return fmt.Errorf("re-parse plans: %w", err)
 			}
 
+			// Rename fully completed plan files so they are skipped in future runs
+			if err := parser.MarkCompletedPlans(dir); err != nil {
+				fmt.Printf("Warning: could not mark completed plans: %v\n", err)
+			}
+
 			completed++
 		}
 
@@ -239,6 +249,21 @@ Examples:
 		}
 
 		fmt.Printf("Completed %d/%d tasks. %d tasks remaining.\n", completed, count, len(remaining))
+
+		// Push commits to remote
+		if completed > 0 {
+			fmt.Println("Pushing to remote...")
+			push := exec.Command("git", "push")
+			push.Dir = dir
+			push.Stdout = os.Stdout
+			push.Stderr = os.Stderr
+			if err := push.Run(); err != nil {
+				fmt.Printf("Warning: git push failed: %v\n", err)
+			} else {
+				fmt.Println("Pushed successfully.")
+			}
+		}
+
 		return nil
 	},
 }

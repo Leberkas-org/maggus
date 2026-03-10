@@ -8,7 +8,9 @@
       "Bash(go vet:*)",
       "Bash(go:*)",
       "Bash(go install:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(ls:*)",
+      "Bash(xargs wc:*)"
     ]
   }
 }

@@ -177,6 +177,7 @@ func FindNextIncomplete(tasks []Task) *Task {
 }
 
 // ParsePlans finds all .maggus/plan_*.md files in the given directory and parses them.
+// Files ending in _completed.md are excluded.
 // Tasks are returned in order: files sorted by name, tasks in document order within each file.
 func ParsePlans(dir string) ([]Task, error) {
 	pattern := filepath.Join(dir, ".maggus", "plan_*.md")
@@ -189,6 +190,9 @@ func ParsePlans(dir string) ([]Task, error) {
 
 	var allTasks []Task
 	for _, f := range files {
+		if strings.HasSuffix(f, "_completed.md") {
+			continue
+		}
 		tasks, err := ParseFile(f)
 		if err != nil {
 			return nil, err
@@ -197,4 +201,46 @@ func ParsePlans(dir string) ([]Task, error) {
 	}
 
 	return allTasks, nil
+}
+
+// MarkCompletedPlans renames plan files where all tasks are complete (and none are blocked)
+// by appending _completed before the .md extension (e.g. plan_1.md → plan_1_completed.md).
+func MarkCompletedPlans(dir string) error {
+	pattern := filepath.Join(dir, ".maggus", "plan_*.md")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("glob %s: %w", pattern, err)
+	}
+
+	for _, f := range files {
+		if strings.HasSuffix(f, "_completed.md") {
+			continue
+		}
+
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return err
+		}
+
+		if len(tasks) == 0 {
+			continue
+		}
+
+		allComplete := true
+		for _, t := range tasks {
+			if !t.IsComplete() || t.IsBlocked() {
+				allComplete = false
+				break
+			}
+		}
+
+		if allComplete {
+			newName := strings.TrimSuffix(f, ".md") + "_completed.md"
+			if err := os.Rename(f, newName); err != nil {
+				return fmt.Errorf("rename %s: %w", f, err)
+			}
+		}
+	}
+
+	return nil
 }

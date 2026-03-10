@@ -260,6 +260,88 @@ func TestBlockedCriterion(t *testing.T) {
 	}
 }
 
+func TestParsePlans_SkipsCompletedFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1_completed.md", `# Plan 1
+### TASK-001: Done task
+**Acceptance Criteria:**
+- [x] Done
+`)
+	writeTempPlan(t, dir, "plan_2.md", `# Plan 2
+### TASK-010: Open task
+**Acceptance Criteria:**
+- [ ] Not done
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task (completed file should be skipped), got %d", len(tasks))
+	}
+	if tasks[0].ID != "TASK-010" {
+		t.Errorf("expected TASK-010, got %s", tasks[0].ID)
+	}
+}
+
+func TestMarkCompletedPlans(t *testing.T) {
+	dir := t.TempDir()
+
+	// plan_1: all tasks complete
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+### TASK-001: Done task
+**Acceptance Criteria:**
+- [x] Done A
+- [x] Done B
+`)
+
+	// plan_2: has incomplete task
+	writeTempPlan(t, dir, "plan_2.md", `# Plan 2
+### TASK-010: Open task
+**Acceptance Criteria:**
+- [ ] Not done
+`)
+
+	if err := MarkCompletedPlans(dir); err != nil {
+		t.Fatalf("MarkCompletedPlans error: %v", err)
+	}
+
+	// plan_1 should have been renamed
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1.md")); !os.IsNotExist(err) {
+		t.Error("plan_1.md should have been renamed")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1_completed.md")); err != nil {
+		t.Error("plan_1_completed.md should exist")
+	}
+
+	// plan_2 should still be there
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_2.md")); err != nil {
+		t.Error("plan_2.md should still exist")
+	}
+}
+
+func TestMarkCompletedPlans_SkipsBlockedPlan(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+### TASK-001: Blocked task
+**Acceptance Criteria:**
+- [x] Done
+- [x] ⚠️ BLOCKED: Needs human input
+`)
+
+	if err := MarkCompletedPlans(dir); err != nil {
+		t.Fatalf("MarkCompletedPlans error: %v", err)
+	}
+
+	// Should NOT be renamed because the task is blocked
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1.md")); err != nil {
+		t.Error("plan_1.md should still exist (blocked tasks prevent completion)")
+	}
+}
+
 func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	// Task has unchecked criteria AND a blocked criterion — should be skipped
 	tasks := []Task{

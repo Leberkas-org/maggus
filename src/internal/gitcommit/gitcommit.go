@@ -48,6 +48,12 @@ func CommitIteration(workDir string) (Result, error) {
 		return Result{}, fmt.Errorf("write cleaned COMMIT.md: %w", err)
 	}
 
+	// Safety gate: ensure COMMIT.md is never included in the commit.
+	// The agent may have staged it via `git add .` or `git add -A`.
+	unstage := exec.Command("git", "reset", "HEAD", "--", commitFile)
+	unstage.Dir = workDir
+	unstage.CombinedOutput() // ignore errors (file may not be staged)
+
 	// Run git commit
 	cmd := exec.Command("git", "commit", "-F", commitFile)
 	cmd.Dir = workDir
