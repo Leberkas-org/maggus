@@ -1,7 +1,6 @@
-feat: pass selected model to Claude CLI (TASK-303)
+feat: add --model CLI flag to work command (TASK-304)
 
-- Add model parameter to runner.RunClaude; when non-empty, appends
-  --model flag to the claude command arguments
-- Load config and resolve model alias in the work command
-- Display resolved model name (or "default") in the startup banner
-- Pass resolved model name to run tracker instead of hardcoded "claude"
+Add a --model flag that overrides the config file model for a single run.
+Accepts both short aliases (opus, sonnet, haiku) and full model IDs.
+When neither CLI flag nor config file specifies a model, no --model flag
+is passed to the Claude CLI.

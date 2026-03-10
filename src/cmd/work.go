@@ -24,6 +24,7 @@ const defaultTaskCount = 5
 var (
 	countFlag       int
 	noBootstrapFlag bool
+	modelFlag       string
 )
 
 var workCmd = &cobra.Command{
@@ -35,7 +36,8 @@ by prompting Claude Code. Defaults to 5 tasks if no count is specified.
 Examples:
   maggus work        # work on the next 5 tasks
   maggus work 10     # work on the next 10 tasks
-  maggus work -c 3   # work on the next 3 tasks`,
+  maggus work -c 3   # work on the next 3 tasks
+  maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		count := countFlag
@@ -62,8 +64,12 @@ Examples:
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		// Resolve model from config
-		resolvedModel := config.ResolveModel(cfg.Model)
+		// Resolve model: CLI flag overrides config file
+		modelInput := cfg.Model
+		if modelFlag != "" {
+			modelInput = modelFlag
+		}
+		resolvedModel := config.ResolveModel(modelInput)
 
 		// Ensure .gitignore has required entries
 		added, err := gitignore.EnsureEntries(dir)
@@ -239,5 +245,6 @@ Examples:
 func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
+	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	rootCmd.AddCommand(workCmd)
 }

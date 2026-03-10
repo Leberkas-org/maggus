@@ -62,11 +62,11 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want a `--model` flag on the `work` command so that I can override the config file model for a single run.
 
 **Acceptance Criteria:**
-- [ ] `maggus work --model opus` overrides the config file model
-- [ ] `maggus work` without `--model` uses the config file value
-- [ ] If neither CLI flag nor config file specifies a model, no `--model` flag is passed to Claude CLI
-- [ ] The flag accepts both short aliases and full model IDs
-- [ ] Flag is documented in `maggus work --help`
+- [x] `maggus work --model opus` overrides the config file model
+- [x] `maggus work` without `--model` uses the config file value
+- [x] If neither CLI flag nor config file specifies a model, no `--model` flag is passed to Claude CLI
+- [x] The flag accepts both short aliases and full model IDs
+- [x] Flag is documented in `maggus work --help`
 
 ### TASK-305: Custom Markdown Includes in Prompt
 
