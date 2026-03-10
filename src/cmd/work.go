@@ -10,6 +10,7 @@ import (
 
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
+	"github.com/dirnei/maggus/internal/gitignore"
 	"github.com/dirnei/maggus/internal/parser"
 	"github.com/dirnei/maggus/internal/prompt"
 	"github.com/dirnei/maggus/internal/runner"
@@ -52,6 +53,15 @@ Examples:
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
+		}
+
+		// Ensure .gitignore has required entries
+		added, err := gitignore.EnsureEntries(dir)
+		if err != nil {
+			return fmt.Errorf("check gitignore: %w", err)
+		}
+		for _, entry := range added {
+			fmt.Printf("Added to .gitignore: %s\n", entry)
 		}
 
 		tasks, err := parser.ParsePlans(dir)

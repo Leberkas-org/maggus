@@ -96,4 +96,11 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("   - Task selected (ID and title)\n")
 	b.WriteString("   - Commands run and their outcomes\n")
 	b.WriteString("   - Any deviations or skips from the acceptance criteria\n")
+
+	// Update project memory
+	b.WriteString("5. Crete or update `.maggus/MEMORY.md` with any project knowledge gained during this task. ")
+	b.WriteString("This file serves as a portable project memory for consistency across machines. ")
+	b.WriteString("Include: project structure changes, build/tooling changes, new conventions, ")
+	b.WriteString("architectural decisions, and important file paths. ")
+	b.WriteString("Keep it concise and organized by topic. Do NOT commit this file.\n")
 }

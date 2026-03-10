@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+TASK-(\d+):\s+(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+(TASK-[\w-]+?):\s+(.+)$`)
 
 type Criterion struct {
 	Text    string
@@ -64,7 +64,6 @@ func ParseFile(path string) ([]Task, error) {
 	var tasks []Task
 	var current *Task
 	inDescription := false
-	inCriteria := false
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -78,12 +77,12 @@ func ParseFile(path string) ([]Task, error) {
 				tasks = append(tasks, *current)
 			}
 			current = &Task{
-				ID:         "TASK-" + m[1],
+				ID:         m[1],
 				Title:      strings.TrimSpace(m[2]),
 				SourceFile: path,
 			}
 			inDescription = false
-			inCriteria = false
+
 			continue
 		}
 
@@ -94,7 +93,7 @@ func ParseFile(path string) ([]Task, error) {
 		// Detect section markers
 		if strings.HasPrefix(line, "**Description:**") {
 			inDescription = true
-			inCriteria = false
+
 			// Grab inline text after the marker
 			text := strings.TrimPrefix(line, "**Description:**")
 			text = strings.TrimSpace(text)
@@ -105,15 +104,39 @@ func ParseFile(path string) ([]Task, error) {
 		}
 
 		if strings.HasPrefix(line, "**Acceptance Criteria:**") {
-			inCriteria = true
+
 			inDescription = false
+			continue
+		}
+
+		// Checkbox lines are always treated as criteria (with or without section header)
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- [x] ") {
+
+			inDescription = false
+			text := strings.TrimPrefix(trimmed, "- [x] ")
+			blocked := strings.Contains(text, "BLOCKED:")
+			current.Criteria = append(current.Criteria, Criterion{
+				Text:    text,
+				Checked: true,
+				Blocked: blocked,
+			})
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- [ ] ") {
+
+			inDescription = false
+			current.Criteria = append(current.Criteria, Criterion{
+				Text:    strings.TrimPrefix(trimmed, "- [ ] "),
+				Checked: false,
+			})
 			continue
 		}
 
 		// A new section (bold marker or heading) ends the current section
 		if strings.HasPrefix(line, "**") || strings.HasPrefix(line, "### ") || strings.HasPrefix(line, "## ") {
 			inDescription = false
-			inCriteria = false
+
 			// If it's a non-task heading, finalize current task
 			if strings.HasPrefix(line, "## ") {
 				if current != nil {
@@ -127,24 +150,6 @@ func ParseFile(path string) ([]Task, error) {
 
 		if inDescription {
 			current.Description += line + "\n"
-		}
-
-		if inCriteria {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "- [x] ") {
-				text := strings.TrimPrefix(trimmed, "- [x] ")
-				blocked := strings.Contains(text, "BLOCKED:")
-				current.Criteria = append(current.Criteria, Criterion{
-					Text:    text,
-					Checked: true,
-					Blocked: blocked,
-				})
-			} else if strings.HasPrefix(trimmed, "- [ ] ") {
-				current.Criteria = append(current.Criteria, Criterion{
-					Text:    strings.TrimPrefix(trimmed, "- [ ] "),
-					Checked: false,
-				})
-			}
 		}
 	}
 
