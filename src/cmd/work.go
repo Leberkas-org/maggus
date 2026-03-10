@@ -172,6 +172,7 @@ Examples:
 
 			opts := prompt.Options{
 				NoBootstrap: noBootstrapFlag,
+				Include:     cfg.Include,
 				RunID:       run.ID,
 				RunDir:      run.RelativeDir(dir),
 				Iteration:   i + 1,

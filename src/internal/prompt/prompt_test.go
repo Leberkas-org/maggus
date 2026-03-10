@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -112,6 +113,54 @@ func TestBuild_NoBootstrap_OmitsBootstrapSection(t *testing.T) {
 		if !strings.Contains(result, want) {
 			t.Errorf("--no-bootstrap prompt missing required section %q\n\nGot:\n%s", want, result)
 		}
+	}
+}
+
+func TestBuild_EmptyIncludes_StandardBootstrapOnly(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	// opts.Include is nil (empty)
+	result := Build(task, opts)
+
+	// Standard bootstrap files should be present
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md", "PROJECT_CONTEXT.md", "TOOLING.md"} {
+		if !strings.Contains(result, f) {
+			t.Errorf("expected standard bootstrap file %q in prompt", f)
+		}
+	}
+
+	// No "Read the file" instructions should appear
+	if strings.Contains(result, "Read the file") {
+		t.Errorf("empty includes should not produce 'Read the file' instructions\n\nGot:\n%s", result)
+	}
+}
+
+func TestBuild_Includes_AddsReadInstructions(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	opts.Include = []string{"ARCHITECTURE.md", "docs/PATTERNS.md"}
+	result := Build(task, opts)
+
+	// Standard bootstrap files should still be present
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md", "PROJECT_CONTEXT.md", "TOOLING.md"} {
+		if !strings.Contains(result, f) {
+			t.Errorf("expected standard bootstrap file %q in prompt", f)
+		}
+	}
+
+	// Custom includes should appear as "Read the file" instructions
+	for _, inc := range opts.Include {
+		want := fmt.Sprintf("Read the file `%s` if it exists in the working directory.", inc)
+		if !strings.Contains(result, want) {
+			t.Errorf("expected include instruction %q in prompt\n\nGot:\n%s", want, result)
+		}
+	}
+
+	// Custom includes should appear after standard bootstrap section
+	bootstrapIdx := strings.Index(result, "TOOLING.md")
+	archIdx := strings.Index(result, "ARCHITECTURE.md")
+	if archIdx <= bootstrapIdx {
+		t.Errorf("custom includes should appear after standard bootstrap files")
 	}
 }
 

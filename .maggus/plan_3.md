@@ -73,14 +73,14 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want to register additional markdown files in the config so that Claude reads them as part of the bootstrap context.
 
 **Acceptance Criteria:**
-- [ ] The `include` list from config is passed to `prompt.Build` via `prompt.Options`
-- [ ] Each included file is added to the bootstrap section as: "Read the file `<path>` if it exists in the working directory."
-- [ ] Paths are relative to the project root (e.g. `ARCHITECTURE.md`, `docs/PATTERNS.md`)
-- [ ] The existing hardcoded bootstrap files (CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, TOOLING.md) remain unchanged
-- [ ] Custom includes appear after the standard bootstrap files
-- [ ] If the include list is empty, the bootstrap section is unchanged from current behavior
-- [ ] Unit test: empty includes produces standard bootstrap only
-- [ ] Unit test: includes adds "Read the file" instructions for each entry
+- [x] The `include` list from config is passed to `prompt.Build` via `prompt.Options`
+- [x] Each included file is added to the bootstrap section as: "Read the file `<path>` if it exists in the working directory."
+- [x] Paths are relative to the project root (e.g. `ARCHITECTURE.md`, `docs/PATTERNS.md`)
+- [x] The existing hardcoded bootstrap files (CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, TOOLING.md) remain unchanged
+- [x] Custom includes appear after the standard bootstrap files
+- [x] If the include list is empty, the bootstrap section is unchanged from current behavior
+- [x] Unit test: empty includes produces standard bootstrap only
+- [x] Unit test: includes adds "Read the file" instructions for each entry
 
 ### TASK-306: Wire Config into Work Command
 

@@ -12,6 +12,10 @@ type Options struct {
 	// NoBootstrap disables reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md.
 	NoBootstrap bool
 
+	// Include lists additional markdown files to read as part of the bootstrap context.
+	// Paths are relative to the project root (e.g. "ARCHITECTURE.md", "docs/PATTERNS.md").
+	Include []string
+
 	// Run metadata
 	RunID     string
 	RunDir    string
@@ -25,7 +29,7 @@ func Build(task *parser.Task, opts Options) string {
 
 	// --- Bootstrap section ---
 	if !opts.NoBootstrap {
-		writeBootstrap(&b)
+		writeBootstrap(&b, opts.Include)
 	}
 
 	// --- Run metadata ---
@@ -40,7 +44,7 @@ func Build(task *parser.Task, opts Options) string {
 	return b.String()
 }
 
-func writeBootstrap(b *strings.Builder) {
+func writeBootstrap(b *strings.Builder, includes []string) {
 	b.WriteString("# Bootstrap\n\n")
 	b.WriteString("Before starting work, read the following files if they exist in the working directory:\n")
 	b.WriteString("- CLAUDE.md\n")
@@ -48,6 +52,13 @@ func writeBootstrap(b *strings.Builder) {
 	b.WriteString("- PROJECT_CONTEXT.md\n")
 	b.WriteString("- TOOLING.md\n")
 	b.WriteString("\nThese files contain project conventions, architecture context, and tooling instructions. Follow them.\n\n")
+
+	for _, path := range includes {
+		fmt.Fprintf(b, "Read the file `%s` if it exists in the working directory.\n", path)
+	}
+	if len(includes) > 0 {
+		b.WriteString("\n")
+	}
 }
 
 func writeRunMetadata(b *strings.Builder, opts Options) {
