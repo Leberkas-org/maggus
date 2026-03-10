@@ -87,13 +87,13 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want the work command to load the config and apply model + includes so that everything works end-to-end.
 
 **Acceptance Criteria:**
-- [ ] `work` command loads config via `config.Load(dir)` early in execution
-- [ ] CLI `--model` flag overrides `config.Model` if provided
-- [ ] Model is resolved via `config.ResolveModel` before passing to runner and run tracker
-- [ ] `config.Include` is passed through to prompt options
-- [ ] Works correctly with no config file (backwards compatible)
-- [ ] Works correctly with config file but no `--model` flag
-- [ ] Works correctly with `--model` flag overriding config
+- [x] `work` command loads config via `config.Load(dir)` early in execution
+- [x] CLI `--model` flag overrides `config.Model` if provided
+- [x] Model is resolved via `config.ResolveModel` before passing to runner and run tracker
+- [x] `config.Include` is passed through to prompt options
+- [x] Works correctly with no config file (backwards compatible)
+- [x] Works correctly with config file but no `--model` flag
+- [x] Works correctly with `--model` flag overriding config
 
 ## Functional Requirements
 
