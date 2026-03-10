@@ -22,9 +22,10 @@ builds:
         goarch: arm64
 
 archives:
-  - format_overrides:
+  - formats: [tar.gz]
+    format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"
