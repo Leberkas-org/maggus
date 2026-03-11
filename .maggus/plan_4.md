@@ -59,12 +59,12 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want to run `maggus status --plain` and get clean, uncolored text output so that I can pipe the output into other tools or scripts.
 
 **Acceptance Criteria:**
-- [ ] `maggus status` accepts a `--plain` flag (boolean, default: false)
-- [ ] When `--plain` is set, all ANSI color codes are stripped from output
-- [ ] When `--plain` is set, Unicode box/arrow characters are replaced with ASCII equivalents (e.g., `[####......] 4/10` instead of `[████░░░░░░]`, `->` instead of `→`, `[x]` instead of `✓`)
-- [ ] Progress bar in plain mode uses `#` for filled and `.` for empty
-- [ ] Output is otherwise identical in structure (same lines, same information)
-- [ ] Typecheck/lint passes
+- [x] `maggus status` accepts a `--plain` flag (boolean, default: false)
+- [x] When `--plain` is set, all ANSI color codes are stripped from output
+- [x] When `--plain` is set, Unicode box/arrow characters are replaced with ASCII equivalents (e.g., `[####......] 4/10` instead of `[████░░░░░░]`, `->` instead of `→`, `[x]` instead of `✓`)
+- [x] Progress bar in plain mode uses `#` for filled and `.` for empty
+- [x] Output is otherwise identical in structure (same lines, same information)
+- [x] Typecheck/lint passes
 
 ### TASK-404: `maggus list [N]` command
 **Description:** As a developer, I want to run `maggus list` to preview the next N upcoming workable tasks so that I can plan my session before starting `maggus work`.

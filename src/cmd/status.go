@@ -59,11 +59,33 @@ func buildProgressBar(done, total int) string {
 		strings.Repeat(string(progressBarEmpty), progressBarWidth-filled)
 }
 
+func buildProgressBarPlain(done, total int) string {
+	if total == 0 {
+		return strings.Repeat(".", progressBarWidth)
+	}
+	filled := (done * progressBarWidth) / total
+	return strings.Repeat("#", filled) +
+		strings.Repeat(".", progressBarWidth-filled)
+}
+
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show a compact summary of plan progress",
 	Long:  `Reads all plan files in .maggus/ and displays a compact progress summary.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		plain, err := cmd.Flags().GetBool("plain")
+		if err != nil {
+			return err
+		}
+
+		// Helper: returns color codes only when not in plain mode
+		color := func(code string) string {
+			if plain {
+				return ""
+			}
+			return code
+		}
+
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
@@ -128,30 +150,40 @@ var statusCmd = &cobra.Command{
 		for _, p := range plans {
 			done := p.doneCount()
 			total := len(p.tasks)
-			bar := buildProgressBar(done, total)
 
-			var prefix, color, suffix string
+			var bar string
+			if plain {
+				bar = buildProgressBarPlain(done, total)
+			} else {
+				bar = buildProgressBar(done, total)
+			}
+
+			var prefix, clr, suffix string
 
 			if p.completed {
-				prefix = " ✓ "
-				color = colorDim + colorGreen
+				if plain {
+					prefix = " [x] "
+				} else {
+					prefix = " ✓ "
+				}
+				clr = color(colorDim + colorGreen)
 				suffix = "done"
 			} else if p.blockedCount() > 0 {
 				prefix = "   "
-				color = colorRed
+				clr = color(colorRed)
 				suffix = "blocked"
 			} else if total > 0 && done == total {
 				prefix = "   "
-				color = colorGreen
+				clr = color(colorGreen)
 				suffix = "done"
 			} else {
 				prefix = "   "
-				color = colorYellow
+				clr = color(colorYellow)
 				suffix = "in progress"
 			}
 
 			fmt.Printf("%s%s%-32s [%s]  %d/%d   %s%s\n",
-				color, prefix, p.filename, bar, done, total, suffix, colorReset)
+				clr, prefix, p.filename, bar, done, total, suffix, color(colorReset))
 		}
 
 		fmt.Println()
@@ -175,42 +207,54 @@ var statusCmd = &cobra.Command{
 		for _, p := range plans {
 			fmt.Println()
 			if p.completed {
-				fmt.Printf("%s%s Tasks — %s (archived)%s\n", colorDim, colorGreen, p.filename, colorReset)
+				fmt.Printf("%s%s Tasks — %s (archived)%s\n", color(colorDim), color(colorGreen), p.filename, color(colorReset))
 			} else {
 				fmt.Printf(" Tasks — %s\n", p.filename)
 			}
 			fmt.Println(" ──────────────────────────────────────────")
 
 			for _, t := range p.tasks {
-				var icon, color, prefix string
+				var icon, clr, prefix string
 
 				if t.IsComplete() {
-					icon = "✓"
-					if p.completed {
-						color = colorDim + colorGreen
+					if plain {
+						icon = "[x]"
 					} else {
-						color = colorGreen
+						icon = "✓"
+					}
+					if p.completed {
+						clr = color(colorDim + colorGreen)
+					} else {
+						clr = color(colorGreen)
 					}
 					prefix = "  "
 				} else if t.IsBlocked() {
-					icon = "⚠"
-					color = colorRed
+					if plain {
+						icon = "[!]"
+					} else {
+						icon = "⚠"
+					}
+					clr = color(colorRed)
 					prefix = "  "
 				} else if t.ID == nextTaskID {
-					icon = "○"
-					color = colorCyan
-					prefix = "→ "
+					icon = "o"
+					clr = color(colorCyan)
+					if plain {
+						prefix = "-> "
+					} else {
+						prefix = "→ "
+					}
 				} else {
-					icon = "○"
-					color = ""
+					icon = "o"
+					clr = ""
 					prefix = "  "
 				}
 
 				if p.completed {
-					color = colorDim
+					clr = color(colorDim)
 				}
 
-				fmt.Printf(" %s%s%s  %s: %s%s\n", color, prefix, icon, t.ID, t.Title, colorReset)
+				fmt.Printf(" %s%s%s  %s: %s%s\n", clr, prefix, icon, t.ID, t.Title, color(colorReset))
 			}
 		}
 
@@ -220,4 +264,5 @@ var statusCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
+	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
 }
