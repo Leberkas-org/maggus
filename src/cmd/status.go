@@ -255,6 +255,21 @@ var statusCmd = &cobra.Command{
 				}
 
 				fmt.Printf(" %s%s%s  %s: %s%s\n", clr, prefix, icon, t.ID, t.Title, color(colorReset))
+
+				if t.IsBlocked() && !p.completed {
+					for _, c := range t.Criteria {
+						if !c.Blocked {
+							continue
+						}
+						reason := strings.TrimPrefix(c.Text, "⚠️ BLOCKED: ")
+						reason = strings.TrimPrefix(reason, "BLOCKED: ")
+						if plain {
+							fmt.Printf("         BLOCKED: %s\n", reason)
+						} else {
+							fmt.Printf("         %sBLOCKED: %s%s\n", color(colorRed), reason, color(colorReset))
+						}
+					}
+				}
 			}
 		}
 

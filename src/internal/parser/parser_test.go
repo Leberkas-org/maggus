@@ -211,11 +211,11 @@ func TestBlockedCriterion(t *testing.T) {
 	writeTempPlan(t, dir, "plan_1.md", `# Plan
 
 ### TASK-001: Blocked task
-**Description:** Has a blocked criterion.
+**Description:** Has an unchecked blocked criterion.
 
 **Acceptance Criteria:**
 - [x] Done thing
-- [x] ⚠️ BLOCKED: Can't do this — needs human input
+- [ ] ⚠️ BLOCKED: Can't do this — needs human input
 
 ### TASK-002: Open task
 **Description:** This one is workable.
@@ -233,9 +233,9 @@ func TestBlockedCriterion(t *testing.T) {
 		t.Fatalf("expected 2 tasks, got %d", len(tasks))
 	}
 
-	// TASK-001 is complete (all checked) but blocked
-	if !tasks[0].IsComplete() {
-		t.Error("TASK-001 should be complete (all criteria checked)")
+	// TASK-001 is incomplete (unchecked blocked criterion) and blocked
+	if tasks[0].IsComplete() {
+		t.Error("TASK-001 should not be complete (has unchecked criterion)")
 	}
 	if !tasks[0].IsBlocked() {
 		t.Error("TASK-001 should be blocked")
@@ -325,20 +325,45 @@ func TestMarkCompletedPlans(t *testing.T) {
 func TestMarkCompletedPlans_SkipsBlockedPlan(t *testing.T) {
 	dir := t.TempDir()
 
+	// An unchecked BLOCKED criterion means truly blocked — should NOT rename
 	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
 ### TASK-001: Blocked task
 **Acceptance Criteria:**
 - [x] Done
-- [x] ⚠️ BLOCKED: Needs human input
+- [ ] ⚠️ BLOCKED: Needs human input
 `)
 
 	if err := MarkCompletedPlans(dir); err != nil {
 		t.Fatalf("MarkCompletedPlans error: %v", err)
 	}
 
-	// Should NOT be renamed because the task is blocked
+	// Should NOT be renamed because the task has an unchecked blocked criterion
 	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1.md")); err != nil {
 		t.Error("plan_1.md should still exist (blocked tasks prevent completion)")
+	}
+}
+
+func TestMarkCompletedPlans_RenamesWhenBlockedCriterionResolved(t *testing.T) {
+	dir := t.TempDir()
+
+	// A checked BLOCKED criterion means the block was resolved — should rename
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+### TASK-001: Formerly blocked task
+**Acceptance Criteria:**
+- [x] Done
+- [x] ⚠️ BLOCKED: Needs human input — resolved: not applicable for CLI tool
+`)
+
+	if err := MarkCompletedPlans(dir); err != nil {
+		t.Fatalf("MarkCompletedPlans error: %v", err)
+	}
+
+	// Should be renamed because all criteria are checked (block was resolved)
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1.md")); !os.IsNotExist(err) {
+		t.Error("plan_1.md should have been renamed (resolved blocked criterion)")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1_completed.md")); err != nil {
+		t.Error("plan_1_completed.md should exist")
 	}
 }
 
@@ -349,7 +374,7 @@ func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 			ID: "TASK-001",
 			Criteria: []Criterion{
 				{Text: "Done", Checked: true},
-				{Text: "⚠️ BLOCKED: Needs API key", Checked: true, Blocked: true},
+				{Text: "⚠️ BLOCKED: Needs API key", Checked: false, Blocked: true},
 				{Text: "Not done yet", Checked: false},
 			},
 		},

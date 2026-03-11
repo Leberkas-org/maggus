@@ -15,7 +15,7 @@ var taskHeadingRe = regexp.MustCompile(`^###\s+(TASK-[\w-]+?):\s+(.+)$`)
 type Criterion struct {
 	Text    string
 	Checked bool
-	Blocked bool // marked as [x] ⚠️ BLOCKED: ...
+	Blocked bool // unchecked criterion containing "BLOCKED:" — a checked BLOCKED: means resolved
 }
 
 type Task struct {
@@ -114,21 +114,21 @@ func ParseFile(path string) ([]Task, error) {
 		if strings.HasPrefix(trimmed, "- [x] ") {
 
 			inDescription = false
-			text := strings.TrimPrefix(trimmed, "- [x] ")
-			blocked := strings.Contains(text, "BLOCKED:")
 			current.Criteria = append(current.Criteria, Criterion{
-				Text:    text,
+				Text:    strings.TrimPrefix(trimmed, "- [x] "),
 				Checked: true,
-				Blocked: blocked,
+				Blocked: false, // checked items are resolved; never count as blocked
 			})
 			continue
 		}
 		if strings.HasPrefix(trimmed, "- [ ] ") {
 
 			inDescription = false
+			text := strings.TrimPrefix(trimmed, "- [ ] ")
 			current.Criteria = append(current.Criteria, Criterion{
-				Text:    strings.TrimPrefix(trimmed, "- [ ] "),
+				Text:    text,
 				Checked: false,
+				Blocked: strings.Contains(text, "BLOCKED:"),
 			})
 			continue
 		}
