@@ -29,16 +29,16 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want to run `maggus status` and immediately see a high-level summary of my plan progress so that I know how much work is left at a glance.
 
 **Acceptance Criteria:**
-- [ ] `maggus status` is a registered subcommand of the root Cobra command
-- [ ] Output starts with a compact summary block showing totals: total tasks, completed, pending, blocked
-- [ ] Each plan file gets one line showing: plan filename, a progress bar, and "X/Y tasks" count
+- [x] `maggus status` is a registered subcommand of the root Cobra command
+- [x] Output starts with a compact summary block showing totals: total tasks, completed, pending, blocked
+- [x] Each plan file gets one line showing: plan filename, a progress bar, and "X/Y tasks" count
   - Example: `plan_3.md  [████████░░]  4/6 tasks`
-- [ ] Progress bar width is fixed (e.g., 10 characters) and fills proportionally
-- [ ] Completed plans (filename contains `_completed`) are shown with a distinct indicator (e.g., ✓) and skipped from the count of active plans
-- [ ] Colors are used: green for fully done, yellow for in-progress, red/orange for any blocked tasks
-- [ ] Runs without error when `.maggus/` has no plan files (prints "No plans found.")
-- [ ] Typecheck/lint passes
-- [ ] Verify in browser using dev-browser skill
+- [x] Progress bar width is fixed (e.g., 10 characters) and fills proportionally
+- [x] Completed plans (filename contains `_completed`) are shown with a distinct indicator (e.g., ✓) and skipped from the count of active plans
+- [x] Colors are used: green for fully done, yellow for in-progress, red/orange for any blocked tasks
+- [x] Runs without error when `.maggus/` has no plan files (prints "No plans found.")
+- [x] Typecheck/lint passes
+- [x] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available in the skills list; maggus status is a CLI tool with no browser component
 
 ### TASK-402: `maggus status` — detailed task list section
 **Description:** As a developer, I want `maggus status` to also show me all individual tasks with their status so that I can see exactly which tasks are done, pending, or blocked.
