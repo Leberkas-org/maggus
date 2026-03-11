@@ -2,57 +2,45 @@
 
 ## What's New
 
-### Config File Support
-Maggus now reads `.maggus/config.yml` for persistent project-level settings. No more repeating flags on every run.
+### Compact `maggus list` Output
 
-```yaml
-model: sonnet
-include:
-  - ARCHITECTURE.md
+`maggus list` now shows one line per task — no more description snippets cluttering the output.
+
+```
+Next 5 task(s):
+
+ #1  TASK-001: First upcoming task
+ #2  TASK-002: Second upcoming task
+ #3  TASK-003: Third upcoming task
 ```
 
-### Model Selection
-Choose which Claude model Maggus uses via config file or CLI flag:
+The first task (`#1`) is still highlighted in cyan in color mode. A new `--all` flag shows every upcoming workable task with no count cap, changing the header to `All upcoming tasks:`.
 
 ```bash
-maggus work --model opus
-maggus work --model haiku
+maggus list --all
+maggus list --all --plain
 ```
 
-Short aliases (`sonnet`, `opus`, `haiku`) resolve to their full model IDs automatically. The `--model` flag overrides the config file.
+### Redesigned `maggus status` Layout
 
-### Custom Prompt Includes
-Add project-specific context files to every agent prompt via `include` in `config.yml`. Useful for architecture docs, coding patterns, or any reference material the agent should read before starting.
+The status output is restructured for clarity: task details appear first, with the Plans table as a summary at the very bottom.
 
-### Run Logs
-Every session now creates a timestamped run directory at `.maggus/runs/<RUN_ID>/` containing:
-- `run.md` — session metadata (model, branch, start/end commit, timing)
-- `iteration-01.md`, `iteration-02.md`, … — per-task logs written by the agent
+New output order: **Header → Summary → Task sections → Plans table**
 
-### Completed Plan Renaming
-When all tasks in a plan file are finished, Maggus renames it to `plan_N_completed.md` automatically. Future runs skip completed plans without needing manual cleanup.
+### Hide Completed Plans by Default in `maggus status`
 
-### Improved Startup Banner
-The startup screen now shows model, iteration count, current branch, and run ID before the 3-second safety pause.
-
-### Summary Banner
-After each session, Maggus prints a summary with the run ID, branch, log directory, and commit range.
-
-### Auto Git Push
-After completing tasks, Maggus automatically pushes the feature branch to remote.
-
-### No-Bootstrap Flag
-Skip reading `CLAUDE.md`/`AGENTS.md`/`PROJECT_CONTEXT.md`/`TOOLING.md` with `--no-bootstrap` for faster runs on projects that don't use these files.
-
----
-
-## Installation
-
-Download the binary for your platform from the Assets below, or build from source:
+Completed plans are now hidden by default to keep the output focused on active work. Pass `--all` to reveal the full history.
 
 ```bash
-cd src
-go build -o maggus .
+# Default: only active plans shown
+maggus status
+
+# Show everything including completed plans
+maggus status --all
 ```
 
-Requires `claude` (Claude Code CLI) on your PATH.
+The header count and summary totals always include completed plans in their numbers regardless of the flag, so the overall counts remain accurate.
+
+### Completed Plan Renames Included in Iteration Commits
+
+When Maggus renames a finished plan to `plan_N_completed.md`, that rename is now included in the same commit as the task's changes rather than appearing as a separate untracked file.

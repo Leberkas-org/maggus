@@ -41,6 +41,8 @@ Pre-built binaries for Windows, macOS, and Linux are attached to each [GitHub Re
 
 ## Usage
 
+### Work
+
 ```bash
 # Work on the next 5 tasks (default)
 maggus work
@@ -61,6 +63,46 @@ maggus work --no-bootstrap
 ```
 
 Maggus processes tasks sequentially, one at a time. After each task it commits the changes, re-reads the plan to pick up any updates, then moves to the next incomplete task.
+
+### List
+
+Preview the next tasks without starting any work:
+
+```bash
+# Show the next 5 upcoming tasks (default)
+maggus list
+
+# Show the next N upcoming tasks
+maggus list 10
+maggus list --count 10
+
+# Show all upcoming tasks (no count cap)
+maggus list --all
+
+# Plain output (no colors)
+maggus list --plain
+maggus list --all --plain
+```
+
+Each task is shown on a single line: `#1  TASK-001: Title`. The first task is highlighted in cyan (color mode). Completed tasks are never shown.
+
+### Status
+
+Get a full overview of task and plan progress:
+
+```bash
+# Show status (completed plans hidden by default)
+maggus status
+
+# Show all plans, including completed ones
+maggus status --all
+
+# Plain output (no colors)
+maggus status --plain
+maggus status --all --plain
+```
+
+Output order: header → summary → task sections → plans table. Completed plans are hidden by default to keep the output focused on active work.
 
 ## Configuration
 
@@ -127,5 +169,3 @@ Press `Ctrl+C` while a task is running to stop after the current task completes.
 
 - **Agent choice** — Support for AI agents beyond Claude Code
 - **Task management service** — A hosted backend replacing the markdown files, like a Jira board optimized for Maggus to read and for humans to edit, plan, and supervise
-- **Status overview** — A `maggus status` command to show task progress at a glance
-- **Preview** — A `maggus list <amount>` command to show the next n tasks that should be worked on
