@@ -18,82 +18,82 @@ Extend maggus to support configurable model selection and custom markdown file i
 **Description:** As a user, I want maggus to read settings from `.maggus/config.yml` so that I can configure model and includes persistently.
 
 **Acceptance Criteria:**
-- [ ] New package `internal/config` with a `Config` struct containing `Model string` and `Include []string` fields
-- [ ] `config.Load(dir string)` reads `.maggus/config.yml` from the given directory
-- [ ] If the file does not exist, return a zero-value Config (no error)
-- [ ] If the file exists but is invalid YAML, return a descriptive error
-- [ ] Config file uses this format:
+- [x] New package `internal/config` with a `Config` struct containing `Model string` and `Include []string` fields
+- [x] `config.Load(dir string)` reads `.maggus/config.yml` from the given directory
+- [x] If the file does not exist, return a zero-value Config (no error)
+- [x] If the file exists but is invalid YAML, return a descriptive error
+- [x] Config file uses this format:
   ```yaml
   model: sonnet
   include:
     - ARCHITECTURE.md
     - docs/PATTERNS.md
   ```
-- [ ] Unit test: missing file returns empty config
-- [ ] Unit test: valid YAML parses correctly
-- [ ] Unit test: invalid YAML returns error
+- [x] Unit test: missing file returns empty config
+- [x] Unit test: valid YAML parses correctly
+- [x] Unit test: invalid YAML returns error
 
 ### TASK-302: Model Alias Resolution
 
 **Description:** As a user, I want to use short names like `sonnet` or `opus` instead of full model IDs so that configuration is convenient.
 
 **Acceptance Criteria:**
-- [ ] New function `config.ResolveModel(input string) string` that maps short aliases to full model IDs
-- [ ] Supported aliases: `sonnet` → `claude-sonnet-4-6`, `opus` → `claude-opus-4-6`, `haiku` → `claude-haiku-4-5-20251001`
-- [ ] If the input is not a known alias, return it unchanged (allows full model IDs like `claude-sonnet-4-6`)
-- [ ] Empty string input returns empty string (means "use CLI default")
-- [ ] Unit test: known aliases resolve correctly
-- [ ] Unit test: unknown strings pass through unchanged
-- [ ] Unit test: empty string returns empty string
+- [x] New function `config.ResolveModel(input string) string` that maps short aliases to full model IDs
+- [x] Supported aliases: `sonnet` → `claude-sonnet-4-6`, `opus` → `claude-opus-4-6`, `haiku` → `claude-haiku-4-5-20251001`
+- [x] If the input is not a known alias, return it unchanged (allows full model IDs like `claude-sonnet-4-6`)
+- [x] Empty string input returns empty string (means "use CLI default")
+- [x] Unit test: known aliases resolve correctly
+- [x] Unit test: unknown strings pass through unchanged
+- [x] Unit test: empty string returns empty string
 
 ### TASK-303: Pass Model to Claude CLI
 
 **Description:** As a user, I want maggus to pass the selected model to the Claude CLI so that my tasks run on the chosen model.
 
 **Acceptance Criteria:**
-- [ ] `runner.RunClaude` accepts a model parameter (empty string means no `--model` flag)
-- [ ] When model is non-empty, `--model <resolved-model-id>` is added to the claude command arguments
-- [ ] When model is empty, no `--model` flag is passed (Claude CLI picks its default)
-- [ ] The startup banner displays the resolved model name (or "default" if empty)
-- [ ] The run tracker receives the resolved model name instead of hardcoded "claude"
+- [x] `runner.RunClaude` accepts a model parameter (empty string means no `--model` flag)
+- [x] When model is non-empty, `--model <resolved-model-id>` is added to the claude command arguments
+- [x] When model is empty, no `--model` flag is passed (Claude CLI picks its default)
+- [x] The startup banner displays the resolved model name (or "default" if empty)
+- [x] The run tracker receives the resolved model name instead of hardcoded "claude"
 
 ### TASK-304: CLI Flag for Model Override
 
 **Description:** As a user, I want a `--model` flag on the `work` command so that I can override the config file model for a single run.
 
 **Acceptance Criteria:**
-- [ ] `maggus work --model opus` overrides the config file model
-- [ ] `maggus work` without `--model` uses the config file value
-- [ ] If neither CLI flag nor config file specifies a model, no `--model` flag is passed to Claude CLI
-- [ ] The flag accepts both short aliases and full model IDs
-- [ ] Flag is documented in `maggus work --help`
+- [x] `maggus work --model opus` overrides the config file model
+- [x] `maggus work` without `--model` uses the config file value
+- [x] If neither CLI flag nor config file specifies a model, no `--model` flag is passed to Claude CLI
+- [x] The flag accepts both short aliases and full model IDs
+- [x] Flag is documented in `maggus work --help`
 
 ### TASK-305: Custom Markdown Includes in Prompt
 
 **Description:** As a user, I want to register additional markdown files in the config so that Claude reads them as part of the bootstrap context.
 
 **Acceptance Criteria:**
-- [ ] The `include` list from config is passed to `prompt.Build` via `prompt.Options`
-- [ ] Each included file is added to the bootstrap section as: "Read the file `<path>` if it exists in the working directory."
-- [ ] Paths are relative to the project root (e.g. `ARCHITECTURE.md`, `docs/PATTERNS.md`)
-- [ ] The existing hardcoded bootstrap files (CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, TOOLING.md) remain unchanged
-- [ ] Custom includes appear after the standard bootstrap files
-- [ ] If the include list is empty, the bootstrap section is unchanged from current behavior
-- [ ] Unit test: empty includes produces standard bootstrap only
-- [ ] Unit test: includes adds "Read the file" instructions for each entry
+- [x] The `include` list from config is passed to `prompt.Build` via `prompt.Options`
+- [x] Each included file is added to the bootstrap section as: "Read the file `<path>` if it exists in the working directory."
+- [x] Paths are relative to the project root (e.g. `ARCHITECTURE.md`, `docs/PATTERNS.md`)
+- [x] The existing hardcoded bootstrap files (CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, TOOLING.md) remain unchanged
+- [x] Custom includes appear after the standard bootstrap files
+- [x] If the include list is empty, the bootstrap section is unchanged from current behavior
+- [x] Unit test: empty includes produces standard bootstrap only
+- [x] Unit test: includes adds "Read the file" instructions for each entry
 
 ### TASK-306: Wire Config into Work Command
 
 **Description:** As a user, I want the work command to load the config and apply model + includes so that everything works end-to-end.
 
 **Acceptance Criteria:**
-- [ ] `work` command loads config via `config.Load(dir)` early in execution
-- [ ] CLI `--model` flag overrides `config.Model` if provided
-- [ ] Model is resolved via `config.ResolveModel` before passing to runner and run tracker
-- [ ] `config.Include` is passed through to prompt options
-- [ ] Works correctly with no config file (backwards compatible)
-- [ ] Works correctly with config file but no `--model` flag
-- [ ] Works correctly with `--model` flag overriding config
+- [x] `work` command loads config via `config.Load(dir)` early in execution
+- [x] CLI `--model` flag overrides `config.Model` if provided
+- [x] Model is resolved via `config.ResolveModel` before passing to runner and run tracker
+- [x] `config.Include` is passed through to prompt options
+- [x] Works correctly with no config file (backwards compatible)
+- [x] Works correctly with config file but no `--model` flag
+- [x] Works correctly with `--model` flag overriding config
 
 ## Functional Requirements
 

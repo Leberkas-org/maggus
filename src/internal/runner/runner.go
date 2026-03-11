@@ -68,6 +68,7 @@ type display struct {
 	toolHistory []string // last N tools used
 	output      string
 	extras      string // skills + MCPs
+	model       string
 	toolCount   int
 	skills      []string
 	mcps        []string
@@ -86,10 +87,14 @@ func termWidth() int {
 	return w
 }
 
-func newDisplay() *display {
+func newDisplay(model string) *display {
+	if model == "" {
+		model = "default"
+	}
 	d := &display{
 		status:    "Starting...",
 		output:    "-",
+		model:     model,
 		startTime: time.Now(),
 		done:      make(chan struct{}),
 	}
@@ -167,6 +172,7 @@ func (d *display) renderLocked() {
 	}
 
 	lines = append(lines, fmt.Sprintf("    %sExtras:%s  %s%s%s", colorBold, colorReset, colorCyan, truncate(extrasStr, contentWidth), colorReset))
+	lines = append(lines, fmt.Sprintf("    %sModel:%s   %s%s%s", colorBold, colorReset, colorGray, d.model, colorReset))
 	lines = append(lines, fmt.Sprintf("    %sElapsed:%s %s%s%s", colorBold, colorReset, colorGray, elapsed, colorReset))
 
 	// Move cursor up to overwrite previous block
@@ -251,18 +257,28 @@ func (d *display) setOutput(o string) {
 
 // RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
 // The context can be used to kill the claude process (e.g., on Ctrl+C).
-func RunClaude(ctx context.Context, prompt string) error {
+// If model is non-empty, --model <model> is added to the command arguments.
+func RunClaude(ctx context.Context, prompt string, model string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
 	}
 
-	cmd := exec.CommandContext(ctx, path,
+	args := []string{
 		"-p", prompt,
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
-	)
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+
+	cmd := exec.CommandContext(ctx, path, args...)
+
+	// On Windows, put the child in a new process group so Ctrl+C goes only
+	// to the Go process. We then kill the child tree via cmd.Cancel.
+	setProcAttr(cmd)
 
 	// Capture stderr for diagnostics while still showing it on terminal.
 	var stderrBuf strings.Builder
@@ -281,6 +297,9 @@ func RunClaude(ctx context.Context, prompt string) error {
 		}
 		return cmd.Process.Kill()
 	}
+	// After Cancel runs, wait up to 5s then forcibly close I/O pipes so
+	// cmd.Wait() doesn't hang on orphaned grandchild processes.
+	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -294,62 +313,88 @@ func RunClaude(ctx context.Context, prompt string) error {
 	// Hide cursor during display
 	fmt.Print("\033[?25l")
 
-	d := newDisplay()
+	d := newDisplay(model)
 
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	// Read stdout in a goroutine so we can also watch for context cancellation.
+	type scanResult struct {
+		eventCount int
+		scanErr    error
+	}
+	scanDone := make(chan scanResult, 1)
 
-	eventCount := 0
-	for scanner.Scan() {
-		line := scanner.Bytes()
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
-		var event streamEvent
-		if err := json.Unmarshal(line, &event); err != nil {
-			continue
-		}
+		eventCount := 0
+		for scanner.Scan() {
+			line := scanner.Bytes()
 
-		eventCount++
-
-		switch event.Type {
-		case "assistant":
-			var msg assistantMessage
-			if err := json.Unmarshal(event.Message, &msg); err != nil {
+			var event streamEvent
+			if err := json.Unmarshal(line, &event); err != nil {
 				continue
 			}
-			for _, block := range msg.Content {
-				switch block.Type {
-				case "text":
-					d.setStatus("Thinking...")
-					d.setOutput(block.Text)
-				case "tool_use":
-					var input toolInput
-					json.Unmarshal(block.Input, &input)
-					desc := describeToolUse(block.Name, input)
-					d.setStatus("Running tool")
-					d.setTool(desc)
 
-					// Track skills and MCPs
-					if block.Name == "Skill" && input.Skill != "" {
-						d.addSkill(input.Skill)
-					}
-					if strings.HasPrefix(block.Name, "mcp__") {
-						// mcp__servername__toolname → extract server name
-						parts := strings.SplitN(block.Name, "__", 3)
-						if len(parts) >= 2 {
-							d.addMCP(parts[1])
+			eventCount++
+
+			switch event.Type {
+			case "assistant":
+				var msg assistantMessage
+				if err := json.Unmarshal(event.Message, &msg); err != nil {
+					continue
+				}
+				for _, block := range msg.Content {
+					switch block.Type {
+					case "text":
+						d.setStatus("Thinking...")
+						d.setOutput(block.Text)
+					case "tool_use":
+						var input toolInput
+						json.Unmarshal(block.Input, &input)
+						desc := describeToolUse(block.Name, input)
+						d.setStatus("Running tool")
+						d.setTool(desc)
+
+						// Track skills and MCPs
+						if block.Name == "Skill" && input.Skill != "" {
+							d.addSkill(input.Skill)
+						}
+						if strings.HasPrefix(block.Name, "mcp__") {
+							// mcp__servername__toolname → extract server name
+							parts := strings.SplitN(block.Name, "__", 3)
+							if len(parts) >= 2 {
+								d.addMCP(parts[1])
+							}
 						}
 					}
 				}
-			}
 
-		case "result":
-			if event.Subtype == "success" {
-				d.setStatus("Done")
-			} else {
-				d.setStatus("Failed")
-				d.setOutput(event.Result)
+			case "result":
+				if event.Subtype == "success" {
+					d.setStatus("Done")
+				} else {
+					d.setStatus("Failed")
+					d.setOutput(event.Result)
+				}
 			}
 		}
+		scanDone <- scanResult{eventCount: eventCount, scanErr: scanner.Err()}
+	}()
+
+	// Wait for either the scanner to finish or context cancellation.
+	var result scanResult
+	select {
+	case result = <-scanDone:
+		// Scanner finished normally
+	case <-ctx.Done():
+		// Context cancelled (Ctrl+C) — kill the process tree
+		d.setStatus("Interrupted")
+		d.stop()
+		d.render()
+		fmt.Print("\033[?25h")
+		fmt.Println()
+		cmd.Wait() // triggers cmd.Cancel which kills the process tree
+		return ErrInterrupted
 	}
 
 	// Stop spinner, final render, restore cursor
@@ -358,19 +403,17 @@ func RunClaude(ctx context.Context, prompt string) error {
 	fmt.Print("\033[?25h")
 	fmt.Println()
 
-	if ctx.Err() != nil {
-		d.setStatus("Interrupted")
-		cmd.Wait() // clean up
-		return ErrInterrupted
-	}
-
 	// Check for scanner errors (e.g., stdout closed unexpectedly)
-	if scanErr := scanner.Err(); scanErr != nil {
+	if result.scanErr != nil {
 		cmd.Wait() // clean up
-		return fmt.Errorf("reading claude output: %w", scanErr)
+		return fmt.Errorf("reading claude output: %w", result.scanErr)
 	}
 
 	if err := cmd.Wait(); err != nil {
+		// If context was cancelled while we were in cmd.Wait, treat as interrupt
+		if ctx.Err() != nil {
+			return ErrInterrupted
+		}
 		stderr := strings.TrimSpace(stderrBuf.String())
 		if stderr != "" {
 			return fmt.Errorf("claude exited with error: %w\nstderr: %s", err, stderr)
@@ -379,7 +422,7 @@ func RunClaude(ctx context.Context, prompt string) error {
 	}
 
 	// Detect silent failures: Claude started and exited cleanly but produced no events
-	if eventCount == 0 {
+	if result.eventCount == 0 {
 		stderr := strings.TrimSpace(stderrBuf.String())
 		msg := "claude produced no output (0 events received). Possible causes:\n" +
 			"  - Claude CLI not authenticated (run 'claude' interactively to check)\n" +
@@ -388,7 +431,7 @@ func RunClaude(ctx context.Context, prompt string) error {
 		if stderr != "" {
 			msg += fmt.Sprintf("\n  stderr: %s", stderr)
 		}
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	return nil

@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"time"
 
+	"github.com/dirnei/maggus/internal/config"
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
 	"github.com/dirnei/maggus/internal/gitignore"
@@ -23,6 +25,7 @@ const defaultTaskCount = 5
 var (
 	countFlag       int
 	noBootstrapFlag bool
+	modelFlag       string
 )
 
 var workCmd = &cobra.Command{
@@ -34,7 +37,8 @@ by prompting Claude Code. Defaults to 5 tasks if no count is specified.
 Examples:
   maggus work        # work on the next 5 tasks
   maggus work 10     # work on the next 10 tasks
-  maggus work -c 3   # work on the next 3 tasks`,
+  maggus work -c 3   # work on the next 3 tasks
+  maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		count := countFlag
@@ -55,6 +59,34 @@ Examples:
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
+		// Load config
+		cfg, err := config.Load(dir)
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		// Validate includes: warn about missing files, skip them from prompt
+		validIncludes := config.ValidateIncludes(cfg.Include, dir)
+		for _, p := range cfg.Include {
+			found := false
+			for _, v := range validIncludes {
+				if v == p {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Fprintf(os.Stderr, "Warning: included file not found and will be skipped: %s\n", p)
+			}
+		}
+
+		// Resolve model: CLI flag overrides config file
+		modelInput := cfg.Model
+		if modelFlag != "" {
+			modelInput = modelFlag
+		}
+		resolvedModel := config.ResolveModel(modelInput)
+
 		// Ensure .gitignore has required entries
 		added, err := gitignore.EnsureEntries(dir)
 		if err != nil {
@@ -72,6 +104,11 @@ Examples:
 		if len(tasks) == 0 {
 			fmt.Println("No plan files found in .maggus/")
 			return nil
+		}
+
+		// Mark any fully completed plan files before checking for work
+		if err := parser.MarkCompletedPlans(dir); err != nil {
+			fmt.Printf("Warning: could not mark completed plans: %v\n", err)
 		}
 
 		// Check if there are any incomplete tasks
@@ -92,7 +129,11 @@ Examples:
 		}
 
 		// Create run tracker
-		run, err := runtracker.New(dir, "claude", count)
+		modelDisplay := resolvedModel
+		if modelDisplay == "" {
+			modelDisplay = "default"
+		}
+		run, err := runtracker.New(dir, modelDisplay, count)
 		if err != nil {
 			return fmt.Errorf("create run tracker: %w", err)
 		}
@@ -100,8 +141,9 @@ Examples:
 		// Startup banner
 		fmt.Println()
 		fmt.Println("══════════════════════════════════════════")
-		fmt.Println("  Maggus Work Session")
+		fmt.Printf("  Maggus Work Session (v%s)\n", Version)
 		fmt.Println("══════════════════════════════════════════")
+		fmt.Printf("  Model:        %s\n", modelDisplay)
 		fmt.Printf("  Iterations:   %d\n", count)
 		fmt.Printf("  Branch:       %s\n", run.Branch)
 		fmt.Printf("  Run ID:       %s\n", run.ID)
@@ -114,15 +156,14 @@ Examples:
 		fmt.Println("Press Ctrl+C within 3 seconds to abort...")
 
 		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer pauseCancel()
 
 		select {
 		case <-pauseCtx.Done():
 			pauseCancel()
-			// Reset signal handling so future Ctrl+C works normally
 			fmt.Println("\nAborted.")
 			return nil
 		case <-time.After(3 * time.Second):
+			// Stop intercepting signals so the next NotifyContext can take over
 			pauseCancel()
 		}
 
@@ -151,6 +192,7 @@ Examples:
 
 			opts := prompt.Options{
 				NoBootstrap: noBootstrapFlag,
+				Include:     validIncludes,
 				RunID:       run.ID,
 				RunDir:      run.RelativeDir(dir),
 				Iteration:   i + 1,
@@ -158,7 +200,7 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, p); err != nil {
+			if err := runner.RunClaude(ctx, p, resolvedModel); err != nil {
 				if err == runner.ErrInterrupted {
 					fmt.Println("\nInterrupted. Stopping loop.")
 					break
@@ -181,6 +223,11 @@ Examples:
 			tasks, err = parser.ParsePlans(dir)
 			if err != nil {
 				return fmt.Errorf("re-parse plans: %w", err)
+			}
+
+			// Rename fully completed plan files so they are skipped in future runs
+			if err := parser.MarkCompletedPlans(dir); err != nil {
+				fmt.Printf("Warning: could not mark completed plans: %v\n", err)
 			}
 
 			completed++
@@ -217,6 +264,21 @@ Examples:
 		}
 
 		fmt.Printf("Completed %d/%d tasks. %d tasks remaining.\n", completed, count, len(remaining))
+
+		// Push commits to remote
+		if completed > 0 {
+			fmt.Println("Pushing to remote...")
+			push := exec.Command("git", "push")
+			push.Dir = dir
+			push.Stdout = os.Stdout
+			push.Stderr = os.Stderr
+			if err := push.Run(); err != nil {
+				fmt.Printf("Warning: git push failed: %v\n", err)
+			} else {
+				fmt.Println("Pushed successfully.")
+			}
+		}
+
 		return nil
 	},
 }
@@ -224,5 +286,6 @@ Examples:
 func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
+	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	rootCmd.AddCommand(workCmd)
 }
