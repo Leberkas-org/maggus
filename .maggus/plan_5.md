@@ -22,17 +22,17 @@ The `status` command currently shows the Plans progress table at the top, follow
 **Description:** As a developer, I want `maggus list` to show only the task ID and title per line, and optionally show all upcoming workable tasks without a count limit using `--all`.
 
 **Acceptance Criteria:**
-- [ ] Each task is rendered on a single line: `#1  TASK-001: Title`
-- [ ] No description/snippet line is printed below the task title
-- [ ] No blank lines between task entries
-- [ ] Without `--all`: only the next N workable tasks are shown (default N=5)
-- [ ] With `--all`: all workable tasks are shown with no count cap; completed tasks are not shown
-- [ ] With `--all`: the header reads `All upcoming tasks:` instead of `Next N task(s):`
-- [ ] With `--all`: the `--count` / positional `N` argument is ignored
-- [ ] The first task (#1) is still highlighted in cyan (color mode)
-- [ ] The `--plain` and `--all` flags can be combined
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] Each task is rendered on a single line: `#1  TASK-001: Title`
+- [x] No description/snippet line is printed below the task title
+- [x] No blank lines between task entries
+- [x] Without `--all`: only the next N workable tasks are shown (default N=5)
+- [x] With `--all`: all workable tasks are shown with no count cap; completed tasks are not shown
+- [x] With `--all`: the header reads `All upcoming tasks:` instead of `Next N task(s):`
+- [x] With `--all`: the `--count` / positional `N` argument is ignored
+- [x] The first task (#1) is still highlighted in cyan (color mode)
+- [x] The `--plain` and `--all` flags can be combined
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-502: Restructure `maggus status` layout — Tasks first, Plans at bottom
 **Description:** As a developer, I want `maggus status` to show task details before the Plans table so that I see actual work immediately, with the Plans table as a summary at the very bottom.
