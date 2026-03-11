@@ -77,6 +77,10 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		all, err := cmd.Flags().GetBool("all")
+		if err != nil {
+			return err
+		}
 
 		// Helper: returns color codes only when not in plain mode
 		color := func(code string) string {
@@ -144,49 +148,8 @@ var statusCmd = &cobra.Command{
 		// Header
 		fmt.Printf("Maggus Status — %d plans (%d active), %d tasks total\n\n",
 			len(plans), activePlans, totalTasks)
-		fmt.Println(" Plans")
-		fmt.Println(" ──────────────────────────────────────────")
 
-		for _, p := range plans {
-			done := p.doneCount()
-			total := len(p.tasks)
-
-			var bar string
-			if plain {
-				bar = buildProgressBarPlain(done, total)
-			} else {
-				bar = buildProgressBar(done, total)
-			}
-
-			var prefix, clr, suffix string
-
-			if p.completed {
-				if plain {
-					prefix = " [x] "
-				} else {
-					prefix = " ✓ "
-				}
-				clr = color(colorDim + colorGreen)
-				suffix = "done"
-			} else if p.blockedCount() > 0 {
-				prefix = "   "
-				clr = color(colorRed)
-				suffix = "blocked"
-			} else if total > 0 && done == total {
-				prefix = "   "
-				clr = color(colorGreen)
-				suffix = "done"
-			} else {
-				prefix = "   "
-				clr = color(colorYellow)
-				suffix = "in progress"
-			}
-
-			fmt.Printf("%s%s%-32s [%s]  %d/%d   %s%s\n",
-				clr, prefix, p.filename, bar, done, total, suffix, color(colorReset))
-		}
-
-		fmt.Println()
+		// Summary
 		fmt.Printf(" Summary: %d/%d tasks complete · %d pending · %d blocked\n",
 			totalDone, totalTasks, totalPending, totalBlocked)
 
@@ -205,6 +168,9 @@ var statusCmd = &cobra.Command{
 
 		// Detailed task list section
 		for _, p := range plans {
+			if p.completed && !all {
+				continue
+			}
 			fmt.Println()
 			if p.completed {
 				fmt.Printf("%s%s Tasks — %s (archived)%s\n", color(colorDim), color(colorGreen), p.filename, color(colorReset))
@@ -273,6 +239,54 @@ var statusCmd = &cobra.Command{
 			}
 		}
 
+		// Plans table at the bottom
+		fmt.Println()
+		fmt.Println(" Plans")
+		fmt.Println(" ──────────────────────────────────────────")
+
+		for _, p := range plans {
+			if p.completed && !all {
+				continue
+			}
+
+			done := p.doneCount()
+			total := len(p.tasks)
+
+			var bar string
+			if plain {
+				bar = buildProgressBarPlain(done, total)
+			} else {
+				bar = buildProgressBar(done, total)
+			}
+
+			var prefix, clr, suffix string
+
+			if p.completed {
+				if plain {
+					prefix = " [x] "
+				} else {
+					prefix = " ✓ "
+				}
+				clr = color(colorDim + colorGreen)
+				suffix = "done"
+			} else if p.blockedCount() > 0 {
+				prefix = "   "
+				clr = color(colorRed)
+				suffix = "blocked"
+			} else if total > 0 && done == total {
+				prefix = "   "
+				clr = color(colorGreen)
+				suffix = "done"
+			} else {
+				prefix = "   "
+				clr = color(colorYellow)
+				suffix = "in progress"
+			}
+
+			fmt.Printf("%s%s%-32s [%s]  %d/%d   %s%s\n",
+				clr, prefix, p.filename, bar, done, total, suffix, color(colorReset))
+		}
+
 		return nil
 	},
 }
@@ -280,4 +294,5 @@ var statusCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
+	statusCmd.Flags().Bool("all", false, "Show completed plans in task sections and Plans table")
 }

@@ -208,6 +208,22 @@ Examples:
 				return fmt.Errorf("task %s failed: %w", next.ID, err)
 			}
 
+			// Re-parse to pick up any changes the agent made
+			tasks, err = parser.ParsePlans(dir)
+			if err != nil {
+				return fmt.Errorf("re-parse plans: %w", err)
+			}
+
+			// Rename fully completed plan files before committing so the rename is included
+			if err := parser.MarkCompletedPlans(dir); err != nil {
+				fmt.Printf("Warning: could not mark completed plans: %v\n", err)
+			}
+
+			// Stage any plan renames so they are included in the commit
+			stagePlans := exec.Command("git", "add", "--", ".maggus/")
+			stagePlans.Dir = dir
+			stagePlans.CombinedOutput() // ignore errors
+
 			// Commit using COMMIT.md
 			commitResult, err := gitcommit.CommitIteration(dir)
 			if err != nil {
@@ -217,17 +233,6 @@ Examples:
 				fmt.Printf("Committed: %s\n", commitResult.Message)
 			} else {
 				fmt.Println(commitResult.Message)
-			}
-
-			// Re-parse to pick up any changes the agent made
-			tasks, err = parser.ParsePlans(dir)
-			if err != nil {
-				return fmt.Errorf("re-parse plans: %w", err)
-			}
-
-			// Rename fully completed plan files so they are skipped in future runs
-			if err := parser.MarkCompletedPlans(dir); err != nil {
-				fmt.Printf("Warning: could not mark completed plans: %v\n", err)
 			}
 
 			completed++
