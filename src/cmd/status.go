@@ -77,6 +77,10 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		all, err := cmd.Flags().GetBool("all")
+		if err != nil {
+			return err
+		}
 
 		// Helper: returns color codes only when not in plain mode
 		color := func(code string) string {
@@ -164,6 +168,9 @@ var statusCmd = &cobra.Command{
 
 		// Detailed task list section
 		for _, p := range plans {
+			if p.completed && !all {
+				continue
+			}
 			fmt.Println()
 			if p.completed {
 				fmt.Printf("%s%s Tasks — %s (archived)%s\n", color(colorDim), color(colorGreen), p.filename, color(colorReset))
@@ -238,6 +245,10 @@ var statusCmd = &cobra.Command{
 		fmt.Println(" ──────────────────────────────────────────")
 
 		for _, p := range plans {
+			if p.completed && !all {
+				continue
+			}
+
 			done := p.doneCount()
 			total := len(p.tasks)
 
@@ -283,4 +294,5 @@ var statusCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
+	statusCmd.Flags().Bool("all", false, "Show completed plans in task sections and Plans table")
 }

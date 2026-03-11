@@ -49,14 +49,14 @@ The `status` command currently shows the Plans progress table at the top, follow
 **Description:** As a developer, I want completed plans to be hidden by default so that the output stays focused on active work, with `--all` to reveal the full history.
 
 **Acceptance Criteria:**
-- [ ] Without `--all`: completed plan task sections are not printed
-- [ ] Without `--all`: completed plan rows in the Plans table are not printed
-- [ ] Without `--all`: the header count still reflects all plans (e.g. "4 plans (1 active)")
-- [ ] Without `--all`: summary totals still include completed plan tasks in the numbers
-- [ ] With `--all`: completed plan task sections are printed before the active plan sections
-- [ ] With `--all`: completed plan rows appear in the Plans table (below the active plan rows)
-- [ ] The `--plain` flag and `--all` flag can be combined
-- [ ] Typecheck/lint passes
+- [x] Without `--all`: completed plan task sections are not printed
+- [x] Without `--all`: completed plan rows in the Plans table are not printed
+- [x] Without `--all`: the header count still reflects all plans (e.g. "4 plans (1 active)")
+- [x] Without `--all`: summary totals still include completed plan tasks in the numbers
+- [x] With `--all`: completed plan task sections are printed before the active plan sections
+- [x] With `--all`: completed plan rows appear in the Plans table (below the active plan rows)
+- [x] The `--plain` flag and `--all` flag can be combined
+- [x] Typecheck/lint passes
 
 ## Design Mockups
 
