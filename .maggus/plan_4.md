@@ -105,14 +105,14 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want all new commands to be properly registered and working end-to-end so that `maggus --help` lists them and they behave correctly in a real project.
 
 **Acceptance Criteria:**
-- [ ] `maggus --help` shows `status` and `list` as available subcommands with short descriptions
-- [ ] `maggus status --help` shows the `--plain` flag
-- [ ] `maggus list --help` shows the `--count` flag
-- [ ] Running `maggus status` in a directory with no `.maggus/` folder prints a helpful message and exits 0 (not a panic)
-- [ ] Running `maggus list` in a directory with no `.maggus/` folder prints a helpful message and exits 0
-- [ ] Include validation warnings appear before the first iteration spinner, not after
-- [ ] All existing tests still pass (`go test ./...`)
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `maggus --help` shows `status` and `list` as available subcommands with short descriptions
+- [x] `maggus status --help` shows the `--plain` flag
+- [x] `maggus list --help` shows the `--count` flag
+- [x] Running `maggus status` in a directory with no `.maggus/` folder prints a helpful message and exits 0 (not a panic)
+- [x] Running `maggus list` in a directory with no `.maggus/` folder prints a helpful message and exits 0
+- [x] Include validation warnings appear before the first iteration spinner, not after
+- [x] All existing tests still pass (`go test ./...`)
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ---
 
