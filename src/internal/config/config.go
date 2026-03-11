@@ -53,3 +53,17 @@ func ResolveModel(input string) string {
 	}
 	return input
 }
+
+// ValidateIncludes checks each path in includes relative to baseDir.
+// It returns only the paths that exist. Callers should warn about any
+// paths that are dropped (i.e. present in includes but not in the result).
+func ValidateIncludes(includes []string, baseDir string) []string {
+	valid := make([]string, 0, len(includes))
+	for _, p := range includes {
+		abs := filepath.Join(baseDir, p)
+		if _, err := os.Stat(abs); err == nil {
+			valid = append(valid, p)
+		}
+	}
+	return valid
+}

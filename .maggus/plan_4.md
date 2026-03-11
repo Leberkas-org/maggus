@@ -88,18 +88,18 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want Maggus to warn me if a file listed in `config.yml` under `include` doesn't exist so that I notice misconfiguration before wasting a full Claude run.
 
 **Acceptance Criteria:**
-- [ ] Before starting the work loop in `cmd/work.go`, after loading config, validate each entry in `config.Include`
-- [ ] For each path in `config.Include`, check if the file exists relative to the current working directory
-- [ ] If a file is missing, print a **warning** (not an error) to stderr:
+- [x] Before starting the work loop in `cmd/work.go`, after loading config, validate each entry in `config.Include`
+- [x] For each path in `config.Include`, check if the file exists relative to the current working directory
+- [x] If a file is missing, print a **warning** (not an error) to stderr:
   ```
   Warning: included file not found: docs/PATTERNS.md (skipping)
   ```
-- [ ] Missing files are **skipped** from the prompt — execution continues normally
-- [ ] If all included files are missing, execution still continues (the warning is enough)
-- [ ] The validation warning is printed before Claude is invoked, not silently ignored
-- [ ] Add a helper function `ValidateIncludes(includes []string, baseDir string) []string` in `internal/config/` that returns only the valid (existing) paths — this is the list actually passed to the prompt builder
-- [ ] Unit tests for `ValidateIncludes`: empty list, all valid, some missing, all missing
-- [ ] Typecheck/lint passes
+- [x] Missing files are **skipped** from the prompt — execution continues normally
+- [x] If all included files are missing, execution still continues (the warning is enough)
+- [x] The validation warning is printed before Claude is invoked, not silently ignored
+- [x] Add a helper function `ValidateIncludes(includes []string, baseDir string) []string` in `internal/config/` that returns only the valid (existing) paths — this is the list actually passed to the prompt builder
+- [x] Unit tests for `ValidateIncludes`: empty list, all valid, some missing, all missing
+- [x] Typecheck/lint passes
 
 ### TASK-406: Wire up new commands and ensure end-to-end behavior
 **Description:** As a developer, I want all new commands to be properly registered and working end-to-end so that `maggus --help` lists them and they behave correctly in a real project.

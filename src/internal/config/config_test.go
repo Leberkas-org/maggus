@@ -83,6 +83,46 @@ func TestResolveModel_EmptyString(t *testing.T) {
 	}
 }
 
+func TestValidateIncludes_Empty(t *testing.T) {
+	dir := t.TempDir()
+	result := ValidateIncludes([]string{}, dir)
+	if len(result) != 0 {
+		t.Errorf("expected empty result, got %v", result)
+	}
+}
+
+func TestValidateIncludes_AllValid(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.md", "b.md"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(""), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := ValidateIncludes([]string{"a.md", "b.md"}, dir)
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %v", result)
+	}
+}
+
+func TestValidateIncludes_SomeMissing(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "exists.md"), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := ValidateIncludes([]string{"exists.md", "missing.md"}, dir)
+	if len(result) != 1 || result[0] != "exists.md" {
+		t.Errorf("expected [exists.md], got %v", result)
+	}
+}
+
+func TestValidateIncludes_AllMissing(t *testing.T) {
+	dir := t.TempDir()
+	result := ValidateIncludes([]string{"nope.md", "also-nope.md"}, dir)
+	if len(result) != 0 {
+		t.Errorf("expected empty result, got %v", result)
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

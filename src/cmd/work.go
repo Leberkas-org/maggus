@@ -65,6 +65,21 @@ Examples:
 			return fmt.Errorf("load config: %w", err)
 		}
 
+		// Validate includes: warn about missing files, skip them from prompt
+		validIncludes := config.ValidateIncludes(cfg.Include, dir)
+		for _, p := range cfg.Include {
+			found := false
+			for _, v := range validIncludes {
+				if v == p {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Fprintf(os.Stderr, "Warning: included file not found and will be skipped: %s\n", p)
+			}
+		}
+
 		// Resolve model: CLI flag overrides config file
 		modelInput := cfg.Model
 		if modelFlag != "" {
@@ -177,7 +192,7 @@ Examples:
 
 			opts := prompt.Options{
 				NoBootstrap: noBootstrapFlag,
-				Include:     cfg.Include,
+				Include:     validIncludes,
 				RunID:       run.ID,
 				RunDir:      run.RelativeDir(dir),
 				Iteration:   i + 1,
