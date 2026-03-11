@@ -13,6 +13,7 @@ import (
 
 const (
 	colorGreen  = "\033[32m"
+	colorCyan   = "\033[36m"
 	colorYellow = "\033[33m"
 	colorRed    = "\033[31m"
 	colorDim    = "\033[2m"
@@ -156,6 +157,62 @@ var statusCmd = &cobra.Command{
 		fmt.Println()
 		fmt.Printf(" Summary: %d/%d tasks complete · %d pending · %d blocked\n",
 			totalDone, totalTasks, totalPending, totalBlocked)
+
+		// Find the global next workable task (first across all active plans)
+		var nextTaskID string
+		for _, p := range plans {
+			if p.completed {
+				continue
+			}
+			next := parser.FindNextIncomplete(p.tasks)
+			if next != nil {
+				nextTaskID = next.ID
+				break
+			}
+		}
+
+		// Detailed task list section
+		for _, p := range plans {
+			fmt.Println()
+			if p.completed {
+				fmt.Printf("%s%s Tasks — %s (archived)%s\n", colorDim, colorGreen, p.filename, colorReset)
+			} else {
+				fmt.Printf(" Tasks — %s\n", p.filename)
+			}
+			fmt.Println(" ──────────────────────────────────────────")
+
+			for _, t := range p.tasks {
+				var icon, color, prefix string
+
+				if t.IsComplete() {
+					icon = "✓"
+					if p.completed {
+						color = colorDim + colorGreen
+					} else {
+						color = colorGreen
+					}
+					prefix = "  "
+				} else if t.IsBlocked() {
+					icon = "⚠"
+					color = colorRed
+					prefix = "  "
+				} else if t.ID == nextTaskID {
+					icon = "○"
+					color = colorCyan
+					prefix = "→ "
+				} else {
+					icon = "○"
+					color = ""
+					prefix = "  "
+				}
+
+				if p.completed {
+					color = colorDim
+				}
+
+				fmt.Printf(" %s%s%s  %s: %s%s\n", color, prefix, icon, t.ID, t.Title, colorReset)
+			}
+		}
 
 		return nil
 	},

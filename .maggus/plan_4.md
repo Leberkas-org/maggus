@@ -44,16 +44,16 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want `maggus status` to also show me all individual tasks with their status so that I can see exactly which tasks are done, pending, or blocked.
 
 **Acceptance Criteria:**
-- [ ] Below the compact summary, a detailed section lists every task across all active plans
-- [ ] Each task line shows: status icon, task ID, task title
+- [x] Below the compact summary, a detailed section lists every task across all active plans
+- [x] Each task line shows: status icon, task ID, task title
   - `✓ TASK-003: Do the thing` (completed)
   - `○ TASK-004: Do the next thing` (pending)
   - `⚠ TASK-005: Blocked task` (blocked)
-- [ ] The next workable task (the one `maggus work` would pick up) is visually highlighted (e.g., `→` arrow prefix, bold or cyan color)
-- [ ] Tasks are grouped under their plan file heading
-- [ ] Completed plans are still shown but visually dimmed or marked as archived
-- [ ] Typecheck/lint passes
-- [ ] Verify in browser using dev-browser skill
+- [x] The next workable task (the one `maggus work` would pick up) is visually highlighted (e.g., `→` arrow prefix, bold or cyan color)
+- [x] Tasks are grouped under their plan file heading
+- [x] Completed plans are still shown but visually dimmed or marked as archived
+- [x] Typecheck/lint passes
+- [x] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available; maggus status is a CLI tool with no browser component
 
 ### TASK-403: `--plain` flag for `maggus status`
 **Description:** As a developer, I want to run `maggus status --plain` and get clean, uncolored text output so that I can pipe the output into other tools or scripts.
