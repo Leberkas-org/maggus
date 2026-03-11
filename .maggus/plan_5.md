@@ -38,12 +38,12 @@ The `status` command currently shows the Plans progress table at the top, follow
 **Description:** As a developer, I want `maggus status` to show task details before the Plans table so that I see actual work immediately, with the Plans table as a summary at the very bottom.
 
 **Acceptance Criteria:**
-- [ ] Output order is: Header → Summary → Task sections → Plans table
-- [ ] The current/active plan's task section appears directly above the Plans table
-- [ ] Within each active plan, both completed (`✓`) and pending (`o`) tasks are shown
-- [ ] The Plans table is the last thing printed
-- [ ] The `--plain` flag still works correctly
-- [ ] Typecheck/lint passes
+- [x] Output order is: Header → Summary → Task sections → Plans table
+- [x] The current/active plan's task section appears directly above the Plans table
+- [x] Within each active plan, both completed (`✓`) and pending (`o`) tasks are shown
+- [x] The Plans table is the last thing printed
+- [x] The `--plain` flag still works correctly
+- [x] Typecheck/lint passes
 
 ### TASK-503: Hide completed plans by default; add `--all` flag
 **Description:** As a developer, I want completed plans to be hidden by default so that the output stays focused on active work, with `--all` to reveal the full history.
