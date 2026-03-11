@@ -22,6 +22,7 @@ Give him an implementation plan and he'll grind through the tasks one by one, pr
 
 3. Run `maggus work` and Maggus will find the next incomplete task, build a focused prompt, and send it to Claude Code
 4. A task is complete when all its acceptance criteria are checked (`[x]`)
+5. After each task, Maggus commits the changes and moves to the next one
 
 ## Installation
 
@@ -33,6 +34,10 @@ go build -o maggus .
 ```
 
 Make sure `claude` (Claude Code CLI) is available on your PATH.
+
+### Pre-built binaries
+
+Pre-built binaries for Windows, macOS, and Linux are attached to each [GitHub Release](https://github.com/leberkas-org/maggus/releases).
 
 ## Usage
 
@@ -46,14 +51,81 @@ maggus work 10
 # Same thing with a flag
 maggus work --count 10
 maggus work -c 10
+
+# Override the model for this run
+maggus work --model opus
+maggus work --model sonnet
+
+# Skip reading bootstrap context files
+maggus work --no-bootstrap
 ```
 
-Maggus processes tasks sequentially, one at a time. After each task it re-reads the plan to pick up any changes the agent made, then moves to the next incomplete task.
+Maggus processes tasks sequentially, one at a time. After each task it commits the changes, re-reads the plan to pick up any updates, then moves to the next incomplete task.
+
+## Configuration
+
+Maggus reads `.maggus/config.yml` from the project root. All fields are optional.
+
+```yaml
+# .maggus/config.yml
+
+# Default model to use (short alias or full model ID)
+model: sonnet
+
+# Extra markdown files to include in the prompt bootstrap context
+include:
+  - ARCHITECTURE.md
+  - docs/PATTERNS.md
+```
+
+### Model aliases
+
+| Alias    | Full model ID                   |
+|----------|---------------------------------|
+| `sonnet` | `claude-sonnet-4-6`             |
+| `opus`   | `claude-opus-4-6`               |
+| `haiku`  | `claude-haiku-4-5-20251001`     |
+
+You can also pass a full model ID directly. The `--model` CLI flag overrides the config file.
+
+## Run Logs
+
+Every `maggus work` invocation creates a timestamped run directory under `.maggus/runs/<RUN_ID>/`:
+
+- `run.md` — start/end metadata, branch, model, commit range
+- `iteration-01.md`, `iteration-02.md`, … — per-task logs written by the agent
+
+These files are gitignored automatically.
+
+## Blocked Tasks
+
+If a task criterion cannot be completed (missing dependency, needs human input, external blocker), the agent marks it as:
+
+```
+- [x] ⚠️ BLOCKED: <original criterion text> — <reason>
+```
+
+Maggus treats blocked tasks as complete and skips them in future runs.
+
+## Completed Plans
+
+When all tasks in a plan file are done, Maggus renames it from `plan_N.md` to `plan_N_completed.md` so it is skipped in future runs.
+
+## Project Memory
+
+Each task instructs the agent to maintain `.maggus/MEMORY.md` — a portable project memory file with architecture decisions, build instructions, and conventions. This file is gitignored and intended to be synced separately across machines.
+
+## Startup Safety Pause
+
+Before starting work, Maggus prints a banner showing the model, iteration count, branch, and run ID, then waits 3 seconds. Press `Ctrl+C` during this window to abort before any agent is invoked.
+
+## Graceful Interruption
+
+Press `Ctrl+C` while a task is running to stop after the current task completes. The agent finishes its work, commits, and then Maggus exits cleanly.
 
 ## Roadmap
 
-- **Single binary distribution** -- Cross-platform builds for Windows, Mac, and Linux
-- **Agent choice** -- Support for AI agents beyond Claude Code
-- **Task management service** -- A hosted backend replacing the markdown files, like a Jira board optimized for Maggus to read and for humans to edit, plan, and supervise
-- **Status overview** -- A `maggus status` command to show task progress at a glance
-- **Auto-update checkboxes** -- Maggus marks tasks as done in the plan file after the agent completes them
+- **Agent choice** — Support for AI agents beyond Claude Code
+- **Task management service** — A hosted backend replacing the markdown files, like a Jira board optimized for Maggus to read and for humans to edit, plan, and supervise
+- **Status overview** — A `maggus status` command to show task progress at a glance
+- **Preview** — A `maggus list <amount>` command to show the next n tasks that should be worked on
