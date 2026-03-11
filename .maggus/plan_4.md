@@ -70,19 +70,19 @@ None of these require a network call or Claude. They are fast, local, purely inf
 **Description:** As a developer, I want to run `maggus list` to preview the next N upcoming workable tasks so that I can plan my session before starting `maggus work`.
 
 **Acceptance Criteria:**
-- [ ] `maggus list` is a registered subcommand
-- [ ] Default N is 5; can be overridden: `maggus list 10` or `maggus list --count 10`
-- [ ] Only shows tasks that are **workable** (incomplete AND not blocked) — skips completed and blocked tasks
-- [ ] Output format per task:
+- [x] `maggus list` is a registered subcommand
+- [x] Default N is 5; can be overridden: `maggus list 10` or `maggus list --count 10`
+- [x] Only shows tasks that are **workable** (incomplete AND not blocked) — skips completed and blocked tasks
+- [x] Output format per task:
   ```
   #1  TASK-004: Title of task
       As a user, I want ... (first line of description, truncated to 80 chars if needed)
   ```
-- [ ] If there are no workable tasks, prints: "No pending tasks found. All done!"
-- [ ] If fewer than N tasks are available, shows what exists without error
-- [ ] Accepts `--plain` flag (same behavior as in `status`)
-- [ ] Typecheck/lint passes
-- [ ] Verify in browser using dev-browser skill
+- [x] If there are no workable tasks, prints: "No pending tasks found. All done!"
+- [x] If fewer than N tasks are available, shows what exists without error
+- [x] Accepts `--plain` flag (same behavior as in `status`)
+- [x] Typecheck/lint passes
+- [x] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available; maggus list is a CLI tool with no browser component
 
 ### TASK-405: Include file validation with warnings
 **Description:** As a developer, I want Maggus to warn me if a file listed in `config.yml` under `include` doesn't exist so that I notice misconfiguration before wasting a full Claude run.
