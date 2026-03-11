@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dirnei/maggus/internal/config"
@@ -273,7 +274,17 @@ Examples:
 		// Push commits to remote
 		if completed > 0 {
 			fmt.Println("Pushing to remote...")
-			push := exec.Command("git", "push")
+			// Get current branch name for --set-upstream
+			branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+			branchCmd.Dir = dir
+			branchOut, branchErr := branchCmd.Output()
+			var push *exec.Cmd
+			if branchErr == nil {
+				branch := strings.TrimSpace(string(branchOut))
+				push = exec.Command("git", "push", "--set-upstream", "origin", branch)
+			} else {
+				push = exec.Command("git", "push")
+			}
 			push.Dir = dir
 			push.Stdout = os.Stdout
 			push.Stderr = os.Stderr
