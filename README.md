@@ -6,6 +6,8 @@ Your best and worst co-worker at the same time. A junior developer that just wor
 
 Give him an implementation plan and he'll grind through the tasks one by one, prompting an AI agent for each.
 
+> **Skill Marketplace:** Looking for ready-made skills? Check out the [Maggus Skills Marketplace](https://github.com/Leberkas-org/maggus-skills.git).
+
 ## How It Works
 
 1. Create an implementation plan using the **maggus-plan** skill (or write one manually)
