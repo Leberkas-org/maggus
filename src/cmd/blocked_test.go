@@ -1261,6 +1261,184 @@ func TestReloadTask(t *testing.T) {
 	}
 }
 
+// --- End-to-end tests (TASK-007) ---
+
+func TestE2E_NoBlockedTasksExitsCleanly(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Clean
+## User Stories
+### TASK-001: All good
+**Acceptance Criteria:**
+- [x] Done
+- [ ] In progress
+`)
+	restore := mockActionPicker(nil)
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	err := runBlocked(&cmd, dir)
+	if err != nil {
+		t.Fatalf("expected nil error (exit 0), got: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "No blocked tasks found.") {
+		t.Errorf("expected 'No blocked tasks found.', got:\n%s", out)
+	}
+}
+
+func TestE2E_MultipleBlockedTasksAcrossMultiplePlans(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: One
+## User Stories
+### TASK-001: Blocked in plan one
+**Description:** First plan blocker.
+**Acceptance Criteria:**
+- [ ] BLOCKED: needs API key
+`)
+	writeBlockedPlan(t, dir, "plan_2.md", `# Plan: Two
+## User Stories
+### TASK-010: Blocked in plan two
+**Description:** Second plan blocker.
+**Acceptance Criteria:**
+- [ ] BLOCKED: needs database
+`)
+	// Skip both
+	out := runBlockedWithActions(t, dir, []blockedAction{actionSkip, actionSkip})
+
+	if !strings.Contains(out, "Found 2 blocked task(s).") {
+		t.Errorf("expected 2 blocked tasks, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Blocked task 1 of 2") {
+		t.Errorf("expected progress 1 of 2, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Blocked task 2 of 2") {
+		t.Errorf("expected progress 2 of 2, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected TASK-001 from plan one, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-010") {
+		t.Errorf("expected TASK-010 from plan two, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Plan: plan_1.md") {
+		t.Errorf("expected plan_1.md in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Plan: plan_2.md") {
+		t.Errorf("expected plan_2.md in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Done. Summary: 0 unblocked, 0 resolved, 2 skipped") {
+		t.Errorf("expected summary, got:\n%s", out)
+	}
+}
+
+func TestE2E_AfterUnblockTaskNoLongerBlocked(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+## User Stories
+### TASK-001: Was blocked
+**Description:** Had a blocker.
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`)
+	// Unblock the criterion
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock})
+	if !strings.Contains(out, "Unblocked:") {
+		t.Fatalf("expected unblock confirmation, got:\n%s", out)
+	}
+
+	// Now verify the task is no longer blocked via collectBlockedTasks
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("expected 0 blocked tasks after unblock, got %d", len(blocked))
+	}
+
+	// Also verify the file content
+	data, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	content := string(data)
+	if strings.Contains(content, "BLOCKED:") {
+		t.Errorf("file should not contain BLOCKED: after unblock, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] waiting on API") {
+		t.Errorf("unblocked criterion should remain as unchecked, got:\n%s", content)
+	}
+}
+
+func TestE2E_AfterResolveLineGoneFromFile(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+## User Stories
+### TASK-001: Was blocked
+**Description:** Had a blocker.
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionResolve})
+	if !strings.Contains(out, "Resolved:") {
+		t.Fatalf("expected resolve confirmation, got:\n%s", out)
+	}
+
+	// Verify the line is completely gone
+	data, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	content := string(data)
+	if strings.Contains(content, "waiting on API") {
+		t.Errorf("resolved criterion should be completely gone, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] Normal criterion") {
+		t.Errorf("other criteria should be preserved, got:\n%s", content)
+	}
+
+	// Task should no longer be blocked
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("expected 0 blocked tasks after resolve, got %d", len(blocked))
+	}
+}
+
+func TestE2E_AbortMidWizardPreservesChanges(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: One
+## User Stories
+### TASK-001: First blocked
+**Description:** Blocked.
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+`)
+	writeBlockedPlan(t, dir, "plan_2.md", `# Plan: Two
+## User Stories
+### TASK-002: Second blocked
+**Description:** Blocked.
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+`)
+	// Unblock first task (plan 1), then abort on second task (plan 2)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionAbort})
+
+	if !strings.Contains(out, "Aborted. Summary: 1 unblocked, 0 resolved, 0 skipped") {
+		t.Errorf("expected abort summary, got:\n%s", out)
+	}
+
+	// Verify plan 1 was modified (change preserved)
+	data1, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	if strings.Contains(string(data1), "BLOCKED:") {
+		t.Errorf("plan_1.md should have been unblocked, got:\n%s", string(data1))
+	}
+
+	// Verify plan 2 was NOT modified (abort before processing)
+	data2, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_2.md"))
+	if !strings.Contains(string(data2), "BLOCKED: reason B") {
+		t.Errorf("plan_2.md should still be blocked, got:\n%s", string(data2))
+	}
+}
+
 func TestWrapText(t *testing.T) {
 	// Short text should not wrap
 	result := wrapText("hello", 80, "  ")

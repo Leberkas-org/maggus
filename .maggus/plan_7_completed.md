@@ -84,15 +84,15 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a developer, I want to verify the full `maggus blocked` flow works correctly and handles edge cases.
 
 **Acceptance Criteria:**
-- [ ] `maggus blocked` with no blocked tasks prints "No blocked tasks found." and exits 0
-- [ ] `maggus blocked` with one blocked task shows the detail view and action picker correctly
-- [ ] `maggus blocked` with multiple blocked tasks across multiple plans walks through all of them
-- [ ] Aborting mid-wizard preserves changes already made and prints a partial summary
-- [ ] After unblocking a task, `maggus status` no longer shows it as blocked
-- [ ] After resolving a criterion, the line is gone from the plan file
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` passes
-- [ ] `go test ./...` passes
+- [x] `maggus blocked` with no blocked tasks prints "No blocked tasks found." and exits 0
+- [x] `maggus blocked` with one blocked task shows the detail view and action picker correctly
+- [x] `maggus blocked` with multiple blocked tasks across multiple plans walks through all of them
+- [x] Aborting mid-wizard preserves changes already made and prints a partial summary
+- [x] After unblocking a task, `maggus status` no longer shows it as blocked
+- [x] After resolving a criterion, the line is gone from the plan file
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` passes
+- [x] `go test ./...` passes
 
 ## Functional Requirements
 
