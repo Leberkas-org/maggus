@@ -53,6 +53,17 @@ type CommitMsg struct {
 	Message string
 }
 
+// QuitMsg tells the TUI to exit.
+type QuitMsg struct{}
+
+// IterationStartMsg resets per-iteration state when a new iteration begins.
+type IterationStartMsg struct {
+	Current   int
+	Total     int
+	TaskID    string
+	TaskTitle string
+}
+
 // tickMsg is sent by the spinner ticker.
 type tickMsg time.Time
 
@@ -86,14 +97,15 @@ type tuiModel struct {
 	quitting    bool
 }
 
-func newTUIModel(model string, version string, fingerprint string, cancelFunc func()) tuiModel {
+// NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
+func NewTUIModel(model string, version string, fingerprint string, cancelFunc func()) tuiModel {
 	if model == "" {
 		model = "default"
 	}
 	return tuiModel{
 		version:     version,
 		fingerprint: fingerprint,
-		status:      "Starting...",
+		status:      "Waiting...",
 		output:      "-",
 		model:       model,
 		startTime:   time.Now(),
@@ -131,12 +143,27 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.frame = (m.frame + 1) % len(spinnerFrames)
 		return m, tickCmd()
 
+	case QuitMsg:
+		m.quitting = true
+		return m, tea.Quit
+
+	case IterationStartMsg:
+		m.currentIter = msg.Current
+		m.totalIters = msg.Total
+		m.taskID = msg.TaskID
+		m.taskTitle = msg.TaskTitle
+		// Reset per-iteration state
+		m.status = "Starting..."
+		m.output = "-"
+		m.toolHistory = nil
+		m.toolCount = 0
+		m.extras = ""
+		m.skills = nil
+		m.mcps = nil
+		m.startTime = time.Now()
+
 	case StatusMsg:
 		m.status = msg.Status
-		if msg.Status == "Done" || msg.Status == "Failed" {
-			m.quitting = true
-			return m, tea.Quit
-		}
 
 	case OutputMsg:
 		text := strings.TrimSpace(msg.Text)

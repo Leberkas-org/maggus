@@ -2,9 +2,9 @@ package runner
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
-	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
@@ -14,32 +14,12 @@ func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := RunClaude(ctx, func() {}, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task", nil)
+	m := NewTUIModel("", "dev", "test-fp", func() {})
+	p := tea.NewProgram(m)
+
+	err := RunClaude(ctx, "test prompt", "", p)
 	if err == nil {
 		t.Fatal("expected error when claude is not on PATH")
-	}
-}
-
-func TestRunClaudeCallsStopOnContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var stopCalled atomic.Bool
-
-	// Cancel immediately — the force-quit goroutine inside RunClaude
-	// should call stop(). But RunClaude will fail early because claude
-	// is not on PATH. We test the pattern indirectly by cancelling
-	// before the call and checking that stop is called.
-	cancel()
-
-	// Even though RunClaude will error (no claude binary), the goroutine
-	// that calls stop() on ctx.Done() will fire because ctx is already done.
-	_ = RunClaude(ctx, func() { stopCalled.Store(true) }, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task", nil)
-
-	// Give the goroutine a moment to fire
-	time.Sleep(50 * time.Millisecond)
-
-	if !stopCalled.Load() {
-		t.Fatal("expected stop() to be called after context cancellation")
 	}
 }
 

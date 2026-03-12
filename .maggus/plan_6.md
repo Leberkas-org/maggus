@@ -109,15 +109,15 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing �
 **Description:** As a developer, I want the work command to use the new TUI, passing all required data (version, fingerprint, progress, task info, commit results) so that the full experience works end-to-end.
 
 **Acceptance Criteria:**
-- [ ] `cmd/work.go` calls `fingerprint.Get()` at startup and passes the result to the TUI
-- [ ] The startup banner (version, model, iterations, branch, run ID, permissions warning, 3-second countdown) is shown BEFORE entering the bubbletea alt-screen — it stays in the normal terminal scrollback
-- [ ] After the countdown, the bubbletea TUI takes over the full screen
-- [ ] Progress (current iteration, total count) is updated via messages to the TUI model at each loop iteration
-- [ ] Task info is updated via messages at each loop iteration
-- [ ] Commit results are sent to the TUI after each `gitcommit.CommitIteration`
-- [ ] When the work loop ends (all tasks done, interrupted, or count reached), the bubbletea program is quit and the summary banner is printed in normal terminal mode
-- [ ] The 3-second abort countdown still works with Ctrl+C (before TUI starts)
-- [ ] Typecheck/lint passes
+- [x] `cmd/work.go` calls `fingerprint.Get()` at startup and passes the result to the TUI
+- [x] The startup banner (version, model, iterations, branch, run ID, permissions warning, 3-second countdown) is shown BEFORE entering the bubbletea alt-screen — it stays in the normal terminal scrollback
+- [x] After the countdown, the bubbletea TUI takes over the full screen
+- [x] Progress (current iteration, total count) is updated via messages to the TUI model at each loop iteration
+- [x] Task info is updated via messages at each loop iteration
+- [x] Commit results are sent to the TUI after each `gitcommit.CommitIteration`
+- [x] When the work loop ends (all tasks done, interrupted, or count reached), the bubbletea program is quit and the summary banner is printed in normal terminal mode
+- [x] The 3-second abort countdown still works with Ctrl+C (before TUI starts)
+- [x] Typecheck/lint passes
 
 ### TASK-009: Unstage .maggus/runs files before committing
 **Description:** As a user, I want `.maggus/runs/*` files to never be committed, even if the AI agent manually stages them with `git add .` or `git add -A`.

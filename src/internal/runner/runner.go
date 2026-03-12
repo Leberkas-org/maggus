@@ -49,14 +49,10 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 const maxToolHistory = 10
 const maxCommitHistory = 5
 
-// RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
-// The context can be used to kill the claude process (e.g., on Ctrl+C).
-// The stop function resets signal handling to default so a second Ctrl+C terminates immediately.
+// RunClaude invokes `claude -p <prompt>` with stream-json output and sends progress events
+// to the provided bubbletea program. The caller owns the TUI lifecycle.
 // If model is non-empty, --model <model> is added to the command arguments.
-// Version and fingerprint are displayed in the TUI header.
-// currentIter and totalIters control the progress bar in the header.
-// taskID and taskTitle are displayed in the task info section below the header.
-func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int, taskID string, taskTitle string, prevCommits []string) error {
+func RunClaude(ctx context.Context, prompt string, model string, p *tea.Program) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -104,36 +100,9 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string, ve
 		return fmt.Errorf("create stdout pipe: %w", err)
 	}
 
-	// Force-quit goroutine: after context cancellation, reset signal handling
-	// so a second Ctrl+C terminates the process immediately.
-	go func() {
-		<-ctx.Done()
-		stop()
-	}()
-
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start claude: %w", err)
 	}
-
-	// Create a child context so the TUI's Ctrl+C handler can cancel it,
-	// which triggers the cmd.Cancel process-kill logic.
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
-
-	// Create and start the bubbletea program.
-	m := newTUIModel(model, version, fingerprint, cancelFunc)
-	m.currentIter = currentIter
-	m.totalIters = totalIters
-	m.taskID = taskID
-	m.taskTitle = taskTitle
-	if len(prevCommits) > 0 {
-		m.commits = make([]string, len(prevCommits))
-		copy(m.commits, prevCommits)
-	}
-	p := tea.NewProgram(m, tea.WithAltScreen())
-
-	// Track whether we got interrupted via Ctrl+C in the TUI.
-	interrupted := false
 
 	// Read stdout in a goroutine and send events to the bubbletea program.
 	type scanResult struct {
@@ -200,42 +169,12 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string, ve
 		scanDone <- scanResult{eventCount: eventCount, scanErr: scanner.Err()}
 	}()
 
-	// Watch for context cancellation to send interrupt to the TUI.
-	go func() {
-		<-cancelCtx.Done()
-		p.Send(StatusMsg{Status: "Interrupted"})
-	}()
-
-	// Run the bubbletea program (blocks until quit).
-	finalModel, tuiErr := p.Run()
-	if tuiErr != nil {
-		// TUI failed to start — fall through to cleanup
-		cmd.Wait()
-		return fmt.Errorf("TUI error: %w", tuiErr)
-	}
-
-	// Check if the TUI quit due to Ctrl+C.
-	if fm, ok := finalModel.(tuiModel); ok && fm.status == "Interrupted" {
-		interrupted = true
-	}
-
 	// Wait for scanner to finish.
 	var result scanResult
 	select {
 	case result = <-scanDone:
-	case <-time.After(10 * time.Second):
-		// Scanner didn't finish in time after TUI quit
-	}
-
-	if interrupted {
-		cmd.Wait()
-		return ErrInterrupted
-	}
-
-	// Check for scanner errors
-	if result.scanErr != nil {
-		cmd.Wait()
-		return fmt.Errorf("reading claude output: %w", result.scanErr)
+	case <-time.After(10 * time.Minute):
+		// Safety timeout
 	}
 
 	if err := cmd.Wait(); err != nil {
@@ -247,6 +186,11 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string, ve
 			return fmt.Errorf("claude exited with error: %w\nstderr: %s", err, stderr)
 		}
 		return fmt.Errorf("claude exited with error: %w", err)
+	}
+
+	// Check for scanner errors
+	if result.scanErr != nil {
+		return fmt.Errorf("reading claude output: %w", result.scanErr)
 	}
 
 	// Detect silent failures
