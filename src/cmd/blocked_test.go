@@ -982,6 +982,285 @@ func TestRunBlockedErrorOnMissingLine(t *testing.T) {
 	}
 }
 
+// --- Wizard loop tests (TASK-006) ---
+
+// runBlockedWithActions is a helper that sets up a blocked plan directory,
+// mocks the action picker with the given actions, and runs the wizard.
+func runBlockedWithActions(t *testing.T, dir string, actions []blockedAction) string {
+	t.Helper()
+	restore := mockActionPicker(actions)
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	return buf.String()
+}
+
+func TestWizardProgressIndicator(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: First blocked
+**Description:** Blocked one.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+
+### TASK-002: Second blocked
+**Description:** Blocked two.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionSkip, actionSkip})
+
+	if !strings.Contains(out, "Blocked task 1 of 2") {
+		t.Errorf("expected 'Blocked task 1 of 2', got:\n%s", out)
+	}
+	if !strings.Contains(out, "Blocked task 2 of 2") {
+		t.Errorf("expected 'Blocked task 2 of 2', got:\n%s", out)
+	}
+}
+
+func TestWizardMovesToNextTask(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: First blocked
+**Description:** Blocked one.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+
+### TASK-002: Second blocked
+**Description:** Blocked two.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionSkip})
+
+	// Both tasks should appear in output
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected TASK-001 in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-002") {
+		t.Errorf("expected TASK-002 in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Unblocked:") {
+		t.Errorf("expected 'Unblocked:' for first task, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Skipped:") {
+		t.Errorf("expected 'Skipped:' for second task, got:\n%s", out)
+	}
+}
+
+func TestWizardSummaryAllProcessed(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: First blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+
+### TASK-002: Second blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+
+### TASK-003: Third blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason C
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionResolve, actionSkip})
+
+	if !strings.Contains(out, "Done. Summary: 1 unblocked, 1 resolved, 1 skipped") {
+		t.Errorf("expected summary line, got:\n%s", out)
+	}
+}
+
+func TestWizardSummaryOnAbort(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: First blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+
+### TASK-002: Second blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+
+### TASK-003: Third blocked
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason C
+`)
+	// Unblock first, then abort on second
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionAbort})
+
+	if !strings.Contains(out, "Aborted. Summary: 1 unblocked, 0 resolved, 0 skipped") {
+		t.Errorf("expected abort summary, got:\n%s", out)
+	}
+}
+
+func TestWizardRefreshesAfterAction(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has two blockers.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] BLOCKED: reason B
+`)
+	// Unblock first criterion, skip second
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionSkip})
+
+	// After unblocking "reason A", the refresh should show "reason A" without blocked marker
+	// Count how many times the task detail appears (initial + after each action that's not abort)
+	planCount := strings.Count(out, "Plan: plan_1.md")
+	// Initial render + 1 refresh after unblock + 1 refresh after skip = 3
+	if planCount < 2 {
+		t.Errorf("expected at least 2 renders of task detail (initial + refresh), got %d in:\n%s", planCount, out)
+	}
+
+	// After unblocking "reason A", it should appear as unblocked (non-blocked) in the refreshed view
+	if !strings.Contains(out, "Unblocked: BLOCKED: reason A") {
+		t.Errorf("expected 'Unblocked:' message, got:\n%s", out)
+	}
+}
+
+func TestWizardSummaryZeroCounts(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionSkip})
+
+	if !strings.Contains(out, "Done. Summary: 0 unblocked, 0 resolved, 1 skipped") {
+		t.Errorf("expected zero-count summary, got:\n%s", out)
+	}
+}
+
+func TestWizardMultipleCriteriaPerTask(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Multi blocked
+**Description:** Has three blockers.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] BLOCKED: reason B
+- [ ] BLOCKED: reason C
+`)
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionResolve, actionSkip})
+
+	if !strings.Contains(out, "Done. Summary: 1 unblocked, 1 resolved, 1 skipped") {
+		t.Errorf("expected correct summary for multi-criteria task, got:\n%s", out)
+	}
+}
+
+func TestWizardAbortMidTaskPrintsSummary(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Multi blocked
+**Description:** Has three blockers.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] BLOCKED: reason B
+- [ ] BLOCKED: reason C
+`)
+	// Unblock first, resolve second, abort on third
+	out := runBlockedWithActions(t, dir, []blockedAction{actionUnblock, actionResolve, actionAbort})
+
+	if !strings.Contains(out, "Aborted. Summary: 1 unblocked, 1 resolved, 0 skipped") {
+		t.Errorf("expected abort summary with partial counts, got:\n%s", out)
+	}
+}
+
+func TestWizardSummaryString(t *testing.T) {
+	s := wizardSummary{unblocked: 3, resolved: 2, skipped: 1}
+	expected := "3 unblocked, 2 resolved, 1 skipped"
+	if s.String() != expected {
+		t.Errorf("expected %q, got %q", expected, s.String())
+	}
+}
+
+func TestReloadTask(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Test task
+**Description:** A task.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] Normal
+`)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	task := reloadTask(planPath, "TASK-001")
+	if task == nil {
+		t.Fatal("expected non-nil task")
+	}
+	if task.ID != "TASK-001" {
+		t.Errorf("expected TASK-001, got %s", task.ID)
+	}
+
+	// Non-existent task returns nil
+	task = reloadTask(planPath, "TASK-999")
+	if task != nil {
+		t.Error("expected nil for non-existent task")
+	}
+
+	// Non-existent file returns nil
+	task = reloadTask(filepath.Join(dir, "nonexistent.md"), "TASK-001")
+	if task != nil {
+		t.Error("expected nil for non-existent file")
+	}
+}
+
 func TestWrapText(t *testing.T) {
 	// Short text should not wrap
 	result := wrapText("hello", 80, "  ")

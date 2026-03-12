@@ -72,13 +72,13 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a user, I want the wizard to walk me through all blocked tasks one by one, showing the detail view and action picker for each, until all are handled or I abort.
 
 **Acceptance Criteria:**
-- [ ] After handling all blocked criteria in one task, the wizard moves to the next blocked task
-- [ ] A progress indicator shows which blocked task the user is on (e.g. "Blocked task 2 of 5")
-- [ ] After each action (unblock/resolve/skip), the screen is refreshed to show the updated state of the current task's criteria
-- [ ] When all blocked tasks have been processed, the wizard prints a summary: N unblocked, N resolved, N skipped
-- [ ] Abort at any point prints the same summary for actions taken so far
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] After handling all blocked criteria in one task, the wizard moves to the next blocked task
+- [x] A progress indicator shows which blocked task the user is on (e.g. "Blocked task 2 of 5")
+- [x] After each action (unblock/resolve/skip), the screen is refreshed to show the updated state of the current task's criteria
+- [x] When all blocked tasks have been processed, the wizard prints a summary: N unblocked, N resolved, N skipped
+- [x] Abort at any point prints the same summary for actions taken so far
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-007: End-to-end test and polish
 **Description:** As a developer, I want to verify the full `maggus blocked` flow works correctly and handles edge cases.

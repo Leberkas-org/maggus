@@ -282,6 +282,32 @@ func resolveCriterion(filePath string, c parser.Criterion) error {
 	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0o644)
 }
 
+// wizardSummary tracks action counts during the wizard loop.
+type wizardSummary struct {
+	unblocked int
+	resolved  int
+	skipped   int
+}
+
+func (s wizardSummary) String() string {
+	return fmt.Sprintf("%d unblocked, %d resolved, %d skipped", s.unblocked, s.resolved, s.skipped)
+}
+
+// reloadTask re-parses a plan file and returns the task matching the given ID.
+// Returns the updated task or nil if not found.
+func reloadTask(sourceFile, taskID string) *parser.Task {
+	tasks, err := parser.ParseFile(sourceFile)
+	if err != nil {
+		return nil
+	}
+	for _, t := range tasks {
+		if t.ID == taskID {
+			return &t
+		}
+	}
+	return nil
+}
+
 func runBlocked(cmd *cobra.Command, dir string) error {
 	out := cmd.OutOrStdout()
 
@@ -303,8 +329,11 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 	fmt.Fprintf(out, "Found %d blocked task(s).\n", len(blocked))
 
 	termWidth := getTerminalWidth()
+	summary := wizardSummary{}
 	aborted := false
-	for _, task := range blocked {
+
+	for i, task := range blocked {
+		fmt.Fprintf(out, "\n%sBlocked task %d of %d%s\n", colorCyan, i+1, len(blocked), colorReset)
 		renderBlockedTaskDetail(out, task, termWidth)
 
 		for _, c := range task.Criteria {
@@ -323,28 +352,44 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
 				} else {
 					fmt.Fprintf(out, "   %s→ Unblocked: %s%s\n", colorGreen, c.Text, colorReset)
+					summary.unblocked++
 				}
 			case actionResolve:
 				if err := resolveCriterion(task.SourceFile, c); err != nil {
 					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
 				} else {
 					fmt.Fprintf(out, "   %s→ Resolved: %s%s\n", colorYellow, c.Text, colorReset)
+					summary.resolved++
 				}
 			case actionSkip:
 				fmt.Fprintf(out, "   → Skipped: %s\n", c.Text)
+				summary.skipped++
 			case actionAbort:
-				fmt.Fprintln(out, "\n   Aborted.")
 				aborted = true
 			}
 
 			if aborted {
 				break
 			}
+
+			// Refresh the task detail view after each action
+			if updated := reloadTask(task.SourceFile, task.ID); updated != nil {
+				fmt.Fprintln(out)
+				renderBlockedTaskDetail(out, *updated, termWidth)
+			}
 		}
 
 		if aborted {
 			break
 		}
+	}
+
+	// Print summary
+	fmt.Fprintf(out, "\n%s──────────────────────────────────────────%s\n", colorDim, colorReset)
+	if aborted {
+		fmt.Fprintf(out, " Aborted. Summary: %s\n", summary)
+	} else {
+		fmt.Fprintf(out, " Done. Summary: %s\n", summary)
 	}
 
 	return nil
