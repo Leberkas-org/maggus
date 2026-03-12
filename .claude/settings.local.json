@@ -12,7 +12,8 @@
       "Bash(ls:*)",
       "Bash(xargs wc:*)",
       "Bash(python -c *)",
-      "Bash(cd \"C:/c/maggus\" && python fix_status.py && rm fix_status.py)"
+      "Bash(cd \"C:/c/maggus\" && python fix_status.py && rm fix_status.py)",
+      "Bash(ls C:/c/maggus/.maggus/plan_*.md 2>/dev/null | sort -t_ -k2 -n | tail -1)"
     ]
   }
 }

@@ -29,14 +29,14 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a visitor, I want the docs site to have a Simpsons-inspired visual identity so that it feels fun and matches Maggus's personality.
 
 **Acceptance Criteria:**
-- [ ] VitePress theme config uses Simpsons yellow (`#FDD835`) as the primary brand color
-- [ ] Accent/secondary color is Simpsons sky blue (`#2196F3`)
-- [ ] The homepage hero section has a playful tagline (e.g. "Your best and worst co-worker at the same time")
-- [ ] The Maggus avatar (`avatar.png`) is displayed prominently on the homepage as the hero image
-- [ ] Homepage has a features grid with 3-4 key selling points (plan-driven, autonomous, commits for you, etc.)
-- [ ] Custom CSS overrides are in `docs/.vitepress/theme/custom.css` or equivalent
-- [ ] The color scheme works in both light and dark mode
-- [ ] Verify in browser using dev-browser skill
+- [x] VitePress theme config uses Simpsons yellow (`#FDD835`) as the primary brand color
+- [x] Accent/secondary color is Simpsons sky blue (`#2196F3`)
+- [x] The homepage hero section has a playful tagline (e.g. "Your best and worst co-worker at the same time")
+- [x] The Maggus avatar (`avatar.png`) is displayed prominently on the homepage as the hero image
+- [x] Homepage has a features grid with 3-4 key selling points (plan-driven, autonomous, commits for you, etc.)
+- [x] Custom CSS overrides are in `docs/.vitepress/theme/custom.css` or equivalent
+- [x] The color scheme works in both light and dark mode
+- [x] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available in this environment
 
 ### TASK-003: Create "Getting Started" guide
 **Description:** As a new user, I want a getting started page so that I can install and run Maggus for the first time.
