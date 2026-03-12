@@ -27,13 +27,13 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a developer, I want to parse all active plans and collect every blocked task with its plan filename so the wizard knows what to present.
 
 **Acceptance Criteria:**
-- [ ] Reuses `parser.ParsePlans(dir)` to get all tasks
-- [ ] Filters to only tasks where `task.IsBlocked()` is true
-- [ ] Each blocked task retains its `SourceFile` so the wizard can display the plan name and later modify the correct file
-- [ ] The list is ordered by plan file name, then by document order within each plan (same order as `parser.ParsePlans` returns)
-- [ ] If no blocked tasks exist, prints "No blocked tasks found." and exits cleanly
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] Reuses `parser.ParsePlans(dir)` to get all tasks
+- [x] Filters to only tasks where `task.IsBlocked()` is true
+- [x] Each blocked task retains its `SourceFile` so the wizard can display the plan name and later modify the correct file
+- [x] The list is ordered by plan file name, then by document order within each plan (same order as `parser.ParsePlans` returns)
+- [x] If no blocked tasks exist, prints "No blocked tasks found." and exits cleanly
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-003: Build the blocked task detail view
 **Description:** As a user, I want to see the full context of a blocked task — plan name, task ID, title, description, and all acceptance criteria (with blocked ones highlighted) — so I can make an informed decision.

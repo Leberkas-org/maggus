@@ -152,3 +152,126 @@ func TestBlockedHelpDescription(t *testing.T) {
 		t.Error("blockedCmd.Long should not be empty")
 	}
 }
+
+func TestCollectBlockedTasksRetainsSourceFile(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_2.md", `# Plan: Two
+
+## User Stories
+
+### TASK-010: Blocked in plan two
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: needs dependency
+`)
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 1 {
+		t.Fatalf("expected 1 blocked task, got %d", len(blocked))
+	}
+	expectedFile := filepath.Join(dir, ".maggus", "plan_2.md")
+	if blocked[0].SourceFile != expectedFile {
+		t.Errorf("expected SourceFile %q, got %q", expectedFile, blocked[0].SourceFile)
+	}
+}
+
+func TestCollectBlockedTasksOrderedByPlanThenDocument(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: One
+
+## User Stories
+
+### TASK-002: Second in plan one
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason B
+
+### TASK-001: First in plan one
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+`)
+	writeBlockedPlan(t, dir, "plan_2.md", `# Plan: Two
+
+## User Stories
+
+### TASK-003: In plan two
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason C
+`)
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 3 {
+		t.Fatalf("expected 3 blocked tasks, got %d", len(blocked))
+	}
+	// plan_1.md tasks come first in document order, then plan_2.md
+	if blocked[0].ID != "TASK-002" {
+		t.Errorf("expected first blocked task TASK-002, got %s", blocked[0].ID)
+	}
+	if blocked[1].ID != "TASK-001" {
+		t.Errorf("expected second blocked task TASK-001, got %s", blocked[1].ID)
+	}
+	if blocked[2].ID != "TASK-003" {
+		t.Errorf("expected third blocked task TASK-003, got %s", blocked[2].ID)
+	}
+}
+
+func TestCollectBlockedTasksMultiplePlansSourceFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: One
+
+## User Stories
+
+### TASK-001: Blocked in one
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason
+`)
+	writeBlockedPlan(t, dir, "plan_3.md", `# Plan: Three
+
+## User Stories
+
+### TASK-005: Blocked in three
+**Description:** Blocked.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason
+`)
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 2 {
+		t.Fatalf("expected 2 blocked tasks, got %d", len(blocked))
+	}
+	plan1 := filepath.Join(dir, ".maggus", "plan_1.md")
+	plan3 := filepath.Join(dir, ".maggus", "plan_3.md")
+	if blocked[0].SourceFile != plan1 {
+		t.Errorf("first task SourceFile: expected %q, got %q", plan1, blocked[0].SourceFile)
+	}
+	if blocked[1].SourceFile != plan3 {
+		t.Errorf("second task SourceFile: expected %q, got %q", plan3, blocked[1].SourceFile)
+	}
+}
+
+func TestCollectBlockedTasksEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// No .maggus dir at all
+	blocked, err := collectBlockedTasks(dir)
+	if err != nil {
+		t.Fatalf("collectBlockedTasks: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("expected 0 blocked tasks, got %d", len(blocked))
+	}
+}

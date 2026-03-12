@@ -3,9 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/dirnei/maggus/internal/parser"
 	"github.com/spf13/cobra"
@@ -25,36 +22,34 @@ unblock, resolve, or skip each blocked criterion interactively.`,
 	},
 }
 
+// collectBlockedTasks parses all active plans and returns only blocked tasks,
+// ordered by plan file name then document order within each plan.
+func collectBlockedTasks(dir string) ([]parser.Task, error) {
+	tasks, err := parser.ParsePlans(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var blocked []parser.Task
+	for _, t := range tasks {
+		if t.IsBlocked() {
+			blocked = append(blocked, t)
+		}
+	}
+	return blocked, nil
+}
+
 func runBlocked(cmd *cobra.Command, dir string) error {
 	out := cmd.OutOrStdout()
 
-	maggusDir := filepath.Join(dir, ".maggus")
-	if _, err := os.Stat(maggusDir); os.IsNotExist(err) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		fmt.Fprintln(out, "No blocked tasks found.")
 		return nil
 	}
 
-	pattern := filepath.Join(maggusDir, "plan_*.md")
-	files, err := filepath.Glob(pattern)
+	blocked, err := collectBlockedTasks(dir)
 	if err != nil {
-		return fmt.Errorf("glob plans: %w", err)
-	}
-	sort.Strings(files)
-
-	var blocked []parser.Task
-	for _, f := range files {
-		if strings.HasSuffix(f, "_completed.md") {
-			continue
-		}
-		tasks, err := parser.ParseFile(f)
-		if err != nil {
-			return fmt.Errorf("parse %s: %w", f, err)
-		}
-		for _, t := range tasks {
-			if t.IsBlocked() {
-				blocked = append(blocked, t)
-			}
-		}
+		return err
 	}
 
 	if len(blocked) == 0 {
