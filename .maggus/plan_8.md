@@ -78,13 +78,13 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a user, I want to understand all configuration options so that I can customize Maggus for my project.
 
 **Acceptance Criteria:**
-- [ ] Page at `docs/reference/configuration.md`
-- [ ] Documents `.maggus/config.yml` with all fields (`model`, `include`)
-- [ ] Includes the model alias table (sonnet, opus, haiku → full IDs)
-- [ ] Explains how `--model` CLI flag overrides config
-- [ ] Explains the `include` paths for additional context files
-- [ ] Documents bootstrap context files (CLAUDE.md, AGENTS.md, etc.) and the `--no-bootstrap` flag
-- [ ] Navigation sidebar shows this page under "Reference"
+- [x] Page at `docs/reference/configuration.md`
+- [x] Documents `.maggus/config.yml` with all fields (`model`, `include`)
+- [x] Includes the model alias table (sonnet, opus, haiku → full IDs)
+- [x] Explains how `--model` CLI flag overrides config
+- [x] Explains the `include` paths for additional context files
+- [x] Documents bootstrap context files (CLAUDE.md, AGENTS.md, etc.) and the `--no-bootstrap` flag
+- [x] Navigation sidebar shows this page under "Reference"
 
 ### TASK-007: Create "Concepts" page covering run logs, memory, and TUI
 **Description:** As a user, I want to understand Maggus's runtime behavior so that I know what to expect when it runs.

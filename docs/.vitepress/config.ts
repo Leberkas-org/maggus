@@ -28,7 +28,8 @@ export default defineConfig({
         {
           text: 'Reference',
           items: [
-            { text: 'CLI Commands', link: '/reference/commands' }
+            { text: 'CLI Commands', link: '/reference/commands' },
+            { text: 'Configuration', link: '/reference/configuration' }
           ]
         }
       ]
