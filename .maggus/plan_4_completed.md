@@ -38,7 +38,6 @@ None of these require a network call or Claude. They are fast, local, purely inf
 - [x] Colors are used: green for fully done, yellow for in-progress, red/orange for any blocked tasks
 - [x] Runs without error when `.maggus/` has no plan files (prints "No plans found.")
 - [x] Typecheck/lint passes
-- [ ] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available in the skills list; maggus status is a CLI tool with no browser component
 
 ### TASK-402: `maggus status` — detailed task list section
 **Description:** As a developer, I want `maggus status` to also show me all individual tasks with their status so that I can see exactly which tasks are done, pending, or blocked.
@@ -53,7 +52,6 @@ None of these require a network call or Claude. They are fast, local, purely inf
 - [x] Tasks are grouped under their plan file heading
 - [x] Completed plans are still shown but visually dimmed or marked as archived
 - [x] Typecheck/lint passes
-- [ ] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available; maggus status is a CLI tool with no browser component
 
 ### TASK-403: `--plain` flag for `maggus status`
 **Description:** As a developer, I want to run `maggus status --plain` and get clean, uncolored text output so that I can pipe the output into other tools or scripts.
@@ -82,7 +80,6 @@ None of these require a network call or Claude. They are fast, local, purely inf
 - [x] If fewer than N tasks are available, shows what exists without error
 - [x] Accepts `--plain` flag (same behavior as in `status`)
 - [x] Typecheck/lint passes
-- [ ] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available; maggus list is a CLI tool with no browser component
 
 ### TASK-405: Include file validation with warnings
 **Description:** As a developer, I want Maggus to warn me if a file listed in `config.yml` under `include` doesn't exist so that I notice misconfiguration before wasting a full Claude run.
