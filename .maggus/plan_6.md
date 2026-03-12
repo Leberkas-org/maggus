@@ -86,12 +86,12 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing �
 **Description:** As a user, I want the existing status display (output, tools, extras, model, elapsed time) to work within the new fixed-layout TUI.
 
 **Acceptance Criteria:**
-- [ ] The status section renders: spinner + status, output (last line), tool history (last 10), extras, model, elapsed time — same information as today
-- [ ] Spinner animates via bubbletea tick messages (100ms interval)
-- [ ] Tool history shows the last 10 tools with `│` prefix and `▶` for the most recent, same as current behavior
-- [ ] The section occupies a fixed vertical space (status + output + 10 tool lines + extras + model + elapsed = predictable height)
-- [ ] All stream events (assistant text, tool_use, result) update the model via messages, same parsing logic as today
-- [ ] Typecheck/lint passes
+- [x] The status section renders: spinner + status, output (last line), tool history (last 10), extras, model, elapsed time — same information as today
+- [x] Spinner animates via bubbletea tick messages (100ms interval)
+- [x] Tool history shows the last 10 tools with `│` prefix and `▶` for the most recent, same as current behavior
+- [x] The section occupies a fixed vertical space (status + output + 10 tool lines + extras + model + elapsed = predictable height)
+- [x] All stream events (assistant text, tool_use, result) update the model via messages, same parsing logic as today
+- [x] Typecheck/lint passes
 
 ### TASK-007: Build the commit message scrolling region
 **Description:** As a user, I want commit messages to appear in a small scrolling area that does not push the rest of the UI off-screen, similar to how tool history works.
