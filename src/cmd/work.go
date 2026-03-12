@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dirnei/maggus/internal/config"
+	"github.com/dirnei/maggus/internal/fingerprint"
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
 	"github.com/dirnei/maggus/internal/gitignore"
@@ -129,6 +131,13 @@ Examples:
 			_ = branch
 		}
 
+		// Get host fingerprint
+		hostFingerprint, err := fingerprint.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not get host fingerprint: %v\n", err)
+			hostFingerprint = "unknown"
+		}
+
 		// Create run tracker
 		modelDisplay := resolvedModel
 		if modelDisplay == "" {
@@ -156,7 +165,7 @@ Examples:
 		fmt.Println()
 		fmt.Println("Press Ctrl+C within 3 seconds to abort...")
 
-		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 
 		select {
 		case <-pauseCtx.Done():
@@ -170,73 +179,120 @@ Examples:
 
 		fmt.Println()
 
-		// Set up Ctrl+C handling for the work loop
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer cancel()
+		// Set up signal handling for the work loop.
+		// During bubbletea's alt-screen (raw mode), Ctrl+C is captured as a key
+		// event rather than generating SIGINT. The TUI's KeyCtrlC handler calls
+		// workCancel() to cancel the work context. The signal handler covers
+		// the time between iterations when bubbletea is not consuming input.
+		sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
+		defer sigStop()
 
+		workCtx, workCancel := context.WithCancel(context.Background())
+		defer workCancel()
+
+		// Propagate signal cancellation to the work context.
+		go func() {
+			<-sigCtx.Done()
+			sigStop()    // reset signals so second Ctrl+C force-kills
+			workCancel() // cancel the work context
+		}()
+
+		// TUI cancel function: resets signals for force-quit + cancels work context.
+		tuiCancel := func() {
+			sigStop()
+			workCancel()
+		}
+
+		// Create the persistent TUI that lives across all iterations.
+		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+
+		// Run the work loop in a goroutine, sending events to the TUI.
+		var workErr error
 		completed := 0
-		for i := 0; i < count; i++ {
-			// Check if interrupted between iterations
-			if ctx.Err() != nil {
-				fmt.Println("\nInterrupted. Stopping loop.")
-				break
-			}
+		go func() {
+			defer func() {
+				p.Send(runner.QuitMsg{})
+			}()
 
-			next := parser.FindNextIncomplete(tasks)
-			if next == nil {
-				fmt.Println("All tasks are complete!")
-				break
-			}
-
-			fmt.Printf("========== Iteration %d of %d ==========\n", i+1, count)
-			fmt.Printf("Working on %s: %s...\n", next.ID, next.Title)
-
-			opts := prompt.Options{
-				NoBootstrap: noBootstrapFlag,
-				Include:     validIncludes,
-				RunID:       run.ID,
-				RunDir:      run.RelativeDir(dir),
-				Iteration:   i + 1,
-				IterLog:     run.RelativeIterationLogPath(dir, i+1),
-			}
-
-			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, p, resolvedModel); err != nil {
-				if err == runner.ErrInterrupted {
-					fmt.Println("\nInterrupted. Stopping loop.")
+			for i := 0; i < count; i++ {
+				if workCtx.Err() != nil {
 					break
 				}
-				return fmt.Errorf("task %s failed: %w", next.ID, err)
-			}
 
-			// Re-parse to pick up any changes the agent made
-			tasks, err = parser.ParsePlans(dir)
-			if err != nil {
-				return fmt.Errorf("re-parse plans: %w", err)
-			}
+				next := parser.FindNextIncomplete(tasks)
+				if next == nil {
+					break
+				}
 
-			// Rename fully completed plan files before committing so the rename is included
-			if err := parser.MarkCompletedPlans(dir); err != nil {
-				fmt.Printf("Warning: could not mark completed plans: %v\n", err)
-			}
+				// Signal iteration start to the TUI (resets per-iteration state).
+				p.Send(runner.IterationStartMsg{
+					Current:   i + 1,
+					Total:     count,
+					TaskID:    next.ID,
+					TaskTitle: next.Title,
+				})
 
-			// Stage any plan renames so they are included in the commit
-			stagePlans := exec.Command("git", "add", "--", ".maggus/")
-			stagePlans.Dir = dir
-			stagePlans.CombinedOutput() // ignore errors
+				opts := prompt.Options{
+					NoBootstrap: noBootstrapFlag,
+					Include:     validIncludes,
+					RunID:       run.ID,
+					RunDir:      run.RelativeDir(dir),
+					Iteration:   i + 1,
+					IterLog:     run.RelativeIterationLogPath(dir, i+1),
+				}
 
-			// Commit using COMMIT.md
-			commitResult, err := gitcommit.CommitIteration(dir)
-			if err != nil {
-				return fmt.Errorf("commit after %s: %w", next.ID, err)
-			}
-			if commitResult.Committed {
-				fmt.Printf("Committed: %s\n", commitResult.Message)
-			} else {
-				fmt.Println(commitResult.Message)
-			}
+				builtPrompt := prompt.Build(next, opts)
+				if err := runner.RunClaude(workCtx, builtPrompt, resolvedModel, p); err != nil {
+					if workCtx.Err() != nil {
+						break
+					}
+					workErr = fmt.Errorf("task %s failed: %w", next.ID, err)
+					return
+				}
 
-			completed++
+				// Re-parse to pick up any changes the agent made
+				var parseErr error
+				tasks, parseErr = parser.ParsePlans(dir)
+				if parseErr != nil {
+					workErr = fmt.Errorf("re-parse plans: %w", parseErr)
+					return
+				}
+
+				// Rename fully completed plan files before committing
+				if markErr := parser.MarkCompletedPlans(dir); markErr != nil {
+					// non-fatal
+				}
+
+				// Stage any plan renames so they are included in the commit
+				stagePlans := exec.Command("git", "add", "--", ".maggus/")
+				stagePlans.Dir = dir
+				stagePlans.CombinedOutput() // ignore errors
+
+				// Commit using COMMIT.md
+				commitResult, commitErr := gitcommit.CommitIteration(dir)
+				if commitErr != nil {
+					workErr = fmt.Errorf("commit after %s: %w", next.ID, commitErr)
+					return
+				}
+				if commitResult.Committed {
+					p.Send(runner.CommitMsg{Message: commitResult.Message})
+				}
+
+				completed++
+
+				// Update progress to reflect completed iteration.
+				p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
+			}
+		}()
+
+		// Run the TUI (blocks until QuitMsg or Ctrl+C).
+		if _, tuiErr := p.Run(); tuiErr != nil {
+			return fmt.Errorf("TUI error: %w", tuiErr)
+		}
+
+		if workErr != nil {
+			return workErr
 		}
 
 		// Finalize run log

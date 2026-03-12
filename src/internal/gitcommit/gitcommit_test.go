@@ -143,6 +143,53 @@ func TestCommitIteration_Success(t *testing.T) {
 	}
 }
 
+func TestCommitIteration_UnstagesMaggusRuns(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// Create .maggus/runs/ files and stage them
+	runsDir := filepath.Join(dir, ".maggus", "runs", "20260312")
+	os.MkdirAll(runsDir, 0755)
+	os.WriteFile(filepath.Join(runsDir, "iteration-01.md"), []byte("log\n"), 0644)
+	run(t, dir, "git", "add", ".maggus/runs/")
+
+	// Create .maggus/MEMORY.md and stage it
+	os.WriteFile(filepath.Join(dir, ".maggus", "MEMORY.md"), []byte("memory\n"), 0644)
+	run(t, dir, "git", "add", ".maggus/MEMORY.md")
+
+	// Create a real change to commit
+	os.WriteFile(filepath.Join(dir, "feature.go"), []byte("package main\n"), 0644)
+	run(t, dir, "git", "add", "feature.go")
+
+	// Create COMMIT.md
+	os.WriteFile(filepath.Join(dir, commitFile), []byte("feat: add feature\n"), 0644)
+
+	result, err := CommitIteration(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Committed {
+		t.Error("expected Committed=true")
+	}
+
+	// Verify .maggus/runs/ files were NOT committed
+	cmd := exec.Command("git", "show", "--name-only", "--format=", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git show failed: %v", err)
+	}
+	committed := string(out)
+	if strings.Contains(committed, ".maggus/runs/") {
+		t.Error(".maggus/runs/ files should not be in the commit")
+	}
+	if strings.Contains(committed, ".maggus/MEMORY.md") {
+		t.Error(".maggus/MEMORY.md should not be in the commit")
+	}
+	if !strings.Contains(committed, "feature.go") {
+		t.Error("feature.go should be in the commit")
+	}
+}
+
 func TestCommitIteration_NothingStaged(t *testing.T) {
 	dir := initGitRepo(t)
 

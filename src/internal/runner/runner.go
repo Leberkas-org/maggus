@@ -10,26 +10,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"golang.org/x/term"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ErrInterrupted is returned when the user presses Ctrl+C.
 var ErrInterrupted = fmt.Errorf("interrupted by user")
-
-// ANSI color codes
-const (
-	colorReset   = "\033[0m"
-	colorGreen   = "\033[32m"
-	colorYellow  = "\033[33m"
-	colorBlue    = "\033[34m"
-	colorCyan    = "\033[36m"
-	colorGray    = "\033[90m"
-	colorRed     = "\033[31m"
-	colorBold    = "\033[1m"
-)
 
 type streamEvent struct {
 	Type    string          `json:"type"`
@@ -60,205 +47,12 @@ type toolInput struct {
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 const maxToolHistory = 10
+const maxCommitHistory = 5
 
-// display holds the compact status block state.
-type display struct {
-	mu          sync.Mutex
-	status      string
-	toolHistory []string // last N tools used
-	output      string
-	extras      string // skills + MCPs
-	model       string
-	toolCount   int
-	skills      []string
-	mcps        []string
-	startTime   time.Time
-	rendered    bool
-	lastLines   int // how many lines we rendered last time
-	frame       int
-	done        chan struct{}
-}
-
-func termWidth() int {
-	w, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || w <= 0 {
-		return 120
-	}
-	return w
-}
-
-func newDisplay(model string) *display {
-	if model == "" {
-		model = "default"
-	}
-	d := &display{
-		status:    "Starting...",
-		output:    "-",
-		model:     model,
-		startTime: time.Now(),
-		done:      make(chan struct{}),
-	}
-	// Start spinner goroutine
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-d.done:
-				return
-			case <-ticker.C:
-				d.mu.Lock()
-				d.frame = (d.frame + 1) % len(spinnerFrames)
-				d.renderLocked()
-				d.mu.Unlock()
-			}
-		}
-	}()
-	return d
-}
-
-func (d *display) stop() {
-	close(d.done)
-}
-
-func (d *display) render() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.renderLocked()
-}
-
-func (d *display) renderLocked() {
-	elapsed := time.Since(d.startTime).Truncate(time.Second)
-	w := termWidth()
-
-	// Label "    Tools:   " = 13 chars
-	contentWidth := w - 13
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
-
-	spinner := colorCyan + spinnerFrames[d.frame] + colorReset
-
-	statusColor := colorYellow
-	if d.status == "Done" {
-		statusColor = colorGreen
-		spinner = colorGreen + "✓" + colorReset
-	} else if d.status == "Failed" {
-		statusColor = colorRed
-		spinner = colorRed + "✗" + colorReset
-	}
-
-	extrasStr := d.extras
-	if extrasStr == "" {
-		extrasStr = "-"
-	}
-
-	var lines []string
-	lines = append(lines, fmt.Sprintf("  %s %sStatus:%s  %s%s%s", spinner, colorBold, colorReset, statusColor, d.status, colorReset))
-	lines = append(lines, fmt.Sprintf("    %sOutput:%s  %s", colorBold, colorReset, truncate(d.output, contentWidth)))
-
-	// Tool history
-	lines = append(lines, fmt.Sprintf("    %sTools:%s   %s(%d total)%s", colorBold, colorReset, colorGray, d.toolCount, colorReset))
-	for i, t := range d.toolHistory {
-		prefix := colorGray + "│" + colorReset
-		if i == len(d.toolHistory)-1 {
-			prefix = colorBlue + "▶" + colorReset
-		}
-		lines = append(lines, fmt.Sprintf("    %s %s%s%s", prefix, colorBlue, truncate(t, contentWidth), colorReset))
-	}
-	// Pad empty lines if fewer than maxToolHistory
-	for i := len(d.toolHistory); i < maxToolHistory; i++ {
-		lines = append(lines, "")
-	}
-
-	lines = append(lines, fmt.Sprintf("    %sExtras:%s  %s%s%s", colorBold, colorReset, colorCyan, truncate(extrasStr, contentWidth), colorReset))
-	lines = append(lines, fmt.Sprintf("    %sModel:%s   %s%s%s", colorBold, colorReset, colorGray, d.model, colorReset))
-	lines = append(lines, fmt.Sprintf("    %sElapsed:%s %s%s%s", colorBold, colorReset, colorGray, elapsed, colorReset))
-
-	// Move cursor up to overwrite previous block
-	if d.rendered && d.lastLines > 0 {
-		fmt.Printf("\033[%dA", d.lastLines)
-	}
-	d.rendered = true
-	d.lastLines = len(lines)
-
-	for _, line := range lines {
-		fmt.Printf("\033[2K%s\n", line)
-	}
-}
-
-func (d *display) setStatus(s string) {
-	d.mu.Lock()
-	d.status = s
-	d.mu.Unlock()
-}
-
-func (d *display) setTool(t string) {
-	d.mu.Lock()
-	d.toolHistory = append(d.toolHistory, t)
-	if len(d.toolHistory) > maxToolHistory {
-		d.toolHistory = d.toolHistory[len(d.toolHistory)-maxToolHistory:]
-	}
-	d.toolCount++
-	d.mu.Unlock()
-}
-
-func (d *display) addSkill(name string) {
-	d.mu.Lock()
-	// Deduplicate
-	for _, s := range d.skills {
-		if s == name {
-			d.mu.Unlock()
-			return
-		}
-	}
-	d.skills = append(d.skills, name)
-	d.rebuildExtras()
-	d.mu.Unlock()
-}
-
-func (d *display) addMCP(name string) {
-	d.mu.Lock()
-	for _, m := range d.mcps {
-		if m == name {
-			d.mu.Unlock()
-			return
-		}
-	}
-	d.mcps = append(d.mcps, name)
-	d.rebuildExtras()
-	d.mu.Unlock()
-}
-
-func (d *display) rebuildExtras() {
-	var parts []string
-	for _, s := range d.skills {
-		parts = append(parts, "skill:"+s)
-	}
-	for _, m := range d.mcps {
-		parts = append(parts, "mcp:"+m)
-	}
-	d.extras = strings.Join(parts, "  ")
-}
-
-func (d *display) setOutput(o string) {
-	// Take last non-empty line
-	o = strings.TrimSpace(o)
-	if idx := strings.LastIndex(o, "\n"); idx >= 0 {
-		o = strings.TrimSpace(o[idx+1:])
-	}
-	if o == "" {
-		return
-	}
-	d.mu.Lock()
-	d.output = o
-	d.mu.Unlock()
-}
-
-// RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
-// The context can be used to kill the claude process (e.g., on Ctrl+C).
+// RunClaude invokes `claude -p <prompt>` with stream-json output and sends progress events
+// to the provided bubbletea program. The caller owns the TUI lifecycle.
 // If model is non-empty, --model <model> is added to the command arguments.
-func RunClaude(ctx context.Context, prompt string, model string) error {
+func RunClaude(ctx context.Context, prompt string, model string, p *tea.Program) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -310,12 +104,7 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 		return fmt.Errorf("start claude: %w", err)
 	}
 
-	// Hide cursor during display
-	fmt.Print("\033[?25l")
-
-	d := newDisplay(model)
-
-	// Read stdout in a goroutine so we can also watch for context cancellation.
+	// Read stdout in a goroutine and send events to the bubbletea program.
 	type scanResult struct {
 		eventCount int
 		scanErr    error
@@ -346,24 +135,23 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 				for _, block := range msg.Content {
 					switch block.Type {
 					case "text":
-						d.setStatus("Thinking...")
-						d.setOutput(block.Text)
+						p.Send(StatusMsg{Status: "Thinking..."})
+						p.Send(OutputMsg{Text: block.Text})
 					case "tool_use":
 						var input toolInput
 						json.Unmarshal(block.Input, &input)
 						desc := describeToolUse(block.Name, input)
-						d.setStatus("Running tool")
-						d.setTool(desc)
+						p.Send(StatusMsg{Status: "Running tool"})
+						p.Send(ToolMsg{Description: desc})
 
 						// Track skills and MCPs
 						if block.Name == "Skill" && input.Skill != "" {
-							d.addSkill(input.Skill)
+							p.Send(SkillMsg{Name: input.Skill})
 						}
 						if strings.HasPrefix(block.Name, "mcp__") {
-							// mcp__servername__toolname → extract server name
 							parts := strings.SplitN(block.Name, "__", 3)
 							if len(parts) >= 2 {
-								d.addMCP(parts[1])
+								p.Send(MCPMsg{Name: parts[1]})
 							}
 						}
 					}
@@ -371,46 +159,25 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 
 			case "result":
 				if event.Subtype == "success" {
-					d.setStatus("Done")
+					p.Send(StatusMsg{Status: "Done"})
 				} else {
-					d.setStatus("Failed")
-					d.setOutput(event.Result)
+					p.Send(OutputMsg{Text: event.Result})
+					p.Send(StatusMsg{Status: "Failed"})
 				}
 			}
 		}
 		scanDone <- scanResult{eventCount: eventCount, scanErr: scanner.Err()}
 	}()
 
-	// Wait for either the scanner to finish or context cancellation.
+	// Wait for scanner to finish.
 	var result scanResult
 	select {
 	case result = <-scanDone:
-		// Scanner finished normally
-	case <-ctx.Done():
-		// Context cancelled (Ctrl+C) — kill the process tree
-		d.setStatus("Interrupted")
-		d.stop()
-		d.render()
-		fmt.Print("\033[?25h")
-		fmt.Println()
-		cmd.Wait() // triggers cmd.Cancel which kills the process tree
-		return ErrInterrupted
-	}
-
-	// Stop spinner, final render, restore cursor
-	d.stop()
-	d.render()
-	fmt.Print("\033[?25h")
-	fmt.Println()
-
-	// Check for scanner errors (e.g., stdout closed unexpectedly)
-	if result.scanErr != nil {
-		cmd.Wait() // clean up
-		return fmt.Errorf("reading claude output: %w", result.scanErr)
+	case <-time.After(10 * time.Minute):
+		// Safety timeout
 	}
 
 	if err := cmd.Wait(); err != nil {
-		// If context was cancelled while we were in cmd.Wait, treat as interrupt
 		if ctx.Err() != nil {
 			return ErrInterrupted
 		}
@@ -421,7 +188,12 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 		return fmt.Errorf("claude exited with error: %w", err)
 	}
 
-	// Detect silent failures: Claude started and exited cleanly but produced no events
+	// Check for scanner errors
+	if result.scanErr != nil {
+		return fmt.Errorf("reading claude output: %w", result.scanErr)
+	}
+
+	// Detect silent failures
 	if result.eventCount == 0 {
 		stderr := strings.TrimSpace(stderrBuf.String())
 		msg := "claude produced no output (0 events received). Possible causes:\n" +
