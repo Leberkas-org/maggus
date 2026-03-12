@@ -54,7 +54,8 @@ const maxToolHistory = 10
 // If model is non-empty, --model <model> is added to the command arguments.
 // Version and fingerprint are displayed in the TUI header.
 // currentIter and totalIters control the progress bar in the header.
-func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int) error {
+// taskID and taskTitle are displayed in the task info section below the header.
+func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int, taskID string, taskTitle string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -122,6 +123,8 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string, ve
 	m := newTUIModel(model, version, fingerprint, cancelFunc)
 	m.currentIter = currentIter
 	m.totalIters = totalIters
+	m.taskID = taskID
+	m.taskTitle = taskTitle
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	// Track whether we got interrupted via Ctrl+C in the TUI.

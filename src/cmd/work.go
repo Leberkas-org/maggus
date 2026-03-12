@@ -209,7 +209,7 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, stop, p, resolvedModel, Version, hostFingerprint, i+1, count); err != nil {
+			if err := runner.RunClaude(ctx, stop, p, resolvedModel, Version, hostFingerprint, i+1, count, next.ID, next.Title); err != nil {
 				if ctx.Err() != nil {
 					fmt.Println("Shutting down...")
 					break

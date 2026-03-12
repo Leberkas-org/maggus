@@ -76,11 +76,11 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing â
 **Description:** As a user, I want to see the current task ID and title below the header so I know what maggus is working on.
 
 **Acceptance Criteria:**
-- [ ] Section below the header shows: `TASK-NNN: Task Title`
-- [ ] Task info updates when the work loop moves to the next task
-- [ ] The task info is sent to the TUI model as a message when each iteration starts
-- [ ] Visually distinct from the header (e.g. different color or indentation)
-- [ ] Typecheck/lint passes
+- [x] Section below the header shows: `TASK-NNN: Task Title`
+- [x] Task info updates when the work loop moves to the next task
+- [x] The task info is sent to the TUI model as a message when each iteration starts
+- [x] Visually distinct from the header (e.g. different color or indentation)
+- [x] Typecheck/lint passes
 
 ### TASK-006: Build the main status section (output, tools, extras, model, elapsed)
 **Description:** As a user, I want the existing status display (output, tools, extras, model, elapsed time) to work within the new fixed-layout TUI.

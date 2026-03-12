@@ -42,6 +42,12 @@ type MCPMsg struct {
 	Name string
 }
 
+// TaskInfoMsg is sent when the current task changes.
+type TaskInfoMsg struct {
+	ID    string
+	Title string
+}
+
 // tickMsg is sent by the spinner ticker.
 type tickMsg time.Time
 
@@ -52,6 +58,10 @@ type tuiModel struct {
 	fingerprint string
 	currentIter int
 	totalIters  int
+
+	// Task info
+	taskID    string
+	taskTitle string
 
 	status      string
 	toolHistory []string
@@ -157,6 +167,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ProgressMsg:
 		m.currentIter = msg.Current
 		m.totalIters = msg.Total
+
+	case TaskInfoMsg:
+		m.taskID = msg.ID
+		m.taskTitle = msg.Title
 	}
 
 	return m, nil
@@ -267,6 +281,12 @@ func (m tuiModel) renderView() string {
 
 	// Render header
 	b.WriteString(m.renderHeader())
+
+	// Render task info
+	if m.taskID != "" {
+		taskLine := fmt.Sprintf("  %s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
+		b.WriteString(taskLine + "\n\n")
+	}
 
 	b.WriteString(fmt.Sprintf("  %s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
 	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), truncate(m.output, contentWidth)))
