@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/dirnei/maggus/internal/parser"
 	"github.com/spf13/cobra"
@@ -61,25 +59,14 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 		return code
 	}
 
-	maggusDir := filepath.Join(dir, ".maggus")
-	if _, err := os.Stat(maggusDir); os.IsNotExist(err) {
-		fmt.Fprintln(out, "No pending tasks found. All done!")
-		return nil
-	}
-
-	pattern := filepath.Join(maggusDir, "plan_*.md")
-	files, err := filepath.Glob(pattern)
+	files, err := parser.GlobPlanFiles(dir, false)
 	if err != nil {
 		return fmt.Errorf("glob plans: %w", err)
 	}
-	sort.Strings(files)
 
-	// Collect workable tasks in order, skipping completed plans
+	// Collect workable tasks in order
 	var workable []parser.Task
 	for _, f := range files {
-		if strings.HasSuffix(f, "_completed.md") {
-			continue
-		}
 		tasks, err := parser.ParseFile(f)
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", f, err)
@@ -113,7 +100,8 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 		if i == 0 {
 			clr = color(colorCyan)
 		}
-		fmt.Fprintf(out, " %s#%-2d %s: %s%s\n", clr, i+1, t.ID, t.Title, color(colorReset))
+		planFile := color(colorDim) + filepath.Base(t.SourceFile) + color(colorReset)
+		fmt.Fprintf(out, " %s#%-2d %s: %s%s  %s\n", clr, i+1, t.ID, t.Title, color(colorReset), planFile)
 	}
 
 	return nil

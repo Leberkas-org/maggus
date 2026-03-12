@@ -1,0 +1,80 @@
+/**
+ * Simpsons-inspired theme for Maggus docs
+ * Primary: Simpsons Yellow #FDD835
+ * Accent: Simpsons Sky Blue #2196F3
+ */
+
+/* ── Light mode ─────────────────────────────────────────── */
+:root {
+  --vp-c-brand-1: #FDD835;
+  --vp-c-brand-2: #FBC02D;
+  --vp-c-brand-3: #F9A825;
+  --vp-c-brand-soft: rgba(253, 216, 53, 0.14);
+
+  /* Use sky blue for interactive/link elements */
+  --vp-c-tip-1: #2196F3;
+  --vp-c-tip-2: #1E88E5;
+  --vp-c-tip-3: #1976D2;
+  --vp-c-tip-soft: rgba(33, 150, 243, 0.14);
+
+  /* Button overrides – yellow buttons need dark text */
+  --vp-button-brand-text: #1a1a1a;
+  --vp-button-brand-bg: #FDD835;
+  --vp-button-brand-hover-text: #1a1a1a;
+  --vp-button-brand-hover-bg: #FBC02D;
+  --vp-button-brand-active-text: #1a1a1a;
+  --vp-button-brand-active-bg: #F9A825;
+
+  /* Home hero name gradient */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #FDD835 0%, #2196F3 100%);
+
+  /* Hero image glow */
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(253, 216, 53, 0.3) 0%, rgba(33, 150, 243, 0.3) 100%);
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+/* ── Dark mode ──────────────────────────────────────────── */
+.dark {
+  --vp-c-brand-1: #FDD835;
+  --vp-c-brand-2: #FFEE58;
+  --vp-c-brand-3: #FFF176;
+  --vp-c-brand-soft: rgba(253, 216, 53, 0.16);
+
+  --vp-c-tip-1: #42A5F5;
+  --vp-c-tip-2: #64B5F6;
+  --vp-c-tip-3: #90CAF9;
+  --vp-c-tip-soft: rgba(33, 150, 243, 0.16);
+
+  --vp-button-brand-text: #1a1a1a;
+  --vp-button-brand-bg: #FDD835;
+  --vp-button-brand-hover-text: #1a1a1a;
+  --vp-button-brand-hover-bg: #FFEE58;
+  --vp-button-brand-active-text: #1a1a1a;
+  --vp-button-brand-active-bg: #FFF176;
+
+  --vp-home-hero-name-background: linear-gradient(135deg, #FDD835 0%, #42A5F5 100%);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(253, 216, 53, 0.25) 0%, rgba(66, 165, 245, 0.25) 100%);
+}
+
+/* ── Hero image sizing ──────────────────────────────────── */
+.VPHero .VPImage {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 50%;
+  box-shadow: 0 4px 24px rgba(253, 216, 53, 0.3);
+}
+
+.dark .VPHero .VPImage {
+  box-shadow: 0 4px 24px rgba(253, 216, 53, 0.2);
+}
+
+/* ── Feature cards accent ───────────────────────────────── */
+.VPFeature .icon {
+  color: #2196F3;
+}
+
+/* ── Sidebar active link uses blue accent ───────────────── */
+.VPSidebarItem.is-active > .item > .link > .text {
+  color: #2196F3;
+}

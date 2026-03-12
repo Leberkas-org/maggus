@@ -11,8 +11,7 @@
       "Bash(xargs grep:*)",
       "Bash(ls:*)",
       "Bash(xargs wc:*)",
-      "Bash(python -c *)",
-      "Bash(cd \"C:/c/maggus\" && python fix_status.py && rm fix_status.py)"
+      "Bash(python -c *)"
     ]
   }
 }
