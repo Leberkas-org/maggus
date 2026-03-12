@@ -156,7 +156,7 @@ Examples:
 		fmt.Println()
 		fmt.Println("Press Ctrl+C within 3 seconds to abort...")
 
-		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		pauseCtx, pauseCancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 
 		select {
 		case <-pauseCtx.Done():
@@ -171,14 +171,14 @@ Examples:
 		fmt.Println()
 
 		// Set up Ctrl+C handling for the work loop
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer cancel()
+		ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
+		defer stop()
 
 		completed := 0
 		for i := 0; i < count; i++ {
 			// Check if interrupted between iterations
 			if ctx.Err() != nil {
-				fmt.Println("\nInterrupted. Stopping loop.")
+				fmt.Println("Shutting down...")
 				break
 			}
 
@@ -201,9 +201,9 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, p, resolvedModel); err != nil {
-				if err == runner.ErrInterrupted {
-					fmt.Println("\nInterrupted. Stopping loop.")
+			if err := runner.RunClaude(ctx, stop, p, resolvedModel); err != nil {
+				if ctx.Err() != nil {
+					fmt.Println("Shutting down...")
 					break
 				}
 				return fmt.Errorf("task %s failed: %w", next.ID, err)

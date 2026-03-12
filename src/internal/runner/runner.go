@@ -257,8 +257,9 @@ func (d *display) setOutput(o string) {
 
 // RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
 // The context can be used to kill the claude process (e.g., on Ctrl+C).
+// The stop function resets signal handling to default so a second Ctrl+C terminates immediately.
 // If model is non-empty, --model <model> is added to the command arguments.
-func RunClaude(ctx context.Context, prompt string, model string) error {
+func RunClaude(ctx context.Context, stop func(), prompt string, model string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -305,6 +306,13 @@ func RunClaude(ctx context.Context, prompt string, model string) error {
 	if err != nil {
 		return fmt.Errorf("create stdout pipe: %w", err)
 	}
+
+	// Force-quit goroutine: after context cancellation, reset signal handling
+	// so a second Ctrl+C terminates the process immediately.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start claude: %w", err)
