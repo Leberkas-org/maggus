@@ -42,12 +42,12 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a new user, I want a getting started page so that I can install and run Maggus for the first time.
 
 **Acceptance Criteria:**
-- [ ] Page at `docs/guide/getting-started.md`
-- [ ] Covers prerequisites (Go 1.22+, Claude Code CLI on PATH)
-- [ ] Covers installation: build from source and pre-built binaries (link to GitHub Releases)
-- [ ] Covers first run: creating a `.maggus/` directory, writing a minimal plan file, running `maggus work`
-- [ ] Includes a minimal end-to-end example a user can copy-paste and try
-- [ ] Navigation sidebar shows this page under a "Guide" section
+- [x] Page at `docs/guide/getting-started.md`
+- [x] Covers prerequisites (Go 1.22+, Claude Code CLI on PATH)
+- [x] Covers installation: build from source and pre-built binaries (link to GitHub Releases)
+- [x] Covers first run: creating a `.maggus/` directory, writing a minimal plan file, running `maggus work`
+- [x] Includes a minimal end-to-end example a user can copy-paste and try
+- [x] Navigation sidebar shows this page under a "Guide" section
 
 ### TASK-004: Create "Writing Plans" documentation page
 **Description:** As a user, I want to understand how to write implementation plans so that Maggus can process my tasks.

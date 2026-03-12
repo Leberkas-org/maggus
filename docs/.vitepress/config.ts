@@ -8,8 +8,20 @@ export default defineConfig({
     logo: '/avatar.png',
 
     nav: [
-      { text: 'Home', link: '/' }
+      { text: 'Home', link: '/' },
+      { text: 'Guide', link: '/guide/getting-started' }
     ],
+
+    sidebar: {
+      '/guide/': [
+        {
+          text: 'Guide',
+          items: [
+            { text: 'Getting Started', link: '/guide/getting-started' }
+          ]
+        }
+      ]
+    },
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/dirnei/maggus' }
