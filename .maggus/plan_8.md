@@ -115,13 +115,13 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a maintainer, I want the docs site to deploy automatically when I publish a release so that docs stay up to date.
 
 **Acceptance Criteria:**
-- [ ] Workflow file at `.github/workflows/docs.yml`
-- [ ] Triggers on push of tags matching `v*` or `[0-9]*` (release tags)
-- [ ] Workflow installs Node.js, runs `npm ci` and `npm run docs:build` in `docs/`
-- [ ] Deploys the built `docs/.vitepress/dist` to GitHub Pages using `actions/deploy-pages`
-- [ ] Uses `actions/configure-pages` and `actions/upload-pages-artifact` as required
-- [ ] Workflow sets appropriate permissions (`pages: write`, `id-token: write`)
-- [ ] VitePress `base` config is set correctly for the GitHub Pages URL (e.g., `/maggus/`)
+- [x] Workflow file at `.github/workflows/docs.yml`
+- [x] Triggers on push of tags matching `v*` or `[0-9]*` (release tags)
+- [x] Workflow installs Node.js, runs `npm ci` and `npm run docs:build` in `docs/`
+- [x] Deploys the built `docs/.vitepress/dist` to GitHub Pages using `actions/deploy-pages`
+- [x] Uses `actions/configure-pages` and `actions/upload-pages-artifact` as required
+- [x] Workflow sets appropriate permissions (`pages: write`, `id-token: write`)
+- [x] VitePress `base` config is set correctly for the GitHub Pages URL (e.g., `/maggus/`)
 
 ### TASK-010: Slim down README.md
 **Description:** As a visitor on GitHub, I want a concise README that quickly explains what Maggus is and links to the full docs.
