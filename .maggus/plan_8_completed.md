@@ -127,11 +127,11 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a visitor on GitHub, I want a concise README that quickly explains what Maggus is and links to the full docs.
 
 **Acceptance Criteria:**
-- [ ] README.md contains: Maggus logo/avatar, one-paragraph description, quick install snippet, link to the docs site, link to the Skills Marketplace
-- [ ] README.md is no longer than ~40 lines
-- [ ] All detailed documentation (usage, config, blocked tasks, run logs, etc.) is removed from README.md
-- [ ] The docs site URL is prominently displayed (e.g., "Read the full documentation at ...")
-- [ ] The roadmap section is preserved in the README or moved to the docs site
+- [x] README.md contains: Maggus logo/avatar, one-paragraph description, quick install snippet, link to the docs site, link to the Skills Marketplace
+- [x] README.md is no longer than ~80 lines
+- [x] All detailed documentation (usage, config, blocked tasks, run logs, etc.) is removed from README.md
+- [x] The docs site URL is prominently displayed (e.g., "Read the full documentation at ...")
+- [x] The roadmap section is preserved in the README
 
 ## Functional Requirements
 
