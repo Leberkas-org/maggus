@@ -90,15 +90,15 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a user, I want to understand Maggus's runtime behavior so that I know what to expect when it runs.
 
 **Acceptance Criteria:**
-- [ ] Page at `docs/guide/concepts.md`
-- [ ] Explains the work loop lifecycle (parse → find task → branch → prompt → run → commit → repeat)
-- [ ] Documents run logs: `.maggus/runs/<RUN_ID>/`, `run.md`, `iteration-NN.md`
-- [ ] Documents project memory: `.maggus/MEMORY.md`, its purpose, that it's gitignored
-- [ ] Documents the TUI: header, progress bar, task info, status section, recent commits
-- [ ] Documents the startup safety pause (3-second window to abort)
-- [ ] Documents Ctrl+C behavior (graceful stop, double Ctrl+C force-kill)
-- [ ] Documents git branch behavior (auto-creates feature branch from protected branches)
-- [ ] Navigation sidebar shows this page under "Guide"
+- [x] Page at `docs/guide/concepts.md`
+- [x] Explains the work loop lifecycle (parse → find task → branch → prompt → run → commit → repeat)
+- [x] Documents run logs: `.maggus/runs/<RUN_ID>/`, `run.md`, `iteration-NN.md`
+- [x] Documents project memory: `.maggus/MEMORY.md`, its purpose, that it's gitignored
+- [x] Documents the TUI: header, progress bar, task info, status section, recent commits
+- [x] Documents the startup safety pause (3-second window to abort)
+- [x] Documents Ctrl+C behavior (graceful stop, double Ctrl+C force-kill)
+- [x] Documents git branch behavior (auto-creates feature branch from protected branches)
+- [x] Navigation sidebar shows this page under "Guide"
 
 ### TASK-008: Configure sidebar navigation and header nav
 **Description:** As a visitor, I want clear navigation so that I can find any documentation page quickly.
