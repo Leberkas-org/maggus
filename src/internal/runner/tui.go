@@ -48,6 +48,11 @@ type TaskInfoMsg struct {
 	Title string
 }
 
+// CommitMsg is sent when a commit completes, to display in the recent commits section.
+type CommitMsg struct {
+	Message string
+}
+
 // tickMsg is sent by the spinner ticker.
 type tickMsg time.Time
 
@@ -62,6 +67,9 @@ type tuiModel struct {
 	// Task info
 	taskID    string
 	taskTitle string
+
+	// Recent commits
+	commits []string
 
 	status      string
 	toolHistory []string
@@ -171,6 +179,12 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskInfoMsg:
 		m.taskID = msg.ID
 		m.taskTitle = msg.Title
+
+	case CommitMsg:
+		m.commits = append(m.commits, msg.Message)
+		if len(m.commits) > maxCommitHistory {
+			m.commits = m.commits[len(m.commits)-maxCommitHistory:]
+		}
 	}
 
 	return m, nil
@@ -307,6 +321,17 @@ func (m tuiModel) renderView() string {
 	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(truncate(extrasStr, contentWidth))))
 	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
 	b.WriteString(fmt.Sprintf("    %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+
+	// Recent commits section
+	if len(m.commits) > 0 {
+		b.WriteString("\n")
+		b.WriteString(grayStyle.Render(strings.Repeat("─", w)) + "\n")
+		b.WriteString(grayStyle.Render("  Commits:") + "\n")
+		for _, c := range m.commits {
+			line := truncate(c, w-6)
+			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(line)))
+		}
+	}
 
 	return b.String()
 }

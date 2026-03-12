@@ -14,7 +14,7 @@ func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := RunClaude(ctx, func() {}, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task")
+	err := RunClaude(ctx, func() {}, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task", nil)
 	if err == nil {
 		t.Fatal("expected error when claude is not on PATH")
 	}
@@ -33,7 +33,7 @@ func TestRunClaudeCallsStopOnContextCancel(t *testing.T) {
 
 	// Even though RunClaude will error (no claude binary), the goroutine
 	// that calls stop() on ctx.Done() will fire because ctx is already done.
-	_ = RunClaude(ctx, func() { stopCalled.Store(true) }, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task")
+	_ = RunClaude(ctx, func() { stopCalled.Store(true) }, "test prompt", "", "dev", "test-fp", 1, 5, "TASK-001", "Test Task", nil)
 
 	// Give the goroutine a moment to fire
 	time.Sleep(50 * time.Millisecond)

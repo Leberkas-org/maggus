@@ -47,6 +47,7 @@ type toolInput struct {
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 const maxToolHistory = 10
+const maxCommitHistory = 5
 
 // RunClaude invokes `claude -p <prompt>` with stream-json output and displays compact progress.
 // The context can be used to kill the claude process (e.g., on Ctrl+C).
@@ -55,7 +56,7 @@ const maxToolHistory = 10
 // Version and fingerprint are displayed in the TUI header.
 // currentIter and totalIters control the progress bar in the header.
 // taskID and taskTitle are displayed in the task info section below the header.
-func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int, taskID string, taskTitle string) error {
+func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int, taskID string, taskTitle string, prevCommits []string) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -125,6 +126,10 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string, ve
 	m.totalIters = totalIters
 	m.taskID = taskID
 	m.taskTitle = taskTitle
+	if len(prevCommits) > 0 {
+		m.commits = make([]string, len(prevCommits))
+		copy(m.commits, prevCommits)
+	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	// Track whether we got interrupted via Ctrl+C in the TUI.

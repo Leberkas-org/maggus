@@ -97,13 +97,13 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing â
 **Description:** As a user, I want commit messages to appear in a small scrolling area that does not push the rest of the UI off-screen, similar to how tool history works.
 
 **Acceptance Criteria:**
-- [ ] After each iteration, the commit result message is sent to the TUI model
-- [ ] A "Recent Commits" section at the bottom shows the last 3-5 commit messages (one line each, truncated to terminal width)
-- [ ] New commit messages push older ones up within this bounded region
-- [ ] The commit section does not cause any content above it to move or scroll
-- [ ] Between iterations (while Claude is running), the commit section retains previous messages
-- [ ] The section is visually labeled (e.g. `Commits:` header) and uses subdued colors
-- [ ] Typecheck/lint passes
+- [x] After each iteration, the commit result message is sent to the TUI model
+- [x] A "Recent Commits" section at the bottom shows the last 3-5 commit messages (one line each, truncated to terminal width)
+- [x] New commit messages push older ones up within this bounded region
+- [x] The commit section does not cause any content above it to move or scroll
+- [x] Between iterations (while Claude is running), the commit section retains previous messages
+- [x] The section is visually labeled (e.g. `Commits:` header) and uses subdued colors
+- [x] Typecheck/lint passes
 
 ### TASK-008: Wire everything together in the work command
 **Description:** As a developer, I want the work command to use the new TUI, passing all required data (version, fingerprint, progress, task info, commit results) so that the full experience works end-to-end.

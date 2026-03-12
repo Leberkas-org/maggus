@@ -183,6 +183,7 @@ Examples:
 		defer stop()
 
 		completed := 0
+		var recentCommits []string
 		for i := 0; i < count; i++ {
 			// Check if interrupted between iterations
 			if ctx.Err() != nil {
@@ -209,7 +210,7 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, stop, p, resolvedModel, Version, hostFingerprint, i+1, count, next.ID, next.Title); err != nil {
+			if err := runner.RunClaude(ctx, stop, p, resolvedModel, Version, hostFingerprint, i+1, count, next.ID, next.Title, recentCommits); err != nil {
 				if ctx.Err() != nil {
 					fmt.Println("Shutting down...")
 					break
@@ -240,6 +241,10 @@ Examples:
 			}
 			if commitResult.Committed {
 				fmt.Printf("Committed: %s\n", commitResult.Message)
+				recentCommits = append(recentCommits, commitResult.Message)
+				if len(recentCommits) > 5 {
+					recentCommits = recentCommits[len(recentCommits)-5:]
+				}
 			} else {
 				fmt.Println(commitResult.Message)
 			}
