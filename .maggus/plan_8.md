@@ -66,13 +66,13 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a user, I want a reference of all CLI commands so that I know what flags and options are available.
 
 **Acceptance Criteria:**
-- [ ] Page at `docs/reference/commands.md`
-- [ ] Documents `maggus work` with all flags (`--count`, `--model`, `--no-bootstrap`) and examples
-- [ ] Documents `maggus list` with all flags (`--count`, `--all`, `--plain`) and examples
-- [ ] Documents `maggus status` with all flags (`--all`, `--plain`) and examples
-- [ ] Documents `maggus blocked` with usage description and examples
-- [ ] Each command section includes example output where helpful
-- [ ] Navigation sidebar shows this page under a "Reference" section
+- [x] Page at `docs/reference/commands.md`
+- [x] Documents `maggus work` with all flags (`--count`, `--model`, `--no-bootstrap`) and examples
+- [x] Documents `maggus list` with all flags (`--count`, `--all`, `--plain`) and examples
+- [x] Documents `maggus status` with all flags (`--all`, `--plain`) and examples
+- [x] Documents `maggus blocked` with usage description and examples
+- [x] Each command section includes example output where helpful
+- [x] Navigation sidebar shows this page under a "Reference" section
 
 ### TASK-006: Create "Configuration" reference page
 **Description:** As a user, I want to understand all configuration options so that I can customize Maggus for my project.

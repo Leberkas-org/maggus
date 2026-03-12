@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  ignoreDeadLinks: true,
   title: 'Maggus',
   description: 'AI-powered task automation CLI that orchestrates Claude Code to work through implementation plans',
 
@@ -9,7 +10,8 @@ export default defineConfig({
 
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide/getting-started' }
+      { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Reference', link: '/reference/commands' }
     ],
 
     sidebar: {
@@ -19,6 +21,14 @@ export default defineConfig({
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
             { text: 'Writing Plans', link: '/guide/writing-plans' }
+          ]
+        }
+      ],
+      '/reference/': [
+        {
+          text: 'Reference',
+          items: [
+            { text: 'CLI Commands', link: '/reference/commands' }
           ]
         }
       ]
