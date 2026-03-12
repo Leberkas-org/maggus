@@ -52,7 +52,9 @@ const maxToolHistory = 10
 // The context can be used to kill the claude process (e.g., on Ctrl+C).
 // The stop function resets signal handling to default so a second Ctrl+C terminates immediately.
 // If model is non-empty, --model <model> is added to the command arguments.
-func RunClaude(ctx context.Context, stop func(), prompt string, model string) error {
+// Version and fingerprint are displayed in the TUI header.
+// currentIter and totalIters control the progress bar in the header.
+func RunClaude(ctx context.Context, stop func(), prompt string, model string, version string, fingerprint string, currentIter int, totalIters int) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
@@ -117,7 +119,9 @@ func RunClaude(ctx context.Context, stop func(), prompt string, model string) er
 	defer cancelFunc()
 
 	// Create and start the bubbletea program.
-	m := newTUIModel(model, cancelFunc)
+	m := newTUIModel(model, version, fingerprint, cancelFunc)
+	m.currentIter = currentIter
+	m.totalIters = totalIters
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	// Track whether we got interrupted via Ctrl+C in the TUI.

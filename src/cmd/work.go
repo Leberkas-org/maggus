@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dirnei/maggus/internal/config"
+	"github.com/dirnei/maggus/internal/fingerprint"
 	"github.com/dirnei/maggus/internal/gitbranch"
 	"github.com/dirnei/maggus/internal/gitcommit"
 	"github.com/dirnei/maggus/internal/gitignore"
@@ -129,6 +130,13 @@ Examples:
 			_ = branch
 		}
 
+		// Get host fingerprint
+		hostFingerprint, err := fingerprint.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not get host fingerprint: %v\n", err)
+			hostFingerprint = "unknown"
+		}
+
 		// Create run tracker
 		modelDisplay := resolvedModel
 		if modelDisplay == "" {
@@ -201,7 +209,7 @@ Examples:
 			}
 
 			p := prompt.Build(next, opts)
-			if err := runner.RunClaude(ctx, stop, p, resolvedModel); err != nil {
+			if err := runner.RunClaude(ctx, stop, p, resolvedModel, Version, hostFingerprint, i+1, count); err != nil {
 				if ctx.Err() != nil {
 					fmt.Println("Shutting down...")
 					break

@@ -64,13 +64,13 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing �
 **Description:** As a user, I want to see the maggus version, host fingerprint, and task progress at the top of the screen so I always know the run status at a glance.
 
 **Acceptance Criteria:**
-- [ ] Header is rendered at the top of the TUI view
-- [ ] Header shows: `Maggus vX.Y.Z` on the left, host fingerprint (truncated or full UUID) on the right
-- [ ] Below the version line: progress bar in format `[████████░░░░] 3/10 Tasks` showing current iteration vs total count
-- [ ] Progress bar updates after each iteration completes
-- [ ] Header is visually separated from the content below (e.g. a horizontal line or color contrast)
-- [ ] Version and fingerprint are passed into the TUI model at construction time
-- [ ] Typecheck/lint passes
+- [x] Header is rendered at the top of the TUI view
+- [x] Header shows: `Maggus vX.Y.Z` on the left, host fingerprint (truncated or full UUID) on the right
+- [x] Below the version line: progress bar in format `[████████░░░░] 3/10 Tasks` showing current iteration vs total count
+- [x] Progress bar updates after each iteration completes
+- [x] Header is visually separated from the content below (e.g. a horizontal line or color contrast)
+- [x] Version and fingerprint are passed into the TUI model at construction time
+- [x] Typecheck/lint passes
 
 ### TASK-005: Build the task info section
 **Description:** As a user, I want to see the current task ID and title below the header so I know what maggus is working on.

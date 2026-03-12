@@ -11,6 +11,12 @@ import (
 
 // Message types for the bubbletea model.
 
+// ProgressMsg is sent when iteration progress changes.
+type ProgressMsg struct {
+	Current int
+	Total   int
+}
+
 // ToolMsg is sent when a new tool use is detected.
 type ToolMsg struct {
 	Description string
@@ -41,6 +47,12 @@ type tickMsg time.Time
 
 // tuiModel is the bubbletea model that replaces the old display struct.
 type tuiModel struct {
+	// Header fields
+	version     string
+	fingerprint string
+	currentIter int
+	totalIters  int
+
 	status      string
 	toolHistory []string
 	output      string
@@ -56,17 +68,19 @@ type tuiModel struct {
 	quitting    bool
 }
 
-func newTUIModel(model string, cancelFunc func()) tuiModel {
+func newTUIModel(model string, version string, fingerprint string, cancelFunc func()) tuiModel {
 	if model == "" {
 		model = "default"
 	}
 	return tuiModel{
-		status:     "Starting...",
-		output:     "-",
-		model:      model,
-		startTime:  time.Now(),
-		width:      120,
-		cancelFunc: cancelFunc,
+		version:     version,
+		fingerprint: fingerprint,
+		status:      "Starting...",
+		output:      "-",
+		model:       model,
+		startTime:   time.Now(),
+		width:       120,
+		cancelFunc:  cancelFunc,
 	}
 }
 
@@ -139,6 +153,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.mcps = append(m.mcps, msg.Name)
 		m.rebuildExtras()
+
+	case ProgressMsg:
+		m.currentIter = msg.Current
+		m.totalIters = msg.Total
 	}
 
 	return m, nil
@@ -174,6 +192,51 @@ func (m tuiModel) View() string {
 	return m.renderView()
 }
 
+func (m tuiModel) renderHeader() string {
+	var b strings.Builder
+	w := m.width
+	if w < 40 {
+		w = 40
+	}
+
+	// Line 1: version left, fingerprint right
+	left := boldStyle.Render(fmt.Sprintf("Maggus v%s", m.version))
+	right := ""
+	if m.fingerprint != "" {
+		right = grayStyle.Render(m.fingerprint)
+	}
+	// Pad between left and right to fill width
+	// Use raw lengths for spacing calculation (lipgloss adds ANSI escapes)
+	leftRaw := fmt.Sprintf("  Maggus v%s", m.version)
+	rightRaw := m.fingerprint
+	padding := w - len(leftRaw) - len(rightRaw) - 2
+	if padding < 2 {
+		padding = 2
+	}
+	b.WriteString(fmt.Sprintf("  %s%s%s\n", left, strings.Repeat(" ", padding), right))
+
+	// Line 2: progress bar
+	if m.totalIters > 0 {
+		barWidth := 20
+		filled := 0
+		if m.totalIters > 0 {
+			filled = (m.currentIter * barWidth) / m.totalIters
+		}
+		if filled > barWidth {
+			filled = barWidth
+		}
+		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+		progress := fmt.Sprintf("  [%s] %d/%d Tasks", bar, m.currentIter, m.totalIters)
+		b.WriteString(greenStyle.Render(progress) + "\n")
+	}
+
+	// Separator line
+	sep := strings.Repeat("─", w)
+	b.WriteString(grayStyle.Render(sep) + "\n")
+
+	return b.String()
+}
+
 func (m tuiModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
 	w := m.width
@@ -201,6 +264,9 @@ func (m tuiModel) renderView() string {
 	}
 
 	var b strings.Builder
+
+	// Render header
+	b.WriteString(m.renderHeader())
 
 	b.WriteString(fmt.Sprintf("  %s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
 	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), truncate(m.output, contentWidth)))
