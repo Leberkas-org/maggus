@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -176,23 +177,41 @@ func FindNextIncomplete(tasks []Task) *Task {
 	return nil
 }
 
-// ParsePlans finds all .maggus/plan_*.md files in the given directory and parses them.
-// Files ending in _completed.md are excluded.
-// Tasks are returned in order: files sorted by name, tasks in document order within each file.
-func ParsePlans(dir string) ([]Task, error) {
+// GlobPlanFiles returns all plan_*.md file paths in .maggus/, sorted numerically.
+// If includeCompleted is false, files ending in _completed.md are excluded.
+func GlobPlanFiles(dir string, includeCompleted bool) ([]string, error) {
 	pattern := filepath.Join(dir, ".maggus", "plan_*.md")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("glob %s: %w", pattern, err)
 	}
 
-	sort.Strings(files)
+	SortPlanFiles(files)
+
+	if includeCompleted {
+		return files, nil
+	}
+
+	filtered := files[:0]
+	for _, f := range files {
+		if !strings.HasSuffix(f, "_completed.md") {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered, nil
+}
+
+// ParsePlans finds all .maggus/plan_*.md files in the given directory and parses them.
+// Files ending in _completed.md are excluded.
+// Tasks are returned in order: files sorted by name, tasks in document order within each file.
+func ParsePlans(dir string) ([]Task, error) {
+	files, err := GlobPlanFiles(dir, false)
+	if err != nil {
+		return nil, err
+	}
 
 	var allTasks []Task
 	for _, f := range files {
-		if strings.HasSuffix(f, "_completed.md") {
-			continue
-		}
 		tasks, err := ParseFile(f)
 		if err != nil {
 			return nil, err
@@ -203,19 +222,40 @@ func ParsePlans(dir string) ([]Task, error) {
 	return allTasks, nil
 }
 
+// planNumberRe extracts the numeric part from plan filenames like "plan_10.md" or "plan_3_completed.md".
+var planNumberRe = regexp.MustCompile(`plan_(\d+)`)
+
+// SortPlanFiles sorts plan file paths by their numeric plan number (e.g. plan_8 before plan_10).
+func SortPlanFiles(files []string) {
+	sort.Slice(files, func(i, j int) bool {
+		return extractPlanNumber(files[i]) < extractPlanNumber(files[j])
+	})
+}
+
+// extractPlanNumber returns the numeric portion of a plan filename for sorting.
+// Returns math.MaxInt if the number cannot be parsed, pushing unrecognised files to the end.
+func extractPlanNumber(path string) int {
+	base := filepath.Base(path)
+	m := planNumberRe.FindStringSubmatch(base)
+	if m == nil {
+		return 1<<31 - 1
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 1<<31 - 1
+	}
+	return n
+}
+
 // MarkCompletedPlans renames plan files where all tasks are complete (and none are blocked)
 // by appending _completed before the .md extension (e.g. plan_1.md → plan_1_completed.md).
 func MarkCompletedPlans(dir string) error {
-	pattern := filepath.Join(dir, ".maggus", "plan_*.md")
-	files, err := filepath.Glob(pattern)
+	files, err := GlobPlanFiles(dir, false)
 	if err != nil {
-		return fmt.Errorf("glob %s: %w", pattern, err)
+		return err
 	}
 
 	for _, f := range files {
-		if strings.HasSuffix(f, "_completed.md") {
-			continue
-		}
 
 		tasks, err := ParseFile(f)
 		if err != nil {

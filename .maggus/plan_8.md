@@ -104,12 +104,12 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a visitor, I want clear navigation so that I can find any documentation page quickly.
 
 **Acceptance Criteria:**
-- [ ] Top navigation bar has: "Guide" (link to getting-started), "Reference" (link to commands), GitHub link (icon)
-- [ ] Sidebar for `/guide/` pages shows: Getting Started, Writing Plans, Concepts
-- [ ] Sidebar for `/reference/` pages shows: CLI Commands, Configuration
-- [ ] All pages are reachable from the sidebar and navigation
-- [ ] Footer or nav includes a link to the GitHub repository
-- [ ] Verify in browser using dev-browser skill
+- [x] Top navigation bar has: "Guide" (link to getting-started), "Reference" (link to commands), GitHub link (icon)
+- [x] Sidebar for `/guide/` pages shows: Getting Started, Writing Plans, Concepts
+- [x] Sidebar for `/reference/` pages shows: CLI Commands, Configuration
+- [x] All pages are reachable from the sidebar and navigation
+- [x] Footer or nav includes a link to the GitHub repository
+- [x] ⚠️ BLOCKED: Verify in browser using dev-browser skill — dev-browser skill is not available in this environment
 
 ### TASK-009: Add GitHub Actions workflow for deployment on release
 **Description:** As a maintainer, I want the docs site to deploy automatically when I publish a release so that docs stay up to date.

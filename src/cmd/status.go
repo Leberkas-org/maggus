@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/dirnei/maggus/internal/parser"
+
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +16,7 @@ const (
 	colorCyan   = "\033[36m"
 	colorYellow = "\033[33m"
 	colorRed    = "\033[31m"
+	colorBlue   = "\033[34m"
 	colorDim    = "\033[2m"
 	colorReset  = "\033[0m"
 
@@ -95,19 +96,10 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
-		maggusDir := filepath.Join(dir, ".maggus")
-		if _, err := os.Stat(maggusDir); os.IsNotExist(err) {
-			fmt.Println("No plans found.")
-			return nil
-		}
-
-		// Find all plan files including completed ones
-		pattern := filepath.Join(maggusDir, "plan_*.md")
-		files, err := filepath.Glob(pattern)
+		files, err := parser.GlobPlanFiles(dir, true)
 		if err != nil {
 			return fmt.Errorf("glob plans: %w", err)
 		}
-		sort.Strings(files)
 
 		if len(files) == 0 {
 			fmt.Println("No plans found.")
@@ -244,6 +236,19 @@ var statusCmd = &cobra.Command{
 		fmt.Println(" Plans")
 		fmt.Println(" ──────────────────────────────────────────")
 
+		// Find max width of "done/total" strings for aligned columns.
+		maxCountWidth := 0
+		for _, p := range plans {
+			if p.completed && !all {
+				continue
+			}
+			w := len(fmt.Sprintf("%d/%d", p.doneCount(), len(p.tasks)))
+			if w > maxCountWidth {
+				maxCountWidth = w
+			}
+		}
+		countFmt := fmt.Sprintf("%%-%ds", maxCountWidth)
+
 		for _, p := range plans {
 			if p.completed && !all {
 				continue
@@ -277,14 +282,19 @@ var statusCmd = &cobra.Command{
 				prefix = "   "
 				clr = color(colorGreen)
 				suffix = "done"
+			} else if done == 0 {
+				prefix = "   "
+				clr = color(colorBlue)
+				suffix = "new"
 			} else {
 				prefix = "   "
 				clr = color(colorYellow)
 				suffix = "in progress"
 			}
 
-			fmt.Printf("%s%s%-32s [%s]  %d/%d   %s%s\n",
-				clr, prefix, p.filename, bar, done, total, suffix, color(colorReset))
+			countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
+			fmt.Printf("%s%s%-32s [%s]  %s   %s%s\n",
+				clr, prefix, p.filename, bar, countStr, suffix, color(colorReset))
 		}
 
 		return nil
