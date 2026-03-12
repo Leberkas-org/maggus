@@ -34,16 +34,16 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing �
 **Description:** As a user, I want a persistent machine identifier shown in the UI header so that I can distinguish runs from different machines.
 
 **Acceptance Criteria:**
-- [ ] New package `internal/fingerprint` provides a `Get() (string, error)` function that returns a stable UUID
-- [ ] On first call, generates a new UUID v4 and writes it to a platform-specific path
-- [ ] On subsequent calls, reads and returns the existing UUID
-- [ ] Storage paths: Windows → `C:\Program Files\maggus\fingerprint`, Linux → `/usr/local/share/maggus/fingerprint`, macOS → `/Library/Application Support/maggus/fingerprint`
-- [ ] If the directory does not exist, it is created (with appropriate permissions)
-- [ ] If writing to the system path fails (e.g. no admin/root), falls back to user-level path: Windows → `%APPDATA%\maggus\fingerprint`, Linux/macOS → `~/.maggus/fingerprint`
-- [ ] UUID format is standard 8-4-4-4-12 (e.g. `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)
-- [ ] No external UUID library — use `crypto/rand` to generate UUID v4
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] New package `internal/fingerprint` provides a `Get() (string, error)` function that returns a stable UUID
+- [x] On first call, generates a new UUID v4 and writes it to a platform-specific path
+- [x] On subsequent calls, reads and returns the existing UUID
+- [x] Storage paths: Windows → `C:\Program Files\maggus\fingerprint`, Linux → `/usr/local/share/maggus/fingerprint`, macOS → `/Library/Application Support/maggus/fingerprint`
+- [x] If the directory does not exist, it is created (with appropriate permissions)
+- [x] If writing to the system path fails (e.g. no admin/root), falls back to user-level path: Windows → `%APPDATA%\maggus\fingerprint`, Linux/macOS → `~/.maggus/fingerprint`
+- [x] UUID format is standard 8-4-4-4-12 (e.g. `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)
+- [x] No external UUID library — use `crypto/rand` to generate UUID v4
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-003: Introduce bubbletea TUI framework
 **Description:** As a developer, I want the display layer to use bubbletea so that the UI has proper fixed-layout rendering, resize handling, and clean terminal management.
