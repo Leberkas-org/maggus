@@ -53,14 +53,14 @@ The current README.md has grown too large and serves as the only documentation s
 **Description:** As a user, I want to understand how to write implementation plans so that Maggus can process my tasks.
 
 **Acceptance Criteria:**
-- [ ] Page at `docs/guide/writing-plans.md`
-- [ ] Explains the plan file format: location (`.maggus/plan_*.md`), task heading format (`### TASK-NNN: Title`), description, acceptance criteria checkboxes
-- [ ] Explains what makes a task "complete" (all criteria checked)
-- [ ] Explains blocked tasks: the `BLOCKED:` prefix convention, how Maggus skips them
-- [ ] Explains completed plans: automatic rename to `plan_N_completed.md`
-- [ ] Includes a full example plan file
-- [ ] Mentions the `maggus-plan` skill as an alternative to writing plans manually
-- [ ] Navigation sidebar shows this page under "Guide"
+- [x] Page at `docs/guide/writing-plans.md`
+- [x] Explains the plan file format: location (`.maggus/plan_*.md`), task heading format (`### TASK-NNN: Title`), description, acceptance criteria checkboxes
+- [x] Explains what makes a task "complete" (all criteria checked)
+- [x] Explains blocked tasks: the `BLOCKED:` prefix convention, how Maggus skips them
+- [x] Explains completed plans: automatic rename to `plan_N_completed.md`
+- [x] Includes a full example plan file
+- [x] Mentions the `maggus-plan` skill as an alternative to writing plans manually
+- [x] Navigation sidebar shows this page under "Guide"
 
 ### TASK-005: Create "CLI Commands" reference page
 **Description:** As a user, I want a reference of all CLI commands so that I know what flags and options are available.
