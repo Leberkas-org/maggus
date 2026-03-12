@@ -39,12 +39,12 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a user, I want to see the full context of a blocked task — plan name, task ID, title, description, and all acceptance criteria (with blocked ones highlighted) — so I can make an informed decision.
 
 **Acceptance Criteria:**
-- [ ] The detail view shows: plan filename (e.g. `Plan: plan_6.md`), task ID and title, full description text, and all acceptance criteria
-- [ ] Completed criteria `[x]` are shown in green with a checkmark
-- [ ] Blocked criteria `[ ] BLOCKED: ...` are shown in red and clearly highlighted (e.g. with a `⚠` icon or `>>>` marker)
-- [ ] Normal unchecked criteria `[ ]` are shown in default color
-- [ ] The view fits within the terminal width (long lines are wrapped or truncated)
-- [ ] Typecheck/lint passes
+- [x] The detail view shows: plan filename (e.g. `Plan: plan_6.md`), task ID and title, full description text, and all acceptance criteria
+- [x] Completed criteria `[x]` are shown in green with a checkmark
+- [x] Blocked criteria `[ ] BLOCKED: ...` are shown in red and clearly highlighted (e.g. with a `⚠` icon or `>>>` marker)
+- [x] Normal unchecked criteria `[ ]` are shown in default color
+- [x] The view fits within the terminal width (long lines are wrapped or truncated)
+- [x] Typecheck/lint passes
 
 ### TASK-004: Build the action picker for each blocked criterion
 **Description:** As a user, I want to choose what to do with each blocked criterion — unblock it, resolve (remove) it, skip it, or abort the wizard entirely.

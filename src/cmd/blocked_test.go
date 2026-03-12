@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dirnei/maggus/internal/parser"
 )
 
 func writeBlockedPlan(t *testing.T, dir, filename, content string) {
@@ -273,5 +275,142 @@ func TestCollectBlockedTasksEmpty(t *testing.T) {
 	}
 	if len(blocked) != 0 {
 		t.Errorf("expected 0 blocked tasks, got %d", len(blocked))
+	}
+}
+
+func TestRenderBlockedTaskDetail_ShowsPlanAndTitle(t *testing.T) {
+	task := parser.Task{
+		ID:          "TASK-042",
+		Title:       "Fix the widget",
+		Description: "We need to fix the widget because it is broken.",
+		SourceFile:  "/some/path/.maggus/plan_6.md",
+		Criteria: []parser.Criterion{
+			{Text: "Widget is fixed", Checked: true},
+			{Text: "BLOCKED: Needs API key from vendor", Checked: false, Blocked: true},
+			{Text: "Tests pass", Checked: false},
+		},
+	}
+
+	var buf bytes.Buffer
+	renderBlockedTaskDetail(&buf, task, 80)
+	out := buf.String()
+
+	if !strings.Contains(out, "Plan: plan_6.md") {
+		t.Errorf("expected plan filename, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-042") {
+		t.Errorf("expected task ID, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Fix the widget") {
+		t.Errorf("expected task title, got:\n%s", out)
+	}
+	if !strings.Contains(out, "fix the widget because it is broken") {
+		t.Errorf("expected description, got:\n%s", out)
+	}
+}
+
+func TestRenderBlockedTaskDetail_CriteriaFormatting(t *testing.T) {
+	task := parser.Task{
+		ID:         "TASK-001",
+		Title:      "Test task",
+		SourceFile: "/path/.maggus/plan_1.md",
+		Criteria: []parser.Criterion{
+			{Text: "Done thing", Checked: true},
+			{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true},
+			{Text: "Normal unchecked", Checked: false},
+		},
+	}
+
+	var buf bytes.Buffer
+	renderBlockedTaskDetail(&buf, task, 80)
+	out := buf.String()
+
+	// Completed criterion: green checkmark
+	if !strings.Contains(out, colorGreen+"✓ Done thing"+colorReset) {
+		t.Errorf("expected green checkmark for completed criterion, got:\n%s", out)
+	}
+	// Blocked criterion: red with >>> marker
+	if !strings.Contains(out, colorRed+">>> ⚠ BLOCKED: waiting on API"+colorReset) {
+		t.Errorf("expected red blocked criterion with markers, got:\n%s", out)
+	}
+	// Normal unchecked: circle marker, no color codes
+	if !strings.Contains(out, "○ Normal unchecked") {
+		t.Errorf("expected normal unchecked criterion with circle, got:\n%s", out)
+	}
+}
+
+func TestRenderBlockedTaskDetail_NoDescription(t *testing.T) {
+	task := parser.Task{
+		ID:         "TASK-001",
+		Title:      "No desc task",
+		SourceFile: "/path/.maggus/plan_1.md",
+		Criteria: []parser.Criterion{
+			{Text: "BLOCKED: something", Checked: false, Blocked: true},
+		},
+	}
+
+	var buf bytes.Buffer
+	renderBlockedTaskDetail(&buf, task, 80)
+	out := buf.String()
+
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected task ID, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Acceptance Criteria:") {
+		t.Errorf("expected acceptance criteria header, got:\n%s", out)
+	}
+}
+
+func TestRenderBlockedTaskDetail_DisplaysInRunBlocked(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_5.md", `# Plan: Five
+
+## User Stories
+
+### TASK-050: Blocked feature
+**Description:** This feature is blocked.
+
+**Acceptance Criteria:**
+- [x] Step one done
+- [ ] BLOCKED: Needs external service
+- [ ] Step three pending
+`)
+	out := runBlockedCmd(t, dir)
+
+	if !strings.Contains(out, "Found 1 blocked task(s).") {
+		t.Errorf("expected found message, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Plan: plan_5.md") {
+		t.Errorf("expected plan filename in detail view, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-050") {
+		t.Errorf("expected task ID in detail view, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Blocked feature") {
+		t.Errorf("expected task title in detail view, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Acceptance Criteria:") {
+		t.Errorf("expected criteria section, got:\n%s", out)
+	}
+}
+
+func TestWrapText(t *testing.T) {
+	// Short text should not wrap
+	result := wrapText("hello", 80, "  ")
+	if result != "  hello" {
+		t.Errorf("expected '  hello', got %q", result)
+	}
+
+	// Long text should wrap
+	long := "this is a long line that should be wrapped at word boundaries when it exceeds the maximum width"
+	result = wrapText(long, 40, "  ")
+	lines := strings.Split(result, "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected multiple lines, got %d: %q", len(lines), result)
+	}
+	for _, line := range lines {
+		if len(line) > 40 {
+			t.Errorf("line exceeds max width 40: %q (len=%d)", line, len(line))
+		}
 	}
 }

@@ -128,7 +128,7 @@ func ParseFile(path string) ([]Task, error) {
 			current.Criteria = append(current.Criteria, Criterion{
 				Text:    text,
 				Checked: false,
-				Blocked: strings.Contains(text, "BLOCKED:"),
+				Blocked: strings.HasPrefix(text, "BLOCKED:") || strings.HasPrefix(text, "⚠️ BLOCKED:"),
 			})
 			continue
 		}

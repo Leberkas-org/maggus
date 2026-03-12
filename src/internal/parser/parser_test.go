@@ -367,6 +367,56 @@ func TestMarkCompletedPlans_RenamesWhenBlockedCriterionResolved(t *testing.T) {
 	}
 }
 
+func TestBlockedOnlyMatchesPrefix(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### TASK-001: Describe blocked feature
+**Description:** This task describes how blocked tasks work.
+
+**Acceptance Criteria:**
+- [ ] Blocked criteria `+"`"+`[ ] BLOCKED: ...`+"`"+` are shown in red
+- [ ] Handle the BLOCKED: prefix in criterion text
+- [ ] BLOCKED: This one is actually blocked
+- [ ] ⚠️ BLOCKED: This one too
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if len(task.Criteria) != 4 {
+		t.Fatalf("expected 4 criteria, got %d", len(task.Criteria))
+	}
+
+	// Criteria that mention BLOCKED mid-text should NOT be blocked
+	if task.Criteria[0].Blocked {
+		t.Errorf("criterion 0 should not be blocked (BLOCKED: appears mid-text): %q", task.Criteria[0].Text)
+	}
+	if task.Criteria[1].Blocked {
+		t.Errorf("criterion 1 should not be blocked (BLOCKED: appears mid-text): %q", task.Criteria[1].Text)
+	}
+
+	// Criteria that START with BLOCKED: should be blocked
+	if !task.Criteria[2].Blocked {
+		t.Errorf("criterion 2 should be blocked (starts with BLOCKED:): %q", task.Criteria[2].Text)
+	}
+	if !task.Criteria[3].Blocked {
+		t.Errorf("criterion 3 should be blocked (starts with ⚠️ BLOCKED:): %q", task.Criteria[3].Text)
+	}
+
+	// Task should be blocked overall
+	if !task.IsBlocked() {
+		t.Error("task should be blocked")
+	}
+}
+
 func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	// Task has unchecked criteria AND a blocked criterion — should be skipped
 	tasks := []Task{
