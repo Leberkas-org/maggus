@@ -17,11 +17,11 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a developer, I want a new `blocked` subcommand registered with cobra so that `maggus blocked` is a valid CLI invocation.
 
 **Acceptance Criteria:**
-- [ ] New file `src/cmd/blocked.go` with a cobra command registered on `rootCmd`
-- [ ] `maggus blocked` prints a message and exits if no blocked tasks are found
-- [ ] `maggus blocked --help` shows a short description of the wizard
-- [ ] Typecheck/lint passes (`go vet ./...`)
-- [ ] Unit tests are written and successful
+- [x] New file `src/cmd/blocked.go` with a cobra command registered on `rootCmd`
+- [x] `maggus blocked` prints a message and exits if no blocked tasks are found
+- [x] `maggus blocked --help` shows a short description of the wizard
+- [x] Typecheck/lint passes (`go vet ./...`)
+- [x] Unit tests are written and successful
 
 ### TASK-002: Collect and group blocked tasks by plan
 **Description:** As a developer, I want to parse all active plans and collect every blocked task with its plan filename so the wizard knows what to present.
