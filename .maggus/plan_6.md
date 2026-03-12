@@ -49,16 +49,16 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing â
 **Description:** As a developer, I want the display layer to use bubbletea so that the UI has proper fixed-layout rendering, resize handling, and clean terminal management.
 
 **Acceptance Criteria:**
-- [ ] `github.com/charmbracelet/bubbletea` and `github.com/charmbracelet/lipgloss` are added as dependencies
-- [ ] New file `internal/runner/tui.go` contains the bubbletea Model, Init, Update, View implementation
-- [ ] The old `display` struct and its methods (`renderLocked`, spinner goroutine, ANSI cursor manipulation) are replaced by the bubbletea model
-- [ ] The bubbletea program uses `tea.WithAltScreen()` so the TUI occupies a fixed screen that never scrolls
-- [ ] The bubbletea program uses `tea.WithMouseCellMotion()` is NOT used (no mouse needed)
-- [ ] The model receives events via `tea.Msg` types: tool updates, output updates, status changes, tick (for spinner + elapsed time)
-- [ ] `RunClaude` starts the bubbletea program, feeds it messages from the stream parser, and waits for it to quit
-- [ ] Ctrl+C is handled by bubbletea's built-in `tea.KeyCtrlC` message type, which sends a quit signal and triggers the context cancellation from TASK-001
-- [ ] Terminal is always restored cleanly on exit (bubbletea handles this, but verify with force-kill scenarios)
-- [ ] Typecheck/lint passes
+- [x] `github.com/charmbracelet/bubbletea` and `github.com/charmbracelet/lipgloss` are added as dependencies
+- [x] New file `internal/runner/tui.go` contains the bubbletea Model, Init, Update, View implementation
+- [x] The old `display` struct and its methods (`renderLocked`, spinner goroutine, ANSI cursor manipulation) are replaced by the bubbletea model
+- [x] The bubbletea program uses `tea.WithAltScreen()` so the TUI occupies a fixed screen that never scrolls
+- [x] The bubbletea program uses `tea.WithMouseCellMotion()` is NOT used (no mouse needed)
+- [x] The model receives events via `tea.Msg` types: tool updates, output updates, status changes, tick (for spinner + elapsed time)
+- [x] `RunClaude` starts the bubbletea program, feeds it messages from the stream parser, and waits for it to quit
+- [x] Ctrl+C is handled by bubbletea's built-in `tea.KeyCtrlC` message type, which sends a quit signal and triggers the context cancellation from TASK-001
+- [x] Terminal is always restored cleanly on exit (bubbletea handles this, but verify with force-kill scenarios)
+- [x] Typecheck/lint passes
 
 ### TASK-004: Build the header section
 **Description:** As a user, I want to see the maggus version, host fingerprint, and task progress at the top of the screen so I always know the run status at a glance.
