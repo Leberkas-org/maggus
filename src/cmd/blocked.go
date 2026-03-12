@@ -7,10 +7,121 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dirnei/maggus/internal/parser"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
+
+// blockedAction represents the user's choice for a blocked criterion.
+type blockedAction int
+
+const (
+	actionUnblock blockedAction = iota
+	actionResolve
+	actionSkip
+	actionAbort
+)
+
+func (a blockedAction) String() string {
+	switch a {
+	case actionUnblock:
+		return "Unblock"
+	case actionResolve:
+		return "Resolve"
+	case actionSkip:
+		return "Skip"
+	case actionAbort:
+		return "Abort"
+	}
+	return ""
+}
+
+// actionPickerModel is a bubbletea model for selecting an action on a blocked criterion.
+type actionPickerModel struct {
+	criterion parser.Criterion
+	actions   []blockedAction
+	cursor    int
+	chosen    blockedAction
+	done      bool
+}
+
+func newActionPickerModel(criterion parser.Criterion) actionPickerModel {
+	return actionPickerModel{
+		criterion: criterion,
+		actions:   []blockedAction{actionUnblock, actionResolve, actionSkip, actionAbort},
+	}
+}
+
+func (m actionPickerModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m actionPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.actions)-1 {
+				m.cursor++
+			}
+		case "enter":
+			m.chosen = m.actions[m.cursor]
+			m.done = true
+			return m, tea.Quit
+		case "ctrl+c", "q":
+			m.chosen = actionAbort
+			m.done = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m actionPickerModel) View() string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\n   %s⚠ %s%s\n\n", colorRed, m.criterion.Text, colorReset))
+	b.WriteString("   Choose action:\n\n")
+	for i, a := range m.actions {
+		cursor := "  "
+		if i == m.cursor {
+			cursor = "> "
+		}
+		style := ""
+		reset := ""
+		switch a {
+		case actionUnblock:
+			style = colorGreen
+			reset = colorReset
+		case actionResolve:
+			style = colorYellow
+			reset = colorReset
+		case actionAbort:
+			style = colorRed
+			reset = colorReset
+		}
+		b.WriteString(fmt.Sprintf("   %s%s%s%s\n", cursor, style, a.String(), reset))
+	}
+	b.WriteString(fmt.Sprintf("\n   %s↑/↓ navigate • enter select • q abort%s\n", colorDim, colorReset))
+	return b.String()
+}
+
+// runActionPicker runs the interactive bubbletea picker for a blocked criterion.
+// Returns the chosen action. The pickerFunc is injectable for testing.
+var runActionPicker = func(criterion parser.Criterion) (blockedAction, error) {
+	m := newActionPickerModel(criterion)
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return actionAbort, err
+	}
+	result := finalModel.(actionPickerModel)
+	return result.chosen, nil
+}
 
 var blockedCmd = &cobra.Command{
 	Use:   "blocked",
@@ -116,6 +227,61 @@ func renderBlockedTaskDetail(w io.Writer, task parser.Task, termWidth int) {
 	}
 }
 
+// unblockCriterion reads the plan file, removes the "BLOCKED: " prefix from the
+// matching criterion line, and writes the file back. Returns an error if the
+// exact line cannot be found.
+func unblockCriterion(filePath string, c parser.Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read plan file: %w", err)
+	}
+
+	oldLine := "- [ ] " + c.Text
+	// Remove "BLOCKED: " or "⚠️ BLOCKED: " prefix from criterion text
+	newText := c.Text
+	if strings.HasPrefix(newText, "⚠️ BLOCKED: ") {
+		newText = strings.TrimPrefix(newText, "⚠️ BLOCKED: ")
+	} else if strings.HasPrefix(newText, "BLOCKED: ") {
+		newText = strings.TrimPrefix(newText, "BLOCKED: ")
+	}
+	newLine := "- [ ] " + newText
+
+	content := string(data)
+	if !strings.Contains(content, oldLine) {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	content = strings.Replace(content, oldLine, newLine, 1)
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// resolveCriterion reads the plan file, removes the entire criterion line,
+// and writes the file back. Returns an error if the exact line cannot be found.
+func resolveCriterion(filePath string, c parser.Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read plan file: %w", err)
+	}
+
+	targetLine := "- [ ] " + c.Text
+	lines := strings.Split(string(data), "\n")
+	found := false
+	var result []string
+	for _, line := range lines {
+		if !found && strings.TrimSpace(line) == targetLine {
+			found = true
+			continue // skip this line
+		}
+		result = append(result, line)
+	}
+
+	if !found {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0o644)
+}
+
 func runBlocked(cmd *cobra.Command, dir string) error {
 	out := cmd.OutOrStdout()
 
@@ -137,8 +303,48 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 	fmt.Fprintf(out, "Found %d blocked task(s).\n", len(blocked))
 
 	termWidth := getTerminalWidth()
+	aborted := false
 	for _, task := range blocked {
 		renderBlockedTaskDetail(out, task, termWidth)
+
+		for _, c := range task.Criteria {
+			if !c.Blocked {
+				continue
+			}
+
+			action, err := runActionPicker(c)
+			if err != nil {
+				return fmt.Errorf("action picker: %w", err)
+			}
+
+			switch action {
+			case actionUnblock:
+				if err := unblockCriterion(task.SourceFile, c); err != nil {
+					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
+				} else {
+					fmt.Fprintf(out, "   %s→ Unblocked: %s%s\n", colorGreen, c.Text, colorReset)
+				}
+			case actionResolve:
+				if err := resolveCriterion(task.SourceFile, c); err != nil {
+					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
+				} else {
+					fmt.Fprintf(out, "   %s→ Resolved: %s%s\n", colorYellow, c.Text, colorReset)
+				}
+			case actionSkip:
+				fmt.Fprintf(out, "   → Skipped: %s\n", c.Text)
+			case actionAbort:
+				fmt.Fprintln(out, "\n   Aborted.")
+				aborted = true
+			}
+
+			if aborted {
+				break
+			}
+		}
+
+		if aborted {
+			break
+		}
 	}
 
 	return nil

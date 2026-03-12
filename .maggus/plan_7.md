@@ -50,23 +50,23 @@ When maggus encounters blocked tasks (criteria containing `BLOCKED:`), there is 
 **Description:** As a user, I want to choose what to do with each blocked criterion — unblock it, resolve (remove) it, skip it, or abort the wizard entirely.
 
 **Acceptance Criteria:**
-- [ ] For each blocked criterion in the current task, the wizard presents the criterion text and an action menu
-- [ ] Available actions: **Unblock** (remove `BLOCKED:` prefix from the criterion text, keep it as unchecked `- [ ]`), **Resolve** (delete the entire criterion line from the file), **Skip** (leave this criterion unchanged, move to next), **Abort** (quit the wizard immediately)
-- [ ] Actions are selectable via arrow keys and Enter (using an interactive picker — bubbletea list or survey-style prompt)
-- [ ] If the user selects Abort, the wizard exits immediately; any changes already written to disk in previous steps are preserved (each file write is atomic per criterion)
-- [ ] Typecheck/lint passes
+- [x] For each blocked criterion in the current task, the wizard presents the criterion text and an action menu
+- [x] Available actions: **Unblock** (remove `BLOCKED:` prefix from the criterion text, keep it as unchecked `- [ ]`), **Resolve** (delete the entire criterion line from the file), **Skip** (leave this criterion unchanged, move to next), **Abort** (quit the wizard immediately)
+- [x] Actions are selectable via arrow keys and Enter (using an interactive picker — bubbletea list or survey-style prompt)
+- [x] If the user selects Abort, the wizard exits immediately; any changes already written to disk in previous steps are preserved (each file write is atomic per criterion)
+- [x] Typecheck/lint passes
 
 ### TASK-005: Implement file modification for unblock and resolve actions
 **Description:** As a developer, I want the plan markdown file to be updated on disk when the user unblocks or resolves a criterion, so that the change is immediately reflected.
 
 **Acceptance Criteria:**
-- [ ] **Unblock**: reads the plan file, finds the exact line `- [ ] ...BLOCKED: ...`, removes the `BLOCKED: ` substring (keeping the rest of the criterion text), writes the file back
-- [ ] **Resolve**: reads the plan file, finds the exact criterion line, deletes the entire line, writes the file back
-- [ ] File modifications are atomic: read entire file → modify in memory → write entire file. No partial writes
-- [ ] After modifying, the file is still valid markdown parseable by `parser.ParseFile`
-- [ ] If the criterion line cannot be found in the file (e.g. concurrent edit), an error is shown and the wizard continues to the next item
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful (test both unblock and resolve on sample plan markdown)
+- [x] **Unblock**: reads the plan file, finds the exact line `- [ ] ...BLOCKED: ...`, removes the `BLOCKED: ` substring (keeping the rest of the criterion text), writes the file back
+- [x] **Resolve**: reads the plan file, finds the exact criterion line, deletes the entire line, writes the file back
+- [x] File modifications are atomic: read entire file → modify in memory → write entire file. No partial writes
+- [x] After modifying, the file is still valid markdown parseable by `parser.ParseFile`
+- [x] If the criterion line cannot be found in the file (e.g. concurrent edit), an error is shown and the wizard continues to the next item
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful (test both unblock and resolve on sample plan markdown)
 
 ### TASK-006: Wire the wizard loop — step through all blocked tasks
 **Description:** As a user, I want the wizard to walk me through all blocked tasks one by one, showing the detail view and action picker for each, until all are handled or I abort.

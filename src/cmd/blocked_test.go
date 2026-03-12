@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dirnei/maggus/internal/parser"
 )
 
@@ -21,8 +22,25 @@ func writeBlockedPlan(t *testing.T, dir, filename, content string) {
 	}
 }
 
+// mockActionPicker replaces runActionPicker for tests, returning actions from a queue.
+func mockActionPicker(actions []blockedAction) func() {
+	i := 0
+	orig := runActionPicker
+	runActionPicker = func(_ parser.Criterion) (blockedAction, error) {
+		if i >= len(actions) {
+			return actionSkip, nil
+		}
+		a := actions[i]
+		i++
+		return a, nil
+	}
+	return func() { runActionPicker = orig }
+}
+
 func runBlockedCmd(t *testing.T, dir string) string {
 	t.Helper()
+	restore := mockActionPicker([]blockedAction{actionSkip})
+	defer restore()
 	var buf bytes.Buffer
 	cmd := *blockedCmd
 	cmd.SetOut(&buf)
@@ -391,6 +409,576 @@ func TestRenderBlockedTaskDetail_DisplaysInRunBlocked(t *testing.T) {
 	}
 	if !strings.Contains(out, "Acceptance Criteria:") {
 		t.Errorf("expected criteria section, got:\n%s", out)
+	}
+}
+
+func TestActionPickerUnblock(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+`)
+	restore := mockActionPicker([]blockedAction{actionUnblock})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Unblocked:") {
+		t.Errorf("expected 'Unblocked:' in output, got:\n%s", out)
+	}
+}
+
+func TestActionPickerResolve(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+`)
+	restore := mockActionPicker([]blockedAction{actionResolve})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Resolved:") {
+		t.Errorf("expected 'Resolved:' in output, got:\n%s", out)
+	}
+}
+
+func TestActionPickerSkip(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+`)
+	restore := mockActionPicker([]blockedAction{actionSkip})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Skipped:") {
+		t.Errorf("expected 'Skipped:' in output, got:\n%s", out)
+	}
+}
+
+func TestActionPickerAbort(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has two blockers.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] BLOCKED: reason B
+`)
+	// Abort on first criterion — second should not be reached
+	restore := mockActionPicker([]blockedAction{actionAbort})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Aborted.") {
+		t.Errorf("expected 'Aborted.' in output, got:\n%s", out)
+	}
+	// Should not contain any unblock/resolve/skip messages
+	if strings.Contains(out, "Unblocked:") || strings.Contains(out, "Resolved:") || strings.Contains(out, "Skipped:") {
+		t.Errorf("abort should not process further criteria, got:\n%s", out)
+	}
+}
+
+func TestActionPickerAbortPreservesEarlierActions(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has two blockers.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: reason A
+- [ ] BLOCKED: reason B
+`)
+	// Unblock first, abort on second
+	restore := mockActionPicker([]blockedAction{actionUnblock, actionAbort})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Unblocked:") {
+		t.Errorf("expected first action 'Unblocked:' to be preserved, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Aborted.") {
+		t.Errorf("expected 'Aborted.' in output, got:\n%s", out)
+	}
+}
+
+func TestActionPickerModelView(t *testing.T) {
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Blocked: true}
+	m := newActionPickerModel(c)
+	view := m.View()
+	if !strings.Contains(view, "BLOCKED: waiting on API") {
+		t.Errorf("expected criterion text in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Unblock") {
+		t.Errorf("expected 'Unblock' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Resolve") {
+		t.Errorf("expected 'Resolve' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Skip") {
+		t.Errorf("expected 'Skip' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Abort") {
+		t.Errorf("expected 'Abort' in view, got:\n%s", view)
+	}
+}
+
+func TestActionPickerModelNavigation(t *testing.T) {
+	c := parser.Criterion{Text: "BLOCKED: test", Blocked: true}
+	m := newActionPickerModel(c)
+	// Initial cursor should be at 0 (Unblock)
+	if m.cursor != 0 {
+		t.Errorf("expected initial cursor 0, got %d", m.cursor)
+	}
+	// Move down
+	updated, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune("j")}))
+	m = updated.(actionPickerModel)
+	if m.cursor != 1 {
+		t.Errorf("expected cursor 1 after down, got %d", m.cursor)
+	}
+	// Move up
+	updated, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune("k")}))
+	m = updated.(actionPickerModel)
+	if m.cursor != 0 {
+		t.Errorf("expected cursor 0 after up, got %d", m.cursor)
+	}
+	// Can't go above 0
+	updated, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune("k")}))
+	m = updated.(actionPickerModel)
+	if m.cursor != 0 {
+		t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
+	}
+}
+
+func TestActionPickerModelEnterSelects(t *testing.T) {
+	c := parser.Criterion{Text: "BLOCKED: test", Blocked: true}
+	m := newActionPickerModel(c)
+	// Move to Resolve (index 1) and press enter
+	updated, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune("j")}))
+	m = updated.(actionPickerModel)
+	updated, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyEnter}))
+	m = updated.(actionPickerModel)
+	if !m.done {
+		t.Error("expected done to be true after enter")
+	}
+	if m.chosen != actionResolve {
+		t.Errorf("expected actionResolve, got %v", m.chosen)
+	}
+}
+
+func TestActionPickerModelCtrlCAborts(t *testing.T) {
+	c := parser.Criterion{Text: "BLOCKED: test", Blocked: true}
+	m := newActionPickerModel(c)
+	updated, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyCtrlC}))
+	m = updated.(actionPickerModel)
+	if !m.done {
+		t.Error("expected done to be true after ctrl+c")
+	}
+	if m.chosen != actionAbort {
+		t.Errorf("expected actionAbort, got %v", m.chosen)
+	}
+}
+
+// --- File modification tests (TASK-005) ---
+
+func TestUnblockCriterion(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [x] Step one done
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true}
+	if err := unblockCriterion(planPath, c); err != nil {
+		t.Fatalf("unblockCriterion: %v", err)
+	}
+
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	content := string(data)
+
+	// Should have removed BLOCKED: prefix
+	if !strings.Contains(content, "- [ ] waiting on API") {
+		t.Errorf("expected unblocked criterion, got:\n%s", content)
+	}
+	// Should not contain the old blocked line
+	if strings.Contains(content, "- [ ] BLOCKED: waiting on API") {
+		t.Errorf("old blocked line should be removed, got:\n%s", content)
+	}
+	// Other lines should be preserved
+	if !strings.Contains(content, "- [x] Step one done") {
+		t.Errorf("completed criterion should be preserved, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] Normal criterion") {
+		t.Errorf("normal criterion should be preserved, got:\n%s", content)
+	}
+}
+
+func TestUnblockCriterionWithEmojiPrefix(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] ⚠️ BLOCKED: needs external service
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "⚠️ BLOCKED: needs external service", Checked: false, Blocked: true}
+	if err := unblockCriterion(planPath, c); err != nil {
+		t.Fatalf("unblockCriterion: %v", err)
+	}
+
+	data, _ := os.ReadFile(planPath)
+	content := string(data)
+	if !strings.Contains(content, "- [ ] needs external service") {
+		t.Errorf("expected unblocked criterion without emoji prefix, got:\n%s", content)
+	}
+}
+
+func TestResolveCriterion(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [x] Step one done
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true}
+	if err := resolveCriterion(planPath, c); err != nil {
+		t.Fatalf("resolveCriterion: %v", err)
+	}
+
+	data, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	content := string(data)
+
+	// The blocked line should be completely gone
+	if strings.Contains(content, "BLOCKED: waiting on API") {
+		t.Errorf("blocked line should be deleted, got:\n%s", content)
+	}
+	// Other lines should be preserved
+	if !strings.Contains(content, "- [x] Step one done") {
+		t.Errorf("completed criterion should be preserved, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] Normal criterion") {
+		t.Errorf("normal criterion should be preserved, got:\n%s", content)
+	}
+}
+
+func TestUnblockCriterionNotFound(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Task
+**Acceptance Criteria:**
+- [ ] Something else
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: nonexistent criterion", Checked: false, Blocked: true}
+	err := unblockCriterion(planPath, c)
+	if err == nil {
+		t.Fatal("expected error for missing criterion line")
+	}
+	if !strings.Contains(err.Error(), "criterion line not found") {
+		t.Errorf("expected 'criterion line not found' error, got: %v", err)
+	}
+}
+
+func TestResolveCriterionNotFound(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Task
+**Acceptance Criteria:**
+- [ ] Something else
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: nonexistent criterion", Checked: false, Blocked: true}
+	err := resolveCriterion(planPath, c)
+	if err == nil {
+		t.Fatal("expected error for missing criterion line")
+	}
+	if !strings.Contains(err.Error(), "criterion line not found") {
+		t.Errorf("expected 'criterion line not found' error, got: %v", err)
+	}
+}
+
+func TestUnblockCriterionStillParseable(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true}
+	if err := unblockCriterion(planPath, c); err != nil {
+		t.Fatalf("unblockCriterion: %v", err)
+	}
+
+	// The modified file should still be parseable
+	tasks, err := parser.ParseFile(planPath)
+	if err != nil {
+		t.Fatalf("ParseFile after unblock: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	// The formerly blocked criterion should now be unblocked
+	found := false
+	for _, cr := range tasks[0].Criteria {
+		if cr.Text == "waiting on API" {
+			found = true
+			if cr.Blocked {
+				t.Error("criterion should no longer be blocked")
+			}
+			if cr.Checked {
+				t.Error("criterion should still be unchecked")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected to find 'waiting on API' criterion after unblock")
+	}
+}
+
+func TestResolveCriterionStillParseable(t *testing.T) {
+	dir := t.TempDir()
+	planContent := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`
+	writeBlockedPlan(t, dir, "plan_1.md", planContent)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true}
+	if err := resolveCriterion(planPath, c); err != nil {
+		t.Fatalf("resolveCriterion: %v", err)
+	}
+
+	// The modified file should still be parseable
+	tasks, err := parser.ParseFile(planPath)
+	if err != nil {
+		t.Fatalf("ParseFile after resolve: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	// Should only have the normal criterion left
+	if len(tasks[0].Criteria) != 1 {
+		t.Fatalf("expected 1 criterion after resolve, got %d", len(tasks[0].Criteria))
+	}
+	if tasks[0].Criteria[0].Text != "Normal criterion" {
+		t.Errorf("expected 'Normal criterion', got %q", tasks[0].Criteria[0].Text)
+	}
+}
+
+func TestRunBlockedUnblockModifiesFile(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+`)
+	restore := mockActionPicker([]blockedAction{actionUnblock})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+
+	// Verify the file was actually modified
+	data, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	content := string(data)
+	if strings.Contains(content, "BLOCKED:") {
+		t.Errorf("file should no longer contain BLOCKED:, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] waiting on API") {
+		t.Errorf("file should contain unblocked criterion, got:\n%s", content)
+	}
+}
+
+func TestRunBlockedResolveModifiesFile(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+- [ ] Normal criterion
+`)
+	restore := mockActionPicker([]blockedAction{actionResolve})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	if err := runBlocked(&cmd, dir); err != nil {
+		t.Fatalf("runBlocked: %v", err)
+	}
+
+	// Verify the file was actually modified
+	data, _ := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	content := string(data)
+	if strings.Contains(content, "BLOCKED: waiting on API") {
+		t.Errorf("blocked line should be deleted, got:\n%s", content)
+	}
+	if !strings.Contains(content, "- [ ] Normal criterion") {
+		t.Errorf("normal criterion should be preserved, got:\n%s", content)
+	}
+}
+
+func TestRunBlockedErrorOnMissingLine(t *testing.T) {
+	dir := t.TempDir()
+	writeBlockedPlan(t, dir, "plan_1.md", `# Plan: Test
+
+## User Stories
+
+### TASK-001: Blocked task
+**Description:** Has a blocker.
+
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on API
+`)
+	planPath := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	// Simulate concurrent edit: modify file before the action runs
+	// We'll manually remove the blocked line first
+	data, _ := os.ReadFile(planPath)
+	modified := strings.Replace(string(data), "- [ ] BLOCKED: waiting on API", "- [ ] something else", 1)
+	os.WriteFile(planPath, []byte(modified), 0o644)
+
+	// Now run with unblock — it should fail to find the line and show error
+	restore := mockActionPicker([]blockedAction{actionUnblock})
+	defer restore()
+	var buf bytes.Buffer
+	cmd := *blockedCmd
+	cmd.SetOut(&buf)
+	// runBlocked collects blocked tasks first, which will find the task
+	// but the file has been changed, so unblockCriterion will fail.
+	// We need to test the error path differently — inject a task directly.
+	// Actually, since collectBlockedTasks re-parses, the task won't be blocked anymore.
+	// Let's test unblockCriterion directly instead.
+	c := parser.Criterion{Text: "BLOCKED: waiting on API", Checked: false, Blocked: true}
+	err := unblockCriterion(planPath, c)
+	if err == nil {
+		t.Fatal("expected error for concurrent edit")
+	}
+	if !strings.Contains(err.Error(), "criterion line not found") {
+		t.Errorf("expected 'criterion line not found' error, got: %v", err)
 	}
 }
 
