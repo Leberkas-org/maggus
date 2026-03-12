@@ -123,12 +123,12 @@ Two improvements to `maggus work`: (1) Fix Ctrl+C which currently does nothing �
 **Description:** As a user, I want `.maggus/runs/*` files to never be committed, even if the AI agent manually stages them with `git add .` or `git add -A`.
 
 **Acceptance Criteria:**
-- [ ] `gitcommit.CommitIteration` unstages `.maggus/runs/` before committing, using `git reset HEAD -- .maggus/runs/` (same pattern already used for COMMIT.md)
-- [ ] Also unstage `.maggus/MEMORY.md` with the same approach (it is gitignored but could be force-staged)
-- [ ] The unstage commands run silently — errors are ignored (files may not be staged)
-- [ ] Existing unstage of COMMIT.md is preserved
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] `gitcommit.CommitIteration` unstages `.maggus/runs/` before committing, using `git reset HEAD -- .maggus/runs/` (same pattern already used for COMMIT.md)
+- [x] Also unstage `.maggus/MEMORY.md` with the same approach (it is gitignored but could be force-staged)
+- [x] The unstage commands run silently — errors are ignored (files may not be staged)
+- [x] Existing unstage of COMMIT.md is preserved
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-010: End-to-end testing and cleanup
 **Description:** As a developer, I want to verify the full flow works and clean up any leftover code from the old display implementation.
