@@ -146,7 +146,7 @@ var statusCmd = &cobra.Command{
 			totalDone, totalTasks, totalPending, totalBlocked)
 
 		// Find the global next workable task (first across all active plans)
-		var nextTaskID string
+		var nextTaskID, nextTaskFile string
 		for _, p := range plans {
 			if p.completed {
 				continue
@@ -154,6 +154,7 @@ var statusCmd = &cobra.Command{
 			next := parser.FindNextIncomplete(p.tasks)
 			if next != nil {
 				nextTaskID = next.ID
+				nextTaskFile = next.SourceFile
 				break
 			}
 		}
@@ -194,7 +195,7 @@ var statusCmd = &cobra.Command{
 					}
 					clr = color(colorRed)
 					prefix = "  "
-				} else if t.ID == nextTaskID {
+				} else if t.ID == nextTaskID && t.SourceFile == nextTaskFile {
 					icon = "o"
 					clr = color(colorCyan)
 					if plain {
