@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
@@ -21,6 +22,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/runtracker"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
@@ -32,6 +34,8 @@ var (
 	countFlag       int
 	noBootstrapFlag bool
 	modelFlag       string
+	agentFlag       string
+	taskFlag        string
 	worktreeFlag    bool
 	noWorktreeFlag  bool
 )
@@ -51,7 +55,9 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		count := countFlag
 
-		if len(args) > 0 {
+		if taskFlag != "" {
+			count = 1
+		} else if len(args) > 0 {
 			n, err := strconv.Atoi(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid task count %q: must be a positive integer", args[0])
@@ -89,6 +95,21 @@ Examples:
 			}
 		}
 
+		// Resolve agent: CLI flag > config > default ("claude")
+		agentName := cfg.Agent
+		if agentFlag != "" {
+			agentName = agentFlag
+		}
+		activeAgent, err := agent.New(agentName)
+		if err != nil {
+			return err
+		}
+
+		// Validate agent CLI is installed before starting work
+		if err := activeAgent.Validate(); err != nil {
+			return fmt.Errorf("agent %q not available: %w", activeAgent.Name(), err)
+		}
+
 		// Resolve model: CLI flag overrides config file
 		modelInput := cfg.Model
 		if modelFlag != "" {
@@ -113,6 +134,24 @@ Examples:
 			return fmt.Errorf("check gitignore: %w", err)
 		}
 
+		// Get host fingerprint
+		hostFingerprint, _ := fingerprint.Get()
+		if hostFingerprint == "" {
+			hostFingerprint = "unknown"
+		}
+
+		modelDisplay := resolvedModel
+		if modelDisplay == "" {
+			modelDisplay = "default"
+		}
+
+		// repoDir always points to the original repository root.
+		// workDir is where Claude Code operates — either the worktree or the repo itself.
+		repoDir := dir
+		workDir := dir
+
+		// Run-again loop: allows the user to start another batch from the summary screen.
+		for {
 		tasks, err := parser.ParsePlans(dir)
 		if err != nil {
 			return fmt.Errorf("parse plans: %w", err)
@@ -133,26 +172,12 @@ Examples:
 			return nil
 		}
 
-		// Get host fingerprint
-		hostFingerprint, _ := fingerprint.Get()
-		if hostFingerprint == "" {
-			hostFingerprint = "unknown"
-		}
-
 		// Create run tracker
-		modelDisplay := resolvedModel
-		if modelDisplay == "" {
-			modelDisplay = "default"
-		}
 		run, err := runtracker.New(dir, modelDisplay, count)
 		if err != nil {
 			return fmt.Errorf("create run tracker: %w", err)
 		}
 
-		// repoDir always points to the original repository root.
-		// workDir is where Claude Code operates — either the worktree or the repo itself.
-		repoDir := dir
-		workDir := dir
 		var branchMsg string
 
 		if useWorktree {
@@ -210,6 +235,7 @@ Examples:
 			Branch:     run.Branch,
 			RunID:      run.ID,
 			RunDir:     run.RelativeDir(dir),
+			Agent:      activeAgent.Name(),
 		}
 		if useWorktree {
 			banner.Worktree = workDir
@@ -234,6 +260,9 @@ Examples:
 			}()
 
 			// Send startup info messages to the TUI.
+			if activeAgent.Name() == "claude" {
+				p.Send(runner.InfoMsg{Text: "⚠ Using --dangerously-skip-permissions (Claude Code)"})
+			}
 			for _, w := range includeWarnings {
 				p.Send(runner.InfoMsg{Text: w})
 			}
@@ -246,9 +275,11 @@ Examples:
 					break
 				}
 
-				// Find next workable task. In worktree mode, skip locked tasks.
+				// Find next workable task. --task targets a specific ID; otherwise pick next incomplete.
 				var next *parser.Task
-				if useWorktree {
+				if taskFlag != "" {
+					next = findTaskByID(tasks, taskFlag)
+				} else if useWorktree {
 					next = findNextUnlocked(tasks, repoDir)
 				} else {
 					next = parser.FindNextIncomplete(tasks)
@@ -275,6 +306,7 @@ Examples:
 					Total:     count,
 					TaskID:    next.ID,
 					TaskTitle: next.Title,
+					PlanFile:  next.SourceFile,
 				})
 
 				opts := prompt.Options{
@@ -287,7 +319,7 @@ Examples:
 				}
 
 				builtPrompt := prompt.Build(next, opts)
-				if err := runner.RunClaude(workCtx, builtPrompt, resolvedModel, p); err != nil {
+				if err := activeAgent.Run(workCtx, builtPrompt, resolvedModel, p); err != nil {
 					if useWorktree {
 						lock.Release()
 					}
@@ -410,12 +442,53 @@ Examples:
 			}
 		}()
 
-		// Run the TUI (blocks until user dismisses the done screen).
-		if _, tuiErr := p.Run(); tuiErr != nil {
+		// Run the TUI (blocks until user dismisses the summary screen).
+		finalModel, tuiErr := p.Run()
+		if tuiErr != nil {
 			return fmt.Errorf("TUI error: %w", tuiErr)
 		}
 
-		return workErr
+		if workErr != nil {
+			return workErr
+		}
+
+		// Persist per-task usage to .maggus/usage.csv.
+		if tm, ok := finalModel.(runner.TUIModel); ok {
+			usages := tm.TaskUsages()
+			if len(usages) > 0 {
+				var records []usage.Record
+				for _, u := range usages {
+					planRel := u.PlanFile
+					if rel, err := filepath.Rel(dir, u.PlanFile); err == nil {
+						planRel = rel
+					}
+					records = append(records, usage.Record{
+						RunID:        run.ID,
+						TaskID:       u.TaskID,
+						TaskTitle:    u.TaskTitle,
+						PlanFile:     planRel,
+						Model:        modelDisplay,
+						Agent:        activeAgent.Name(),
+						InputTokens:  u.InputTokens,
+						OutputTokens: u.OutputTokens,
+						StartTime:    u.StartTime,
+						EndTime:      u.EndTime,
+					})
+				}
+				_ = usage.Append(dir, records)
+			}
+
+			// Check if user chose "Run again" from the summary menu.
+			result := tm.Result()
+			if result.RunAgain {
+				count = result.TaskCount
+				workDir = dir // reset workDir for next iteration
+				continue
+			}
+		}
+
+		return nil
+		} // end run-again loop
 	},
 }
 
@@ -423,6 +496,8 @@ func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
+	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
+	workCmd.Flags().StringVar(&taskFlag, "task", "", "run a specific task by ID (e.g. TASK-001)")
 	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
 	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)
@@ -470,6 +545,16 @@ func cleanStaleWorktrees(repoDir string) {
 	// Prune and clean locks.
 	worktree.Prune(repoDir)
 	tasklock.CleanAll(repoDir)
+}
+
+// findTaskByID returns the task with the given ID, or nil if not found or already complete.
+func findTaskByID(tasks []parser.Task, id string) *parser.Task {
+	for i := range tasks {
+		if tasks[i].ID == id && !tasks[i].IsComplete() {
+			return &tasks[i]
+		}
+	}
+	return nil
 }
 
 // findNextUnlocked returns the first workable task that is not locked by another session.

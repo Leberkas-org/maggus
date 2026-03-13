@@ -284,3 +284,39 @@ func MarkCompletedPlans(dir string) error {
 
 	return nil
 }
+
+// DeleteTask removes a task section (### TASK-ID: ... up to the next ### or EOF)
+// from the given plan file. Returns an error if the task is not found.
+func DeleteTask(filePath string, taskID string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", filePath, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	start := -1
+	end := len(lines)
+
+	for i, line := range lines {
+		if m := taskHeadingRe.FindStringSubmatch(line); m != nil {
+			if m[1] == taskID {
+				// Found the task — also consume blank lines before the heading
+				start = i
+				for start > 0 && strings.TrimSpace(lines[start-1]) == "" {
+					start--
+				}
+			} else if start >= 0 {
+				// Next task heading — end of the section to delete
+				end = i
+				break
+			}
+		}
+	}
+
+	if start < 0 {
+		return fmt.Errorf("task %s not found in %s", taskID, filePath)
+	}
+
+	result := append(lines[:start], lines[end:]...)
+	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0644)
+}

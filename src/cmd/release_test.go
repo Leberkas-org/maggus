@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leberkas-org/maggus/internal/agent"
 )
 
 func TestReleaseCommandRegistered(t *testing.T) {
@@ -123,11 +125,11 @@ func TestRunReleaseWritesFile(t *testing.T) {
 	os.WriteFile(filepath.Join(maggusDir, "RELEASE_NOTES.md"), []byte("## TASK-001\n- Added feature\n"), 0o644)
 
 	// Mock the Claude invocation
-	origRunner := runClaudeOnce
-	runClaudeOnce = func(ctx context.Context, prompt string, model string) (string, error) {
+	origRunner := runAgentOnce
+	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
 		return "- Added a great new feature for users", nil
 	}
-	defer func() { runClaudeOnce = origRunner }()
+	defer func() { runAgentOnce = origRunner }()
 
 	var buf bytes.Buffer
 	cmd := *releaseCmd
@@ -183,11 +185,11 @@ func TestRunReleaseNoReleaseNotes(t *testing.T) {
 
 	// No .maggus/RELEASE_NOTES.md — should not error
 
-	origRunner := runClaudeOnce
-	runClaudeOnce = func(ctx context.Context, prompt string, model string) (string, error) {
+	origRunner := runAgentOnce
+	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
 		return "- Summary", nil
 	}
-	defer func() { runClaudeOnce = origRunner }()
+	defer func() { runAgentOnce = origRunner }()
 
 	var buf bytes.Buffer
 	cmd := *releaseCmd

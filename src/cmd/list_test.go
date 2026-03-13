@@ -260,12 +260,13 @@ func TestListFirstTaskFormat(t *testing.T) {
 }
 
 func TestListFirstTaskHighlightedInTUI(t *testing.T) {
-	// Test renderListContent directly to verify first task highlighting
+	// Test listModel.viewList() to verify first task highlighting
 	tasks := []parser.Task{
 		{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md"},
 		{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md"},
 	}
-	content := renderListContent(tasks, false)
+	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	content := m.viewList()
 
 	// Should contain the arrow indicator for first task
 	if !strings.Contains(content, "→") {

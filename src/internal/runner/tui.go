@@ -2,45 +2,24 @@ package runner
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // Message types for the bubbletea model.
+// Agent-produced types (StatusMsg, OutputMsg, ToolMsg, SkillMsg, MCPMsg, UsageMsg)
+// are defined in the agent package.
 
 // ProgressMsg is sent when iteration progress changes.
 type ProgressMsg struct {
 	Current int
 	Total   int
-}
-
-// ToolMsg is sent when a new tool use is detected.
-type ToolMsg struct {
-	Description string
-}
-
-// OutputMsg is sent when new assistant text output arrives.
-type OutputMsg struct {
-	Text string
-}
-
-// StatusMsg is sent when the status changes (e.g. "Thinking...", "Running tool", "Done").
-type StatusMsg struct {
-	Status string
-}
-
-// SkillMsg is sent when a skill is used.
-type SkillMsg struct {
-	Name string
-}
-
-// MCPMsg is sent when an MCP tool is used.
-type MCPMsg struct {
-	Name string
 }
 
 // TaskInfoMsg is sent when the current task changes.
@@ -54,18 +33,15 @@ type CommitMsg struct {
 	Message string
 }
 
-// UsageMsg is sent when a result event contains token usage data.
-type UsageMsg struct {
-	InputTokens  int
-	OutputTokens int
-}
-
 // TaskUsage records token usage for a single task/iteration.
 type TaskUsage struct {
 	TaskID       string
 	TaskTitle    string
+	PlanFile     string
 	InputTokens  int
 	OutputTokens int
+	StartTime    time.Time
+	EndTime      time.Time
 }
 
 // InfoMsg displays an informational message in the TUI.
@@ -112,6 +88,13 @@ type IterationStartMsg struct {
 	Total     int
 	TaskID    string
 	TaskTitle string
+	PlanFile  string
+}
+
+// RunAgainResult holds the user's choice from the summary menu.
+type RunAgainResult struct {
+	RunAgain  bool
+	TaskCount int
 }
 
 // tickMsg is sent by the spinner ticker.
@@ -124,6 +107,7 @@ type BannerInfo struct {
 	RunID      string
 	RunDir     string
 	Worktree   string // empty if not using worktree
+	Agent      string // agent name (e.g. "claude", "opencode")
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.
@@ -139,8 +123,8 @@ func FormatTokens(n int) string {
 	return s + "k"
 }
 
-// tuiModel is the bubbletea model that replaces the old display struct.
-type tuiModel struct {
+// TUIModel is the bubbletea model that replaces the old display struct.
+type TUIModel struct {
 	// Header fields
 	version     string
 	fingerprint string
@@ -153,14 +137,20 @@ type tuiModel struct {
 	done         bool
 
 	// Summary state
-	showSummary bool
-	summary     SummaryData
-	pushStatus  string
-	pushDone    bool
+	showSummary    bool
+	summary        SummaryData
+	summaryElapsed time.Duration // frozen elapsed time at summary display
+	pushStatus     string
+	pushDone       bool
+	menuChoice   int    // 0 = Exit, 1 = Run again
+	editingCount bool   // true when typing task count
+	countInput   string // buffer for task count input
+	runAgain     RunAgainResult
 
 	// Task info
-	taskID    string
-	taskTitle string
+	taskID       string
+	taskTitle    string
+	taskPlanFile string
 
 	// Recent commits
 	commits []string
@@ -189,11 +179,11 @@ type tuiModel struct {
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
-func NewTUIModel(model string, version string, fingerprint string, cancelFunc func(), banner BannerInfo) tuiModel {
+func NewTUIModel(model string, version string, fingerprint string, cancelFunc func(), banner BannerInfo) TUIModel {
 	if model == "" {
 		model = "default"
 	}
-	return tuiModel{
+	return TUIModel{
 		version:     version,
 		fingerprint: fingerprint,
 		banner:      banner,
@@ -206,7 +196,17 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 	}
 }
 
-func (m tuiModel) Init() tea.Cmd {
+// Result returns the user's choice from the summary menu.
+func (m TUIModel) Result() RunAgainResult {
+	return m.runAgain
+}
+
+// TaskUsages returns the per-task token usage records.
+func (m TUIModel) TaskUsages() []TaskUsage {
+	return m.taskUsages
+}
+
+func (m TUIModel) Init() tea.Cmd {
 	return tickCmd()
 }
 
@@ -216,13 +216,11 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.done {
-			// Any key exits when done
-			m.quitting = true
-			return m, tea.Quit
+			return m.handleSummaryKeys(msg)
 		}
 		if m.showSummary && msg.Type == tea.KeyCtrlC {
 			// Ctrl+C on summary exits immediately
@@ -230,12 +228,12 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.Type == tea.KeyCtrlC {
-			m.status = "Interrupted"
-			m.quitting = true
+			m.status = "Interrupting..."
 			if m.cancelFunc != nil {
 				m.cancelFunc()
+				m.cancelFunc = nil // prevent double-cancel
 			}
-			return m, tea.Quit
+			return m, nil
 		}
 
 	case tea.WindowSizeMsg:
@@ -252,12 +250,16 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskUsages = append(m.taskUsages, TaskUsage{
 				TaskID:       m.taskID,
 				TaskTitle:    m.taskTitle,
+				PlanFile:     m.taskPlanFile,
 				InputTokens:  m.iterInputTokens,
 				OutputTokens: m.iterOutputTokens,
+				StartTime:    m.startTime,
+				EndTime:      time.Now(),
 			})
 		}
 		m.showSummary = true
 		m.summary = msg.Data
+		m.summaryElapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)
 		m.pushStatus = "Pushing to remote..."
 		return m, nil
 
@@ -273,7 +275,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InfoMsg:
 		m.infoMessages = append(m.infoMessages, msg.Text)
 
-	case UsageMsg:
+	case agent.UsageMsg:
 		m.iterInputTokens += msg.InputTokens
 		m.iterOutputTokens += msg.OutputTokens
 		m.totalInputTokens += msg.InputTokens
@@ -288,14 +290,18 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskUsages = append(m.taskUsages, TaskUsage{
 				TaskID:       m.taskID,
 				TaskTitle:    m.taskTitle,
+				PlanFile:     m.taskPlanFile,
 				InputTokens:  m.iterInputTokens,
 				OutputTokens: m.iterOutputTokens,
+				StartTime:    m.startTime,
+				EndTime:      time.Now(),
 			})
 		}
 		m.currentIter = msg.Current
 		m.totalIters = msg.Total
 		m.taskID = msg.TaskID
 		m.taskTitle = msg.TaskTitle
+		m.taskPlanFile = msg.PlanFile
 		// Reset per-iteration state
 		m.status = "Starting..."
 		m.output = "-"
@@ -308,10 +314,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.iterOutputTokens = 0
 		m.startTime = time.Now()
 
-	case StatusMsg:
+	case agent.StatusMsg:
 		m.status = msg.Status
 
-	case OutputMsg:
+	case agent.OutputMsg:
 		text := strings.TrimSpace(msg.Text)
 		if idx := strings.LastIndex(text, "\n"); idx >= 0 {
 			text = strings.TrimSpace(text[idx+1:])
@@ -320,14 +326,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = text
 		}
 
-	case ToolMsg:
+	case agent.ToolMsg:
 		m.toolHistory = append(m.toolHistory, msg.Description)
 		if len(m.toolHistory) > maxToolHistory {
 			m.toolHistory = m.toolHistory[len(m.toolHistory)-maxToolHistory:]
 		}
 		m.toolCount++
 
-	case SkillMsg:
+	case agent.SkillMsg:
 		for _, s := range m.skills {
 			if s == msg.Name {
 				return m, nil
@@ -336,7 +342,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.skills = append(m.skills, msg.Name)
 		m.rebuildExtras()
 
-	case MCPMsg:
+	case agent.MCPMsg:
 		for _, s := range m.mcps {
 			if s == msg.Name {
 				return m, nil
@@ -363,7 +369,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *tuiModel) rebuildExtras() {
+func (m *TUIModel) rebuildExtras() {
 	var parts []string
 	for _, s := range m.skills {
 		parts = append(parts, "skill:"+s)
@@ -385,7 +391,7 @@ var (
 	grayStyle   = lipgloss.NewStyle().Foreground(styles.Muted)
 )
 
-func (m tuiModel) View() string {
+func (m TUIModel) View() string {
 	if m.showSummary || m.done {
 		return m.renderSummaryView()
 	}
@@ -395,10 +401,13 @@ func (m tuiModel) View() string {
 	return m.renderView()
 }
 
-func (m tuiModel) renderBannerView() string {
+func (m TUIModel) renderBannerView() string {
 	var b strings.Builder
 	b.WriteString(m.renderHeader())
 	b.WriteString("\n")
+	if m.banner.Agent != "" {
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
+	}
 	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Model:"), m.model))
 	b.WriteString(fmt.Sprintf("  %s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
 	if m.banner.Branch != "" {
@@ -418,7 +427,89 @@ func (m tuiModel) renderBannerView() string {
 	return b.String()
 }
 
-func (m tuiModel) renderSummaryView() string {
+func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.editingCount {
+		switch msg.Type {
+		case tea.KeyEscape:
+			m.editingCount = false
+			m.countInput = ""
+			return m, nil
+		case tea.KeyEnter:
+			n, err := strconv.Atoi(m.countInput)
+			if err != nil || n <= 0 {
+				// Invalid input, reset
+				m.countInput = ""
+				return m, nil
+			}
+			m.runAgain = RunAgainResult{RunAgain: true, TaskCount: n}
+			m.quitting = true
+			return m, tea.Quit
+		case tea.KeyBackspace:
+			if len(m.countInput) > 0 {
+				m.countInput = m.countInput[:len(m.countInput)-1]
+			}
+			return m, nil
+		case tea.KeyCtrlC:
+			m.quitting = true
+			return m, tea.Quit
+		default:
+			if len(msg.Runes) == 1 && msg.Runes[0] >= '0' && msg.Runes[0] <= '9' {
+				if len(m.countInput) < 4 { // max 9999 tasks
+					m.countInput += string(msg.Runes[0])
+				}
+			}
+			return m, nil
+		}
+	}
+
+	switch msg.Type {
+	case tea.KeyEscape:
+		m.quitting = true
+		return m, tea.Quit
+	case tea.KeyCtrlC:
+		m.quitting = true
+		return m, tea.Quit
+	case tea.KeyUp, tea.KeyShiftTab:
+		if m.menuChoice > 0 {
+			m.menuChoice--
+		}
+		return m, nil
+	case tea.KeyDown, tea.KeyTab:
+		if m.menuChoice < 1 {
+			m.menuChoice++
+		}
+		return m, nil
+	case tea.KeyEnter:
+		if m.menuChoice == 0 {
+			// Exit
+			m.quitting = true
+			return m, tea.Quit
+		}
+		// Run again — start editing count
+		m.editingCount = true
+		m.countInput = ""
+		return m, nil
+	default:
+		if len(msg.Runes) == 1 {
+			switch msg.Runes[0] {
+			case 'q', 'Q':
+				m.quitting = true
+				return m, tea.Quit
+			case 'j':
+				if m.menuChoice < 1 {
+					m.menuChoice++
+				}
+			case 'k':
+				if m.menuChoice > 0 {
+					m.menuChoice--
+				}
+			}
+		}
+		return m, nil
+	}
+}
+
+func (m TUIModel) renderSummaryView() string {
 	w := m.width
 	if w < 50 {
 		w = 50
@@ -433,7 +524,7 @@ func (m tuiModel) renderSummaryView() string {
 	var content strings.Builder
 
 	// Title
-	elapsed := time.Since(m.summary.StartTime).Truncate(time.Second)
+	elapsed := m.summaryElapsed
 	title := styles.Title.Render("✓ Work Complete")
 	if m.summary.TasksCompleted == 0 {
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
@@ -524,11 +615,55 @@ func (m tuiModel) renderSummaryView() string {
 	out.WriteString("\n")
 	out.WriteString(box.Render(content.String()))
 	out.WriteString("\n\n")
-	out.WriteString(fmt.Sprintf("  %s\n", lipgloss.NewStyle().Foreground(styles.Muted).Render("Press any key to exit")))
+
+	if m.done {
+		out.WriteString(m.renderSummaryMenu())
+	} else {
+		out.WriteString(fmt.Sprintf("  %s\n", lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")))
+	}
+
 	return out.String()
 }
 
-func (m tuiModel) renderHeader() string {
+func (m TUIModel) renderSummaryMenu() string {
+	var menu strings.Builder
+
+	selectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	hintStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
+
+	// Exit option
+	if m.menuChoice == 0 {
+		menu.WriteString(fmt.Sprintf("  %s %s\n", selectedStyle.Render("▸"), selectedStyle.Render("Exit")))
+	} else {
+		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Exit")))
+	}
+
+	// Run again option
+	if m.menuChoice == 1 {
+		if m.editingCount {
+			cursor := "█"
+			countDisplay := m.countInput + cursor
+			menu.WriteString(fmt.Sprintf("  %s %s %s %s\n",
+				selectedStyle.Render("▸"),
+				selectedStyle.Render("Run again:"),
+				selectedStyle.Render(countDisplay),
+				hintStyle.Render("tasks (enter to confirm, esc to cancel)")))
+		} else {
+			menu.WriteString(fmt.Sprintf("  %s %s\n",
+				selectedStyle.Render("▸"),
+				selectedStyle.Render("Run again")))
+		}
+	} else {
+		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Run again")))
+	}
+
+	menu.WriteString(fmt.Sprintf("\n  %s\n", hintStyle.Render("↑/↓ select · enter confirm · q/esc exit")))
+
+	return menu.String()
+}
+
+func (m TUIModel) renderHeader() string {
 	var b strings.Builder
 	w := m.width
 	if w < 40 {
@@ -567,7 +702,7 @@ func (m tuiModel) renderHeader() string {
 	return b.String()
 }
 
-func (m tuiModel) renderView() string {
+func (m TUIModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
 	w := m.width
 	contentWidth := w - 13
