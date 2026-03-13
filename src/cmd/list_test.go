@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 const listTestPlan = `# Plan: Test
@@ -74,7 +76,10 @@ func runListCmd(t *testing.T, dir string, flags ...string) string {
 	cmd.Flags().IntP("count", "c", 5, "Number of tasks to show")
 	cmd.Flags().Bool("plain", false, "Plain output")
 	cmd.Flags().Bool("all", false, "Show all")
-	if err := cmd.ParseFlags(flags); err != nil {
+
+	// Always add --plain for tests to avoid launching bubbletea
+	allFlags := append([]string{"--plain"}, flags...)
+	if err := cmd.ParseFlags(allFlags); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
 	cmd.SetOut(&buf)
@@ -95,24 +100,20 @@ func TestListDefaultCount(t *testing.T) {
 
 	out := runListCmd(t, dir)
 
-	// Header should say "Next 5 task(s):"
 	if !strings.Contains(out, "Next 5 task(s):") {
 		t.Errorf("expected 'Next 5 task(s):' in output, got:\n%s", out)
 	}
 
-	// Should contain tasks 1-5
 	for _, id := range []string{"TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005"} {
 		if !strings.Contains(out, id) {
 			t.Errorf("expected %s in output, got:\n%s", id, out)
 		}
 	}
 
-	// Should NOT contain task 6 (beyond count=5)
 	if strings.Contains(out, "TASK-006") {
 		t.Errorf("expected TASK-006 NOT in output (count=5), got:\n%s", out)
 	}
 
-	// Should NOT contain completed task
 	if strings.Contains(out, "TASK-007") {
 		t.Errorf("expected TASK-007 NOT in output (completed), got:\n%s", out)
 	}
@@ -124,7 +125,6 @@ func TestListNoDescriptionLine(t *testing.T) {
 
 	out := runListCmd(t, dir)
 
-	// Should not contain description text
 	if strings.Contains(out, "Do thing") {
 		t.Errorf("expected no description lines in output, got:\n%s", out)
 	}
@@ -136,7 +136,6 @@ func TestListNoBlankLinesBetweenTasks(t *testing.T) {
 
 	out := runListCmd(t, dir)
 
-	// After the blank line following header, consecutive task lines should not be separated by blank lines
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	inTasks := false
 	for _, line := range lines {
@@ -156,12 +155,10 @@ func TestListAllFlag(t *testing.T) {
 
 	out := runListCmd(t, dir, "--all")
 
-	// Header should say "All upcoming tasks:"
 	if !strings.Contains(out, "All upcoming tasks:") {
 		t.Errorf("expected 'All upcoming tasks:' in output, got:\n%s", out)
 	}
 
-	// Should contain all workable tasks (001-006), not completed (007)
 	for _, id := range []string{"TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006"} {
 		if !strings.Contains(out, id) {
 			t.Errorf("expected %s in output, got:\n%s", id, out)
@@ -176,7 +173,6 @@ func TestListAllIgnoresCount(t *testing.T) {
 	dir := t.TempDir()
 	writeListPlan(t, dir, "plan_1.md", listTestPlan)
 
-	// --all with --count 2 should still show all tasks
 	out := runListCmd(t, dir, "--all", "--count", "2")
 
 	for _, id := range []string{"TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006"} {
@@ -207,9 +203,8 @@ func TestListPlainFlag(t *testing.T) {
 	dir := t.TempDir()
 	writeListPlan(t, dir, "plan_1.md", listTestPlan)
 
-	out := runListCmd(t, dir, "--plain")
+	out := runListCmd(t, dir)
 
-	// Should not contain ANSI escape codes
 	if strings.Contains(out, "\x1b[") {
 		t.Errorf("expected no ANSI codes in plain output, got:\n%s", out)
 	}
@@ -222,7 +217,7 @@ func TestListPlainAndAllCombined(t *testing.T) {
 	dir := t.TempDir()
 	writeListPlan(t, dir, "plan_1.md", listTestPlan)
 
-	out := runListCmd(t, dir, "--plain", "--all")
+	out := runListCmd(t, dir, "--all")
 
 	if strings.Contains(out, "\x1b[") {
 		t.Errorf("expected no ANSI codes in plain output, got:\n%s", out)
@@ -238,7 +233,6 @@ func TestListPlainAndAllCombined(t *testing.T) {
 func TestListSkipsCompletedPlanFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeListPlan(t, dir, "plan_1_completed.md", listTestPlan)
-	// Only a completed plan file — no workable tasks expected
 	out := runListCmd(t, dir)
 	if !strings.Contains(out, "No pending tasks found") {
 		t.Errorf("expected 'No pending tasks found' when only completed plan exists, got:\n%s", out)
@@ -247,7 +241,6 @@ func TestListSkipsCompletedPlanFiles(t *testing.T) {
 
 func TestListNoPendingTasks(t *testing.T) {
 	dir := t.TempDir()
-	// No .maggus dir
 	out := runListCmd(t, dir)
 	if !strings.Contains(out, "No pending tasks found") {
 		t.Errorf("expected 'No pending tasks found', got:\n%s", out)
@@ -260,8 +253,28 @@ func TestListFirstTaskFormat(t *testing.T) {
 
 	out := runListCmd(t, dir)
 
-	// Check task line format: " #1  TASK-001: First task"
-	if !strings.Contains(out, "#1  TASK-001: First task") {
-		t.Errorf("expected '#1  TASK-001: First task' format in output, got:\n%s", out)
+	// First task should have arrow prefix in plain mode
+	if !strings.Contains(out, "-> #1  TASK-001: First task") {
+		t.Errorf("expected '-> #1  TASK-001: First task' format in output, got:\n%s", out)
+	}
+}
+
+func TestListFirstTaskHighlightedInTUI(t *testing.T) {
+	// Test renderListContent directly to verify first task highlighting
+	tasks := []parser.Task{
+		{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md"},
+		{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md"},
+	}
+	content := renderListContent(tasks, false)
+
+	// Should contain the arrow indicator for first task
+	if !strings.Contains(content, "→") {
+		t.Errorf("expected arrow indicator for first task in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "TASK-001") {
+		t.Errorf("expected TASK-001 in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "TASK-002") {
+		t.Errorf("expected TASK-002 in TUI content, got:\n%s", content)
 	}
 }

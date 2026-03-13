@@ -9,11 +9,54 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// NotificationsConfig holds sound notification settings.
+type NotificationsConfig struct {
+	Sound          bool  `yaml:"sound"`
+	OnTaskComplete *bool `yaml:"on_task_complete"`
+	OnRunComplete  *bool `yaml:"on_run_complete"`
+	OnError        *bool `yaml:"on_error"`
+}
+
+// IsTaskCompleteEnabled returns true if task-complete sound should play.
+// Defaults to true when sound is enabled and on_task_complete is not explicitly set.
+func (n NotificationsConfig) IsTaskCompleteEnabled() bool {
+	if !n.Sound {
+		return false
+	}
+	if n.OnTaskComplete != nil {
+		return *n.OnTaskComplete
+	}
+	return true
+}
+
+// IsRunCompleteEnabled returns true if run-complete sound should play.
+func (n NotificationsConfig) IsRunCompleteEnabled() bool {
+	if !n.Sound {
+		return false
+	}
+	if n.OnRunComplete != nil {
+		return *n.OnRunComplete
+	}
+	return true
+}
+
+// IsErrorEnabled returns true if error sound should play.
+func (n NotificationsConfig) IsErrorEnabled() bool {
+	if !n.Sound {
+		return false
+	}
+	if n.OnError != nil {
+		return *n.OnError
+	}
+	return true
+}
+
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Model    string   `yaml:"model"`
-	Include  []string `yaml:"include"`
-	Worktree bool     `yaml:"worktree"`
+	Model         string              `yaml:"model"`
+	Include       []string            `yaml:"include"`
+	Worktree      bool                `yaml:"worktree"`
+	Notifications NotificationsConfig `yaml:"notifications"`
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,
