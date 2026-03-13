@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dirnei/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 func newTestTask() *parser.Task {

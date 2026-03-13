@@ -20,7 +20,7 @@ claude --version
 
 ### Pre-built binaries
 
-Download the latest binary for your platform from [GitHub Releases](https://github.com/dirnei/maggus/releases).
+Download the latest binary for your platform from [GitHub Releases](https://github.com/leberkas-org/maggus/releases).
 
 Available platforms:
 - Linux (amd64, arm64)
@@ -32,7 +32,7 @@ After downloading, extract the archive and move the `maggus` binary to a directo
 ### Build from source
 
 ```bash
-git clone https://github.com/dirnei/maggus.git
+git clone https://github.com/leberkas-org/maggus.git
 cd maggus/src
 go build -o maggus .
 ```

@@ -9,7 +9,7 @@ builds:
     binary: maggus
     ldflags:
       - -s -w
-      - -X github.com/dirnei/maggus/cmd.Version={{.Version}}
+      - -X github.com/leberkas-org/maggus/cmd.Version={{.Version}}
     goos:
       - linux
       - darwin

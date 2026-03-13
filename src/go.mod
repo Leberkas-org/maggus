@@ -1,4 +1,4 @@
-module github.com/dirnei/maggus
+module github.com/leberkas-org/maggus
 
 go 1.25.7
 

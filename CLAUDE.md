@@ -15,7 +15,7 @@ All Go source lives in `src/`. Run commands from that directory.
 cd src && go build -o maggus .
 
 # Build with version injection
-cd src && go build -ldflags "-s -w -X github.com/dirnei/maggus/cmd.Version=1.0.0" -o maggus .
+cd src && go build -ldflags "-s -w -X github.com/leberkas-org/maggus/cmd.Version=1.0.0" -o maggus .
 
 # Build with Windows icon/manifest (requires go-winres)
 cd src && go-winres make && go build -o maggus.exe .

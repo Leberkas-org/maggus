@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dirnei/maggus/internal/tasklock"
-	"github.com/dirnei/maggus/internal/worktree"
+	"github.com/leberkas-org/maggus/internal/tasklock"
+	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
 )
 

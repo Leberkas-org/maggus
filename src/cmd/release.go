@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/dirnei/maggus/internal/config"
-	"github.com/dirnei/maggus/internal/release"
-	"github.com/dirnei/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/release"
+	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/spf13/cobra"
 )
 
