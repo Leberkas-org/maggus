@@ -47,15 +47,15 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want to see a styled summary screen when work completes, showing what was accomplished, and press a key to exit — so the terminal stays clean.
 
 **Acceptance Criteria:**
-- [ ] When all iterations complete (or are interrupted), the TUI transitions to a "summary" view instead of quitting
-- [ ] The summary view shows: run ID, branch, model, total elapsed time, tasks completed vs. total, commit range (start..end), and a list of commits made
-- [ ] If there are remaining incomplete tasks, the summary shows the count and first few task titles
-- [ ] The summary view shows push status: "Pushed to origin/branch-name" or "Push failed: reason"
-- [ ] The summary is rendered inside a lipgloss box with the shared styles from TASK-001
-- [ ] At the bottom: "Press any key to exit" prompt
-- [ ] Pressing any key (or Ctrl+C) exits the TUI and returns to the shell cleanly (no trailing output)
-- [ ] The git push happens in the background while the summary is displayed, with a spinner/status update
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] When all iterations complete (or are interrupted), the TUI transitions to a "summary" view instead of quitting
+- [x] The summary view shows: run ID, branch, model, total elapsed time, tasks completed vs. total, commit range (start..end), and a list of commits made
+- [x] If there are remaining incomplete tasks, the summary shows the count and first few task titles
+- [x] The summary view shows push status: "Pushed to origin/branch-name" or "Push failed: reason"
+- [x] The summary is rendered inside a lipgloss box with the shared styles from TASK-001
+- [x] At the bottom: "Press any key to exit" prompt
+- [x] Pressing any key (or Ctrl+C) exits the TUI and returns to the shell cleanly (no trailing output)
+- [x] The git push happens in the background while the summary is displayed, with a spinner/status update
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-004: Restyle `status` command with lipgloss TUI
 **Description:** As a user, I want `maggus status` to render a polished, styled view using lipgloss instead of raw ANSI codes.

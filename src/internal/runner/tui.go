@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // Message types for the bubbletea model.
@@ -58,6 +59,36 @@ type InfoMsg struct {
 	Text string
 }
 
+// SummaryData holds information displayed on the post-completion summary screen.
+type SummaryData struct {
+	RunID          string
+	Branch         string
+	Model          string
+	StartTime      time.Time
+	TasksCompleted int
+	TasksTotal     int
+	CommitStart    string // short hash of first commit
+	CommitEnd      string // short hash of last commit
+	RemainingTasks []RemainingTask
+}
+
+// RemainingTask is a task that was not completed during the run.
+type RemainingTask struct {
+	ID    string
+	Title string
+}
+
+// SummaryMsg tells the TUI to transition to the summary view.
+type SummaryMsg struct {
+	Data SummaryData
+}
+
+// PushStatusMsg updates the push status on the summary screen.
+type PushStatusMsg struct {
+	Status string // e.g. "Pushed to origin/branch" or "Push failed: reason"
+	Done   bool
+}
+
 // QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
 type QuitMsg struct{}
 
@@ -93,6 +124,12 @@ type tuiModel struct {
 	banner       BannerInfo
 	infoMessages []string
 	done         bool
+
+	// Summary state
+	showSummary bool
+	summary     SummaryData
+	pushStatus  string
+	pushDone    bool
 
 	// Task info
 	taskID    string
@@ -152,6 +189,11 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
+		if m.showSummary && msg.Type == tea.KeyCtrlC {
+			// Ctrl+C on summary exits immediately
+			m.quitting = true
+			return m, tea.Quit
+		}
 		if msg.Type == tea.KeyCtrlC {
 			m.status = "Interrupted"
 			m.quitting = true
@@ -167,6 +209,17 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.frame = (m.frame + 1) % len(spinnerFrames)
 		return m, tickCmd()
+
+	case SummaryMsg:
+		m.showSummary = true
+		m.summary = msg.Data
+		m.pushStatus = "Pushing to remote..."
+		return m, nil
+
+	case PushStatusMsg:
+		m.pushStatus = msg.Status
+		m.pushDone = msg.Done
+		return m, nil
 
 	case QuitMsg:
 		m.done = true
@@ -268,8 +321,8 @@ var (
 )
 
 func (m tuiModel) View() string {
-	if m.done {
-		return m.renderDoneView()
+	if m.showSummary || m.done {
+		return m.renderSummaryView()
 	}
 	if m.taskID == "" {
 		return m.renderBannerView()
@@ -300,27 +353,93 @@ func (m tuiModel) renderBannerView() string {
 	return b.String()
 }
 
-func (m tuiModel) renderDoneView() string {
-	var b strings.Builder
-	b.WriteString(m.renderHeader())
-	b.WriteString("\n")
+func (m tuiModel) renderSummaryView() string {
+	w := m.width
+	if w < 50 {
+		w = 50
+	}
 
-	// Show commits
+	// Build the inner content of the summary box.
+	boxWidth := w - 4 // account for box border + padding
+	if boxWidth < 40 {
+		boxWidth = 40
+	}
+
+	var content strings.Builder
+
+	// Title
+	elapsed := time.Since(m.summary.StartTime).Truncate(time.Second)
+	title := styles.Title.Render("✓ Work Complete")
+	if m.summary.TasksCompleted == 0 {
+		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
+	}
+	content.WriteString(title + "\n\n")
+
+	// Key-value pairs
+	labelStyle := styles.Label.Width(10).Align(lipgloss.Right)
+	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Run ID:"), valStyle.Render(m.summary.RunID)))
+	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Branch:"), valStyle.Render(m.summary.Branch)))
+	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Model:"), valStyle.Render(m.summary.Model)))
+	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Elapsed:"), valStyle.Render(elapsed.String())))
+	content.WriteString(fmt.Sprintf("%s  %s\n",
+		labelStyle.Render("Tasks:"),
+		lipgloss.NewStyle().Foreground(styles.Success).Render(
+			fmt.Sprintf("%d/%d completed", m.summary.TasksCompleted, m.summary.TasksTotal))))
+
+	// Commit range and list
 	if len(m.commits) > 0 {
-		b.WriteString(grayStyle.Render("  Commits:") + "\n")
-		for _, c := range m.commits {
-			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(truncate(c, m.width-6))))
+		content.WriteString("\n")
+		commitHeader := fmt.Sprintf("Commits (%d)", len(m.commits))
+		if m.summary.CommitStart != "" && m.summary.CommitEnd != "" {
+			commitHeader += fmt.Sprintf("  %s..%s", m.summary.CommitStart, m.summary.CommitEnd)
 		}
-		b.WriteString("\n")
+		content.WriteString(styles.Subtitle.Render(commitHeader) + "\n")
+		for _, c := range m.commits {
+			content.WriteString(fmt.Sprintf("  %s %s\n",
+				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
+				truncate(c, boxWidth-4)))
+		}
 	}
 
-	// Show info messages (push status, etc.)
-	for _, msg := range m.infoMessages {
-		b.WriteString(fmt.Sprintf("  %s\n", msg))
+	// Remaining incomplete tasks
+	if len(m.summary.RemainingTasks) > 0 {
+		content.WriteString("\n")
+		content.WriteString(lipgloss.NewStyle().Foreground(styles.Warning).Render(
+			fmt.Sprintf("Remaining (%d)", len(m.summary.RemainingTasks))) + "\n")
+		maxShow := 5
+		for i, t := range m.summary.RemainingTasks {
+			if i >= maxShow {
+				content.WriteString(fmt.Sprintf("  %s\n",
+					lipgloss.NewStyle().Foreground(styles.Muted).Render(
+						fmt.Sprintf("... and %d more", len(m.summary.RemainingTasks)-maxShow))))
+				break
+			}
+			content.WriteString(fmt.Sprintf("  %s %s\n",
+				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
+				fmt.Sprintf("%s: %s", t.ID, truncate(t.Title, boxWidth-len(t.ID)-6))))
+		}
 	}
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render("Press any key to exit")))
-	return b.String()
+
+	// Push status
+	content.WriteString("\n")
+	if m.pushDone {
+		content.WriteString(lipgloss.NewStyle().Foreground(styles.Success).Render(m.pushStatus) + "\n")
+	} else if m.pushStatus != "" {
+		spinner := cyanStyle.Render(spinnerFrames[m.frame])
+		content.WriteString(fmt.Sprintf("%s %s\n", spinner, m.pushStatus))
+	}
+
+	// Render inside a lipgloss box
+	box := styles.Box.Width(boxWidth)
+	var out strings.Builder
+	out.WriteString(m.renderHeader())
+	out.WriteString("\n")
+	out.WriteString(box.Render(content.String()))
+	out.WriteString("\n\n")
+	out.WriteString(fmt.Sprintf("  %s\n", lipgloss.NewStyle().Foreground(styles.Muted).Render("Press any key to exit")))
+	return out.String()
 }
 
 func (m tuiModel) renderHeader() string {

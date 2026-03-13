@@ -213,6 +213,12 @@ Examples:
 		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel, banner)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
+		// Capture the starting commit hash before work begins.
+		startHashCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+		startHashCmd.Dir = workDir
+		startHashBytes, _ := startHashCmd.Output()
+		startHash := strings.TrimSpace(string(startHashBytes))
+
 		// Run the work loop in a goroutine, sending events to the TUI.
 		var workErr error
 		completed := 0
@@ -333,32 +339,66 @@ Examples:
 				p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
 			}
 
-			// Push commits to remote inside the TUI (from workDir, which may be a worktree).
+			// Build summary data.
+			endHashCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+			endHashCmd.Dir = workDir
+			endHashBytes, _ := endHashCmd.Output()
+			endHash := strings.TrimSpace(string(endHashBytes))
+
+			// Determine current branch name.
+			branchNameCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+			branchNameCmd.Dir = workDir
+			branchNameOut, _ := branchNameCmd.Output()
+			currentBranch := strings.TrimSpace(string(branchNameOut))
+
+			// Collect remaining incomplete tasks.
+			var remaining []runner.RemainingTask
+			latestTasks, _ := parser.ParsePlans(workDir)
+			for _, t := range latestTasks {
+				if t.IsWorkable() {
+					remaining = append(remaining, runner.RemainingTask{ID: t.ID, Title: t.Title})
+				}
+			}
+
+			summaryData := runner.SummaryData{
+				RunID:          run.ID,
+				Branch:         currentBranch,
+				Model:          modelDisplay,
+				StartTime:      run.StartTime,
+				TasksCompleted: completed,
+				TasksTotal:     count,
+				CommitStart:    startHash,
+				CommitEnd:      endHash,
+				RemainingTasks: remaining,
+			}
+
+			// Show summary view, then push in the background.
+			p.Send(runner.SummaryMsg{Data: summaryData})
+
+			// Push commits to remote in the background while summary is displayed.
 			if completed > 0 {
-				p.Send(runner.InfoMsg{Text: "Pushing to remote..."})
-				branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-				branchCmd.Dir = workDir
-				branchOut, branchErr := branchCmd.Output()
 				var push *exec.Cmd
-				if branchErr == nil {
-					branch := strings.TrimSpace(string(branchOut))
-					push = exec.Command("git", "push", "--set-upstream", "origin", branch)
+				if currentBranch != "" {
+					push = exec.Command("git", "push", "--set-upstream", "origin", currentBranch)
 				} else {
 					push = exec.Command("git", "push")
 				}
 				push.Dir = workDir
 				if pushOut, pushErr := push.CombinedOutput(); pushErr != nil {
-					p.Send(runner.InfoMsg{Text: fmt.Sprintf("Push failed: %v", pushErr)})
+					p.Send(runner.PushStatusMsg{
+						Status: fmt.Sprintf("Push failed: %v", pushErr),
+						Done:   true,
+					})
 				} else {
-					msg := "Pushed successfully."
+					msg := fmt.Sprintf("Pushed to origin/%s", currentBranch)
 					if s := strings.TrimSpace(string(pushOut)); s != "" {
-						msg = fmt.Sprintf("Pushed: %s", s)
+						_ = s // push output available but branch name is more useful
 					}
-					p.Send(runner.InfoMsg{Text: msg})
+					p.Send(runner.PushStatusMsg{Status: msg, Done: true})
 				}
+			} else {
+				p.Send(runner.PushStatusMsg{Status: "Nothing to push", Done: true})
 			}
-
-			p.Send(runner.InfoMsg{Text: fmt.Sprintf("Completed %d/%d iterations.", completed, count)})
 		}()
 
 		// Run the TUI (blocks until user dismisses the done screen).
