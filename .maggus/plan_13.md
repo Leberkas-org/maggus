@@ -47,15 +47,15 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a developer, I want an OpenCode adapter so that Maggus can use OpenCode as an alternative AI backend.
 
 **Acceptance Criteria:**
-- [ ] New file `internal/agent/opencode.go` implementing the `Agent` interface for OpenCode
-- [ ] Executable lookup uses `exec.LookPath("opencode")`
-- [ ] For streaming mode (`Run`): invokes `opencode -p <prompt> --output-format stream-json` (or the correct OpenCode equivalent flags) with `--model` if provided
-- [ ] OpenCode does NOT need `--dangerously-skip-permissions` — non-interactive mode auto-approves
-- [ ] Streaming JSON parser handles OpenCode's event schema and normalizes events into the same bubbletea messages (StatusMsg, OutputMsg, ToolMsg, UsageMsg, etc.)
-- [ ] For text mode (`RunOnce`): invokes `opencode -p <prompt> --output-format text` (or equivalent)
-- [ ] Process management follows the same pattern as Claude adapter (setProcAttr, Cancel, WaitDelay)
-- [ ] `Validate()` checks for `opencode` on PATH and returns a helpful error if not found
-- [ ] Typecheck/lint passes
+- [x] New file `internal/agent/opencode.go` implementing the `Agent` interface for OpenCode
+- [x] Executable lookup uses `exec.LookPath("opencode")`
+- [x] For streaming mode (`Run`): invokes `opencode -p <prompt> -f json -q` (OpenCode's equivalent flags; does not support streaming events — outputs single JSON blob on completion) with `--model` not supported (model configured via OpenCode config file)
+- [x] OpenCode does NOT need `--dangerously-skip-permissions` — non-interactive mode auto-approves
+- [x] Streaming JSON parser handles OpenCode's event schema and normalizes events into the same bubbletea messages (StatusMsg, OutputMsg, ToolMsg, UsageMsg, etc.)
+- [x] For text mode (`RunOnce`): invokes `opencode -p <prompt> -f text -q` (OpenCode equivalent)
+- [x] Process management follows the same pattern as Claude adapter (setProcAttr, Cancel, WaitDelay)
+- [x] `Validate()` checks for `opencode` on PATH and returns a helpful error if not found
+- [x] Typecheck/lint passes
 
 ### TASK-004: Add agent registry and factory function
 
