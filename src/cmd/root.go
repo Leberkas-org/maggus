@@ -28,27 +28,30 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 
-	m := newMenuModel(loadPlanSummary())
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	result, err := p.Run()
-	if err != nil {
-		return err
-	}
+	for {
+		m := newMenuModel(loadPlanSummary())
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		result, err := p.Run()
+		if err != nil {
+			return err
+		}
 
-	final := result.(menuModel)
-	if final.quitting || final.selected == "" {
-		return nil
-	}
+		final := result.(menuModel)
+		if final.quitting || final.selected == "" {
+			return nil
+		}
 
-	cmdArgs := append([]string{final.selected}, final.args...)
-	sub, remaining, err := rootCmd.Find(cmdArgs)
-	if err != nil {
-		return err
+		cmdArgs := append([]string{final.selected}, final.args...)
+		sub, remaining, err := rootCmd.Find(cmdArgs)
+		if err != nil {
+			return err
+		}
+		if err := sub.ParseFlags(remaining); err != nil {
+			return err
+		}
+		// Run the command; ignore errors so we return to the menu
+		_ = sub.RunE(sub, sub.Flags().Args())
 	}
-	if err := sub.ParseFlags(remaining); err != nil {
-		return err
-	}
-	return sub.RunE(sub, sub.Flags().Args())
 }
 
 func Execute() {
