@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,11 +26,40 @@ var menuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 }
 
+// planSummary holds the aggregated plan statistics for the menu header.
+type planSummary struct {
+	plans   int
+	tasks   int
+	done    int
+	blocked int
+}
+
+// loadPlanSummary computes plan statistics from the current working directory.
+func loadPlanSummary() planSummary {
+	dir, err := os.Getwd()
+	if err != nil {
+		return planSummary{}
+	}
+	plans, err := parsePlans(dir)
+	if err != nil || len(plans) == 0 {
+		return planSummary{}
+	}
+	var s planSummary
+	s.plans = len(plans)
+	for _, p := range plans {
+		s.tasks += len(p.tasks)
+		s.done += p.doneCount()
+		s.blocked += p.blockedCount()
+	}
+	return s
+}
+
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
 	cursor   int
 	selected string // command name chosen by the user, empty if quit
 	quitting bool
+	summary  planSummary
 }
 
 func (m menuModel) Init() tea.Cmd {
@@ -68,8 +98,24 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m menuModel) View() string {
-	titleStyle := styles.Title.MarginBottom(1)
+	titleStyle := styles.Title.MarginBottom(0)
 	header := titleStyle.Render(fmt.Sprintf("Maggus %s", Version))
+
+	// Plan summary line
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	var summaryLine string
+	if m.summary.tasks == 0 {
+		summaryLine = mutedStyle.Render("No plans found")
+	} else {
+		greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
+		redStyle := lipgloss.NewStyle().Foreground(styles.Error)
+		summaryLine = fmt.Sprintf("%s · %s · %s · %s",
+			mutedStyle.Render(fmt.Sprintf("%d plans", m.summary.plans)),
+			mutedStyle.Render(fmt.Sprintf("%d tasks", m.summary.tasks)),
+			greenStyle.Render(fmt.Sprintf("%d done", m.summary.done)),
+			redStyle.Render(fmt.Sprintf("%d blocked", m.summary.blocked)),
+		)
+	}
 
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
@@ -94,6 +140,6 @@ func (m menuModel) View() string {
 
 	footer := styles.StatusBar.Render("↑/↓: navigate · enter: select · q/esc: exit")
 
-	content := header + "\n" + sb.String() + "\n" + footer
+	content := header + "\n" + summaryLine + "\n\n" + sb.String() + "\n" + footer
 	return styles.Box.Render(content) + "\n"
 }

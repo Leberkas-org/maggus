@@ -28,7 +28,7 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 
-	m := menuModel{}
+	m := menuModel{summary: loadPlanSummary()}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := p.Run()
 	if err != nil {

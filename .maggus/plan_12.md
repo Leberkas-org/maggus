@@ -30,11 +30,11 @@ When `maggus` is invoked without any subcommand in an interactive terminal, it c
 **Description:** As a user, I want to see a quick status summary above the menu so that I know the current state of my plans without running `status` first.
 
 **Acceptance Criteria:**
-- [ ] Header shows app name and version (e.g., "Maggus v1.2.3")
-- [ ] Below the title, a summary line shows: number of plans, total tasks, completed tasks, blocked tasks (e.g., "3 plans · 12 tasks · 8 done · 2 blocked")
-- [ ] If no `.maggus/` directory or no plan files exist, the summary line shows "No plans found"
-- [ ] Summary is rendered using shared styles (muted for labels, colored for counts)
-- [ ] Typecheck/lint passes
+- [x] Header shows app name and version (e.g., "Maggus v1.2.3")
+- [x] Below the title, a summary line shows: number of plans, total tasks, completed tasks, blocked tasks (e.g., "3 plans · 12 tasks · 8 done · 2 blocked")
+- [x] If no `.maggus/` directory or no plan files exist, the summary line shows "No plans found"
+- [x] Summary is rendered using shared styles (muted for labels, colored for counts)
+- [x] Typecheck/lint passes
 
 ### TASK-003: Add sub-menus for common command options
 **Description:** As a user, I want to configure common options before launching a command so that I don't have to remember CLI flags.
