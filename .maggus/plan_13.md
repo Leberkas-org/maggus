@@ -137,11 +137,11 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want the CLI Commands reference to document the new `--agent` flag and show agent-aware example output.
 
 **Acceptance Criteria:**
-- [ ] `maggus work` section documents the `--agent` flag in the flags table
-- [ ] Example output section shows the `Agent:` line in the startup banner
-- [ ] Examples include `maggus work --agent opencode` usage
-- [ ] `maggus status` section mentions that it shows the configured agent
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] `maggus work` section documents the `--agent` flag in the flags table
+- [x] Example output section shows the `Agent:` line in the startup banner
+- [x] Examples include `maggus work --agent opencode` usage
+- [x] `maggus status` section mentions that it shows the configured agent
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-011: Update VitePress docs — Concepts page
 

@@ -1,6 +1,6 @@
 # CLI Commands
 
-Maggus provides four commands for working with implementation plans.
+Maggus provides four commands for working with implementation plans. All commands that load configuration will show the configured agent (defaults to `claude`).
 
 ## maggus work
 
@@ -17,7 +17,8 @@ maggus work [count] [flags]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--count` | `-c` | `5` | Number of tasks to work on |
-| `--model` | | *(from config)* | Model to use (e.g. `opus`, `sonnet`, `haiku`, or a full model ID) |
+| `--agent` | | *(from config)* | Agent backend to use (`claude` or `opencode`) |
+| `--model` | | *(from config)* | Model to use (e.g. `opus`, `sonnet`, `anthropic/claude-sonnet-4-6`, or a full model ID) |
 | `--no-bootstrap` | | `false` | Skip reading CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, and TOOLING.md |
 
 The positional `[count]` argument and `--count` flag are interchangeable. The positional argument takes precedence.
@@ -37,6 +38,9 @@ maggus work -c 3
 # Override the model for this run
 maggus work --model opus
 
+# Use OpenCode as the agent backend
+maggus work --agent opencode
+
 # Skip bootstrap context files
 maggus work --no-bootstrap
 ```
@@ -47,6 +51,7 @@ maggus work --no-bootstrap
 ══════════════════════════════════════════
   Maggus Work Session (v1.0.0)
 ══════════════════════════════════════════
+  Agent:        claude
   Model:        claude-opus-4-6
   Iterations:   5
   Branch:       feature/maggustask-042
@@ -118,7 +123,7 @@ The first task is highlighted in cyan (unless `--plain` is used).
 
 ## maggus status
 
-Show a compact summary of plan progress including task counts, progress bars, and per-plan breakdowns.
+Show a compact summary of plan progress including task counts, progress bars, per-plan breakdowns, and the configured agent.
 
 ### Usage
 
@@ -150,6 +155,7 @@ maggus status --plain
 
 ```
 Maggus Status — 3 plans (2 active), 24 tasks total
+ Agent: claude
 
  Summary: 18/24 tasks complete · 4 pending · 2 blocked
 
