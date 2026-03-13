@@ -10,21 +10,21 @@ import (
 
 // Color palette — named constants using ANSI 256 colors for broad terminal compatibility.
 var (
-	Primary = lipgloss.Color("6")  // cyan
-	Success = lipgloss.Color("2")  // green
-	Warning = lipgloss.Color("3")  // yellow
-	Error   = lipgloss.Color("1")  // red
-	Muted   = lipgloss.Color("8")  // gray
-	Accent  = lipgloss.Color("4")  // blue
+	Primary = lipgloss.Color("6") // cyan
+	Success = lipgloss.Color("2") // green
+	Warning = lipgloss.Color("3") // yellow
+	Error   = lipgloss.Color("1") // red
+	Muted   = lipgloss.Color("8") // gray
+	Accent  = lipgloss.Color("4") // blue
 )
 
 // Reusable lipgloss styles.
 var (
-	Title    = lipgloss.NewStyle().Bold(true).Foreground(Primary)
-	Subtitle = lipgloss.NewStyle().Foreground(Primary)
-	Label    = lipgloss.NewStyle().Bold(true)
-	Value    = lipgloss.NewStyle().Foreground(Muted)
-	Box      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(Primary).Padding(0, 1)
+	Title     = lipgloss.NewStyle().Bold(true).Foreground(Primary)
+	Subtitle  = lipgloss.NewStyle().Foreground(Primary)
+	Label     = lipgloss.NewStyle().Bold(true)
+	Value     = lipgloss.NewStyle().Foreground(Muted)
+	Box       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(Primary).Padding(0, 1)
 	StatusBar = lipgloss.NewStyle().Foreground(Muted)
 )
 

@@ -43,7 +43,7 @@ func TestIsValidUUID(t *testing.T) {
 		{"00000000-0000-0000-0000-000000000000", true},
 		{"", false},
 		{"not-a-uuid", false},
-		{"a1b2c3d4e5f6-7890-abcd-ef1234567890", false},  // missing first dash
+		{"a1b2c3d4e5f6-7890-abcd-ef1234567890", false},   // missing first dash
 		{"a1b2c3d4-e5f6-7890-abcd-ef123456789", false},   // too short
 		{"a1b2c3d4-e5f6-7890-abcd-ef12345678901", false}, // too long
 		{"g1b2c3d4-e5f6-7890-abcd-ef1234567890", false},  // invalid hex char

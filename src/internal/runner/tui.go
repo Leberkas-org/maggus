@@ -166,12 +166,12 @@ type tuiModel struct {
 	commits []string
 
 	// Token usage tracking
-	iterInputTokens  int // current iteration input tokens
-	iterOutputTokens int // current iteration output tokens
-	totalInputTokens  int // cumulative input tokens
-	totalOutputTokens int // cumulative output tokens
-	hasUsageData     bool // true if any usage data was received
-	taskUsages       []TaskUsage // per-task usage history
+	iterInputTokens   int         // current iteration input tokens
+	iterOutputTokens  int         // current iteration output tokens
+	totalInputTokens  int         // cumulative input tokens
+	totalOutputTokens int         // cumulative output tokens
+	hasUsageData      bool        // true if any usage data was received
+	taskUsages        []TaskUsage // per-task usage history
 
 	status      string
 	toolHistory []string

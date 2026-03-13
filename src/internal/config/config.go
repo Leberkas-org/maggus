@@ -11,10 +11,10 @@ import (
 
 // NotificationsConfig holds sound notification settings.
 type NotificationsConfig struct {
-	Sound           bool `yaml:"sound"`
-	OnTaskComplete  *bool `yaml:"on_task_complete"`
-	OnRunComplete   *bool `yaml:"on_run_complete"`
-	OnError         *bool `yaml:"on_error"`
+	Sound          bool  `yaml:"sound"`
+	OnTaskComplete *bool `yaml:"on_task_complete"`
+	OnRunComplete  *bool `yaml:"on_run_complete"`
+	OnError        *bool `yaml:"on_error"`
 }
 
 // IsTaskCompleteEnabled returns true if task-complete sound should play.

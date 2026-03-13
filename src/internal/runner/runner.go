@@ -265,4 +265,3 @@ func describeToolUse(tool string, input toolInput) string {
 	}
 	return tool
 }
-

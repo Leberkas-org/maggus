@@ -7,11 +7,11 @@ import (
 
 func TestProgressBar(t *testing.T) {
 	tests := []struct {
-		name          string
-		done, total   int
-		width         int
-		wantFilled    int
-		wantEmpty     int
+		name        string
+		done, total int
+		width       int
+		wantFilled  int
+		wantEmpty   int
 	}{
 		{"zero width", 5, 10, 0, 0, 0},
 		{"zero total", 0, 0, 10, 0, 10},
