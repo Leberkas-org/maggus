@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -36,6 +38,15 @@ func (a blockedAction) String() string {
 	}
 	return ""
 }
+
+// Lipgloss styles for the blocked command.
+var (
+	blockedErrorStyle   = lipgloss.NewStyle().Foreground(styles.Error)
+	blockedSuccessStyle = lipgloss.NewStyle().Foreground(styles.Success)
+	blockedWarningStyle = lipgloss.NewStyle().Foreground(styles.Warning)
+	blockedPrimaryStyle = lipgloss.NewStyle().Foreground(styles.Primary)
+	blockedMutedStyle   = lipgloss.NewStyle().Foreground(styles.Muted)
+)
 
 // actionPickerModel is a bubbletea model for selecting an action on a blocked criterion.
 type actionPickerModel struct {
@@ -84,29 +95,27 @@ func (m actionPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m actionPickerModel) View() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\n   %s⚠ %s%s\n\n", colorRed, m.criterion.Text, colorReset))
+	b.WriteString(fmt.Sprintf("\n   %s\n\n", blockedErrorStyle.Render("⚠ "+m.criterion.Text)))
 	b.WriteString("   Choose action:\n\n")
 	for i, a := range m.actions {
 		cursor := "  "
 		if i == m.cursor {
 			cursor = "> "
 		}
-		style := ""
-		reset := ""
+		var label string
 		switch a {
 		case actionUnblock:
-			style = colorGreen
-			reset = colorReset
+			label = blockedSuccessStyle.Render(a.String())
 		case actionResolve:
-			style = colorYellow
-			reset = colorReset
+			label = blockedWarningStyle.Render(a.String())
 		case actionAbort:
-			style = colorRed
-			reset = colorReset
+			label = blockedErrorStyle.Render(a.String())
+		default:
+			label = a.String()
 		}
-		b.WriteString(fmt.Sprintf("   %s%s%s%s\n", cursor, style, a.String(), reset))
+		b.WriteString(fmt.Sprintf("   %s%s\n", cursor, label))
 	}
-	b.WriteString(fmt.Sprintf("\n   %s↑/↓ navigate • enter select • q abort%s\n", colorDim, colorReset))
+	b.WriteString(fmt.Sprintf("\n   %s\n", blockedMutedStyle.Render("↑/↓ navigate • enter select • q abort")))
 	return b.String()
 }
 
@@ -195,9 +204,9 @@ func wrapText(text string, maxWidth int, indent string) string {
 func renderBlockedTaskDetail(w io.Writer, task parser.Task, termWidth int) {
 	planFile := filepath.Base(task.SourceFile)
 
-	fmt.Fprintf(w, "\n%s──────────────────────────────────────────%s\n", colorDim, colorReset)
+	fmt.Fprintf(w, "\n%s\n", styles.Separator(42))
 	fmt.Fprintf(w, " Plan: %s\n", planFile)
-	fmt.Fprintf(w, " %s%s: %s%s\n", colorCyan, task.ID, task.Title, colorReset)
+	fmt.Fprintf(w, " %s\n", blockedPrimaryStyle.Render(task.ID+": "+task.Title))
 
 	if task.Description != "" {
 		fmt.Fprintln(w)
@@ -212,16 +221,13 @@ func renderBlockedTaskDetail(w io.Writer, task parser.Task, termWidth int) {
 
 	for _, c := range task.Criteria {
 		if c.Checked {
-			// Completed: green with checkmark
-			line := fmt.Sprintf("   %s✓ %s%s", colorGreen, c.Text, colorReset)
+			line := fmt.Sprintf("   %s", blockedSuccessStyle.Render("✓ "+c.Text))
 			fmt.Fprintln(w, line)
 		} else if c.Blocked {
-			// Blocked: red with warning marker
-			line := fmt.Sprintf("   %s>>> ⚠ %s%s", colorRed, c.Text, colorReset)
+			line := fmt.Sprintf("   %s", blockedErrorStyle.Render(">>> ⚠ "+c.Text))
 			fmt.Fprintln(w, line)
 		} else {
-			// Normal unchecked: default color
-			line := fmt.Sprintf("   ○ %s", c.Text)
+			line := fmt.Sprintf("   %s %s", blockedMutedStyle.Render("○"), c.Text)
 			fmt.Fprintln(w, line)
 		}
 	}
@@ -333,7 +339,7 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 	aborted := false
 
 	for i, task := range blocked {
-		fmt.Fprintf(out, "\n%sBlocked task %d of %d%s\n", colorCyan, i+1, len(blocked), colorReset)
+		fmt.Fprintf(out, "\n%s\n", blockedPrimaryStyle.Render(fmt.Sprintf("Blocked task %d of %d", i+1, len(blocked))))
 		renderBlockedTaskDetail(out, task, termWidth)
 
 		for _, c := range task.Criteria {
@@ -349,16 +355,16 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 			switch action {
 			case actionUnblock:
 				if err := unblockCriterion(task.SourceFile, c); err != nil {
-					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
+					fmt.Fprintf(out, "   %s\n", blockedErrorStyle.Render("→ Error: "+err.Error()))
 				} else {
-					fmt.Fprintf(out, "   %s→ Unblocked: %s%s\n", colorGreen, c.Text, colorReset)
+					fmt.Fprintf(out, "   %s\n", blockedSuccessStyle.Render("→ Unblocked: "+c.Text))
 					summary.unblocked++
 				}
 			case actionResolve:
 				if err := resolveCriterion(task.SourceFile, c); err != nil {
-					fmt.Fprintf(out, "   %s→ Error: %v%s\n", colorRed, err, colorReset)
+					fmt.Fprintf(out, "   %s\n", blockedErrorStyle.Render("→ Error: "+err.Error()))
 				} else {
-					fmt.Fprintf(out, "   %s→ Resolved: %s%s\n", colorYellow, c.Text, colorReset)
+					fmt.Fprintf(out, "   %s\n", blockedWarningStyle.Render("→ Resolved: "+c.Text))
 					summary.resolved++
 				}
 			case actionSkip:
@@ -384,13 +390,14 @@ func runBlocked(cmd *cobra.Command, dir string) error {
 		}
 	}
 
-	// Print summary
-	fmt.Fprintf(out, "\n%s──────────────────────────────────────────%s\n", colorDim, colorReset)
+	// Print summary in a styled box
+	var summaryText string
 	if aborted {
-		fmt.Fprintf(out, " Aborted. Summary: %s\n", summary)
+		summaryText = fmt.Sprintf("Aborted. Summary: %s", summary)
 	} else {
-		fmt.Fprintf(out, " Done. Summary: %s\n", summary)
+		summaryText = fmt.Sprintf("Done. Summary: %s", summary)
 	}
+	fmt.Fprintf(out, "\n%s\n", styles.Box.Render(summaryText))
 
 	return nil
 }

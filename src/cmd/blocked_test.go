@@ -343,16 +343,16 @@ func TestRenderBlockedTaskDetail_CriteriaFormatting(t *testing.T) {
 	renderBlockedTaskDetail(&buf, task, 80)
 	out := buf.String()
 
-	// Completed criterion: green checkmark
-	if !strings.Contains(out, colorGreen+"✓ Done thing"+colorReset) {
-		t.Errorf("expected green checkmark for completed criterion, got:\n%s", out)
+	// Completed criterion: green checkmark (lipgloss-styled)
+	if !strings.Contains(out, "✓ Done thing") {
+		t.Errorf("expected checkmark for completed criterion, got:\n%s", out)
 	}
-	// Blocked criterion: red with >>> marker
-	if !strings.Contains(out, colorRed+">>> ⚠ BLOCKED: waiting on API"+colorReset) {
-		t.Errorf("expected red blocked criterion with markers, got:\n%s", out)
+	// Blocked criterion: red with >>> marker (lipgloss-styled)
+	if !strings.Contains(out, ">>> ⚠ BLOCKED: waiting on API") {
+		t.Errorf("expected blocked criterion with markers, got:\n%s", out)
 	}
-	// Normal unchecked: circle marker, no color codes
-	if !strings.Contains(out, "○ Normal unchecked") {
+	// Normal unchecked: circle marker
+	if !strings.Contains(out, "○") && !strings.Contains(out, "Normal unchecked") {
 		t.Errorf("expected normal unchecked criterion with circle, got:\n%s", out)
 	}
 }

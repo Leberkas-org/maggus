@@ -87,13 +87,13 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want `maggus blocked` to render its interactive wizard with lipgloss styling instead of raw ANSI codes.
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/blocked.go` is refactored to use lipgloss styles from the shared package instead of raw ANSI escape codes
-- [ ] The `actionPickerModel` view uses lipgloss styles for the menu items (green for unblock, yellow for resolve, red for abort)
-- [ ] The task detail view (`renderBlockedTaskDetail`) uses lipgloss styles and the shared `Separator` helper
-- [ ] The summary at the end uses a styled box
-- [ ] The raw `colorGreen`, `colorRed`, etc. constants are no longer used (can be removed if status.go also stops using them)
-- [ ] Interactive behavior (up/down/enter navigation) is unchanged
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `src/cmd/blocked.go` is refactored to use lipgloss styles from the shared package instead of raw ANSI escape codes
+- [x] The `actionPickerModel` view uses lipgloss styles for the menu items (green for unblock, yellow for resolve, red for abort)
+- [x] The task detail view (`renderBlockedTaskDetail`) uses lipgloss styles and the shared `Separator` helper
+- [x] The summary at the end uses a styled box
+- [x] The raw `colorGreen`, `colorRed`, etc. constants are no longer used (can be removed if status.go also stops using them)
+- [x] Interactive behavior (up/down/enter navigation) is unchanged
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-007: Add configurable sound notifications
 **Description:** As a user, I want optional sound notifications when tasks complete, runs finish, or errors occur, so I can walk away and be alerted.
