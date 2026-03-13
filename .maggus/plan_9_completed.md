@@ -93,12 +93,12 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As the Claude Code agent working inside a worktree, I need to know that I'm operating in a worktree so I don't make incorrect assumptions about the git state.
 
 **Acceptance Criteria:**
-- [ ] The prompt built by `src/internal/prompt/prompt.go` includes a `WORKTREE: true` metadata field when running in worktree mode
-- [ ] The prompt includes `WORKTREE_DIR: .maggus-work/<run-id>` so the agent knows the working directory context
-- [ ] The prompt instructions remind the agent that other sessions may be running concurrently and it should not make assumptions about branch state outside its own branch
-- [ ] `prompt.Options` struct gains `Worktree bool` and `WorktreeDir string` fields
-- [ ] Existing prompts (non-worktree mode) are unchanged
-- [ ] Unit tests verify prompt output with and without worktree fields
+- [x] The prompt built by `src/internal/prompt/prompt.go` includes a `WORKTREE: true` metadata field when running in worktree mode
+- [x] The prompt includes `WORKTREE_DIR: .maggus-work/<run-id>` so the agent knows the working directory context
+- [x] The prompt instructions remind the agent that other sessions may be running concurrently and it should not make assumptions about branch state outside its own branch
+- [x] `prompt.Options` struct gains `Worktree bool` and `WorktreeDir string` fields
+- [x] Existing prompts (non-worktree mode) are unchanged
+- [x] Unit tests verify prompt output with and without worktree fields
 
 ## Functional Requirements
 
