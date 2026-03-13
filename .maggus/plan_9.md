@@ -66,17 +66,17 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a user running `maggus work --worktree`, I want the work loop to create a worktree at the start of the session, run all iterations inside it, push the branch, and clean up the worktree when done.
 
 **Acceptance Criteria:**
-- [ ] When worktree mode is enabled, the work loop creates a worktree at `.maggus-work/<run-id>/` before the iteration loop starts
-- [ ] The worktree is created on a new branch: `feature/maggustask-<first-task-number>` (based on the first task that will be worked on)
-- [ ] All Claude Code invocations, plan parsing, staging, and committing operate on the worktree directory (not the original repo dir)
-- [ ] The `.maggus/` directory content (plans, config, runs) is shared via the worktree (git worktree shares the git state), so plan file changes in the worktree are visible to other sessions re-parsing plans
-- [ ] Task locking (`tasklock.Acquire`) is called before each iteration; locked tasks are skipped (find next unlocked workable task)
-- [ ] Task locks are released after each iteration's commit succeeds
-- [ ] The startup banner displays the worktree path when in worktree mode
-- [ ] On completion (all tasks done or count reached): the branch is pushed, then the worktree is removed
-- [ ] On interrupt (Ctrl+C): the worktree is removed in a deferred cleanup (best-effort; warn but don't fail if removal fails)
-- [ ] When worktree mode is disabled, behavior is identical to the current implementation (no regressions)
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] When worktree mode is enabled, the work loop creates a worktree at `.maggus-work/<run-id>/` before the iteration loop starts
+- [x] The worktree is created on a new branch: `feature/maggustask-<first-task-number>` (based on the first task that will be worked on)
+- [x] All Claude Code invocations, plan parsing, staging, and committing operate on the worktree directory (not the original repo dir)
+- [x] The `.maggus/` directory content (plans, config, runs) is shared via the worktree (git worktree shares the git state), so plan file changes in the worktree are visible to other sessions re-parsing plans
+- [x] Task locking (`tasklock.Acquire`) is called before each iteration; locked tasks are skipped (find next unlocked workable task)
+- [x] Task locks are released after each iteration's commit succeeds
+- [x] The startup banner displays the worktree path when in worktree mode
+- [x] On completion (all tasks done or count reached): the branch is pushed, then the worktree is removed
+- [x] On interrupt (Ctrl+C): the worktree is removed in a deferred cleanup (best-effort; warn but don't fail if removal fails)
+- [x] When worktree mode is disabled, behavior is identical to the current implementation (no regressions)
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-006: Handle worktree cleanup edge cases
 **Description:** As a user, I want robust worktree cleanup so that `.maggus-work/` doesn't accumulate stale worktrees from crashed or interrupted sessions.
