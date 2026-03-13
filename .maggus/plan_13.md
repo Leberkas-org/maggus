@@ -158,15 +158,15 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want a dedicated documentation page explaining the `maggus-plan` skill — what it is, how to use it, and how it integrates with the Maggus workflow.
 
 **Acceptance Criteria:**
-- [ ] New file `docs/guide/maggus-plan-skill.md` documenting the skill
-- [ ] Explains what the skill is: a Claude Code skill that generates `.maggus/plan_*.md` files interactively through clarifying questions
-- [ ] Documents the trigger: how to invoke it (e.g. `/maggus-plan <description>` in Claude Code)
-- [ ] Shows the question-and-answer flow with an example interaction
-- [ ] Documents the output format: plan file structure, TASK-NNN format, acceptance criteria conventions
-- [ ] Explains how the generated plan integrates with `maggus work` (the generated file is immediately usable)
-- [ ] Includes at least one complete example showing a feature description → questions → generated plan → running `maggus work`
-- [ ] VitePress sidebar in `.vitepress/config.ts` is updated to include the new page under Guide
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] New file `docs/guide/maggus-plan-skill.md` documenting the skill
+- [x] Explains what the skill is: a Claude Code skill that generates `.maggus/plan_*.md` files interactively through clarifying questions
+- [x] Documents the trigger: how to invoke it (e.g. `/maggus-plan <description>` in Claude Code)
+- [x] Shows the question-and-answer flow with an example interaction
+- [x] Documents the output format: plan file structure, TASK-NNN format, acceptance criteria conventions
+- [x] Explains how the generated plan integrates with `maggus work` (the generated file is immediately usable)
+- [x] Includes at least one complete example showing a feature description → questions → generated plan → running `maggus work`
+- [x] VitePress sidebar in `.vitepress/config.ts` is updated to include the new page under Guide
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-013: Update VitePress site description and homepage
 
