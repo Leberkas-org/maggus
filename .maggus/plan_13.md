@@ -114,12 +114,12 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want the configuration docs to explain the new `agent` and `provider/model` fields with examples for both Claude Code and OpenCode.
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/configuration.md` documents the new `agent` field with allowed values and default behavior
-- [ ] Model section is updated to show `provider/model` as the primary format with examples for multiple providers
-- [ ] Legacy alias table is preserved but marked as a convenience shorthand
-- [ ] Full config example shows both a Claude Code setup and an OpenCode setup side by side
-- [ ] CLI flag `--agent` is documented with precedence rules
-- [ ] Typecheck/lint passes (VitePress builds without errors: `npm run docs:build` in `docs/`)
+- [x] `docs/reference/configuration.md` documents the new `agent` field with allowed values and default behavior
+- [x] Model section is updated to show `provider/model` as the primary format with examples for multiple providers
+- [x] Legacy alias table is preserved but marked as a convenience shorthand
+- [x] Full config example shows both a Claude Code setup and an OpenCode setup side by side
+- [x] CLI flag `--agent` is documented with precedence rules
+- [x] Typecheck/lint passes (VitePress builds without errors: `npm run docs:build` in `docs/`)
 
 ### TASK-009: Update VitePress docs — Getting Started guide
 
