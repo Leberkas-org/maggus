@@ -5,10 +5,94 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 )
+
+// listModel is the bubbletea model for the list TUI.
+type listModel struct {
+	content string // pre-rendered list content
+}
+
+func (m listModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case tea.KeyMsg:
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m listModel) View() string {
+	footer := styles.StatusBar.Render("Press any key to exit")
+	return m.content + "\n" + footer + "\n"
+}
+
+// renderListContent builds the styled list output for the TUI.
+func renderListContent(workable []parser.Task, all bool) string {
+	var sb strings.Builder
+
+	// Header
+	var header string
+	if all {
+		header = styles.Title.Render(fmt.Sprintf("All upcoming tasks (%d)", len(workable)))
+	} else {
+		header = styles.Title.Render(fmt.Sprintf("Next %d task(s)", len(workable)))
+	}
+	sb.WriteString(header)
+	sb.WriteString("\n")
+	sb.WriteString(" " + styles.Separator(42))
+
+	primaryStyle := lipgloss.NewStyle().Foreground(styles.Primary)
+	mutedStyle := lipgloss.NewStyle().Faint(true)
+
+	for i, t := range workable {
+		sb.WriteString("\n")
+		planFile := mutedStyle.Render(filepath.Base(t.SourceFile))
+
+		if i == 0 {
+			line := fmt.Sprintf(" → #%-2d %s: %s", i+1, t.ID, t.Title)
+			sb.WriteString(primaryStyle.Render(line))
+		} else {
+			line := fmt.Sprintf("   #%-2d %s: %s", i+1, t.ID, t.Title)
+			sb.WriteString(line)
+		}
+		sb.WriteString("  " + planFile)
+	}
+
+	return styles.Box.Render(sb.String())
+}
+
+// renderListPlain builds the plain-text list output (no ANSI, no TUI).
+func renderListPlain(workable []parser.Task, all bool) string {
+	var sb strings.Builder
+
+	if all {
+		fmt.Fprintln(&sb, "All upcoming tasks:")
+	} else {
+		fmt.Fprintf(&sb, "Next %d task(s):\n", len(workable))
+	}
+	fmt.Fprintln(&sb)
+
+	for i, t := range workable {
+		planFile := filepath.Base(t.SourceFile)
+		if i == 0 {
+			fmt.Fprintf(&sb, " -> #%-2d %s: %s  %s\n", i+1, t.ID, t.Title, planFile)
+		} else {
+			fmt.Fprintf(&sb, "    #%-2d %s: %s  %s\n", i+1, t.ID, t.Title, planFile)
+		}
+	}
+
+	return sb.String()
+}
 
 var listCmd = &cobra.Command{
 	Use:   "list [N]",
@@ -50,15 +134,6 @@ var listCmd = &cobra.Command{
 }
 
 func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
-	out := cmd.OutOrStdout()
-
-	color := func(code string) string {
-		if plain {
-			return ""
-		}
-		return code
-	}
-
 	files, err := parser.GlobPlanFiles(dir, false)
 	if err != nil {
 		return fmt.Errorf("glob plans: %w", err)
@@ -79,7 +154,7 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	}
 
 	if len(workable) == 0 {
-		fmt.Fprintln(out, "No pending tasks found. All done!")
+		fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
 		return nil
 	}
 
@@ -88,23 +163,17 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 		workable = workable[:count]
 	}
 
-	if all {
-		fmt.Fprintln(out, "All upcoming tasks:")
-	} else {
-		fmt.Fprintf(out, "Next %d task(s):\n", len(workable))
-	}
-	fmt.Fprintln(out)
-
-	for i, t := range workable {
-		clr := ""
-		if i == 0 {
-			clr = color(colorCyan)
-		}
-		planFile := color(colorDim) + filepath.Base(t.SourceFile) + color(colorReset)
-		fmt.Fprintf(out, " %s#%-2d %s: %s%s  %s\n", clr, i+1, t.ID, t.Title, color(colorReset), planFile)
+	if plain {
+		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, all))
+		return nil
 	}
 
-	return nil
+	// TUI mode: render content and display in alt-screen
+	content := renderListContent(workable, all)
+	m := listModel{content: content}
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	_, err = p.Run()
+	return err
 }
 
 func init() {

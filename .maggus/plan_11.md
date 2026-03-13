@@ -74,14 +74,14 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want `maggus list` to render a styled task list using lipgloss instead of raw ANSI codes.
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/list.go` is refactored to use a bubbletea model with alt-screen
-- [ ] The task list uses shared styles from `src/internal/tui/styles/`
-- [ ] The first task (next up) is highlighted with primary color
-- [ ] Each task shows its number, ID, and title in a clean layout
-- [ ] Header shows count information styled with `Title` style
-- [ ] The `--plain` flag still works — when set, skips the TUI and prints plain-text output
-- [ ] Pressing `q`, `Esc`, or any key exits the view
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `src/cmd/list.go` is refactored to use a bubbletea model with alt-screen
+- [x] The task list uses shared styles from `src/internal/tui/styles/`
+- [x] The first task (next up) is highlighted with primary color
+- [x] Each task shows its number, ID, and title in a clean layout
+- [x] Header shows count information styled with `Title` style
+- [x] The `--plain` flag still works — when set, skips the TUI and prints plain-text output
+- [x] Pressing `q`, `Esc`, or any key exits the view
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-006: Restyle `blocked` command with lipgloss TUI
 **Description:** As a user, I want `maggus blocked` to render its interactive wizard with lipgloss styling instead of raw ANSI codes.
