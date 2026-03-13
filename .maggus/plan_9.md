@@ -46,12 +46,12 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a user, I want to enable worktree mode via `.maggus/config.yml` or CLI flags so I can control when worktrees are used.
 
 **Acceptance Criteria:**
-- [ ] `Config` struct in `src/internal/config/config.go` gains a `Worktree bool` field (`yaml:"worktree"`)
-- [ ] `maggus work` command gains `--worktree` and `--no-worktree` bool flags
-- [ ] Resolution order: `--no-worktree` (force off) > `--worktree` (force on) > config file value > default (`false`)
-- [ ] Existing config files without the `worktree` key continue to work (defaults to `false`)
-- [ ] Unit tests for config loading with and without the worktree field
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `Config` struct in `src/internal/config/config.go` gains a `Worktree bool` field (`yaml:"worktree"`)
+- [x] `maggus work` command gains `--worktree` and `--no-worktree` bool flags
+- [x] Resolution order: `--no-worktree` (force off) > `--worktree` (force on) > config file value > default (`false`)
+- [x] Existing config files without the `worktree` key continue to work (defaults to `false`)
+- [x] Unit tests for config loading with and without the worktree field
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-004: Add `.maggus-work/` to gitignore management
 **Description:** As a developer, I want `.maggus-work/` automatically added to `.gitignore` so worktree directories are never committed.

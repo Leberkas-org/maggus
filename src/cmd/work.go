@@ -29,6 +29,8 @@ var (
 	countFlag       int
 	noBootstrapFlag bool
 	modelFlag       string
+	worktreeFlag    bool
+	noWorktreeFlag  bool
 )
 
 var workCmd = &cobra.Command{
@@ -89,6 +91,16 @@ Examples:
 			modelInput = modelFlag
 		}
 		resolvedModel := config.ResolveModel(modelInput)
+
+		// Resolve worktree mode: --no-worktree > --worktree > config > default (false)
+		useWorktree := cfg.Worktree
+		if worktreeFlag {
+			useWorktree = true
+		}
+		if noWorktreeFlag {
+			useWorktree = false
+		}
+		_ = useWorktree // will be used in TASK-005
 
 		// Ensure .gitignore has required entries
 		added, err := gitignore.EnsureEntries(dir)
@@ -359,5 +371,7 @@ func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
+	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
+	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)
 }
