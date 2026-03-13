@@ -134,13 +134,13 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a developer, I want the existing `runner/tui.go` to use the shared style package so there's one source of truth for visual styling.
 
 **Acceptance Criteria:**
-- [ ] `src/internal/runner/tui.go` imports and uses styles from `src/internal/tui/styles/`
-- [ ] The local style variables (`boldStyle`, `statusStyle`, `greenStyle`, `redStyle`, `cyanStyle`, `blueStyle`, `grayStyle`) are removed from `tui.go`
-- [ ] The `renderHeader()` and `renderView()` methods use shared styles
-- [ ] The progress bar in `renderHeader()` uses the shared `ProgressBar` helper
-- [ ] The local `truncate` function is replaced with the shared `Truncate` helper
-- [ ] Visual output is unchanged or improved — no regression in the work TUI appearance
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `src/internal/runner/tui.go` imports and uses styles from `src/internal/tui/styles/`
+- [x] The local style variables (`boldStyle`, `statusStyle`, `greenStyle`, `redStyle`, `cyanStyle`, `blueStyle`, `grayStyle`) are removed from `tui.go`
+- [x] The `renderHeader()` and `renderView()` methods use shared styles
+- [x] The progress bar in `renderHeader()` uses the shared `ProgressBar` helper
+- [x] The local `truncate` function is replaced with the shared `Truncate` helper
+- [x] Visual output is unchanged or improved — no regression in the work TUI appearance
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ## Functional Requirements
 

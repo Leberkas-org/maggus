@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
@@ -55,10 +56,10 @@ func TestDescribeToolUse(t *testing.T) {
 }
 
 func TestTruncate(t *testing.T) {
-	if got := truncate("hello", 10); got != "hello" {
+	if got := styles.Truncate("hello", 10); got != "hello" {
 		t.Errorf("truncate short string: got %q", got)
 	}
-	if got := truncate("hello world!", 8); got != "hello..." {
+	if got := styles.Truncate("hello world!", 8); got != "hello..." {
 		t.Errorf("truncate long string: got %q", got)
 	}
 }

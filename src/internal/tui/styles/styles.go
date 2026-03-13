@@ -15,7 +15,7 @@ var (
 	Warning = lipgloss.Color("3")  // yellow
 	Error   = lipgloss.Color("1")  // red
 	Muted   = lipgloss.Color("8")  // gray
-	Accent  = lipgloss.Color("5")  // blue/purple
+	Accent  = lipgloss.Color("4")  // blue
 )
 
 // Reusable lipgloss styles.

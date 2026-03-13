@@ -373,15 +373,15 @@ func (m *tuiModel) rebuildExtras() {
 	m.extras = strings.Join(parts, "  ")
 }
 
-// Styles
+// Styles — aliases to the shared style package for concise rendering code.
 var (
-	boldStyle   = lipgloss.NewStyle().Bold(true)
-	statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
-	greenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	cyanStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	grayStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	boldStyle   = styles.Label
+	statusStyle = lipgloss.NewStyle().Foreground(styles.Warning)
+	greenStyle  = lipgloss.NewStyle().Foreground(styles.Success)
+	redStyle    = lipgloss.NewStyle().Foreground(styles.Error)
+	cyanStyle   = lipgloss.NewStyle().Foreground(styles.Primary)
+	blueStyle   = lipgloss.NewStyle().Foreground(styles.Accent)
+	grayStyle   = lipgloss.NewStyle().Foreground(styles.Muted)
 )
 
 func (m tuiModel) View() string {
@@ -484,7 +484,7 @@ func (m tuiModel) renderSummaryView() string {
 		for _, c := range m.commits {
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				truncate(c, boxWidth-4)))
+				styles.Truncate(c, boxWidth-4)))
 		}
 	}
 
@@ -503,7 +503,7 @@ func (m tuiModel) renderSummaryView() string {
 			}
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%s: %s", t.ID, truncate(t.Title, boxWidth-len(t.ID)-6))))
+				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, boxWidth-len(t.ID)-6))))
 		}
 	}
 
@@ -553,16 +553,10 @@ func (m tuiModel) renderHeader() string {
 	// Line 2: progress bar
 	if m.totalIters > 0 {
 		barWidth := 20
-		filled := 0
-		if m.totalIters > 0 {
-			filled = (m.currentIter * barWidth) / m.totalIters
-		}
-		if filled > barWidth {
-			filled = barWidth
-		}
-		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-		progress := fmt.Sprintf("  [%s] %d/%d Tasks", bar, m.currentIter, m.totalIters)
-		b.WriteString(greenStyle.Render(progress) + "\n")
+		bar := styles.ProgressBar(m.currentIter, m.totalIters, barWidth)
+		progress := fmt.Sprintf("  [%s] %s", bar,
+			greenStyle.Render(fmt.Sprintf("%d/%d Tasks", m.currentIter, m.totalIters)))
+		b.WriteString(progress + "\n")
 	}
 
 	// Separator line
@@ -610,7 +604,7 @@ func (m tuiModel) renderView() string {
 	}
 
 	b.WriteString(fmt.Sprintf("  %s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), truncate(m.output, contentWidth)))
+	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
 
 	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
 	for i, t := range m.toolHistory {
@@ -618,14 +612,14 @@ func (m tuiModel) renderView() string {
 		if i == len(m.toolHistory)-1 {
 			prefix = blueStyle.Render("▶")
 		}
-		b.WriteString(fmt.Sprintf("    %s %s\n", prefix, blueStyle.Render(truncate(t, contentWidth))))
+		b.WriteString(fmt.Sprintf("    %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
 	}
 	// Pad empty lines for consistent layout
 	for i := len(m.toolHistory); i < maxToolHistory; i++ {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(truncate(extrasStr, contentWidth))))
+	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
 	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
 	b.WriteString(fmt.Sprintf("    %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
@@ -643,7 +637,7 @@ func (m tuiModel) renderView() string {
 		b.WriteString(grayStyle.Render(strings.Repeat("─", w)) + "\n")
 		b.WriteString(grayStyle.Render("  Commits:") + "\n")
 		for _, c := range m.commits {
-			line := truncate(c, w-6)
+			line := styles.Truncate(c, w-6)
 			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(line)))
 		}
 	}
