@@ -69,11 +69,11 @@ When `maggus` is invoked without any subcommand in an interactive terminal, it c
 **Description:** As a user, I want the selected command to actually run after I pick it from the menu so that the menu is functional end-to-end.
 
 **Acceptance Criteria:**
-- [ ] After the menu TUI exits, the selected command executes with the configured options
-- [ ] The alt-screen is properly exited before the selected command starts (no rendering artifacts)
-- [ ] If the selected command itself uses alt-screen (status, list, blocked), it works correctly after the menu exits
-- [ ] If the user quits the menu without selecting (q/esc), no command is executed and maggus exits cleanly
-- [ ] Typecheck/lint passes
+- [x] After the menu TUI exits, the selected command executes with the configured options
+- [x] The alt-screen is properly exited before the selected command starts (no rendering artifacts)
+- [x] If the selected command itself uses alt-screen (status, list, blocked), it works correctly after the menu exits
+- [x] If the user quits the menu without selecting (q/esc), no command is executed and maggus exits cleanly
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

@@ -45,7 +45,9 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	sub.ParseFlags(remaining)
+	if err := sub.ParseFlags(remaining); err != nil {
+		return err
+	}
 	return sub.RunE(sub, sub.Flags().Args())
 }
 
