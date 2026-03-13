@@ -58,12 +58,12 @@ When `maggus` is invoked without any subcommand in an interactive terminal, it c
 **Description:** As a user piping maggus output or running in CI, I want the default help text instead of a TUI so that non-interactive usage is not broken.
 
 **Acceptance Criteria:**
-- [ ] When stdout is not a terminal (e.g., piped to a file or another command), `maggus` with no subcommand prints the standard Cobra help text
-- [ ] When stdout is a terminal, the interactive menu is shown
-- [ ] Detection uses `os.Stdout.Fd()` with `term.IsTerminal()` or equivalent from the existing `x/term` dependency
-- [ ] Existing `--help` flag behavior is unchanged (always prints help text, never launches TUI)
-- [ ] Typecheck/lint passes
-- [ ] Unit test verifies that the root command still produces help output when `RunE` is set (e.g., by checking output contains "Usage:")
+- [x] When stdout is not a terminal (e.g., piped to a file or another command), `maggus` with no subcommand prints the standard Cobra help text
+- [x] When stdout is a terminal, the interactive menu is shown
+- [x] Detection uses `os.Stdout.Fd()` with `term.IsTerminal()` or equivalent from the existing `x/term` dependency
+- [x] Existing `--help` flag behavior is unchanged (always prints help text, never launches TUI)
+- [x] Typecheck/lint passes
+- [x] Unit test verifies that the root command still produces help output when `RunE` is set (e.g., by checking output contains "Usage:")
 
 ### TASK-005: Launch selected command from the menu
 **Description:** As a user, I want the selected command to actually run after I pick it from the menu so that the menu is functional end-to-end.
