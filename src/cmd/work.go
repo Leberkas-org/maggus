@@ -158,6 +158,9 @@ Examples:
 		workDir := dir
 
 		if useWorktree {
+			// Clean up stale worktrees from previous crashed runs.
+			cleanStaleWorktrees(repoDir)
+
 			// Create worktree at .maggus-work/<run-id>/ on a new feature branch
 			branchName := gitbranch.FeatureBranchName(nextTask.ID)
 			wtPath := filepath.Join(repoDir, ".maggus-work", run.ID)
@@ -431,6 +434,53 @@ func init() {
 	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
 	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)
+}
+
+// cleanStaleWorktrees removes worktrees in .maggus-work/ whose lock files are
+// all stale (older than 2 hours), indicating a crashed or interrupted session.
+func cleanStaleWorktrees(repoDir string) {
+	workDir := filepath.Join(repoDir, maggusWorkDir)
+	entries, err := os.ReadDir(workDir)
+	if err != nil {
+		return
+	}
+
+	// Get branch info before removal.
+	details, _ := worktree.ListDetailed(repoDir)
+	branchByPath := make(map[string]string)
+	for _, d := range details {
+		branchByPath[filepath.ToSlash(d.Path)] = d.Branch
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		// Only clean up if all locks are stale (no active session).
+		if !tasklock.AllStale(repoDir) {
+			continue
+		}
+
+		wtPath := filepath.Join(workDir, e.Name())
+		normalizedPath := filepath.ToSlash(wtPath)
+
+		if err := worktree.Remove(repoDir, wtPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not remove stale worktree %s: %v\n", e.Name(), err)
+			continue
+		}
+
+		// Delete associated branch.
+		if branch, ok := branchByPath[normalizedPath]; ok {
+			shortBranch := strings.TrimPrefix(branch, "refs/heads/")
+			worktree.DeleteBranch(repoDir, shortBranch)
+		}
+
+		fmt.Fprintf(os.Stderr, "Cleaned up stale worktree: %s\n", e.Name())
+	}
+
+	// Prune and clean locks.
+	worktree.Prune(repoDir)
+	tasklock.CleanAll(repoDir)
 }
 
 // findNextUnlocked returns the first workable task that is not locked by another session.

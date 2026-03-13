@@ -82,12 +82,12 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a user, I want robust worktree cleanup so that `.maggus-work/` doesn't accumulate stale worktrees from crashed or interrupted sessions.
 
 **Acceptance Criteria:**
-- [ ] New subcommand `maggus worktree clean` that removes all worktrees in `.maggus-work/` and their associated branches
-- [ ] `maggus worktree clean` calls `git worktree remove` for each directory in `.maggus-work/`, then `git worktree prune`
-- [ ] `maggus worktree list` subcommand that shows active worktrees with their run IDs and branches
-- [ ] On `maggus work --worktree` startup, if a stale worktree exists from a previous crashed run (detectable by checking if the run's lock files are all stale), it is cleaned up automatically before creating a new one
-- [ ] Cleanup removes associated task lock files in `.maggus/locks/`
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] New subcommand `maggus worktree clean` that removes all worktrees in `.maggus-work/` and their associated branches
+- [x] `maggus worktree clean` calls `git worktree remove` for each directory in `.maggus-work/`, then `git worktree prune`
+- [x] `maggus worktree list` subcommand that shows active worktrees with their run IDs and branches
+- [x] On `maggus work --worktree` startup, if a stale worktree exists from a previous crashed run (detectable by checking if the run's lock files are all stale), it is cleaned up automatically before creating a new one
+- [x] Cleanup removes associated task lock files in `.maggus/locks/`
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-007: Update prompt context for worktree awareness
 **Description:** As the Claude Code agent working inside a worktree, I need to know that I'm operating in a worktree so I don't make incorrect assumptions about the git state.

@@ -65,6 +65,47 @@ func (l Lock) Release() error {
 	return nil
 }
 
+// CleanAll removes all lock files in the locks directory.
+func CleanAll(dir string) error {
+	locksDir := filepath.Join(dir, lockDir)
+	entries, err := os.ReadDir(locksDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read locks directory: %w", err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".lock" {
+			os.Remove(filepath.Join(locksDir, e.Name()))
+		}
+	}
+	return nil
+}
+
+// AllStale returns true if all lock files in the locks directory are stale
+// (older than 2 hours), or if there are no lock files.
+func AllStale(dir string) bool {
+	locksDir := filepath.Join(dir, lockDir)
+	entries, err := os.ReadDir(locksDir)
+	if err != nil {
+		return true
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) != ".lock" {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if time.Since(info.ModTime()) <= staleDuration {
+			return false
+		}
+	}
+	return true
+}
+
 // IsLocked checks whether a lock file exists for the given task ID.
 // Stale locks (older than 2 hours) are not considered locked.
 func IsLocked(dir, taskID string) bool {

@@ -14,7 +14,7 @@ hero:
       link: /
     - theme: alt
       text: View on GitHub
-      link: https://github.com/dirnei/maggus
+      link: https://github.com/leberkas-org/maggus
 
 features:
   - icon: "\U0001F4CB"

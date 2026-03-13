@@ -124,3 +124,70 @@ func TestReleaseEmptyPath(t *testing.T) {
 		t.Fatalf("releasing empty lock should not error: %v", err)
 	}
 }
+
+func TestCleanAll(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create some locks.
+	_, err := Acquire(dir, "TASK-010", "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Acquire(dir, "TASK-011", "run-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CleanAll(dir); err != nil {
+		t.Fatalf("CleanAll: %v", err)
+	}
+
+	if IsLocked(dir, "TASK-010") {
+		t.Error("TASK-010 should not be locked after CleanAll")
+	}
+	if IsLocked(dir, "TASK-011") {
+		t.Error("TASK-011 should not be locked after CleanAll")
+	}
+}
+
+func TestCleanAllNoLocksDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := CleanAll(dir); err != nil {
+		t.Fatalf("CleanAll on missing dir: %v", err)
+	}
+}
+
+func TestAllStaleNoLocks(t *testing.T) {
+	dir := t.TempDir()
+	if !AllStale(dir) {
+		t.Fatal("AllStale should return true when no locks exist")
+	}
+}
+
+func TestAllStaleFreshLock(t *testing.T) {
+	dir := t.TempDir()
+	lock, err := Acquire(dir, "TASK-020", "run-x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+
+	if AllStale(dir) {
+		t.Fatal("AllStale should return false when a fresh lock exists")
+	}
+}
+
+func TestAllStaleWithStaleLocks(t *testing.T) {
+	dir := t.TempDir()
+
+	locksDir := filepath.Join(dir, lockDir)
+	os.MkdirAll(locksDir, 0755)
+	path := filepath.Join(locksDir, "TASK-021.lock")
+	os.WriteFile(path, []byte("stale"), 0644)
+	staleTime := time.Now().Add(-3 * time.Hour)
+	os.Chtimes(path, staleTime, staleTime)
+
+	if !AllStale(dir) {
+		t.Fatal("AllStale should return true when all locks are stale")
+	}
+}
