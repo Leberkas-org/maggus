@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dirnei/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 // Options controls what sections are included in the prompt.
@@ -21,6 +21,12 @@ type Options struct {
 	RunDir    string
 	Iteration int
 	IterLog   string
+
+	// Worktree indicates this session is running inside a git worktree.
+	Worktree bool
+
+	// WorktreeDir is the worktree directory relative to the repo root (e.g. ".maggus-work/<run-id>").
+	WorktreeDir string
 }
 
 // Build creates a focused prompt for Claude Code to work on a single task.
@@ -68,6 +74,10 @@ func writeRunMetadata(b *strings.Builder, opts Options) {
 	fmt.Fprintf(b, "- **RUN_DIR:** %s\n", opts.RunDir)
 	fmt.Fprintf(b, "- **ITERATION:** %d\n", opts.Iteration)
 	fmt.Fprintf(b, "- **ITER_LOG:** %s\n", opts.IterLog)
+	if opts.Worktree {
+		b.WriteString("- **WORKTREE:** true\n")
+		fmt.Fprintf(b, "- **WORKTREE_DIR:** %s\n", opts.WorktreeDir)
+	}
 	b.WriteString("\n")
 }
 
@@ -88,6 +98,11 @@ func writeTask(b *strings.Builder, task *parser.Task) {
 
 func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("# Instructions\n\n")
+	if opts.Worktree {
+		b.WriteString("**WORKTREE MODE:** You are running inside a git worktree. Other Maggus sessions may be running concurrently in separate worktrees. ")
+		b.WriteString("Do not make assumptions about branch state outside your own branch. ")
+		b.WriteString("Do not modify or switch branches — stay on your current branch.\n\n")
+	}
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
 	b.WriteString("Do NOT scan plan files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")
@@ -116,4 +131,10 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("Include: project structure changes, build/tooling changes, new conventions, ")
 	b.WriteString("architectural decisions, and important file paths. ")
 	b.WriteString("Keep it concise and organized by topic. Do NOT commit this file.\n")
+
+	// Append release notes
+	b.WriteString("6. Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. ")
+	b.WriteString("Use the format: `## TASK-NNN: Title` followed by 1-3 bullet points. ")
+	b.WriteString("Focus on what changed from the user's perspective, not implementation details. ")
+	b.WriteString("If the task has no user-visible changes, skip this step. Do NOT commit this file.\n")
 }

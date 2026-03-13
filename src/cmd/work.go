@@ -6,20 +6,23 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dirnei/maggus/internal/config"
-	"github.com/dirnei/maggus/internal/fingerprint"
-	"github.com/dirnei/maggus/internal/gitbranch"
-	"github.com/dirnei/maggus/internal/gitcommit"
-	"github.com/dirnei/maggus/internal/gitignore"
-	"github.com/dirnei/maggus/internal/parser"
-	"github.com/dirnei/maggus/internal/prompt"
-	"github.com/dirnei/maggus/internal/runner"
-	"github.com/dirnei/maggus/internal/runtracker"
+	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/fingerprint"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/gitcommit"
+	"github.com/leberkas-org/maggus/internal/gitignore"
+	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/prompt"
+	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/runtracker"
+	"github.com/leberkas-org/maggus/internal/tasklock"
+	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +32,8 @@ var (
 	countFlag       int
 	noBootstrapFlag bool
 	modelFlag       string
+	worktreeFlag    bool
+	noWorktreeFlag  bool
 )
 
 var workCmd = &cobra.Command{
@@ -90,6 +95,15 @@ Examples:
 		}
 		resolvedModel := config.ResolveModel(modelInput)
 
+		// Resolve worktree mode: --no-worktree > --worktree > config > default (false)
+		useWorktree := cfg.Worktree
+		if worktreeFlag {
+			useWorktree = true
+		}
+		if noWorktreeFlag {
+			useWorktree = false
+		}
+
 		// Ensure .gitignore has required entries
 		added, err := gitignore.EnsureEntries(dir)
 		if err != nil {
@@ -121,16 +135,6 @@ Examples:
 			return nil
 		}
 
-		// Check for protected branch and create feature branch if needed
-		{
-			branch, msg, err := gitbranch.EnsureFeatureBranch(dir, nextTask.ID)
-			if err != nil {
-				return fmt.Errorf("ensure feature branch: %w", err)
-			}
-			fmt.Println(msg)
-			_ = branch
-		}
-
 		// Get host fingerprint
 		hostFingerprint, err := fingerprint.Get()
 		if err != nil {
@@ -148,6 +152,39 @@ Examples:
 			return fmt.Errorf("create run tracker: %w", err)
 		}
 
+		// repoDir always points to the original repository root.
+		// workDir is where Claude Code operates — either the worktree or the repo itself.
+		repoDir := dir
+		workDir := dir
+
+		if useWorktree {
+			// Clean up stale worktrees from previous crashed runs.
+			cleanStaleWorktrees(repoDir)
+
+			// Create worktree at .maggus-work/<run-id>/ on a new feature branch
+			branchName := gitbranch.FeatureBranchName(nextTask.ID)
+			wtPath := filepath.Join(repoDir, ".maggus-work", run.ID)
+			if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
+				return fmt.Errorf("create worktree: %w", err)
+			}
+			workDir = wtPath
+
+			// Deferred cleanup: remove worktree on exit (best-effort on interrupt).
+			defer func() {
+				fmt.Fprintf(os.Stderr, "Cleaning up worktree at %s...\n", wtPath)
+				if rmErr := worktree.Remove(repoDir, wtPath); rmErr != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not remove worktree: %v\n", rmErr)
+				}
+			}()
+		} else {
+			// Non-worktree mode: check for protected branch and create feature branch if needed
+			_, msg, err := gitbranch.EnsureFeatureBranch(dir, nextTask.ID)
+			if err != nil {
+				return fmt.Errorf("ensure feature branch: %w", err)
+			}
+			fmt.Println(msg)
+		}
+
 		// Startup banner
 		fmt.Println()
 		fmt.Println("══════════════════════════════════════════")
@@ -158,6 +195,9 @@ Examples:
 		fmt.Printf("  Branch:       %s\n", run.Branch)
 		fmt.Printf("  Run ID:       %s\n", run.ID)
 		fmt.Printf("  Run Dir:      %s\n", run.RelativeDir(dir))
+		if useWorktree {
+			fmt.Printf("  Worktree:     %s\n", workDir)
+		}
 		fmt.Printf("  Permissions:  --dangerously-skip-permissions\n")
 		fmt.Println("══════════════════════════════════════════")
 		fmt.Println()
@@ -220,9 +260,27 @@ Examples:
 					break
 				}
 
-				next := parser.FindNextIncomplete(tasks)
+				// Find next workable task. In worktree mode, skip locked tasks.
+				var next *parser.Task
+				if useWorktree {
+					next = findNextUnlocked(tasks, repoDir)
+				} else {
+					next = parser.FindNextIncomplete(tasks)
+				}
 				if next == nil {
 					break
+				}
+
+				// Acquire task lock in worktree mode.
+				var lock tasklock.Lock
+				if useWorktree {
+					var lockErr error
+					lock, lockErr = tasklock.Acquire(repoDir, next.ID, run.ID)
+					if lockErr != nil {
+						// Another session grabbed it between check and acquire; retry.
+						i--
+						continue
+					}
 				}
 
 				// Signal iteration start to the TUI (resets per-iteration state).
@@ -237,13 +295,16 @@ Examples:
 					NoBootstrap: noBootstrapFlag,
 					Include:     validIncludes,
 					RunID:       run.ID,
-					RunDir:      run.RelativeDir(dir),
+					RunDir:      run.RelativeDir(workDir),
 					Iteration:   i + 1,
-					IterLog:     run.RelativeIterationLogPath(dir, i+1),
+					IterLog:     run.RelativeIterationLogPath(workDir, i+1),
 				}
 
 				builtPrompt := prompt.Build(next, opts)
 				if err := runner.RunClaude(workCtx, builtPrompt, resolvedModel, p); err != nil {
+					if useWorktree {
+						lock.Release()
+					}
 					if workCtx.Err() != nil {
 						break
 					}
@@ -253,30 +314,41 @@ Examples:
 
 				// Re-parse to pick up any changes the agent made
 				var parseErr error
-				tasks, parseErr = parser.ParsePlans(dir)
+				tasks, parseErr = parser.ParsePlans(workDir)
 				if parseErr != nil {
+					if useWorktree {
+						lock.Release()
+					}
 					workErr = fmt.Errorf("re-parse plans: %w", parseErr)
 					return
 				}
 
 				// Rename fully completed plan files before committing
-				if markErr := parser.MarkCompletedPlans(dir); markErr != nil {
+				if markErr := parser.MarkCompletedPlans(workDir); markErr != nil {
 					// non-fatal
 				}
 
 				// Stage any plan renames so they are included in the commit
 				stagePlans := exec.Command("git", "add", "--", ".maggus/")
-				stagePlans.Dir = dir
+				stagePlans.Dir = workDir
 				stagePlans.CombinedOutput() // ignore errors
 
 				// Commit using COMMIT.md
-				commitResult, commitErr := gitcommit.CommitIteration(dir)
+				commitResult, commitErr := gitcommit.CommitIteration(workDir)
 				if commitErr != nil {
+					if useWorktree {
+						lock.Release()
+					}
 					workErr = fmt.Errorf("commit after %s: %w", next.ID, commitErr)
 					return
 				}
 				if commitResult.Committed {
 					p.Send(runner.CommitMsg{Message: commitResult.Message})
+				}
+
+				// Release task lock after successful commit.
+				if useWorktree {
+					lock.Release()
 				}
 
 				completed++
@@ -296,12 +368,12 @@ Examples:
 		}
 
 		// Finalize run log
-		if err := run.Finalize(dir); err != nil {
+		if err := run.Finalize(workDir); err != nil {
 			fmt.Printf("Warning: could not finalize run log: %v\n", err)
 		}
 
 		// Print summary banner
-		run.PrintSummary(dir)
+		run.PrintSummary(workDir)
 
 		// Collect remaining incomplete tasks
 		var remaining []string
@@ -327,12 +399,12 @@ Examples:
 
 		fmt.Printf("Completed %d/%d tasks. %d tasks remaining.\n", completed, count, len(remaining))
 
-		// Push commits to remote
+		// Push commits to remote (from workDir, which may be a worktree).
+		// In worktree mode, push happens before the deferred worktree removal.
 		if completed > 0 {
 			fmt.Println("Pushing to remote...")
-			// Get current branch name for --set-upstream
 			branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-			branchCmd.Dir = dir
+			branchCmd.Dir = workDir
 			branchOut, branchErr := branchCmd.Output()
 			var push *exec.Cmd
 			if branchErr == nil {
@@ -341,7 +413,7 @@ Examples:
 			} else {
 				push = exec.Command("git", "push")
 			}
-			push.Dir = dir
+			push.Dir = workDir
 			push.Stdout = os.Stdout
 			push.Stderr = os.Stderr
 			if err := push.Run(); err != nil {
@@ -359,5 +431,64 @@ func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
+	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
+	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)
+}
+
+// cleanStaleWorktrees removes worktrees in .maggus-work/ whose lock files are
+// all stale (older than 2 hours), indicating a crashed or interrupted session.
+func cleanStaleWorktrees(repoDir string) {
+	workDir := filepath.Join(repoDir, maggusWorkDir)
+	entries, err := os.ReadDir(workDir)
+	if err != nil {
+		return
+	}
+
+	// Get branch info before removal.
+	details, _ := worktree.ListDetailed(repoDir)
+	branchByPath := make(map[string]string)
+	for _, d := range details {
+		branchByPath[filepath.ToSlash(d.Path)] = d.Branch
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		// Only clean up if all locks are stale (no active session).
+		if !tasklock.AllStale(repoDir) {
+			continue
+		}
+
+		wtPath := filepath.Join(workDir, e.Name())
+		normalizedPath := filepath.ToSlash(wtPath)
+
+		if err := worktree.Remove(repoDir, wtPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not remove stale worktree %s: %v\n", e.Name(), err)
+			continue
+		}
+
+		// Delete associated branch.
+		if branch, ok := branchByPath[normalizedPath]; ok {
+			shortBranch := strings.TrimPrefix(branch, "refs/heads/")
+			worktree.DeleteBranch(repoDir, shortBranch)
+		}
+
+		fmt.Fprintf(os.Stderr, "Cleaned up stale worktree: %s\n", e.Name())
+	}
+
+	// Prune and clean locks.
+	worktree.Prune(repoDir)
+	tasklock.CleanAll(repoDir)
+}
+
+// findNextUnlocked returns the first workable task that is not locked by another session.
+func findNextUnlocked(tasks []parser.Task, repoDir string) *parser.Task {
+	for i := range tasks {
+		if tasks[i].IsWorkable() && !tasklock.IsLocked(repoDir, tasks[i].ID) {
+			return &tasks[i]
+		}
+	}
+	return nil
 }

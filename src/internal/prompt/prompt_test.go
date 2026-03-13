@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dirnei/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 func newTestTask() *parser.Task {
@@ -161,6 +161,97 @@ func TestBuild_Includes_AddsReadInstructions(t *testing.T) {
 	archIdx := strings.Index(result, "ARCHITECTURE.md")
 	if archIdx <= bootstrapIdx {
 		t.Errorf("custom includes should appear after standard bootstrap files")
+	}
+}
+
+func TestBuild_Worktree_AddsMetadataAndInstructions(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	opts.Worktree = true
+	opts.WorktreeDir = ".maggus-work/20260309-120000"
+	result := Build(task, opts)
+
+	worktreeChecks := []string{
+		"**WORKTREE:** true",
+		"**WORKTREE_DIR:** .maggus-work/20260309-120000",
+		"WORKTREE MODE:",
+		"Other Maggus sessions may be running concurrently",
+		"Do not make assumptions about branch state outside your own branch",
+		"Do not modify or switch branches",
+	}
+
+	for _, want := range worktreeChecks {
+		if !strings.Contains(result, want) {
+			t.Errorf("worktree prompt missing %q\n\nGot:\n%s", want, result)
+		}
+	}
+
+	// Worktree metadata should appear in the Run Metadata section
+	metaIdx := strings.Index(result, "# Run Metadata")
+	taskIdx := strings.Index(result, "# Task")
+	wtIdx := strings.Index(result, "**WORKTREE:** true")
+	if wtIdx <= metaIdx || wtIdx >= taskIdx {
+		t.Errorf("WORKTREE metadata should appear between Run Metadata and Task sections")
+	}
+}
+
+func TestBuild_NoWorktree_OmitsWorktreeFields(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	// Worktree is false by default
+	result := Build(task, opts)
+
+	worktreeMarkers := []string{
+		"WORKTREE:",
+		"WORKTREE_DIR:",
+		"WORKTREE MODE:",
+		"Other Maggus sessions may be running concurrently",
+	}
+
+	for _, marker := range worktreeMarkers {
+		if strings.Contains(result, marker) {
+			t.Errorf("non-worktree prompt should not contain %q\n\nGot:\n%s", marker, result)
+		}
+	}
+
+	// All standard sections should still be present
+	for _, want := range []string{"# Bootstrap", "# Run Metadata", "# Task", "# Instructions"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("non-worktree prompt missing %q", want)
+		}
+	}
+}
+
+func TestBuild_ContainsReleaseNotesInstruction(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	result := Build(task, opts)
+
+	releaseNotesChecks := []string{
+		"`.maggus/RELEASE_NOTES.md`",
+		"## TASK-NNN: Title",
+		"1-3 bullet points",
+		"user's perspective",
+		"Do NOT commit this file",
+	}
+
+	for _, want := range releaseNotesChecks {
+		if !strings.Contains(result, want) {
+			t.Errorf("prompt missing release notes instruction %q\n\nGot:\n%s", want, result)
+		}
+	}
+
+	// Verify it appears as step 6 (after step 5 about MEMORY.md)
+	memoryIdx := strings.Index(result, "5. Create or update `.maggus/MEMORY.md`")
+	releaseIdx := strings.Index(result, "6. Append a short release note entry")
+	if memoryIdx == -1 {
+		t.Fatal("step 5 (MEMORY.md) not found")
+	}
+	if releaseIdx == -1 {
+		t.Fatal("step 6 (RELEASE_NOTES.md) not found")
+	}
+	if releaseIdx <= memoryIdx {
+		t.Error("step 6 (release notes) should appear after step 5 (MEMORY.md)")
 	}
 }
 

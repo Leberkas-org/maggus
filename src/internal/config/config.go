@@ -11,8 +11,9 @@ import (
 
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Model   string   `yaml:"model"`
-	Include []string `yaml:"include"`
+	Model    string   `yaml:"model"`
+	Include  []string `yaml:"include"`
+	Worktree bool     `yaml:"worktree"`
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,

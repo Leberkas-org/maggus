@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/dirnei/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/spf13/cobra"
 )
 

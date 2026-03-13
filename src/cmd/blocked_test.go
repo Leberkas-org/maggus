@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dirnei/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 func writeBlockedPlan(t *testing.T, dir, filename, content string) {

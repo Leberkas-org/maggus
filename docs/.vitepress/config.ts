@@ -38,7 +38,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/dirnei/maggus' }
+      { icon: 'github', link: 'https://github.com/leberkas-org/maggus' }
     ]
   }
 })
