@@ -61,14 +61,14 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want `maggus status` to render a polished, styled view using lipgloss instead of raw ANSI codes.
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/status.go` is refactored to use a bubbletea model with alt-screen
-- [ ] The status view uses shared styles from `src/internal/tui/styles/`
-- [ ] Plan progress bars use the shared `ProgressBar` helper
-- [ ] Task list uses styled icons: checkmark (success color) for complete, warning icon (error color) for blocked, circle (muted) for pending, arrow (primary) for next-up
-- [ ] The view is framed in a lipgloss box
-- [ ] The `--plain` flag still works — when set, skips the TUI and prints plain-text output (for scripting/piping)
-- [ ] Pressing `q`, `Esc`, or any key exits the view
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `src/cmd/status.go` is refactored to use a bubbletea model with alt-screen
+- [x] The status view uses shared styles from `src/internal/tui/styles/`
+- [x] Plan progress bars use the shared `ProgressBar` helper
+- [x] Task list uses styled icons: checkmark (success color) for complete, warning icon (error color) for blocked, circle (muted) for pending, arrow (primary) for next-up
+- [x] The view is framed in a lipgloss box
+- [x] The `--plain` flag still works — when set, skips the TUI and prints plain-text output (for scripting/piping)
+- [x] Pressing `q`, `Esc`, or any key exits the view
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-005: Restyle `list` command with lipgloss TUI
 **Description:** As a user, I want `maggus list` to render a styled task list using lipgloss instead of raw ANSI codes.
