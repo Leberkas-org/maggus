@@ -57,7 +57,6 @@ func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, p 
 
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrWriter{tee: os.Stderr, buf: &stderrBuf}
-	cmd.Stdin = os.Stdin
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
@@ -129,7 +128,6 @@ func (a *OpenCodeAgent) RunOnce(ctx context.Context, prompt string, model string
 	setProcAttr(cmd)
 
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil

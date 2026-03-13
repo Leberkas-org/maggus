@@ -63,11 +63,47 @@ func buildProgressBarPlain(done, total int) string {
 	return styles.ProgressBarPlain(done, total, progressBarWidth)
 }
 
-// statusModel is the bubbletea model for the status TUI with scrolling.
+// statusModel is the bubbletea model for the interactive status TUI.
 type statusModel struct {
-	viewport viewport.Model
-	content  string // pre-rendered status content
-	ready    bool
+	plans       []planInfo
+	showAll     bool
+	nextTaskID  string
+	nextTaskFile string
+	agentName   string
+
+	// Flat list of selectable tasks (index into plans/tasks)
+	selectableTasks []parser.Task
+	cursor          int
+	width           int
+	height          int
+
+	// Detail view state
+	showDetail     bool
+	detailViewport viewport.Model
+	detailReady    bool
+
+	// Run action
+	runTask bool
+}
+
+func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) statusModel {
+	// Build flat list of selectable tasks
+	var selectable []parser.Task
+	for _, p := range plans {
+		if p.completed && !showAll {
+			continue
+		}
+		selectable = append(selectable, p.tasks...)
+	}
+
+	return statusModel{
+		plans:           plans,
+		showAll:         showAll,
+		nextTaskID:      nextTaskID,
+		nextTaskFile:    nextTaskFile,
+		agentName:       agentName,
+		selectableTasks: selectable,
+	}
 }
 
 func (m statusModel) Init() tea.Cmd {
@@ -77,54 +113,113 @@ func (m statusModel) Init() tea.Cmd {
 func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		// Reserve 1 line for the footer
-		m.viewport = viewport.New(msg.Width, msg.Height-1)
-		m.viewport.SetContent(m.content)
-		m.ready = true
-		return m, nil
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "esc", "ctrl+c":
-			return m, tea.Quit
-		case "home":
-			if m.ready {
-				m.viewport.GotoTop()
-				return m, nil
-			}
-		case "end":
-			if m.ready {
-				m.viewport.GotoBottom()
-				return m, nil
-			}
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.showDetail {
+			m.detailViewport.Width = msg.Width
+			m.detailViewport.Height = msg.Height - 2
+			m.detailReady = true
 		}
+		return m, nil
+
+	case tea.KeyMsg:
+		if m.showDetail {
+			return m.updateDetail(msg)
+		}
+		return m.updateList(msg)
 	}
 
-	if m.ready {
+	if m.showDetail && m.detailReady {
 		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.detailViewport, cmd = m.detailViewport.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "alt+r":
+		m.runTask = true
+		return m, tea.Quit
+	case "q", "esc", "ctrl+c":
+		return m, tea.Quit
+	case "up", "k":
+		if len(m.selectableTasks) > 0 {
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.selectableTasks) - 1
+			}
+		}
+	case "down", "j":
+		if len(m.selectableTasks) > 0 {
+			if m.cursor < len(m.selectableTasks)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+		}
+	case "home":
+		m.cursor = 0
+	case "end":
+		if len(m.selectableTasks) > 0 {
+			m.cursor = len(m.selectableTasks) - 1
+		}
+	case "enter":
+		if len(m.selectableTasks) > 0 {
+			t := m.selectableTasks[m.cursor]
+			m.showDetail = true
+			content := m.renderDetailContent(t)
+			m.detailViewport = viewport.New(m.width, m.height-2)
+			m.detailViewport.SetContent(content)
+			m.detailReady = true
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "alt+r":
+		m.runTask = true
+		return m, tea.Quit
+	case "q":
+		return m, tea.Quit
+	case "esc", "backspace":
+		m.showDetail = false
+		m.detailReady = false
+		return m, nil
+	case "ctrl+c":
+		return m, tea.Quit
+	case "home":
+		if m.detailReady {
+			m.detailViewport.GotoTop()
+			return m, nil
+		}
+	case "end":
+		if m.detailReady {
+			m.detailViewport.GotoBottom()
+			return m, nil
+		}
+	}
+	if m.detailReady {
+		var cmd tea.Cmd
+		m.detailViewport, cmd = m.detailViewport.Update(msg)
 		return m, cmd
 	}
 	return m, nil
 }
 
 func (m statusModel) View() string {
-	if !m.ready {
-		return ""
+	if m.showDetail {
+		return m.viewDetail()
 	}
-	footer := statusFooter(m.viewport)
-	return m.viewport.View() + "\n" + footer
+	return m.viewStatus()
 }
 
-func statusFooter(vp viewport.Model) string {
-	if vp.TotalLineCount() <= vp.Height {
-		return styles.StatusBar.Render("q/esc: exit")
-	}
-	pct := vp.ScrollPercent() * 100
-	return styles.StatusBar.Render(fmt.Sprintf("↑/↓: scroll · q/esc: exit · %.0f%%", pct))
-}
-
-// renderStatusContent builds the styled status output for the TUI.
-func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) string {
+func (m statusModel) viewStatus() string {
 	var sb strings.Builder
 
 	// Compute totals
@@ -132,7 +227,7 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 	totalDone := 0
 	totalBlocked := 0
 	activePlans := 0
-	for _, p := range plans {
+	for _, p := range m.plans {
 		totalTasks += len(p.tasks)
 		totalDone += p.doneCount()
 		totalBlocked += p.blockedCount()
@@ -144,18 +239,19 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 
 	// Header
 	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %d plans (%d active), %d tasks total",
-		len(plans), activePlans, totalTasks))
+		len(m.plans), activePlans, totalTasks))
 	sb.WriteString(header)
 	sb.WriteString("\n\n")
 
 	// Summary
 	summary := fmt.Sprintf(" Summary: %d/%d tasks complete · %d pending · %d blocked · Agent: %s",
-		totalDone, totalTasks, totalPending, totalBlocked, agentName)
+		totalDone, totalTasks, totalPending, totalBlocked, m.agentName)
 	sb.WriteString(summary)
 
-	// Task sections
-	for _, p := range plans {
-		if p.completed && !showAll {
+	// Task sections with cursor
+	taskIdx := 0
+	for _, p := range m.plans {
+		if p.completed && !m.showAll {
 			continue
 		}
 		sb.WriteString("\n\n")
@@ -168,7 +264,7 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 		sb.WriteString(" " + styles.Separator(42))
 
 		for _, t := range p.tasks {
-			var icon, prefix string
+			var icon string
 			var style lipgloss.Style
 
 			if t.IsComplete() {
@@ -178,26 +274,34 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 				} else {
 					style = statusGreenStyle
 				}
-				prefix = "  "
 			} else if t.IsBlocked() {
 				icon = "⚠"
 				style = statusRedStyle
-				prefix = "  "
-			} else if t.ID == nextTaskID && t.SourceFile == nextTaskFile {
+			} else if t.ID == m.nextTaskID && t.SourceFile == m.nextTaskFile {
 				icon = "→"
 				style = statusCyanStyle
-				prefix = "→ "
 			} else {
 				icon = "○"
 				style = lipgloss.NewStyle().Foreground(styles.Muted)
-				prefix = "  "
 			}
 
 			if p.completed {
 				style = statusDimStyle
 			}
 
-			line := fmt.Sprintf(" %s%s  %s: %s", prefix, icon, t.ID, t.Title)
+			// Cursor indicator
+			var prefix string
+			if taskIdx == m.cursor {
+				prefix = " ▸ "
+				// Override style for selected row
+				if !p.completed {
+					style = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+				}
+			} else {
+				prefix = "   "
+			}
+
+			line := fmt.Sprintf("%s%s  %s: %s", prefix, icon, t.ID, t.Title)
 			sb.WriteString("\n")
 			sb.WriteString(style.Render(line))
 
@@ -213,6 +317,8 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 					sb.WriteString(statusRedStyle.Render(blockedLine))
 				}
 			}
+
+			taskIdx++
 		}
 	}
 
@@ -223,8 +329,8 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 	sb.WriteString(" " + styles.Separator(42))
 
 	maxCountWidth := 0
-	for _, p := range plans {
-		if p.completed && !showAll {
+	for _, p := range m.plans {
+		if p.completed && !m.showAll {
 			continue
 		}
 		w := len(fmt.Sprintf("%d/%d", p.doneCount(), len(p.tasks)))
@@ -234,8 +340,8 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 	}
 	countFmt := fmt.Sprintf("%%-%ds", maxCountWidth)
 
-	for _, p := range plans {
-		if p.completed && !showAll {
+	for _, p := range m.plans {
+		if p.completed && !m.showAll {
 			continue
 		}
 
@@ -274,7 +380,95 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 		sb.WriteString(style.Render(line))
 	}
 
+	content := styles.Box.Render(sb.String())
+	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run task · q/esc: exit")
+	return content + "\n" + footer
+}
+
+func (m statusModel) renderDetailContent(t parser.Task) string {
+	var sb strings.Builder
+
+	titleStyle := styles.Title
+	labelStyle := styles.Label.Width(10).Align(lipgloss.Right)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	successStyle := lipgloss.NewStyle().Foreground(styles.Success)
+	warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+
+	sb.WriteString(titleStyle.Render(fmt.Sprintf("%s: %s", t.ID, t.Title)))
+	sb.WriteString("\n\n")
+
+	// Metadata
+	sb.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Plan:"), mutedStyle.Render(filepath.Base(t.SourceFile))))
+
+	// Status
+	var statusText string
+	var statusStyle lipgloss.Style
+	if t.IsComplete() {
+		statusText = "Complete"
+		statusStyle = successStyle
+	} else if t.IsBlocked() {
+		statusText = "Blocked"
+		statusStyle = warningStyle
+	} else {
+		statusText = "Pending"
+		statusStyle = mutedStyle
+	}
+	sb.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Status:"), statusStyle.Render(statusText)))
+
+	// Criteria counts
+	done := 0
+	blocked := 0
+	for _, c := range t.Criteria {
+		if c.Checked {
+			done++
+		}
+		if c.Blocked {
+			blocked++
+		}
+	}
+	sb.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Criteria:"),
+		mutedStyle.Render(fmt.Sprintf("%d total, %d done, %d blocked", len(t.Criteria), done, blocked))))
+
+	// Description
+	if t.Description != "" {
+		sb.WriteString("\n")
+		sb.WriteString(styles.Subtitle.Render("Description"))
+		sb.WriteString("\n")
+		for _, line := range strings.Split(strings.TrimSpace(t.Description), "\n") {
+			sb.WriteString("  " + line + "\n")
+		}
+	}
+
+	// Acceptance criteria
+	if len(t.Criteria) > 0 {
+		sb.WriteString("\n")
+		sb.WriteString(styles.Subtitle.Render("Acceptance Criteria"))
+		sb.WriteString("\n")
+		for _, c := range t.Criteria {
+			var checkbox string
+			if c.Checked {
+				checkbox = successStyle.Render("✓")
+			} else if c.Blocked {
+				checkbox = warningStyle.Render("⊘")
+			} else {
+				checkbox = mutedStyle.Render("○")
+			}
+			sb.WriteString(fmt.Sprintf("  %s %s\n", checkbox, c.Text))
+		}
+	}
+
 	return styles.Box.Render(sb.String())
+}
+
+func (m statusModel) viewDetail() string {
+	if !m.detailReady {
+		return ""
+	}
+	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run task · esc/backspace: back · q: exit")
+	if m.detailViewport.TotalLineCount() <= m.detailViewport.Height {
+		footer = styles.StatusBar.Render("alt+r: run task · esc/backspace: back · q: exit")
+	}
+	return m.detailViewport.View() + "\n" + footer
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
@@ -470,12 +664,17 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		// TUI mode: render content and display in alt-screen
-		content := renderStatusContent(plans, all, nextTaskID, nextTaskFile, agentName)
-		m := statusModel{content: content}
-		p := tea.NewProgram(m, tea.WithAltScreen())
-		_, err = p.Run()
-		return err
+		// TUI mode: interactive status with detail view
+		m := newStatusModel(plans, all, nextTaskID, nextTaskFile, agentName)
+		prog := tea.NewProgram(m, tea.WithAltScreen())
+		result, err := prog.Run()
+		if err != nil {
+			return err
+		}
+		if final, ok := result.(statusModel); ok && final.runTask {
+			return dispatchWork()
+		}
+		return nil
 	},
 }
 

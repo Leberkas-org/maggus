@@ -11,7 +11,12 @@
       "Bash(xargs grep:*)",
       "Bash(ls:*)",
       "Bash(xargs wc:*)",
-      "Bash(python -c *)"
+      "Bash(python -c *)",
+      "Bash(grep:*)",
+      "Read(*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:opencode.ai)"
     ]
   }
 }

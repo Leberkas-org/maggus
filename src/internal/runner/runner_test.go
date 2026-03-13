@@ -109,10 +109,10 @@ func TestUsageAccumulation(t *testing.T) {
 	}
 
 	updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 2, TaskID: "TASK-001", TaskTitle: "First task"})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 1000, OutputTokens: 500})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	if !m.hasUsageData {
 		t.Error("expected hasUsageData to be true after receiving usage")
@@ -125,7 +125,7 @@ func TestUsageAccumulation(t *testing.T) {
 	}
 
 	updated, _ = m.Update(IterationStartMsg{Current: 2, Total: 2, TaskID: "TASK-002", TaskTitle: "Second task"})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	if len(m.taskUsages) != 1 {
 		t.Fatalf("expected 1 task usage entry, got %d", len(m.taskUsages))
@@ -141,14 +141,14 @@ func TestUsageAccumulation(t *testing.T) {
 	}
 
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 2000, OutputTokens: 800})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	if m.totalInputTokens != 3000 || m.totalOutputTokens != 1300 {
 		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.totalInputTokens, m.totalOutputTokens)
 	}
 
 	updated, _ = m.Update(SummaryMsg{Data: SummaryData{TasksCompleted: 2, TasksTotal: 2}})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	if len(m.taskUsages) != 2 {
 		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.taskUsages))
@@ -162,7 +162,7 @@ func TestUsageNAWhenNoData(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
 
 	updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-001", TaskTitle: "Test"})
-	m = updated.(tuiModel)
+	m = updated.(TUIModel)
 
 	view := m.renderView()
 	if !contains(view, "N/A") {

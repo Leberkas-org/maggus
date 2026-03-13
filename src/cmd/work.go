@@ -22,6 +22,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/runtracker"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
@@ -130,6 +131,24 @@ Examples:
 			return fmt.Errorf("check gitignore: %w", err)
 		}
 
+		// Get host fingerprint
+		hostFingerprint, _ := fingerprint.Get()
+		if hostFingerprint == "" {
+			hostFingerprint = "unknown"
+		}
+
+		modelDisplay := resolvedModel
+		if modelDisplay == "" {
+			modelDisplay = "default"
+		}
+
+		// repoDir always points to the original repository root.
+		// workDir is where Claude Code operates — either the worktree or the repo itself.
+		repoDir := dir
+		workDir := dir
+
+		// Run-again loop: allows the user to start another batch from the summary screen.
+		for {
 		tasks, err := parser.ParsePlans(dir)
 		if err != nil {
 			return fmt.Errorf("parse plans: %w", err)
@@ -150,26 +169,12 @@ Examples:
 			return nil
 		}
 
-		// Get host fingerprint
-		hostFingerprint, _ := fingerprint.Get()
-		if hostFingerprint == "" {
-			hostFingerprint = "unknown"
-		}
-
 		// Create run tracker
-		modelDisplay := resolvedModel
-		if modelDisplay == "" {
-			modelDisplay = "default"
-		}
 		run, err := runtracker.New(dir, modelDisplay, count)
 		if err != nil {
 			return fmt.Errorf("create run tracker: %w", err)
 		}
 
-		// repoDir always points to the original repository root.
-		// workDir is where Claude Code operates — either the worktree or the repo itself.
-		repoDir := dir
-		workDir := dir
 		var branchMsg string
 
 		if useWorktree {
@@ -296,6 +301,7 @@ Examples:
 					Total:     count,
 					TaskID:    next.ID,
 					TaskTitle: next.Title,
+					PlanFile:  next.SourceFile,
 				})
 
 				opts := prompt.Options{
@@ -431,12 +437,53 @@ Examples:
 			}
 		}()
 
-		// Run the TUI (blocks until user dismisses the done screen).
-		if _, tuiErr := p.Run(); tuiErr != nil {
+		// Run the TUI (blocks until user dismisses the summary screen).
+		finalModel, tuiErr := p.Run()
+		if tuiErr != nil {
 			return fmt.Errorf("TUI error: %w", tuiErr)
 		}
 
-		return workErr
+		if workErr != nil {
+			return workErr
+		}
+
+		// Persist per-task usage to .maggus/usage.csv.
+		if tm, ok := finalModel.(runner.TUIModel); ok {
+			usages := tm.TaskUsages()
+			if len(usages) > 0 {
+				var records []usage.Record
+				for _, u := range usages {
+					planRel := u.PlanFile
+					if rel, err := filepath.Rel(dir, u.PlanFile); err == nil {
+						planRel = rel
+					}
+					records = append(records, usage.Record{
+						RunID:        run.ID,
+						TaskID:       u.TaskID,
+						TaskTitle:    u.TaskTitle,
+						PlanFile:     planRel,
+						Model:        modelDisplay,
+						Agent:        activeAgent.Name(),
+						InputTokens:  u.InputTokens,
+						OutputTokens: u.OutputTokens,
+						StartTime:    u.StartTime,
+						EndTime:      u.EndTime,
+					})
+				}
+				_ = usage.Append(dir, records)
+			}
+
+			// Check if user chose "Run again" from the summary menu.
+			result := tm.Result()
+			if result.RunAgain {
+				count = result.TaskCount
+				workDir = dir // reset workDir for next iteration
+				continue
+			}
+		}
+
+		return nil
+		} // end run-again loop
 	},
 }
 

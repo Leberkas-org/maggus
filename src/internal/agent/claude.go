@@ -56,7 +56,6 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrWriter{tee: os.Stderr, buf: &stderrBuf}
-	cmd.Stdin = os.Stdin
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
@@ -151,6 +150,13 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 	var result scanResult
 	select {
 	case result = <-scanDone:
+	case <-ctx.Done():
+		// Context cancelled (e.g. Ctrl+C) — wait briefly for scanner to finish
+		// after the process is killed, then proceed to cmd.Wait().
+		select {
+		case result = <-scanDone:
+		case <-time.After(5 * time.Second):
+		}
 	case <-time.After(10 * time.Minute):
 	}
 
@@ -205,7 +211,6 @@ func (a *ClaudeAgent) RunOnce(ctx context.Context, prompt string, model string) 
 	setProcAttr(cmd)
 
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	cmd.WaitDelay = 5 * time.Second
 
 	out, err := cmd.Output()

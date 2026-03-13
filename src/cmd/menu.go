@@ -278,9 +278,18 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+const logo = `
+ ███╗   ███╗  █████╗   ██████╗  ██████╗  ██╗   ██╗ ███████╗
+ ████╗ ████║ ██╔══██╗ ██╔════╝ ██╔════╝  ██║   ██║ ██╔════╝
+ ██╔████╔██║ ███████║ ██║  ███╗██║  ███╗ ██║   ██║ ███████╗
+ ██║╚██╔╝██║ ██╔══██║ ██║   ██║██║   ██║ ██║   ██║ ╚════██║
+ ██║ ╚═╝ ██║ ██║  ██║ ╚██████╔╝╚██████╔╝ ╚██████╔╝ ███████║
+ ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝`
+
 func (m menuModel) View() string {
-	titleStyle := styles.Title.MarginBottom(0)
-	header := titleStyle.Render(fmt.Sprintf("Maggus %s", Version))
+	logoStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	header := logoStyle.Render(logo) + "\n" + versionStyle.Render(fmt.Sprintf("  v%s — Your best and worst co-worker", Version))
 
 	// Plan summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
