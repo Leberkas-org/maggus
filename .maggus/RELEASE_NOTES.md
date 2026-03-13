@@ -1,3 +1,32 @@
+## TASK-005: Launch selected command from the menu
+
+- Selecting a command from the interactive menu now actually executes it with the configured options
+- Alt-screen is cleanly exited before the selected command starts, so commands with their own TUI (status, list) work correctly
+- Quitting the menu with q/Esc exits cleanly without running any command
+
+## TASK-004: Non-interactive terminal fallback
+
+- Running `maggus` with no subcommand in a non-interactive context (piped output, CI) now reliably prints standard help text instead of attempting to launch the TUI
+- Added unit test coverage for root command help output behavior
+
+## TASK-003: Sub-menus for common command options
+
+- Selecting a command with configurable options (work, list, status, worktree) now opens a sub-menu to set flags before launching
+- Use arrow keys to navigate options, left/right to change values, and select "Run" to execute with chosen settings
+- Press Esc in a sub-menu to return to the main menu without launching
+
+## TASK-002: Plan summary banner in menu header
+
+- The main menu now shows a plan summary line below the title (e.g., "3 plans · 12 tasks · 8 done · 2 blocked")
+- Shows "No plans found" when no plan files exist
+- Counts are color-coded: green for done, red for blocked
+
+## TASK-001: Interactive Main Menu
+
+- Running `maggus` without arguments now shows an interactive menu listing all available commands
+- Navigate with arrow keys, select with Enter, exit with q/Esc
+- Non-interactive terminals (pipes, CI) still show standard help text
+
 ## TASK-008: Parse and track token usage from Claude Code output
 
 - The work TUI now displays cumulative token usage (input/output) in the status area during execution

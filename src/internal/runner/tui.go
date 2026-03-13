@@ -240,6 +240,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		return m, tea.ClearScreen
 
 	case tickMsg:
 		m.frame = (m.frame + 1) % len(spinnerFrames)
