@@ -21,13 +21,13 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a developer, I want a `worktree` package that wraps `git worktree` commands so that Maggus can create, list, and remove worktrees programmatically.
 
 **Acceptance Criteria:**
-- [ ] New package at `src/internal/worktree/worktree.go`
-- [ ] `Create(repoDir, worktreeDir, branch string) error` — runs `git worktree add <worktreeDir> -b <branch>` from `repoDir`
-- [ ] `Remove(repoDir, worktreeDir string) error` — runs `git worktree remove <worktreeDir> --force` from `repoDir`
-- [ ] `List(repoDir string) ([]string, error)` — runs `git worktree list --porcelain` and returns worktree paths
-- [ ] All functions use `repoDir` as the command working directory (not the worktree)
-- [ ] Errors from git are wrapped with descriptive context
-- [ ] Unit tests cover success and error paths (use `exec.Command` mocking or test in a real temp git repo)
+- [x] New package at `src/internal/worktree/worktree.go`
+- [x] `Create(repoDir, worktreeDir, branch string) error` — runs `git worktree add <worktreeDir> -b <branch>` from `repoDir`
+- [x] `Remove(repoDir, worktreeDir string) error` — runs `git worktree remove <worktreeDir> --force` from `repoDir`
+- [x] `List(repoDir string) ([]string, error)` — runs `git worktree list --porcelain` and returns worktree paths
+- [x] All functions use `repoDir` as the command working directory (not the worktree)
+- [x] Errors from git are wrapped with descriptive context
+- [x] Unit tests cover success and error paths (use `exec.Command` mocking or test in a real temp git repo)
 
 ### TASK-002: Add task locking for parallel execution
 **Description:** As a user running multiple Maggus sessions in parallel, I want a locking mechanism so that two sessions never pick the same task.
