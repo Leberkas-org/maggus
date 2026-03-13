@@ -35,6 +35,7 @@ var (
 	noBootstrapFlag bool
 	modelFlag       string
 	agentFlag       string
+	taskFlag        string
 	worktreeFlag    bool
 	noWorktreeFlag  bool
 )
@@ -54,7 +55,9 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		count := countFlag
 
-		if len(args) > 0 {
+		if taskFlag != "" {
+			count = 1
+		} else if len(args) > 0 {
 			n, err := strconv.Atoi(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid task count %q: must be a positive integer", args[0])
@@ -272,9 +275,11 @@ Examples:
 					break
 				}
 
-				// Find next workable task. In worktree mode, skip locked tasks.
+				// Find next workable task. --task targets a specific ID; otherwise pick next incomplete.
 				var next *parser.Task
-				if useWorktree {
+				if taskFlag != "" {
+					next = findTaskByID(tasks, taskFlag)
+				} else if useWorktree {
 					next = findNextUnlocked(tasks, repoDir)
 				} else {
 					next = parser.FindNextIncomplete(tasks)
@@ -492,6 +497,7 @@ func init() {
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
+	workCmd.Flags().StringVar(&taskFlag, "task", "", "run a specific task by ID (e.g. TASK-001)")
 	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
 	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)
@@ -539,6 +545,16 @@ func cleanStaleWorktrees(repoDir string) {
 	// Prune and clean locks.
 	worktree.Prune(repoDir)
 	tasklock.CleanAll(repoDir)
+}
+
+// findTaskByID returns the task with the given ID, or nil if not found or already complete.
+func findTaskByID(tasks []parser.Task, id string) *parser.Task {
+	for i := range tasks {
+		if tasks[i].ID == id && !tasks[i].IsComplete() {
+			return &tasks[i]
+		}
+	}
+	return nil
 }
 
 // findNextUnlocked returns the first workable task that is not locked by another session.

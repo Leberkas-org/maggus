@@ -83,10 +83,15 @@ type statusModel struct {
 	detailReady    bool
 
 	// Run action
-	runTask bool
+	runTaskID string
+
+	// Delete confirmation
+	confirmDelete bool
+	deleteErr     string
+	dir           string // working directory for file operations
 }
 
-func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) statusModel {
+func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
 	// Build flat list of selectable tasks
 	var selectable []parser.Task
 	for _, p := range plans {
@@ -103,6 +108,7 @@ func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, ag
 		nextTaskFile:    nextTaskFile,
 		agentName:       agentName,
 		selectableTasks: selectable,
+		dir:             dir,
 	}
 }
 
@@ -123,6 +129,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.confirmDelete {
+			return m.updateConfirmDelete(msg)
+		}
 		if m.showDetail {
 			return m.updateDetail(msg)
 		}
@@ -140,8 +149,14 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "alt+r":
-		m.runTask = true
+		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+backspace":
+		if len(m.selectableTasks) > 0 {
+			m.confirmDelete = true
+			m.deleteErr = ""
+		}
+		return m, nil
 	case "q", "esc", "ctrl+c":
 		return m, tea.Quit
 	case "up", "k":
@@ -183,8 +198,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "alt+r":
-		m.runTask = true
+		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+backspace":
+		m.confirmDelete = true
+		m.deleteErr = ""
+		return m, nil
 	case "q":
 		return m, tea.Quit
 	case "esc", "backspace":
@@ -212,11 +231,71 @@ func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m statusModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y", "enter":
+		t := m.selectableTasks[m.cursor]
+		if err := parser.DeleteTask(t.SourceFile, t.ID); err != nil {
+			m.deleteErr = err.Error()
+			m.confirmDelete = false
+			return m, nil
+		}
+		// Reload plans from disk
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			var selectable []parser.Task
+			for _, p := range plans {
+				if p.completed && !m.showAll {
+					continue
+				}
+				selectable = append(selectable, p.tasks...)
+			}
+			m.selectableTasks = selectable
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		if m.cursor >= len(m.selectableTasks) && m.cursor > 0 {
+			m.cursor--
+		}
+		m.confirmDelete = false
+		m.showDetail = false
+		if len(m.selectableTasks) == 0 {
+			return m, tea.Quit
+		}
+		return m, nil
+	case "n", "N", "esc", "ctrl+c":
+		m.confirmDelete = false
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m statusModel) View() string {
+	if m.confirmDelete {
+		return m.viewConfirmDelete()
+	}
 	if m.showDetail {
 		return m.viewDetail()
 	}
 	return m.viewStatus()
+}
+
+func (m statusModel) viewConfirmDelete() string {
+	t := m.selectableTasks[m.cursor]
+	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("Delete %s: %s?", t.ID, t.Title)))
+	sb.WriteString("\n\n")
+	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  Plan: %s", filepath.Base(t.SourceFile))))
+	sb.WriteString("\n\n")
+	sb.WriteString("  This will permanently remove the task from the plan file.\n\n")
+	sb.WriteString(fmt.Sprintf("  %s / %s",
+		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
+		mutedStyle.Render("n/esc: cancel")))
+
+	return styles.Box.Render(sb.String()) + "\n"
 }
 
 func (m statusModel) viewStatus() string {
@@ -375,13 +454,15 @@ func (m statusModel) viewStatus() string {
 		}
 
 		countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
-		line := fmt.Sprintf("%s%-32s [%s]  %s   %s", prefix, p.filename, bar, countStr, suffix)
+		// Render parts separately so the progress bar keeps its own colors
+		labelPart := fmt.Sprintf("%s%-32s [", prefix, p.filename)
+		afterPart := fmt.Sprintf("]  %s   %s", countStr, suffix)
 		sb.WriteString("\n")
-		sb.WriteString(style.Render(line))
+		sb.WriteString(style.Render(labelPart) + bar + style.Render(afterPart))
 	}
 
 	content := styles.Box.Render(sb.String())
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run task · q/esc: exit")
+	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
 	return content + "\n" + footer
 }
 
@@ -464,9 +545,9 @@ func (m statusModel) viewDetail() string {
 	if !m.detailReady {
 		return ""
 	}
-	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run task · esc/backspace: back · q: exit")
+	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
 	if m.detailViewport.TotalLineCount() <= m.detailViewport.Height {
-		footer = styles.StatusBar.Render("alt+r: run task · esc/backspace: back · q: exit")
+		footer = styles.StatusBar.Render("alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
 	}
 	return m.detailViewport.View() + "\n" + footer
 }
@@ -665,14 +746,14 @@ var statusCmd = &cobra.Command{
 		}
 
 		// TUI mode: interactive status with detail view
-		m := newStatusModel(plans, all, nextTaskID, nextTaskFile, agentName)
+		m := newStatusModel(plans, all, nextTaskID, nextTaskFile, agentName, dir)
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := prog.Run()
 		if err != nil {
 			return err
 		}
-		if final, ok := result.(statusModel); ok && final.runTask {
-			return dispatchWork()
+		if final, ok := result.(statusModel); ok && final.runTaskID != "" {
+			return dispatchWork(final.runTaskID)
 		}
 		return nil
 	},

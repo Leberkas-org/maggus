@@ -31,7 +31,11 @@ type listModel struct {
 	detailReady    bool
 
 	// Run action
-	runTask bool // true if user pressed Alt+R to run the selected task
+	runTaskID string // task ID to run when user presses Alt+R
+
+	// Delete confirmation
+	confirmDelete bool
+	deleteErr     string
 }
 
 func (m listModel) Init() tea.Cmd {
@@ -51,6 +55,9 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.confirmDelete {
+			return m.updateConfirmDelete(msg)
+		}
 		if m.showDetail {
 			return m.updateDetail(msg)
 		}
@@ -68,8 +75,12 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "alt+r":
-		m.runTask = true
+		m.runTaskID = m.tasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+backspace":
+		m.confirmDelete = true
+		m.deleteErr = ""
+		return m, nil
 	case "q", "esc", "ctrl+c":
 		return m, tea.Quit
 	case "up", "k":
@@ -102,8 +113,12 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m listModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "alt+r":
-		m.runTask = true
+		m.runTaskID = m.tasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+backspace":
+		m.confirmDelete = true
+		m.deleteErr = ""
+		return m, nil
 	case "q":
 		return m, tea.Quit
 	case "esc", "backspace":
@@ -131,11 +146,59 @@ func (m listModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m listModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y", "enter":
+		t := m.tasks[m.cursor]
+		if err := parser.DeleteTask(t.SourceFile, t.ID); err != nil {
+			m.deleteErr = err.Error()
+			m.confirmDelete = false
+			return m, nil
+		}
+		// Remove from local list and reset cursor
+		m.tasks = append(m.tasks[:m.cursor], m.tasks[m.cursor+1:]...)
+		if m.cursor >= len(m.tasks) && m.cursor > 0 {
+			m.cursor--
+		}
+		m.confirmDelete = false
+		m.showDetail = false
+		if len(m.tasks) == 0 {
+			return m, tea.Quit
+		}
+		return m, nil
+	case "n", "N", "esc", "ctrl+c":
+		m.confirmDelete = false
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m listModel) View() string {
+	if m.confirmDelete {
+		return m.viewConfirmDelete()
+	}
 	if m.showDetail {
 		return m.viewDetail()
 	}
 	return m.viewList()
+}
+
+func (m listModel) viewConfirmDelete() string {
+	t := m.tasks[m.cursor]
+	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("Delete %s: %s?", t.ID, t.Title)))
+	sb.WriteString("\n\n")
+	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  Plan: %s", filepath.Base(t.SourceFile))))
+	sb.WriteString("\n\n")
+	sb.WriteString("  This will permanently remove the task from the plan file.\n\n")
+	sb.WriteString(fmt.Sprintf("  %s / %s",
+		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
+		mutedStyle.Render("n/esc: cancel")))
+
+	return styles.Box.Render(sb.String()) + "\n"
 }
 
 func (m listModel) viewList() string {
@@ -178,7 +241,7 @@ func (m listModel) viewList() string {
 
 	content := styles.Box.Render(sb.String())
 
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run task · q/esc: exit")
+	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
 	return content + "\n" + footer
 }
 
@@ -248,9 +311,9 @@ func (m listModel) viewDetail() string {
 		return ""
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run task · esc/backspace: back · q: exit")
+	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
 	if m.detailViewport.TotalLineCount() <= m.detailViewport.Height {
-		footer = styles.StatusBar.Render("alt+r: run task · esc/backspace: back · q: exit")
+		footer = styles.StatusBar.Render("alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
 	}
 	return m.detailViewport.View() + "\n" + footer
 }
@@ -366,8 +429,8 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	if err != nil {
 		return err
 	}
-	if final, ok := result.(listModel); ok && final.runTask {
-		return dispatchWork()
+	if final, ok := result.(listModel); ok && final.runTaskID != "" {
+		return dispatchWork(final.runTaskID)
 	}
 	return nil
 }
