@@ -138,6 +138,8 @@ type menuModel struct {
 	args     []string // args to pass to the selected command
 	quitting bool
 	summary  planSummary
+	width    int
+	height   int
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -159,6 +161,10 @@ func (m menuModel) Init() tea.Cmd {
 
 func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	case tea.KeyMsg:
 		if m.inSubMenu {
 			return m.updateSubMenu(msg)
@@ -289,7 +295,7 @@ const logo = `
 func (m menuModel) View() string {
 	logoStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	header := logoStyle.Render(logo) + "\n" + versionStyle.Render(fmt.Sprintf("  v%s — Your best and worst co-worker", Version))
+	header := logoStyle.Render(logo) + "\n" + versionStyle.Render(fmt.Sprintf("  v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
 	// Plan summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -315,6 +321,10 @@ func (m menuModel) View() string {
 	}
 
 	content := header + "\n" + summaryLine + "\n\n" + body
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(content, m.width, m.height)
+	}
 	return styles.Box.Render(content) + "\n"
 }
 

@@ -76,6 +76,44 @@ func ProgressBarPlain(done, total, width int) string {
 	return strings.Repeat("#", filled) + strings.Repeat(".", width-filled)
 }
 
+// FullScreen wraps content in a bordered box that fills the terminal with a
+// small margin, then centers the result on screen. Use this as the outermost
+// wrapper in every View() to get a consistent layout across all commands.
+func FullScreen(content string, width, height int) string {
+	const margin = 2 // chars on each side
+
+	innerW := width - margin*2 - 2  // 2 for border chars
+	innerH := height - margin*2 - 2 // 2 for border chars
+	if innerW < 0 {
+		innerW = 0
+	}
+	if innerH < 0 {
+		innerH = 0
+	}
+
+	box := Box.
+		Width(innerW).
+		Height(innerH).
+		Render(content)
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// FullScreenInnerSize returns the usable content width and height inside a
+// FullScreen box for the given terminal dimensions.
+func FullScreenInnerSize(width, height int) (int, int) {
+	const margin = 2
+	innerW := width - margin*2 - 2 - 2 // margin + border + padding
+	innerH := height - margin*2 - 2     // margin + border
+	if innerW < 0 {
+		innerW = 0
+	}
+	if innerH < 0 {
+		innerH = 0
+	}
+	return innerW, innerH
+}
+
 // Truncate truncates text to maxWidth characters, adding "..." if truncated.
 func Truncate(text string, maxWidth int) string {
 	if maxWidth <= 0 {

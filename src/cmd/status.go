@@ -122,8 +122,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.showDetail {
-			m.detailViewport.Width = msg.Width
-			m.detailViewport.Height = msg.Height - 2
+			w, h := styles.FullScreenInnerSize(msg.Width, msg.Height)
+			m.detailViewport.Width = w
+			m.detailViewport.Height = h - 2 // footer line + gap
 			m.detailReady = true
 		}
 		return m, nil
@@ -186,7 +187,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			t := m.selectableTasks[m.cursor]
 			m.showDetail = true
 			content := m.renderDetailContent(t)
-			m.detailViewport = viewport.New(m.width, m.height-2)
+			w, h := styles.FullScreenInnerSize(m.width, m.height)
+			m.detailViewport = viewport.New(w, h-2)
 			m.detailViewport.SetContent(content)
 			m.detailReady = true
 			return m, nil
@@ -212,6 +214,22 @@ func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+c":
 		return m, tea.Quit
+	case "pgdown":
+		if m.cursor < len(m.selectableTasks)-1 {
+			m.cursor++
+			content := m.renderDetailContent(m.selectableTasks[m.cursor])
+			m.detailViewport.SetContent(content)
+			m.detailViewport.GotoTop()
+		}
+		return m, nil
+	case "pgup":
+		if m.cursor > 0 {
+			m.cursor--
+			content := m.renderDetailContent(m.selectableTasks[m.cursor])
+			m.detailViewport.SetContent(content)
+			m.detailViewport.GotoTop()
+		}
+		return m, nil
 	case "home":
 		if m.detailReady {
 			m.detailViewport.GotoTop()
@@ -295,6 +313,9 @@ func (m statusModel) viewConfirmDelete() string {
 		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
 		mutedStyle.Render("n/esc: cancel")))
 
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(sb.String(), m.width, m.height)
+	}
 	return styles.Box.Render(sb.String()) + "\n"
 }
 
@@ -461,9 +482,14 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString(style.Render(labelPart) + bar + style.Render(afterPart))
 	}
 
-	content := styles.Box.Render(sb.String())
 	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
-	return content + "\n" + footer
+	sb.WriteString("\n\n")
+	sb.WriteString(footer)
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(sb.String(), m.width, m.height)
+	}
+	return styles.Box.Render(sb.String()) + "\n"
 }
 
 func (m statusModel) renderDetailContent(t parser.Task) string {
@@ -538,18 +564,23 @@ func (m statusModel) renderDetailContent(t parser.Task) string {
 		}
 	}
 
-	return styles.Box.Render(sb.String())
+	return sb.String()
 }
 
 func (m statusModel) viewDetail() string {
 	if !m.detailReady {
 		return ""
 	}
-	footer := styles.StatusBar.Render("↑/↓: scroll · alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
+	footer := styles.StatusBar.Render("↑/↓: scroll · pgup/pgdn: prev/next task · alt+r: run · alt+bksp: delete · esc: back · q: exit")
 	if m.detailViewport.TotalLineCount() <= m.detailViewport.Height {
-		footer = styles.StatusBar.Render("alt+r: run · alt+bksp: delete · esc/bksp: back · q: exit")
+		footer = styles.StatusBar.Render("pgup/pgdn: prev/next task · alt+r: run · alt+bksp: delete · esc: back · q: exit")
 	}
-	return m.detailViewport.View() + "\n" + footer
+
+	content := m.detailViewport.View() + "\n" + footer
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(content, m.width, m.height)
+	}
+	return styles.Box.Render(content) + "\n"
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
