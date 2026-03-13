@@ -62,12 +62,12 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a developer, I want a registry that maps agent names to their constructors so the work loop can instantiate the right adapter from config.
 
 **Acceptance Criteria:**
-- [ ] New file `internal/agent/registry.go` with a `New(name string) (Agent, error)` factory function
-- [ ] Supported names: `"claude"` (default), `"opencode"`
-- [ ] Unknown agent names return a clear error listing available agents
-- [ ] An empty or omitted name defaults to `"claude"` for backwards compatibility
-- [ ] Unit tests cover: default selection, explicit selection, unknown agent error
-- [ ] Typecheck/lint passes
+- [x] New file `internal/agent/registry.go` with a `New(name string) (Agent, error)` factory function
+- [x] Supported names: `"claude"` (default), `"opencode"`
+- [x] Unknown agent names return a clear error listing available agents
+- [x] An empty or omitted name defaults to `"claude"` for backwards compatibility
+- [x] Unit tests cover: default selection, explicit selection, unknown agent error
+- [x] Typecheck/lint passes
 
 ### TASK-005: Update config to support `agent` field and `provider/model` format
 
