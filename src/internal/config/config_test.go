@@ -60,9 +60,9 @@ include:
 
 func TestResolveModel_KnownAliases(t *testing.T) {
 	cases := map[string]string{
-		"sonnet": "claude-sonnet-4-6",
-		"opus":   "claude-opus-4-6",
-		"haiku":  "claude-haiku-4-5-20251001",
+		"sonnet": "anthropic/claude-sonnet-4-6",
+		"opus":   "anthropic/claude-opus-4-6",
+		"haiku":  "anthropic/claude-haiku-4-5-20251001",
 	}
 	for alias, want := range cases {
 		if got := ResolveModel(alias); got != want {
@@ -263,6 +263,129 @@ func TestLoad_NotificationsDefaults(t *testing.T) {
 	}
 	if cfg.Notifications.IsErrorEnabled() {
 		t.Error("expected error to be disabled when sound is false")
+	}
+}
+
+func TestLoad_WithAgentField(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `agent: opencode
+model: anthropic/claude-sonnet-4-6
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Agent != "opencode" {
+		t.Errorf("Agent = %q, want %q", cfg.Agent, "opencode")
+	}
+	if cfg.Model != "anthropic/claude-sonnet-4-6" {
+		t.Errorf("Model = %q, want %q", cfg.Model, "anthropic/claude-sonnet-4-6")
+	}
+}
+
+func TestLoad_DefaultAgent(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Agent != "claude" {
+		t.Errorf("Agent = %q, want %q", cfg.Agent, "claude")
+	}
+}
+
+func TestLoad_MissingFileDefaultAgent(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Agent != "claude" {
+		t.Errorf("Agent = %q, want %q", cfg.Agent, "claude")
+	}
+}
+
+func TestResolveModel_ProviderModelFormat(t *testing.T) {
+	cases := map[string]string{
+		"anthropic/claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
+		"openai/gpt-4.1":              "openai/gpt-4.1",
+		"google/gemini-pro":           "google/gemini-pro",
+	}
+	for input, want := range cases {
+		if got := ResolveModel(input); got != want {
+			t.Errorf("ResolveModel(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestResolveModel_LegacyAliasesResolveToProviderFormat(t *testing.T) {
+	cases := map[string]string{
+		"sonnet": "anthropic/claude-sonnet-4-6",
+		"opus":   "anthropic/claude-opus-4-6",
+		"haiku":  "anthropic/claude-haiku-4-5-20251001",
+	}
+	for alias, want := range cases {
+		if got := ResolveModel(alias); got != want {
+			t.Errorf("ResolveModel(%q) = %q, want %q", alias, got, want)
+		}
+	}
+}
+
+func TestResolveModel_BareModelIDPassthrough(t *testing.T) {
+	inputs := []string{"claude-sonnet-4-6", "gpt-4", "my-custom-model"}
+	for _, input := range inputs {
+		if got := ResolveModel(input); got != input {
+			t.Errorf("ResolveModel(%q) = %q, want %q", input, got, input)
+		}
+	}
+}
+
+func TestModelID(t *testing.T) {
+	cases := map[string]string{
+		"anthropic/claude-sonnet-4-6": "claude-sonnet-4-6",
+		"openai/gpt-4.1":              "gpt-4.1",
+		"claude-sonnet-4-6":           "claude-sonnet-4-6",
+		"":                            "",
+	}
+	for input, want := range cases {
+		if got := ModelID(input); got != want {
+			t.Errorf("ModelID(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestModelProvider(t *testing.T) {
+	cases := map[string]string{
+		"anthropic/claude-sonnet-4-6": "anthropic",
+		"openai/gpt-4.1":              "openai",
+		"claude-sonnet-4-6":           "",
+		"":                            "",
+	}
+	for input, want := range cases {
+		if got := ModelProvider(input); got != want {
+			t.Errorf("ModelProvider(%q) = %q, want %q", input, got, want)
+		}
 	}
 }
 

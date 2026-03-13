@@ -74,13 +74,13 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want to set `agent: opencode` in my config and use `provider/model` format for model specification.
 
 **Acceptance Criteria:**
-- [ ] `Config` struct gains an `Agent` field (`yaml:"agent"`)
-- [ ] Model specification uses `provider/model` as the canonical format (e.g. `anthropic/claude-sonnet-4-6`, `openai/gpt-4.1`)
-- [ ] Legacy short aliases (`sonnet`, `opus`, `haiku`) still work and resolve to full IDs for backwards compatibility — `ResolveModel` is updated accordingly
-- [ ] Full model IDs without provider prefix (e.g. `claude-sonnet-4-6`) still work for backwards compatibility
-- [ ] If `agent` is empty or omitted, it defaults to `"claude"`
-- [ ] Unit tests cover: new config field parsing, model resolution with provider prefix, legacy alias resolution, default agent
-- [ ] Typecheck/lint passes
+- [x] `Config` struct gains an `Agent` field (`yaml:"agent"`)
+- [x] Model specification uses `provider/model` as the canonical format (e.g. `anthropic/claude-sonnet-4-6`, `openai/gpt-4.1`)
+- [x] Legacy short aliases (`sonnet`, `opus`, `haiku`) still work and resolve to full IDs for backwards compatibility — `ResolveModel` is updated accordingly
+- [x] Full model IDs without provider prefix (e.g. `claude-sonnet-4-6`) still work for backwards compatibility
+- [x] If `agent` is empty or omitted, it defaults to `"claude"`
+- [x] Unit tests cover: new config field parsing, model resolution with provider prefix, legacy alias resolution, default agent
+- [x] Typecheck/lint passes
 
 ### TASK-006: Wire agent selection into the work loop and CLI
 
