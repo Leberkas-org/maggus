@@ -33,14 +33,14 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a user running multiple Maggus sessions in parallel, I want a locking mechanism so that two sessions never pick the same task.
 
 **Acceptance Criteria:**
-- [ ] New package at `src/internal/tasklock/tasklock.go`
-- [ ] Lock files are stored in `.maggus/locks/` directory (e.g., `.maggus/locks/TASK-001.lock`)
-- [ ] `Acquire(dir, taskID string) (Lock, error)` — creates a lock file atomically using `os.OpenFile` with `O_CREATE|O_EXCL`. The lock file contains the run ID and timestamp for diagnostics
-- [ ] `Lock.Release() error` — removes the lock file
-- [ ] `IsLocked(dir, taskID string) bool` — checks if a lock file exists for the given task
-- [ ] Stale lock detection: lock files older than 2 hours are considered stale and can be overwritten (handles crashed sessions)
-- [ ] Add `.maggus/locks/` to the gitignore entries in `src/internal/gitignore/gitignore.go`
-- [ ] Unit tests cover: acquire, release, double-acquire fails, stale lock override
+- [x] New package at `src/internal/tasklock/tasklock.go`
+- [x] Lock files are stored in `.maggus/locks/` directory (e.g., `.maggus/locks/TASK-001.lock`)
+- [x] `Acquire(dir, taskID string) (Lock, error)` — creates a lock file atomically using `os.OpenFile` with `O_CREATE|O_EXCL`. The lock file contains the run ID and timestamp for diagnostics
+- [x] `Lock.Release() error` — removes the lock file
+- [x] `IsLocked(dir, taskID string) bool` — checks if a lock file exists for the given task
+- [x] Stale lock detection: lock files older than 2 hours are considered stale and can be overwritten (handles crashed sessions)
+- [x] Add `.maggus/locks/` to the gitignore entries in `src/internal/gitignore/gitignore.go`
+- [x] Unit tests cover: acquire, release, double-acquire fails, stale lock override
 
 ### TASK-003: Extend config and CLI flags for worktree option
 **Description:** As a user, I want to enable worktree mode via `.maggus/config.yml` or CLI flags so I can control when worktrees are used.

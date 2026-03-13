@@ -10,6 +10,7 @@ import (
 var requiredEntries = []string{
 	".maggus/runs",
 	".maggus/MEMORY.md",
+	".maggus/locks/",
 	"COMMIT.md",
 }
 
