@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
@@ -76,7 +77,7 @@ func listFooter(vp viewport.Model) string {
 }
 
 // renderListContent builds the styled list output for the TUI.
-func renderListContent(workable []parser.Task, all bool) string {
+func renderListContent(workable []parser.Task, all bool, agentName string) string {
 	var sb strings.Builder
 
 	// Header
@@ -87,6 +88,11 @@ func renderListContent(workable []parser.Task, all bool) string {
 		header = styles.Title.Render(fmt.Sprintf("Next %d task(s)", len(workable)))
 	}
 	sb.WriteString(header)
+	sb.WriteString("\n")
+
+	// Agent info
+	mutedLabel := lipgloss.NewStyle().Faint(true)
+	sb.WriteString(mutedLabel.Render(fmt.Sprintf(" Agent: %s", agentName)))
 	sb.WriteString("\n")
 	sb.WriteString(" " + styles.Separator(42))
 
@@ -111,7 +117,7 @@ func renderListContent(workable []parser.Task, all bool) string {
 }
 
 // renderListPlain builds the plain-text list output (no ANSI, no TUI).
-func renderListPlain(workable []parser.Task, all bool) string {
+func renderListPlain(workable []parser.Task, all bool, agentName string) string {
 	var sb strings.Builder
 
 	if all {
@@ -119,6 +125,7 @@ func renderListPlain(workable []parser.Task, all bool) string {
 	} else {
 		fmt.Fprintf(&sb, "Next %d task(s):\n", len(workable))
 	}
+	fmt.Fprintf(&sb, "Agent: %s\n", agentName)
 	fmt.Fprintln(&sb)
 
 	for i, t := range workable {
@@ -173,6 +180,12 @@ var listCmd = &cobra.Command{
 }
 
 func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	agentName := cfg.Agent
+
 	files, err := parser.GlobPlanFiles(dir, false)
 	if err != nil {
 		return fmt.Errorf("glob plans: %w", err)
@@ -203,12 +216,12 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	}
 
 	if plain {
-		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, all))
+		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, all, agentName))
 		return nil
 	}
 
 	// TUI mode: render content and display in alt-screen
-	content := renderListContent(workable, all)
+	content := renderListContent(workable, all, agentName)
 	m := listModel{content: content}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err = p.Run()

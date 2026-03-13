@@ -103,11 +103,11 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want `maggus list` and `maggus status` to show which agent is configured so I know what backend will be used.
 
 **Acceptance Criteria:**
-- [ ] `maggus status` output includes the configured agent name in its summary section (e.g. `Agent: opencode`)
-- [ ] `maggus list` header or footer shows the configured agent when printing task previews
-- [ ] `--plain` mode includes agent info in a machine-readable format
-- [ ] If agent is the default (`claude`), it still displays explicitly for clarity
-- [ ] Typecheck/lint passes
+- [x] `maggus status` output includes the configured agent name in its summary section (e.g. `Agent: opencode`)
+- [x] `maggus list` header or footer shows the configured agent when printing task previews
+- [x] `--plain` mode includes agent info in a machine-readable format
+- [x] If agent is the default (`claude`), it still displays explicitly for clarity
+- [x] Typecheck/lint passes
 
 ### TASK-008: Update VitePress docs — Configuration reference
 

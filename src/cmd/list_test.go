@@ -265,7 +265,7 @@ func TestListFirstTaskHighlightedInTUI(t *testing.T) {
 		{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md"},
 		{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md"},
 	}
-	content := renderListContent(tasks, false)
+	content := renderListContent(tasks, false, "claude")
 
 	// Should contain the arrow indicator for first task
 	if !strings.Contains(content, "→") {

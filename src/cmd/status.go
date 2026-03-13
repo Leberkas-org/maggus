@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 
@@ -123,7 +124,7 @@ func statusFooter(vp viewport.Model) string {
 }
 
 // renderStatusContent builds the styled status output for the TUI.
-func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFile string) string {
+func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) string {
 	var sb strings.Builder
 
 	// Compute totals
@@ -148,8 +149,8 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 	sb.WriteString("\n\n")
 
 	// Summary
-	summary := fmt.Sprintf(" Summary: %d/%d tasks complete · %d pending · %d blocked",
-		totalDone, totalTasks, totalPending, totalBlocked)
+	summary := fmt.Sprintf(" Summary: %d/%d tasks complete · %d pending · %d blocked · Agent: %s",
+		totalDone, totalTasks, totalPending, totalBlocked, agentName)
 	sb.WriteString(summary)
 
 	// Task sections
@@ -277,7 +278,7 @@ func renderStatusContent(plans []planInfo, showAll bool, nextTaskID, nextTaskFil
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
-func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextTaskID, nextTaskFile string) {
+func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) {
 	totalTasks := 0
 	totalDone := 0
 	totalBlocked := 0
@@ -294,6 +295,7 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 
 	fmt.Fprintf(w, "Maggus Status — %d plans (%d active), %d tasks total\n\n", len(plans), activePlans, totalTasks)
 	fmt.Fprintf(w, " Summary: %d/%d tasks complete · %d pending · %d blocked\n", totalDone, totalTasks, totalPending, totalBlocked)
+	fmt.Fprintf(w, " Agent: %s\n", agentName)
 
 	// Find next task
 	for _, p := range plans {
@@ -443,6 +445,12 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("get working directory: %w", err)
 		}
 
+		cfg, err := config.Load(dir)
+		if err != nil {
+			return err
+		}
+		agentName := cfg.Agent
+
 		plans, err := parsePlans(dir)
 		if err != nil {
 			return err
@@ -457,13 +465,13 @@ var statusCmd = &cobra.Command{
 
 		if plain {
 			var sb strings.Builder
-			renderStatusPlain(&sb, plans, all, nextTaskID, nextTaskFile)
+			renderStatusPlain(&sb, plans, all, nextTaskID, nextTaskFile, agentName)
 			fmt.Fprint(cmd.OutOrStdout(), sb.String())
 			return nil
 		}
 
 		// TUI mode: render content and display in alt-screen
-		content := renderStatusContent(plans, all, nextTaskID, nextTaskFile)
+		content := renderStatusContent(plans, all, nextTaskID, nextTaskFile, agentName)
 		m := statusModel{content: content}
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		_, err = p.Run()
