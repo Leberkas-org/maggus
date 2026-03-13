@@ -120,15 +120,15 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want the work TUI and summary screen to show token usage (input/output tokens) per task and cumulative for the run, so I can monitor how much each session costs.
 
 **Acceptance Criteria:**
-- [ ] The `streamEvent` struct in `src/internal/runner/runner.go` is extended to parse a `usage` field from `result` events. Claude Code's stream-json `result` event includes `"usage": {"input_tokens": N, "output_tokens": N}` — this data is currently ignored
-- [ ] New message type `UsageMsg` with `InputTokens` and `OutputTokens` fields, sent to the TUI when a `result` event contains usage data
-- [ ] The TUI model in `runner/tui.go` tracks per-iteration usage and cumulative usage across all iterations
-- [ ] The work TUI displays cumulative token usage in the header or status area (e.g., "Tokens: 12.3k in / 8.1k out")
-- [ ] Token counts are formatted with `k` suffix for thousands (e.g., `1500` → `1.5k`, `234` → `234`)
-- [ ] The post-completion summary screen (TASK-003) displays: total input tokens, total output tokens, and per-task breakdown
-- [ ] If Claude Code does not return usage data (e.g., older CLI version), the TUI gracefully shows "N/A" instead of zeros
-- [ ] Unit tests for token formatting helper and usage accumulation
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] The `streamEvent` struct in `src/internal/runner/runner.go` is extended to parse a `usage` field from `result` events. Claude Code's stream-json `result` event includes `"usage": {"input_tokens": N, "output_tokens": N}` — this data is currently ignored
+- [x] New message type `UsageMsg` with `InputTokens` and `OutputTokens` fields, sent to the TUI when a `result` event contains usage data
+- [x] The TUI model in `runner/tui.go` tracks per-iteration usage and cumulative usage across all iterations
+- [x] The work TUI displays cumulative token usage in the header or status area (e.g., "Tokens: 12.3k in / 8.1k out")
+- [x] Token counts are formatted with `k` suffix for thousands (e.g., `1500` → `1.5k`, `234` → `234`)
+- [x] The post-completion summary screen (TASK-003) displays: total input tokens, total output tokens, and per-task breakdown
+- [x] If Claude Code does not return usage data (e.g., older CLI version), the TUI gracefully shows "N/A" instead of zeros
+- [x] Unit tests for token formatting helper and usage accumulation
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-009: Update existing `work` TUI styles to use shared package
 **Description:** As a developer, I want the existing `runner/tui.go` to use the shared style package so there's one source of truth for visual styling.

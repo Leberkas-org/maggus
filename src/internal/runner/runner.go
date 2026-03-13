@@ -23,6 +23,12 @@ type streamEvent struct {
 	Subtype string          `json:"subtype"`
 	Message json.RawMessage `json:"message"`
 	Result  string          `json:"result"`
+	Usage   *streamUsage    `json:"usage,omitempty"`
+}
+
+type streamUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 type assistantMessage struct {
@@ -158,6 +164,12 @@ func RunClaude(ctx context.Context, prompt string, model string, p *tea.Program)
 				}
 
 			case "result":
+				if event.Usage != nil {
+					p.Send(UsageMsg{
+						InputTokens:  event.Usage.InputTokens,
+						OutputTokens: event.Usage.OutputTokens,
+					})
+				}
 				if event.Subtype == "success" {
 					p.Send(StatusMsg{Status: "Done"})
 				} else {

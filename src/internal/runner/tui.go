@@ -54,6 +54,20 @@ type CommitMsg struct {
 	Message string
 }
 
+// UsageMsg is sent when a result event contains token usage data.
+type UsageMsg struct {
+	InputTokens  int
+	OutputTokens int
+}
+
+// TaskUsage records token usage for a single task/iteration.
+type TaskUsage struct {
+	TaskID       string
+	TaskTitle    string
+	InputTokens  int
+	OutputTokens int
+}
+
 // InfoMsg displays an informational message in the TUI.
 type InfoMsg struct {
 	Text string
@@ -112,6 +126,19 @@ type BannerInfo struct {
 	Worktree   string // empty if not using worktree
 }
 
+// FormatTokens formats a token count with a `k` suffix for thousands.
+// e.g., 234 → "234", 1500 → "1.5k", 12345 → "12.3k"
+func FormatTokens(n int) string {
+	if n < 1000 {
+		return fmt.Sprintf("%d", n)
+	}
+	v := float64(n) / 1000.0
+	// Use one decimal place, but drop trailing zero (e.g., 2.0k → "2k")
+	s := fmt.Sprintf("%.1f", v)
+	s = strings.TrimSuffix(s, ".0")
+	return s + "k"
+}
+
 // tuiModel is the bubbletea model that replaces the old display struct.
 type tuiModel struct {
 	// Header fields
@@ -137,6 +164,14 @@ type tuiModel struct {
 
 	// Recent commits
 	commits []string
+
+	// Token usage tracking
+	iterInputTokens  int // current iteration input tokens
+	iterOutputTokens int // current iteration output tokens
+	totalInputTokens  int // cumulative input tokens
+	totalOutputTokens int // cumulative output tokens
+	hasUsageData     bool // true if any usage data was received
+	taskUsages       []TaskUsage // per-task usage history
 
 	status      string
 	toolHistory []string
@@ -211,6 +246,15 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case SummaryMsg:
+		// Save last iteration's usage before transitioning to summary.
+		if m.taskID != "" && (m.iterInputTokens > 0 || m.iterOutputTokens > 0) {
+			m.taskUsages = append(m.taskUsages, TaskUsage{
+				TaskID:       m.taskID,
+				TaskTitle:    m.taskTitle,
+				InputTokens:  m.iterInputTokens,
+				OutputTokens: m.iterOutputTokens,
+			})
+		}
 		m.showSummary = true
 		m.summary = msg.Data
 		m.pushStatus = "Pushing to remote..."
@@ -228,7 +272,25 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InfoMsg:
 		m.infoMessages = append(m.infoMessages, msg.Text)
 
+	case UsageMsg:
+		m.iterInputTokens += msg.InputTokens
+		m.iterOutputTokens += msg.OutputTokens
+		m.totalInputTokens += msg.InputTokens
+		m.totalOutputTokens += msg.OutputTokens
+		if msg.InputTokens > 0 || msg.OutputTokens > 0 {
+			m.hasUsageData = true
+		}
+
 	case IterationStartMsg:
+		// Save previous iteration's usage before resetting.
+		if m.taskID != "" && (m.iterInputTokens > 0 || m.iterOutputTokens > 0) {
+			m.taskUsages = append(m.taskUsages, TaskUsage{
+				TaskID:       m.taskID,
+				TaskTitle:    m.taskTitle,
+				InputTokens:  m.iterInputTokens,
+				OutputTokens: m.iterOutputTokens,
+			})
+		}
 		m.currentIter = msg.Current
 		m.totalIters = msg.Total
 		m.taskID = msg.TaskID
@@ -241,6 +303,8 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.extras = ""
 		m.skills = nil
 		m.mcps = nil
+		m.iterInputTokens = 0
+		m.iterOutputTokens = 0
 		m.startTime = time.Now()
 
 	case StatusMsg:
@@ -387,6 +451,27 @@ func (m tuiModel) renderSummaryView() string {
 		labelStyle.Render("Tasks:"),
 		lipgloss.NewStyle().Foreground(styles.Success).Render(
 			fmt.Sprintf("%d/%d completed", m.summary.TasksCompleted, m.summary.TasksTotal))))
+
+	// Token usage totals
+	if m.hasUsageData {
+		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render(tokenStr)))
+	} else {
+		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render("N/A")))
+	}
+
+	// Per-task token breakdown
+	if len(m.taskUsages) > 0 {
+		content.WriteString("\n")
+		content.WriteString(styles.Subtitle.Render("Token Usage") + "\n")
+		for _, tu := range m.taskUsages {
+			content.WriteString(fmt.Sprintf("  %s %s  %s in / %s out\n",
+				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
+				fmt.Sprintf("%-12s", tu.TaskID),
+				FormatTokens(tu.InputTokens),
+				FormatTokens(tu.OutputTokens)))
+		}
+	}
 
 	// Commit range and list
 	if len(m.commits) > 0 {
@@ -543,6 +628,14 @@ func (m tuiModel) renderView() string {
 	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(truncate(extrasStr, contentWidth))))
 	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
 	b.WriteString(fmt.Sprintf("    %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+
+	// Token usage
+	if m.hasUsageData {
+		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+	} else {
+		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+	}
 
 	// Recent commits section
 	if len(m.commits) > 0 {
