@@ -57,10 +57,10 @@ Worktrees are session-based: one worktree is created per `maggus work` run, used
 **Description:** As a developer, I want `.maggus-work/` automatically added to `.gitignore` so worktree directories are never committed.
 
 **Acceptance Criteria:**
-- [ ] `src/internal/gitignore/gitignore.go` includes `.maggus-work/` in its required entries list
-- [ ] Existing `EnsureEntries` function handles the new entry without changes to its API
-- [ ] When `maggus work` runs (with or without worktree mode), `.maggus-work/` is present in `.gitignore`
-- [ ] Unit tests verify the new entry is added
+- [x] `src/internal/gitignore/gitignore.go` includes `.maggus-work/` in its required entries list
+- [x] Existing `EnsureEntries` function handles the new entry without changes to its API
+- [x] When `maggus work` runs (with or without worktree mode), `.maggus-work/` is present in `.gitignore`
+- [x] Unit tests verify the new entry is added
 
 ### TASK-005: Integrate worktree lifecycle into the work loop
 **Description:** As a user running `maggus work --worktree`, I want the work loop to create a worktree at the start of the session, run all iterations inside it, push the branch, and clean up the worktree when done.
