@@ -7,40 +7,18 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // Message types for the bubbletea model.
+// Agent-produced types (StatusMsg, OutputMsg, ToolMsg, SkillMsg, MCPMsg, UsageMsg)
+// are defined in the agent package.
 
 // ProgressMsg is sent when iteration progress changes.
 type ProgressMsg struct {
 	Current int
 	Total   int
-}
-
-// ToolMsg is sent when a new tool use is detected.
-type ToolMsg struct {
-	Description string
-}
-
-// OutputMsg is sent when new assistant text output arrives.
-type OutputMsg struct {
-	Text string
-}
-
-// StatusMsg is sent when the status changes (e.g. "Thinking...", "Running tool", "Done").
-type StatusMsg struct {
-	Status string
-}
-
-// SkillMsg is sent when a skill is used.
-type SkillMsg struct {
-	Name string
-}
-
-// MCPMsg is sent when an MCP tool is used.
-type MCPMsg struct {
-	Name string
 }
 
 // TaskInfoMsg is sent when the current task changes.
@@ -52,12 +30,6 @@ type TaskInfoMsg struct {
 // CommitMsg is sent when a commit completes, to display in the recent commits section.
 type CommitMsg struct {
 	Message string
-}
-
-// UsageMsg is sent when a result event contains token usage data.
-type UsageMsg struct {
-	InputTokens  int
-	OutputTokens int
 }
 
 // TaskUsage records token usage for a single task/iteration.
@@ -273,7 +245,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InfoMsg:
 		m.infoMessages = append(m.infoMessages, msg.Text)
 
-	case UsageMsg:
+	case agent.UsageMsg:
 		m.iterInputTokens += msg.InputTokens
 		m.iterOutputTokens += msg.OutputTokens
 		m.totalInputTokens += msg.InputTokens
@@ -308,10 +280,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.iterOutputTokens = 0
 		m.startTime = time.Now()
 
-	case StatusMsg:
+	case agent.StatusMsg:
 		m.status = msg.Status
 
-	case OutputMsg:
+	case agent.OutputMsg:
 		text := strings.TrimSpace(msg.Text)
 		if idx := strings.LastIndex(text, "\n"); idx >= 0 {
 			text = strings.TrimSpace(text[idx+1:])
@@ -320,14 +292,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = text
 		}
 
-	case ToolMsg:
+	case agent.ToolMsg:
 		m.toolHistory = append(m.toolHistory, msg.Description)
 		if len(m.toolHistory) > maxToolHistory {
 			m.toolHistory = m.toolHistory[len(m.toolHistory)-maxToolHistory:]
 		}
 		m.toolCount++
 
-	case SkillMsg:
+	case agent.SkillMsg:
 		for _, s := range m.skills {
 			if s == msg.Name {
 				return m, nil
@@ -336,7 +308,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.skills = append(m.skills, msg.Name)
 		m.rebuildExtras()
 
-	case MCPMsg:
+	case agent.MCPMsg:
 		for _, s := range m.mcps {
 			if s == msg.Name {
 				return m, nil

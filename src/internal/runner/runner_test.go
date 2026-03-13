@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -25,32 +26,43 @@ func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
 }
 
 func TestErrInterruptedMessage(t *testing.T) {
-	if ErrInterrupted.Error() != "interrupted by user" {
-		t.Fatalf("unexpected error message: %s", ErrInterrupted.Error())
+	if agent.ErrInterrupted.Error() != "interrupted by user" {
+		t.Fatalf("unexpected error message: %s", agent.ErrInterrupted.Error())
 	}
 }
 
 func TestDescribeToolUse(t *testing.T) {
-	tests := []struct {
+	// toolInput and describeToolUse are now in the agent package.
+	cases := []struct {
 		tool   string
-		input  toolInput
+		desc   string
+		cmd    string
+		fp     string
+		pat    string
+		skill  string
 		expect string
 	}{
-		{"Bash", toolInput{Description: "run tests"}, "Bash: run tests"},
-		{"Bash", toolInput{Command: "go test ./..."}, "Bash: go test ./..."},
-		{"Read", toolInput{FilePath: "/foo/bar.go"}, "Read: /foo/bar.go"},
-		{"Edit", toolInput{FilePath: "/foo/bar.go"}, "Edit: /foo/bar.go"},
-		{"Write", toolInput{FilePath: "/foo/bar.go"}, "Write: /foo/bar.go"},
-		{"Glob", toolInput{Pattern: "**/*.go"}, "Glob: **/*.go"},
-		{"Grep", toolInput{Pattern: "TODO"}, "Grep: TODO"},
-		{"Skill", toolInput{Skill: "commit"}, "Skill: commit"},
-		{"mcp__myserver__mytool", toolInput{}, "MCP myserver: mytool"},
-		{"UnknownTool", toolInput{}, "UnknownTool"},
+		{tool: "Bash", desc: "run tests", expect: "Bash: run tests"},
+		{tool: "Bash", cmd: "go test ./...", expect: "Bash: go test ./..."},
+		{tool: "Read", fp: "/foo/bar.go", expect: "Read: /foo/bar.go"},
+		{tool: "Edit", fp: "/foo/bar.go", expect: "Edit: /foo/bar.go"},
+		{tool: "Write", fp: "/foo/bar.go", expect: "Write: /foo/bar.go"},
+		{tool: "Glob", pat: "**/*.go", expect: "Glob: **/*.go"},
+		{tool: "Grep", pat: "TODO", expect: "Grep: TODO"},
+		{tool: "Skill", skill: "commit", expect: "Skill: commit"},
+		{tool: "mcp__myserver__mytool", expect: "MCP myserver: mytool"},
+		{tool: "UnknownTool", expect: "UnknownTool"},
 	}
-	for _, tt := range tests {
-		got := describeToolUse(tt.tool, tt.input)
+	for _, tt := range cases {
+		got := agent.DescribeToolUse(tt.tool, agent.ToolInput{
+			Description: tt.desc,
+			Command:     tt.cmd,
+			FilePath:    tt.fp,
+			Pattern:     tt.pat,
+			Skill:       tt.skill,
+		})
 		if got != tt.expect {
-			t.Errorf("describeToolUse(%q, ...) = %q, want %q", tt.tool, got, tt.expect)
+			t.Errorf("DescribeToolUse(%q, ...) = %q, want %q", tt.tool, got, tt.expect)
 		}
 	}
 }
@@ -89,7 +101,6 @@ func TestFormatTokens(t *testing.T) {
 func TestUsageAccumulation(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
 
-	// Initially no usage data
 	if m.hasUsageData {
 		t.Error("expected hasUsageData to be false initially")
 	}
@@ -97,12 +108,10 @@ func TestUsageAccumulation(t *testing.T) {
 		t.Error("expected zero tokens initially")
 	}
 
-	// Start first iteration
 	updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 2, TaskID: "TASK-001", TaskTitle: "First task"})
 	m = updated.(tuiModel)
 
-	// Receive usage data
-	updated, _ = m.Update(UsageMsg{InputTokens: 1000, OutputTokens: 500})
+	updated, _ = m.Update(agent.UsageMsg{InputTokens: 1000, OutputTokens: 500})
 	m = updated.(tuiModel)
 
 	if !m.hasUsageData {
@@ -115,7 +124,6 @@ func TestUsageAccumulation(t *testing.T) {
 		t.Errorf("total tokens: got %d/%d, want 1000/500", m.totalInputTokens, m.totalOutputTokens)
 	}
 
-	// Start second iteration — should save first task's usage
 	updated, _ = m.Update(IterationStartMsg{Current: 2, Total: 2, TaskID: "TASK-002", TaskTitle: "Second task"})
 	m = updated.(tuiModel)
 
@@ -132,16 +140,13 @@ func TestUsageAccumulation(t *testing.T) {
 		t.Error("expected iter tokens reset to 0 after new iteration")
 	}
 
-	// Receive usage for second iteration
-	updated, _ = m.Update(UsageMsg{InputTokens: 2000, OutputTokens: 800})
+	updated, _ = m.Update(agent.UsageMsg{InputTokens: 2000, OutputTokens: 800})
 	m = updated.(tuiModel)
 
-	// Cumulative should reflect both iterations
 	if m.totalInputTokens != 3000 || m.totalOutputTokens != 1300 {
 		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.totalInputTokens, m.totalOutputTokens)
 	}
 
-	// Summary should save last iteration's usage
 	updated, _ = m.Update(SummaryMsg{Data: SummaryData{TasksCompleted: 2, TasksTotal: 2}})
 	m = updated.(tuiModel)
 
@@ -156,11 +161,9 @@ func TestUsageAccumulation(t *testing.T) {
 func TestUsageNAWhenNoData(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
 
-	// Start an iteration with no usage data sent
 	updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-001", TaskTitle: "Test"})
 	m = updated.(tuiModel)
 
-	// The view should contain "N/A" when no usage data received
 	view := m.renderView()
 	if !contains(view, "N/A") {
 		t.Error("expected 'N/A' in view when no usage data received")

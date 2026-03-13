@@ -32,15 +32,15 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a developer, I want the existing Claude Code invocation logic extracted into an adapter that implements the `Agent` interface.
 
 **Acceptance Criteria:**
-- [ ] New file `internal/agent/claude.go` implementing the `Agent` interface for Claude Code
-- [ ] All logic from `runner.RunClaude` and `runner.RunOnce` is moved into the adapter — the runner package becomes a thin wrapper or is replaced
-- [ ] Executable lookup uses `exec.LookPath("claude")`
-- [ ] CLI flags: `-p`, `--output-format stream-json`, `--verbose`, `--dangerously-skip-permissions`, `--model` (conditional)
-- [ ] Streaming JSON parsing handles Claude Code's event schema (`type: "assistant"`, `type: "result"`, usage, tool_use blocks) exactly as today
-- [ ] The `describeToolUse` helper and tool-name mappings (Bash, Read, Edit, Write, Glob, Grep, Skill, MCP) remain functional
-- [ ] Process management (Windows `taskkill` / Unix `Kill`, `WaitDelay`, `setProcAttr`) is preserved
-- [ ] Existing tests still pass — `go test ./...`
-- [ ] Typecheck/lint passes
+- [x] New file `internal/agent/claude.go` implementing the `Agent` interface for Claude Code
+- [x] All logic from `runner.RunClaude` and `runner.RunOnce` is moved into the adapter — the runner package becomes a thin wrapper or is replaced
+- [x] Executable lookup uses `exec.LookPath("claude")`
+- [x] CLI flags: `-p`, `--output-format stream-json`, `--verbose`, `--dangerously-skip-permissions`, `--model` (conditional)
+- [x] Streaming JSON parsing handles Claude Code's event schema (`type: "assistant"`, `type: "result"`, usage, tool_use blocks) exactly as today
+- [x] The `describeToolUse` helper and tool-name mappings (Bash, Read, Edit, Write, Glob, Grep, Skill, MCP) remain functional
+- [x] Process management (Windows `taskkill` / Unix `Kill`, `WaitDelay`, `setProcAttr`) is preserved
+- [x] Existing tests still pass — `go test ./...`
+- [x] Typecheck/lint passes
 
 ### TASK-003: Implement the OpenCode adapter
 
