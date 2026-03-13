@@ -19,17 +19,17 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a developer, I want a shared style package with reusable lipgloss styles, color palette, and layout helpers so that all commands have a consistent visual language.
 
 **Acceptance Criteria:**
-- [ ] New package at `src/internal/tui/styles/styles.go`
-- [ ] Defines a color palette with named constants: `Primary` (cyan), `Success` (green), `Warning` (yellow), `Error` (red), `Muted` (gray), `Accent` (blue/purple)
-- [ ] Provides reusable lipgloss styles: `Title`, `Subtitle`, `Label`, `Value`, `Separator`, `Box`, `StatusBar`
-- [ ] `Title` style: bold, primary color, used for section headers
-- [ ] `Box` style: bordered box using lipgloss.Border for framing content sections
-- [ ] `Separator(width int) string` helper that renders a styled horizontal rule
-- [ ] `ProgressBar(done, total, width int) string` helper that renders a styled progress bar (replacing the duplicated implementations in status.go and tui.go)
-- [ ] `Truncate(text string, maxWidth int) string` helper (replacing the local `truncate` in tui.go)
-- [ ] Removes the raw ANSI escape code constants from `src/cmd/status.go` (`colorGreen`, `colorCyan`, etc.) — all styling goes through lipgloss
-- [ ] Unit tests for ProgressBar and Truncate helpers
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] New package at `src/internal/tui/styles/styles.go`
+- [x] Defines a color palette with named constants: `Primary` (cyan), `Success` (green), `Warning` (yellow), `Error` (red), `Muted` (gray), `Accent` (blue/purple)
+- [x] Provides reusable lipgloss styles: `Title`, `Subtitle`, `Label`, `Value`, `Separator`, `Box`, `StatusBar`
+- [x] `Title` style: bold, primary color, used for section headers
+- [x] `Box` style: bordered box using lipgloss.Border for framing content sections
+- [x] `Separator(width int) string` helper that renders a styled horizontal rule
+- [x] `ProgressBar(done, total, width int) string` helper that renders a styled progress bar (replacing the duplicated implementations in status.go and tui.go)
+- [x] `Truncate(text string, maxWidth int) string` helper (replacing the local `truncate` in tui.go)
+- [x] Removes the raw ANSI escape code constants from `src/cmd/status.go` (`colorGreen`, `colorCyan`, etc.) — all styling goes through lipgloss
+- [x] Unit tests for ProgressBar and Truncate helpers
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-002: Refactor `work` TUI — remove countdown, capture all output
 **Description:** As a user, I want `maggus work` to start immediately (no 3-second countdown) and never show raw git output, so the experience is clean from start to finish.

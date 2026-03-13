@@ -6,23 +6,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 
 	"github.com/spf13/cobra"
 )
 
-const (
-	colorGreen  = "\033[32m"
-	colorCyan   = "\033[36m"
-	colorYellow = "\033[33m"
-	colorRed    = "\033[31m"
-	colorBlue   = "\033[34m"
-	colorDim    = "\033[2m"
-	colorReset  = "\033[0m"
+const progressBarWidth = 10
 
-	progressBarWidth = 10
-	progressBarFull  = '█'
-	progressBarEmpty = '░'
+// Lipgloss styles for the status command.
+var (
+	statusGreenStyle  = lipgloss.NewStyle().Foreground(styles.Success)
+	statusCyanStyle   = lipgloss.NewStyle().Foreground(styles.Primary)
+	statusYellowStyle = lipgloss.NewStyle().Foreground(styles.Warning)
+	statusRedStyle    = lipgloss.NewStyle().Foreground(styles.Error)
+	statusBlueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	statusDimStyle    = lipgloss.NewStyle().Faint(true)
+	statusDimGreen    = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
 )
 
 type planInfo struct {
@@ -52,21 +53,11 @@ func (p *planInfo) blockedCount() int {
 }
 
 func buildProgressBar(done, total int) string {
-	if total == 0 {
-		return strings.Repeat(string(progressBarEmpty), progressBarWidth)
-	}
-	filled := (done * progressBarWidth) / total
-	return strings.Repeat(string(progressBarFull), filled) +
-		strings.Repeat(string(progressBarEmpty), progressBarWidth-filled)
+	return styles.ProgressBar(done, total, progressBarWidth)
 }
 
 func buildProgressBarPlain(done, total int) string {
-	if total == 0 {
-		return strings.Repeat(".", progressBarWidth)
-	}
-	filled := (done * progressBarWidth) / total
-	return strings.Repeat("#", filled) +
-		strings.Repeat(".", progressBarWidth-filled)
+	return styles.ProgressBarPlain(done, total, progressBarWidth)
 }
 
 var statusCmd = &cobra.Command{
@@ -83,12 +74,12 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
-		// Helper: returns color codes only when not in plain mode
-		color := func(code string) string {
+		// Helper: applies a lipgloss style only when not in plain mode.
+		render := func(s lipgloss.Style, text string) string {
 			if plain {
-				return ""
+				return text
 			}
-			return code
+			return s.Render(text)
 		}
 
 		dir, err := os.Getwd()
@@ -166,14 +157,15 @@ var statusCmd = &cobra.Command{
 			}
 			fmt.Println()
 			if p.completed {
-				fmt.Printf("%s%s Tasks — %s (archived)%s\n", color(colorDim), color(colorGreen), p.filename, color(colorReset))
+				fmt.Println(render(statusDimGreen, fmt.Sprintf(" Tasks — %s (archived)", p.filename)))
 			} else {
 				fmt.Printf(" Tasks — %s\n", p.filename)
 			}
 			fmt.Println(" ──────────────────────────────────────────")
 
 			for _, t := range p.tasks {
-				var icon, clr, prefix string
+				var icon, prefix string
+				var style lipgloss.Style
 
 				if t.IsComplete() {
 					if plain {
@@ -182,9 +174,9 @@ var statusCmd = &cobra.Command{
 						icon = "✓"
 					}
 					if p.completed {
-						clr = color(colorDim + colorGreen)
+						style = statusDimGreen
 					} else {
-						clr = color(colorGreen)
+						style = statusGreenStyle
 					}
 					prefix = "  "
 				} else if t.IsBlocked() {
@@ -193,11 +185,11 @@ var statusCmd = &cobra.Command{
 					} else {
 						icon = "⚠"
 					}
-					clr = color(colorRed)
+					style = statusRedStyle
 					prefix = "  "
 				} else if t.ID == nextTaskID && t.SourceFile == nextTaskFile {
 					icon = "o"
-					clr = color(colorCyan)
+					style = statusCyanStyle
 					if plain {
 						prefix = "-> "
 					} else {
@@ -205,15 +197,16 @@ var statusCmd = &cobra.Command{
 					}
 				} else {
 					icon = "o"
-					clr = ""
+					style = lipgloss.NewStyle()
 					prefix = "  "
 				}
 
 				if p.completed {
-					clr = color(colorDim)
+					style = statusDimStyle
 				}
 
-				fmt.Printf(" %s%s%s  %s: %s%s\n", clr, prefix, icon, t.ID, t.Title, color(colorReset))
+				line := fmt.Sprintf(" %s%s  %s: %s", prefix, icon, t.ID, t.Title)
+				fmt.Println(render(style, line))
 
 				if t.IsBlocked() && !p.completed {
 					for _, c := range t.Criteria {
@@ -222,11 +215,8 @@ var statusCmd = &cobra.Command{
 						}
 						reason := strings.TrimPrefix(c.Text, "⚠️ BLOCKED: ")
 						reason = strings.TrimPrefix(reason, "BLOCKED: ")
-						if plain {
-							fmt.Printf("         BLOCKED: %s\n", reason)
-						} else {
-							fmt.Printf("         %sBLOCKED: %s%s\n", color(colorRed), reason, color(colorReset))
-						}
+						blockedLine := fmt.Sprintf("         BLOCKED: %s", reason)
+						fmt.Println(render(statusRedStyle, blockedLine))
 					}
 				}
 			}
@@ -265,7 +255,8 @@ var statusCmd = &cobra.Command{
 				bar = buildProgressBar(done, total)
 			}
 
-			var prefix, clr, suffix string
+			var prefix, suffix string
+			var style lipgloss.Style
 
 			if p.completed {
 				if plain {
@@ -273,29 +264,29 @@ var statusCmd = &cobra.Command{
 				} else {
 					prefix = " ✓ "
 				}
-				clr = color(colorDim + colorGreen)
+				style = statusDimGreen
 				suffix = "done"
 			} else if p.blockedCount() > 0 {
 				prefix = "   "
-				clr = color(colorRed)
+				style = statusRedStyle
 				suffix = "blocked"
 			} else if total > 0 && done == total {
 				prefix = "   "
-				clr = color(colorGreen)
+				style = statusGreenStyle
 				suffix = "done"
 			} else if done == 0 {
 				prefix = "   "
-				clr = color(colorBlue)
+				style = statusBlueStyle
 				suffix = "new"
 			} else {
 				prefix = "   "
-				clr = color(colorYellow)
+				style = statusYellowStyle
 				suffix = "in progress"
 			}
 
 			countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
-			fmt.Printf("%s%s%-32s [%s]  %s   %s%s\n",
-				clr, prefix, p.filename, bar, countStr, suffix, color(colorReset))
+			line := fmt.Sprintf("%s%-32s [%s]  %s   %s", prefix, p.filename, bar, countStr, suffix)
+			fmt.Println(render(style, line))
 		}
 
 		return nil
