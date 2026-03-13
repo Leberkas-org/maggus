@@ -16,6 +16,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitignore"
+	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
@@ -94,6 +95,9 @@ Examples:
 			modelInput = modelFlag
 		}
 		resolvedModel := config.ResolveModel(modelInput)
+
+		// Create notifier for sound notifications.
+		notifier := notify.New(cfg.Notifications)
 
 		// Resolve worktree mode: --no-worktree > --worktree > config > default (false)
 		useWorktree := cfg.Worktree
@@ -290,6 +294,7 @@ Examples:
 					if workCtx.Err() != nil {
 						break
 					}
+					notifier.PlayError()
 					workErr = fmt.Errorf("task %s failed: %w", next.ID, err)
 					return
 				}
@@ -326,6 +331,7 @@ Examples:
 				}
 				if commitResult.Committed {
 					p.Send(runner.CommitMsg{Message: commitResult.Message})
+					notifier.PlayTaskComplete()
 				}
 
 				// Release task lock after successful commit.
@@ -371,6 +377,9 @@ Examples:
 				CommitEnd:      endHash,
 				RemainingTasks: remaining,
 			}
+
+			// Notify run complete.
+			notifier.PlayRunComplete()
 
 			// Show summary view, then push in the background.
 			p.Send(runner.SummaryMsg{Data: summaryData})

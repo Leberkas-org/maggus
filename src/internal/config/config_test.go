@@ -199,6 +199,73 @@ include:
 	}
 }
 
+func TestLoad_WithNotifications(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `model: sonnet
+notifications:
+  sound: true
+  on_task_complete: true
+  on_run_complete: false
+  on_error: true
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.Notifications.Sound {
+		t.Error("expected Sound to be true")
+	}
+	if !cfg.Notifications.IsTaskCompleteEnabled() {
+		t.Error("expected task complete to be enabled")
+	}
+	if cfg.Notifications.IsRunCompleteEnabled() {
+		t.Error("expected run complete to be disabled")
+	}
+	if !cfg.Notifications.IsErrorEnabled() {
+		t.Error("expected error to be enabled")
+	}
+}
+
+func TestLoad_NotificationsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Notifications.Sound {
+		t.Error("expected Sound to default to false")
+	}
+	if cfg.Notifications.IsTaskCompleteEnabled() {
+		t.Error("expected task complete to be disabled when sound is false")
+	}
+	if cfg.Notifications.IsRunCompleteEnabled() {
+		t.Error("expected run complete to be disabled when sound is false")
+	}
+	if cfg.Notifications.IsErrorEnabled() {
+		t.Error("expected error to be disabled when sound is false")
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

@@ -99,8 +99,8 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want optional sound notifications when tasks complete, runs finish, or errors occur, so I can walk away and be alerted.
 
 **Acceptance Criteria:**
-- [ ] New package at `src/internal/notify/notify.go`
-- [ ] `Config` struct in `src/internal/config/config.go` gains a `Notifications` section:
+- [x] New package at `src/internal/notify/notify.go`
+- [x] `Config` struct in `src/internal/config/config.go` gains a `Notifications` section:
   ```yaml
   notifications:
     sound: false           # master toggle (default: false)
@@ -108,13 +108,13 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
     on_run_complete: true   # play sound when run finishes (default: true when sound is enabled)
     on_error: true          # play sound on errors (default: true when sound is enabled)
   ```
-- [ ] The `notify` package provides `PlayTaskComplete()`, `PlayRunComplete()`, and `PlayError()` functions
-- [ ] Sound is played by writing a BEL character (`\a`) to the terminal — this is cross-platform (Windows, macOS, Linux) and requires no external dependencies or sound files
-- [ ] Each function checks the config before playing — if disabled, it's a no-op
-- [ ] The work loop calls `PlayTaskComplete()` after each successful commit, `PlayRunComplete()` when the run finishes, and `PlayError()` on task failures
-- [ ] When `sound: false` (the default), no sound is ever played
-- [ ] Unit tests verify that notification functions respect the config toggle
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] The `notify` package provides `PlayTaskComplete()`, `PlayRunComplete()`, and `PlayError()` functions
+- [x] Sound is played by writing a BEL character (`\a`) to the terminal — this is cross-platform (Windows, macOS, Linux) and requires no external dependencies or sound files
+- [x] Each function checks the config before playing — if disabled, it's a no-op
+- [x] The work loop calls `PlayTaskComplete()` after each successful commit, `PlayRunComplete()` when the run finishes, and `PlayError()` on task failures
+- [x] When `sound: false` (the default), no sound is ever played
+- [x] Unit tests verify that notification functions respect the config toggle
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-008: Parse and track token usage from Claude Code output
 **Description:** As a user, I want the work TUI and summary screen to show token usage (input/output tokens) per task and cumulative for the run, so I can monitor how much each session costs.
