@@ -173,10 +173,10 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a visitor, I want the homepage and site metadata to reflect that Maggus supports multiple AI agents, not just Claude Code.
 
 **Acceptance Criteria:**
-- [ ] `docs/.vitepress/config.ts` description is updated to mention multi-agent support (e.g., "AI-powered task automation CLI that orchestrates AI coding agents to work through implementation plans")
-- [ ] `docs/index.md` homepage is updated: hero description and feature bullets mention support for Claude Code and OpenCode
-- [ ] No breaking changes to existing navigation or links
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] `docs/.vitepress/config.ts` description is updated to mention multi-agent support (e.g., "AI-powered task automation CLI that orchestrates AI coding agents to work through implementation plans")
+- [x] `docs/index.md` homepage is updated: hero description and feature bullets mention support for Claude Code and OpenCode
+- [x] No breaking changes to existing navigation or links
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ## Functional Requirements
 

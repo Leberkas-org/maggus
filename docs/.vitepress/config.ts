@@ -4,7 +4,7 @@ export default defineConfig({
   base: '/',
   ignoreDeadLinks: true,
   title: 'Maggus',
-  description: 'AI-powered task automation CLI that orchestrates Claude Code to work through implementation plans',
+  description: 'AI-powered task automation CLI that orchestrates AI coding agents to work through implementation plans',
 
   themeConfig: {
     logo: '/avatar.png',
