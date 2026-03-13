@@ -43,15 +43,15 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
 **Description:** As a developer, I want a `release` package that can gather git history since the last tag and parse conventional commit messages so that `maggus release` has the data it needs.
 
 **Acceptance Criteria:**
-- [ ] New package at `src/internal/release/release.go`
-- [ ] `FindLastTag(dir string) (tag string, err error)` — runs `git describe --tags --abbrev=0` to find the most recent version tag; returns empty string if no tags exist
-- [ ] `CommitsSinceTag(dir, tag string) ([]Commit, error)` — runs `git log <tag>..HEAD --pretty=format:<format>` (or `git log --pretty=format:<format>` if no tag) and returns parsed commits
-- [ ] `Commit` struct contains: `Hash`, `Subject`, `Body`, `Type` (feat/fix/chore/etc., parsed from conventional commit prefix), `Scope` (optional, from parenthetical), `IsBreaking` (from `!` suffix or `BREAKING CHANGE:` in body)
-- [ ] `GroupByType(commits []Commit) map[string][]Commit` — groups commits by their conventional commit type
-- [ ] `FormatChangelog(groups map[string][]Commit, tag string) string` — formats the grouped commits into a markdown changelog section with headers like `### Features`, `### Bug Fixes`, etc.
-- [ ] Commits that don't follow conventional commit format are grouped under `### Other Changes`
-- [ ] Unit tests cover: tag finding, commit parsing, conventional commit type extraction, grouping, formatting
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] New package at `src/internal/release/release.go`
+- [x] `FindLastTag(dir string) (tag string, err error)` — runs `git describe --tags --abbrev=0` to find the most recent version tag; returns empty string if no tags exist
+- [x] `CommitsSinceTag(dir, tag string) ([]Commit, error)` — runs `git log <tag>..HEAD --pretty=format:<format>` (or `git log --pretty=format:<format>` if no tag) and returns parsed commits
+- [x] `Commit` struct contains: `Hash`, `Subject`, `Body`, `Type` (feat/fix/chore/etc., parsed from conventional commit prefix), `Scope` (optional, from parenthetical), `IsBreaking` (from `!` suffix or `BREAKING CHANGE:` in body)
+- [x] `GroupByType(commits []Commit) map[string][]Commit` — groups commits by their conventional commit type
+- [x] `FormatChangelog(groups map[string][]Commit, tag string) string` — formats the grouped commits into a markdown changelog section with headers like `### Features`, `### Bug Fixes`, etc.
+- [x] Commits that don't follow conventional commit format are grouped under `### Other Changes`
+- [x] Unit tests cover: tag finding, commit parsing, conventional commit type extraction, grouping, formatting
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-004: Implement `maggus release` command
 **Description:** As a user, I want to run `maggus release` to generate a `RELEASE.md` that combines a structured changelog with an AI-generated summary of all changes since the last version tag.
