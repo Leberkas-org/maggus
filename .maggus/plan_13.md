@@ -126,11 +126,11 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a new user, I want the Getting Started guide to explain that Maggus supports multiple agents and show how to set up either Claude Code or OpenCode.
 
 **Acceptance Criteria:**
-- [ ] Prerequisites section lists both Claude Code and OpenCode as supported backends, with links to their installation docs
-- [ ] A short section explains that Maggus defaults to Claude Code but can be switched to OpenCode via config or CLI flag
-- [ ] The "First Run" example still uses Claude Code as the default path (minimal change for simplicity)
-- [ ] A callout/tip box shows how to switch to OpenCode for users who prefer it
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] Prerequisites section lists both Claude Code and OpenCode as supported backends, with links to their installation docs
+- [x] A short section explains that Maggus defaults to Claude Code but can be switched to OpenCode via config or CLI flag
+- [x] The "First Run" example still uses Claude Code as the default path (minimal change for simplicity)
+- [x] A callout/tip box shows how to switch to OpenCode for users who prefer it
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-010: Update VitePress docs — CLI Commands reference
 
