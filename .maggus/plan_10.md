@@ -57,12 +57,12 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
 **Description:** As a user, I want to run `maggus release` to generate a `RELEASE.md` that combines a structured changelog with an AI-generated summary of all changes since the last version tag.
 
 **Acceptance Criteria:**
-- [ ] New Cobra command `release` registered in `src/cmd/release.go`
-- [ ] Uses the `release` package from TASK-003 to gather commits and generate the conventional changelog section
-- [ ] Reads `.maggus/RELEASE_NOTES.md` if it exists (the rough notes accumulated during work iterations)
-- [ ] Builds a prompt for Claude Code that includes: the conventional changelog, the rough release notes (if any), and the full diff summary (`git diff <tag>..HEAD --stat`)
-- [ ] Invokes Claude Code (via `runner.RunClaude` or a simpler one-shot invocation) with the prompt, asking it to produce: (1) a short highlights/summary section written for end users, and (2) any notable breaking changes or migration notes
-- [ ] Writes the final `RELEASE.md` to the repository root with this structure:
+- [x] New Cobra command `release` registered in `src/cmd/release.go`
+- [x] Uses the `release` package from TASK-003 to gather commits and generate the conventional changelog section
+- [x] Reads `.maggus/RELEASE_NOTES.md` if it exists (the rough notes accumulated during work iterations)
+- [x] Builds a prompt for Claude Code that includes: the conventional changelog, the rough release notes (if any), and the full diff summary (`git diff <tag>..HEAD --stat`)
+- [x] Invokes Claude Code (via `runner.RunClaude` or a simpler one-shot invocation) with the prompt, asking it to produce: (1) a short highlights/summary section written for end users, and (2) any notable breaking changes or migration notes
+- [x] Writes the final `RELEASE.md` to the repository root with this structure:
   ```
   # Release Notes
 
@@ -72,11 +72,11 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
   ## Changelog
   <conventional changelog from release package>
   ```
-- [ ] Accepts a `--model` flag (same alias resolution as `work`)
-- [ ] If no commits since the last tag, prints "No changes since last tag." and exits
-- [ ] After writing RELEASE.md, prints the path and a preview of the summary section
-- [ ] Unit tests cover: command registration, output format
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] Accepts a `--model` flag (same alias resolution as `work`)
+- [x] If no commits since the last tag, prints "No changes since last tag." and exits
+- [x] After writing RELEASE.md, prints the path and a preview of the summary section
+- [x] Unit tests cover: command registration, output format
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-005: Clear release notes after `maggus release`
 **Description:** As a user, I want `.maggus/RELEASE_NOTES.md` to be cleared after running `maggus release` so that notes don't carry over to the next release cycle.
