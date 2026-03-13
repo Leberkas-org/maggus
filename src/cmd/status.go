@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -61,9 +62,11 @@ func buildProgressBarPlain(done, total int) string {
 	return styles.ProgressBarPlain(done, total, progressBarWidth)
 }
 
-// statusModel is the bubbletea model for the status TUI.
+// statusModel is the bubbletea model for the status TUI with scrolling.
 type statusModel struct {
-	content string // pre-rendered status content
+	viewport viewport.Model
+	content  string // pre-rendered status content
+	ready    bool
 }
 
 func (m statusModel) Init() tea.Cmd {
@@ -72,21 +75,51 @@ func (m statusModel) Init() tea.Cmd {
 
 func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Reserve 1 line for the footer
+		m.viewport = viewport.New(msg.Width, msg.Height-1)
+		m.viewport.SetContent(m.content)
+		m.ready = true
+		return m, nil
 	case tea.KeyMsg:
-		// Any key exits
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
-		default:
-			return m, tea.Quit
+		case "home":
+			if m.ready {
+				m.viewport.GotoTop()
+				return m, nil
+			}
+		case "end":
+			if m.ready {
+				m.viewport.GotoBottom()
+				return m, nil
+			}
 		}
+	}
+
+	if m.ready {
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
 
 func (m statusModel) View() string {
-	footer := styles.StatusBar.Render("Press any key to exit")
-	return m.content + "\n" + footer + "\n"
+	if !m.ready {
+		return ""
+	}
+	footer := statusFooter(m.viewport)
+	return m.viewport.View() + "\n" + footer
+}
+
+func statusFooter(vp viewport.Model) string {
+	if vp.TotalLineCount() <= vp.Height {
+		return styles.StatusBar.Render("q/esc: exit")
+	}
+	pct := vp.ScrollPercent() * 100
+	return styles.StatusBar.Render(fmt.Sprintf("↑/↓: scroll · q/esc: exit · %.0f%%", pct))
 }
 
 // renderStatusContent builds the styled status output for the TUI.

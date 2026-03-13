@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -14,9 +15,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// listModel is the bubbletea model for the list TUI.
+// listModel is the bubbletea model for the list TUI with scrolling.
 type listModel struct {
-	content string // pre-rendered list content
+	viewport viewport.Model
+	content  string // pre-rendered list content
+	ready    bool
 }
 
 func (m listModel) Init() tea.Cmd {
@@ -24,16 +27,52 @@ func (m listModel) Init() tea.Cmd {
 }
 
 func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Reserve 1 line for the footer
+		m.viewport = viewport.New(msg.Width, msg.Height-1)
+		m.viewport.SetContent(m.content)
+		m.ready = true
+		return m, nil
 	case tea.KeyMsg:
-		return m, tea.Quit
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+		case "home":
+			if m.ready {
+				m.viewport.GotoTop()
+				return m, nil
+			}
+		case "end":
+			if m.ready {
+				m.viewport.GotoBottom()
+				return m, nil
+			}
+		}
+	}
+
+	if m.ready {
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
 
 func (m listModel) View() string {
-	footer := styles.StatusBar.Render("Press any key to exit")
-	return m.content + "\n" + footer + "\n"
+	if !m.ready {
+		return ""
+	}
+	footer := listFooter(m.viewport)
+	return m.viewport.View() + "\n" + footer
+}
+
+func listFooter(vp viewport.Model) string {
+	if vp.TotalLineCount() <= vp.Height {
+		return styles.StatusBar.Render("q/esc: exit")
+	}
+	pct := vp.ScrollPercent() * 100
+	return styles.StatusBar.Render(fmt.Sprintf("↑/↓: scroll · q/esc: exit · %.0f%%", pct))
 }
 
 // renderListContent builds the styled list output for the TUI.
