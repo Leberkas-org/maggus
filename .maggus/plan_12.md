@@ -40,8 +40,8 @@ When `maggus` is invoked without any subcommand in an interactive terminal, it c
 **Description:** As a user, I want to configure common options before launching a command so that I don't have to remember CLI flags.
 
 **Acceptance Criteria:**
-- [ ] After selecting a command that has common options, a sub-menu appears instead of immediately launching
-- [ ] Sub-menus for each command with options:
+- [x] After selecting a command that has common options, a sub-menu appears instead of immediately launching
+- [x] Sub-menus for each command with options:
   - `work`: option to set task count (1, 3, 5, 10, all) and worktree mode (on/off)
   - `list`: option to set count (5, 10, 20) or all, and plain mode (on/off)
   - `status`: option to toggle `--all` (show completed plans) and `--plain`
@@ -49,10 +49,10 @@ When `maggus` is invoked without any subcommand in an interactive terminal, it c
   - `clean`: no sub-menu, launches directly
   - `release`: no sub-menu, launches directly
   - `worktree`: sub-menu to pick `list` or `clean` subcommand
-- [ ] Each sub-menu item shows the current/default value
-- [ ] A "Run" option at the bottom of the sub-menu launches the command with selected options
-- [ ] `esc` in a sub-menu returns to the main menu without launching
-- [ ] Typecheck/lint passes
+- [x] Each sub-menu item shows the current/default value
+- [x] A "Run" option at the bottom of the sub-menu launches the command with selected options
+- [x] `esc` in a sub-menu returns to the main menu without launching
+- [x] Typecheck/lint passes
 
 ### TASK-004: Detect interactive terminal and fall back to help text
 **Description:** As a user piping maggus output or running in CI, I want the default help text instead of a TUI so that non-interactive usage is not broken.

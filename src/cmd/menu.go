@@ -26,6 +26,83 @@ var menuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 }
 
+// subMenuOption represents a configurable option in a command's sub-menu.
+type subMenuOption struct {
+	label   string
+	values  []string
+	current int // index into values
+}
+
+// subMenuDef defines the sub-menu for a command.
+type subMenuDef struct {
+	options []subMenuOption
+}
+
+// buildSubMenus returns sub-menu definitions keyed by command name.
+func buildSubMenus() map[string]subMenuDef {
+	return map[string]subMenuDef{
+		"work": {options: []subMenuOption{
+			{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
+			{label: "Worktree", values: []string{"off", "on"}, current: 0},
+		}},
+		"list": {options: []subMenuOption{
+			{label: "Count", values: []string{"5", "10", "20", "all"}, current: 0},
+			{label: "Plain", values: []string{"off", "on"}, current: 0},
+		}},
+		"status": {options: []subMenuOption{
+			{label: "All", values: []string{"off", "on"}, current: 0},
+			{label: "Plain", values: []string{"off", "on"}, current: 0},
+		}},
+		"worktree": {options: []subMenuOption{
+			{label: "Action", values: []string{"list", "clean"}, current: 0},
+		}},
+	}
+}
+
+// buildArgs converts the sub-menu selections into CLI args for the command.
+func buildArgs(cmdName string, opts []subMenuOption) []string {
+	switch cmdName {
+	case "work":
+		var args []string
+		// Tasks option
+		if opts[0].values[opts[0].current] == "all" {
+			args = append(args, "--count", "999")
+		} else {
+			args = append(args, "--count", opts[0].values[opts[0].current])
+		}
+		// Worktree option
+		if opts[1].values[opts[1].current] == "on" {
+			args = append(args, "--worktree")
+		}
+		return args
+	case "list":
+		var args []string
+		// Count option
+		if opts[0].values[opts[0].current] == "all" {
+			args = append(args, "--all")
+		} else {
+			args = append(args, "--count", opts[0].values[opts[0].current])
+		}
+		// Plain option
+		if opts[1].values[opts[1].current] == "on" {
+			args = append(args, "--plain")
+		}
+		return args
+	case "status":
+		var args []string
+		if opts[0].values[opts[0].current] == "on" {
+			args = append(args, "--all")
+		}
+		if opts[1].values[opts[1].current] == "on" {
+			args = append(args, "--plain")
+		}
+		return args
+	case "worktree":
+		return []string{opts[0].values[opts[0].current]}
+	}
+	return nil
+}
+
 // planSummary holds the aggregated plan statistics for the menu header.
 type planSummary struct {
 	plans   int
@@ -57,9 +134,23 @@ func loadPlanSummary() planSummary {
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
 	cursor   int
-	selected string // command name chosen by the user, empty if quit
+	selected string   // command name chosen by the user, empty if quit
+	args     []string // args to pass to the selected command
 	quitting bool
 	summary  planSummary
+
+	// Sub-menu state
+	inSubMenu    bool
+	subCursor    int // cursor within sub-menu (options + Run item)
+	subMenuDefs  map[string]subMenuDef
+	activeSubDef *subMenuDef // pointer to the active sub-menu definition (with live option state)
+}
+
+func newMenuModel(summary planSummary) menuModel {
+	return menuModel{
+		summary:     summary,
+		subMenuDefs: buildSubMenus(),
+	}
 }
 
 func (m menuModel) Init() tea.Cmd {
@@ -69,29 +160,119 @@ func (m menuModel) Init() tea.Cmd {
 func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "esc", "ctrl+c":
-			m.quitting = true
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			} else {
-				m.cursor = len(menuItems) - 1
-			}
-		case "down", "j":
-			if m.cursor < len(menuItems)-1 {
-				m.cursor++
-			} else {
-				m.cursor = 0
-			}
-		case "home":
-			m.cursor = 0
-		case "end":
+		if m.inSubMenu {
+			return m.updateSubMenu(msg)
+		}
+		return m.updateMainMenu(msg)
+	}
+	return m, nil
+}
+
+func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc", "ctrl+c":
+		m.quitting = true
+		return m, tea.Quit
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		} else {
 			m.cursor = len(menuItems) - 1
-		case "enter":
-			m.selected = menuItems[m.cursor].name
+		}
+	case "down", "j":
+		if m.cursor < len(menuItems)-1 {
+			m.cursor++
+		} else {
+			m.cursor = 0
+		}
+	case "home":
+		m.cursor = 0
+	case "end":
+		m.cursor = len(menuItems) - 1
+	case "enter":
+		name := menuItems[m.cursor].name
+		if def, ok := m.subMenuDefs[name]; ok {
+			// Deep copy the sub-menu def so each entry resets
+			copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
+			for i, opt := range def.options {
+				copied.options[i] = subMenuOption{
+					label:   opt.label,
+					values:  opt.values,
+					current: opt.current,
+				}
+			}
+			m.activeSubDef = &copied
+			m.inSubMenu = true
+			m.subCursor = 0
+			return m, nil
+		}
+		// No sub-menu — launch directly
+		m.selected = name
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	itemCount := len(m.activeSubDef.options) + 1 // options + Run
+
+	switch msg.String() {
+	case "esc":
+		m.inSubMenu = false
+		m.activeSubDef = nil
+		m.subCursor = 0
+		return m, nil
+	case "ctrl+c":
+		m.quitting = true
+		return m, tea.Quit
+	case "up", "k":
+		if m.subCursor > 0 {
+			m.subCursor--
+		} else {
+			m.subCursor = itemCount - 1
+		}
+	case "down", "j":
+		if m.subCursor < itemCount-1 {
+			m.subCursor++
+		} else {
+			m.subCursor = 0
+		}
+	case "home":
+		m.subCursor = 0
+	case "end":
+		m.subCursor = itemCount - 1
+	case "left", "h":
+		if m.subCursor < len(m.activeSubDef.options) {
+			opt := &m.activeSubDef.options[m.subCursor]
+			if opt.current > 0 {
+				opt.current--
+			} else {
+				opt.current = len(opt.values) - 1
+			}
+		}
+	case "right", "l":
+		if m.subCursor < len(m.activeSubDef.options) {
+			opt := &m.activeSubDef.options[m.subCursor]
+			if opt.current < len(opt.values)-1 {
+				opt.current++
+			} else {
+				opt.current = 0
+			}
+		}
+	case "enter":
+		if m.subCursor == len(m.activeSubDef.options) {
+			// "Run" selected
+			name := menuItems[m.cursor].name
+			m.selected = name
+			m.args = buildArgs(name, m.activeSubDef.options)
 			return m, tea.Quit
+		}
+		// On an option row: cycle value forward
+		opt := &m.activeSubDef.options[m.subCursor]
+		if opt.current < len(opt.values)-1 {
+			opt.current++
+		} else {
+			opt.current = 0
 		}
 	}
 	return m, nil
@@ -117,6 +298,18 @@ func (m menuModel) View() string {
 		)
 	}
 
+	var body string
+	if m.inSubMenu {
+		body = m.viewSubMenu()
+	} else {
+		body = m.viewMainMenu()
+	}
+
+	content := header + "\n" + summaryLine + "\n\n" + body
+	return styles.Box.Render(content) + "\n"
+}
+
+func (m menuModel) viewMainMenu() string {
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	descStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -139,7 +332,65 @@ func (m menuModel) View() string {
 	}
 
 	footer := styles.StatusBar.Render("↑/↓: navigate · enter: select · q/esc: exit")
+	return sb.String() + "\n" + footer
+}
 
-	content := header + "\n" + summaryLine + "\n\n" + sb.String() + "\n" + footer
-	return styles.Box.Render(content) + "\n"
+func (m menuModel) viewSubMenu() string {
+	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	normalStyle := lipgloss.NewStyle()
+	activeValueStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
+
+	cmdName := menuItems[m.cursor].name
+	titleLine := selectedStyle.Render(cmdName) + "  " + mutedStyle.Render(menuItems[m.cursor].desc)
+
+	var sb strings.Builder
+	sb.WriteString(titleLine + "\n")
+	sb.WriteString(styles.Separator(40) + "\n")
+
+	for i, opt := range m.activeSubDef.options {
+		label := fmt.Sprintf("%-10s", opt.label)
+
+		// Render value choices
+		var valueParts []string
+		for vi, v := range opt.values {
+			if vi == opt.current {
+				valueParts = append(valueParts, activeValueStyle.Render(v))
+			} else {
+				valueParts = append(valueParts, mutedStyle.Render(v))
+			}
+		}
+		valueStr := strings.Join(valueParts, mutedStyle.Render(" / "))
+
+		if i == m.subCursor {
+			fmt.Fprintf(&sb, "  %s %s  %s\n",
+				cursorStyle.Render("→"),
+				normalStyle.Render(label),
+				valueStr,
+			)
+		} else {
+			fmt.Fprintf(&sb, "    %s  %s\n",
+				normalStyle.Render(label),
+				valueStr,
+			)
+		}
+	}
+
+	// Run item
+	runIdx := len(m.activeSubDef.options)
+	sb.WriteString("\n")
+	if m.subCursor == runIdx {
+		fmt.Fprintf(&sb, "  %s %s\n",
+			cursorStyle.Render("→"),
+			selectedStyle.Render("Run"),
+		)
+	} else {
+		fmt.Fprintf(&sb, "    %s\n",
+			normalStyle.Render("Run"),
+		)
+	}
+
+	footer := styles.StatusBar.Render("↑/↓: navigate · ←/→: change value · enter: select/run · esc: back")
+	return sb.String() + "\n" + footer
 }

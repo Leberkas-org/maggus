@@ -28,7 +28,7 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 
-	m := menuModel{summary: loadPlanSummary()}
+	m := newMenuModel(loadPlanSummary())
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := p.Run()
 	if err != nil {
@@ -40,11 +40,13 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	sub, _, err := rootCmd.Find([]string{final.selected})
+	cmdArgs := append([]string{final.selected}, final.args...)
+	sub, remaining, err := rootCmd.Find(cmdArgs)
 	if err != nil {
 		return err
 	}
-	return sub.RunE(sub, nil)
+	sub.ParseFlags(remaining)
+	return sub.RunE(sub, sub.Flags().Args())
 }
 
 func Execute() {
