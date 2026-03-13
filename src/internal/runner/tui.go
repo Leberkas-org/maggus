@@ -53,7 +53,12 @@ type CommitMsg struct {
 	Message string
 }
 
-// QuitMsg tells the TUI to exit.
+// InfoMsg displays an informational message in the TUI.
+type InfoMsg struct {
+	Text string
+}
+
+// QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
 type QuitMsg struct{}
 
 // IterationStartMsg resets per-iteration state when a new iteration begins.
@@ -67,6 +72,15 @@ type IterationStartMsg struct {
 // tickMsg is sent by the spinner ticker.
 type tickMsg time.Time
 
+// BannerInfo holds startup information displayed in the TUI's initial view.
+type BannerInfo struct {
+	Iterations int
+	Branch     string
+	RunID      string
+	RunDir     string
+	Worktree   string // empty if not using worktree
+}
+
 // tuiModel is the bubbletea model that replaces the old display struct.
 type tuiModel struct {
 	// Header fields
@@ -74,6 +88,11 @@ type tuiModel struct {
 	fingerprint string
 	currentIter int
 	totalIters  int
+
+	// Banner / startup info
+	banner       BannerInfo
+	infoMessages []string
+	done         bool
 
 	// Task info
 	taskID    string
@@ -98,13 +117,14 @@ type tuiModel struct {
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
-func NewTUIModel(model string, version string, fingerprint string, cancelFunc func()) tuiModel {
+func NewTUIModel(model string, version string, fingerprint string, cancelFunc func(), banner BannerInfo) tuiModel {
 	if model == "" {
 		model = "default"
 	}
 	return tuiModel{
 		version:     version,
 		fingerprint: fingerprint,
+		banner:      banner,
 		status:      "Waiting...",
 		output:      "-",
 		model:       model,
@@ -127,6 +147,11 @@ func tickCmd() tea.Cmd {
 func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.done {
+			// Any key exits when done
+			m.quitting = true
+			return m, tea.Quit
+		}
 		if msg.Type == tea.KeyCtrlC {
 			m.status = "Interrupted"
 			m.quitting = true
@@ -144,8 +169,11 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case QuitMsg:
-		m.quitting = true
-		return m, tea.Quit
+		m.done = true
+		return m, nil
+
+	case InfoMsg:
+		m.infoMessages = append(m.infoMessages, msg.Text)
 
 	case IterationStartMsg:
 		m.currentIter = msg.Current
@@ -240,11 +268,59 @@ var (
 )
 
 func (m tuiModel) View() string {
-	if m.quitting && (m.status == "Done" || m.status == "Failed" || m.status == "Interrupted") {
-		// Final view before exit — show status one last time
-		return m.renderView()
+	if m.done {
+		return m.renderDoneView()
+	}
+	if m.taskID == "" {
+		return m.renderBannerView()
 	}
 	return m.renderView()
+}
+
+func (m tuiModel) renderBannerView() string {
+	var b strings.Builder
+	b.WriteString(m.renderHeader())
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Model:"), m.model))
+	b.WriteString(fmt.Sprintf("  %s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
+	if m.banner.Branch != "" {
+		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
+	}
+	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Run ID:"), m.banner.RunID))
+	if m.banner.Worktree != "" {
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Worktree:"), m.banner.Worktree))
+	}
+	b.WriteString("\n")
+	for _, msg := range m.infoMessages {
+		b.WriteString(fmt.Sprintf("  %s\n", msg))
+	}
+	if len(m.infoMessages) == 0 {
+		b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render("Starting...")))
+	}
+	return b.String()
+}
+
+func (m tuiModel) renderDoneView() string {
+	var b strings.Builder
+	b.WriteString(m.renderHeader())
+	b.WriteString("\n")
+
+	// Show commits
+	if len(m.commits) > 0 {
+		b.WriteString(grayStyle.Render("  Commits:") + "\n")
+		for _, c := range m.commits {
+			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(truncate(c, m.width-6))))
+		}
+		b.WriteString("\n")
+	}
+
+	// Show info messages (push status, etc.)
+	for _, msg := range m.infoMessages {
+		b.WriteString(fmt.Sprintf("  %s\n", msg))
+	}
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render("Press any key to exit")))
+	return b.String()
 }
 
 func (m tuiModel) renderHeader() string {

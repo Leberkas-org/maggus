@@ -14,7 +14,7 @@ func TestRunClaudeReturnsErrorWhenClaudeNotFound(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m := NewTUIModel("", "dev", "test-fp", func() {})
+	m := NewTUIModel("", "dev", "test-fp", func() {}, BannerInfo{})
 	p := tea.NewProgram(m)
 
 	err := RunClaude(ctx, "test prompt", "", p)

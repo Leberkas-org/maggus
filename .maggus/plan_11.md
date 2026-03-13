@@ -35,13 +35,13 @@ Rethink the Maggus TUI to provide a polished, consistent visual experience from 
 **Description:** As a user, I want `maggus work` to start immediately (no 3-second countdown) and never show raw git output, so the experience is clean from start to finish.
 
 **Acceptance Criteria:**
-- [ ] The 3-second pause/countdown in `src/cmd/work.go` (lines 166-178) is removed entirely
-- [ ] The startup banner that was printed with `fmt.Printf` before the TUI starts is moved inside the TUI as the initial view (rendered via bubbletea, not raw print)
-- [ ] Git push output (currently `push.Stdout = os.Stdout`, lines 344-351) is captured and displayed as a status update inside the TUI instead of raw terminal output
-- [ ] Branch creation messages (from `gitbranch.EnsureFeatureBranch`) are displayed as TUI status messages, not raw `fmt.Println`
-- [ ] All `fmt.Printf`/`fmt.Println` calls in the work command are replaced with TUI messages or removed
-- [ ] The TUI starts immediately when `maggus work` is invoked and stays in alt-screen until the user dismisses the summary
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] The 3-second pause/countdown in `src/cmd/work.go` (lines 166-178) is removed entirely
+- [x] The startup banner that was printed with `fmt.Printf` before the TUI starts is moved inside the TUI as the initial view (rendered via bubbletea, not raw print)
+- [x] Git push output (currently `push.Stdout = os.Stdout`, lines 344-351) is captured and displayed as a status update inside the TUI instead of raw terminal output
+- [x] Branch creation messages (from `gitbranch.EnsureFeatureBranch`) are displayed as TUI status messages, not raw `fmt.Println`
+- [x] All `fmt.Printf`/`fmt.Println` calls in the work command are replaced with TUI messages or removed
+- [x] The TUI starts immediately when `maggus work` is invoked and stays in alt-screen until the user dismisses the summary
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-003: Add post-completion summary screen to `work` TUI
 **Description:** As a user, I want to see a styled summary screen when work completes, showing what was accomplished, and press a key to exit — so the terminal stays clean.
