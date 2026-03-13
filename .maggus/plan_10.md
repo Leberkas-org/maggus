@@ -18,15 +18,15 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
 **Description:** As a user, I want to run `maggus clean` to remove completed plan files and their associated run directories so that `.maggus/` doesn't accumulate stale data.
 
 **Acceptance Criteria:**
-- [ ] New Cobra command `clean` registered in `src/cmd/clean.go`
-- [ ] Deletes all `_completed.md` plan files from `.maggus/`
-- [ ] Identifies run directories in `.maggus/runs/` that are associated with completed plans: a run is "completed" if all plans that existed when it started have since been completed (i.e., renamed to `_completed.md`) or if the run's `run.md` contains an `## End` section (meaning it finished)
-- [ ] Removes only completed run directories; keeps runs that are still in progress (no `## End` section in `run.md`)
-- [ ] Prints a summary of what was removed (e.g., "Removed 3 completed plans, 5 run directories")
-- [ ] If nothing to clean, prints "Nothing to clean."
-- [ ] Has a `--dry-run` flag that shows what would be removed without actually deleting anything
-- [ ] Unit tests cover: completed plan removal, run directory cleanup, dry-run mode, nothing-to-clean case
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] New Cobra command `clean` registered in `src/cmd/clean.go`
+- [x] Deletes all `_completed.md` plan files from `.maggus/`
+- [x] Identifies run directories in `.maggus/runs/` that are associated with completed plans: a run is "completed" if all plans that existed when it started have since been completed (i.e., renamed to `_completed.md`) or if the run's `run.md` contains an `## End` section (meaning it finished)
+- [x] Removes only completed run directories; keeps runs that are still in progress (no `## End` section in `run.md`)
+- [x] Prints a summary of what was removed (e.g., "Removed 3 completed plans, 5 run directories")
+- [x] If nothing to clean, prints "Nothing to clean."
+- [x] Has a `--dry-run` flag that shows what would be removed without actually deleting anything
+- [x] Unit tests cover: completed plan removal, run directory cleanup, dry-run mode, nothing-to-clean case
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-002: Add `.maggus/RELEASE_NOTES.md` to gitignore and prompt instructions
 **Description:** As a developer, I want the work loop to instruct Claude Code to append release-relevant notes to `.maggus/RELEASE_NOTES.md` after each task so that raw material for release notes accumulates during development.
