@@ -148,10 +148,10 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want the Concepts page to explain the agent abstraction and how different backends integrate.
 
 **Acceptance Criteria:**
-- [ ] New "Agents" section (after "Work Loop Lifecycle" or as a sub-section) explaining: what an agent is in Maggus, which agents are supported, and how they differ (permissions handling, model format, etc.)
-- [ ] Work Loop Lifecycle section is updated to say "Invoke the configured agent" instead of "Invoke Claude Code" where appropriate
-- [ ] Mentions that agent selection affects CLI flags and streaming format but not the plan/task workflow
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] New "Agents" section (after "Work Loop Lifecycle" or as a sub-section) explaining: what an agent is in Maggus, which agents are supported, and how they differ (permissions handling, model format, etc.)
+- [x] Work Loop Lifecycle section is updated to say "Invoke the configured agent" instead of "Invoke Claude Code" where appropriate
+- [x] Mentions that agent selection affects CLI flags and streaming format but not the plan/task workflow
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-012: Create VitePress docs page for the `maggus-plan` skill
 
