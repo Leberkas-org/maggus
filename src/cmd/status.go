@@ -575,7 +575,7 @@ func (m statusModel) viewDetail() string {
 	}
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(m.detailViewport.View(), footer, m.width, m.height)
+		return styles.FullScreenLeft(m.detailViewport.View(), footer, m.width, m.height)
 	}
 	return styles.Box.Render(m.detailViewport.View()+"\n"+footer) + "\n"
 }

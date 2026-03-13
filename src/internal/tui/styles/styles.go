@@ -80,57 +80,89 @@ func ProgressBarPlain(done, total, width int) string {
 // full-screen box (outside the border).
 const FullScreenMargin = 2
 
-// centerBlock horizontally centers a block of text within the given width.
-// All lines are shifted by the same amount so internal alignment is preserved.
-func centerBlock(text string, totalWidth int) string {
-	lines := strings.Split(text, "\n")
-
-	// Find the widest visible line (ANSI-aware).
-	maxW := 0
-	for _, l := range lines {
-		if w := lipgloss.Width(l); w > maxW {
-			maxW = w
-		}
-	}
-
-	pad := (totalWidth - maxW) / 2
-	if pad <= 0 {
-		return text
-	}
-
-	prefix := strings.Repeat(" ", pad)
-	for i, l := range lines {
-		if l != "" {
-			lines[i] = prefix + l
-		}
-	}
-	return strings.Join(lines, "\n")
-}
+// maxContentWidth is the target column width for centering content inside the
+// full-screen box. All views use the same reference so centering is consistent.
+const maxContentWidth = 90
 
 // FullScreen wraps content and an optional footer in a bordered box that fills
-// the terminal with a small margin. The content block is horizontally centered
-// as a whole (preserving internal column alignment) and the footer is pinned
-// to the bottom line inside the box.
+// the terminal with a small margin. Content is centered as a block (columns
+// stay aligned) and the footer is pinned to the bottom line.
 func FullScreen(content, footer string, width, height int) string {
 	innerW, innerH := fullScreenInner(width, height)
 
-	// Center the content block as a whole — columns stay aligned.
-	centered := centerBlock(content, innerW)
+	// Calculate consistent left padding based on a fixed target width.
+	// This ensures all views are centered the same way regardless of content.
+	padLeft := (innerW - maxContentWidth) / 2
+	if padLeft < 0 {
+		padLeft = 0
+	}
+
+	// Indent all non-empty content lines by the same amount.
+	if padLeft > 0 {
+		prefix := strings.Repeat(" ", padLeft)
+		lines := strings.Split(content, "\n")
+		for i, l := range lines {
+			if l != "" {
+				lines[i] = prefix + l
+			}
+		}
+		content = strings.Join(lines, "\n")
+	}
 
 	// Count content lines
-	contentLines := strings.Count(centered, "\n") + 1
+	contentLines := strings.Count(content, "\n") + 1
 
-	// Build the composed body: centered content + gap + footer
+	// Build the composed body: content + gap + footer (centered independently)
 	var body string
 	if footer != "" {
-		footerLine := centerBlock(footer, innerW)
+		// Center footer within the full inner width
+		footerW := lipgloss.Width(footer)
+		footerPad := (innerW - footerW) / 2
+		if footerPad < 0 {
+			footerPad = 0
+		}
+		centeredFooter := strings.Repeat(" ", footerPad) + footer
+
 		gap := innerH - contentLines - 1
 		if gap < 0 {
 			gap = 0
 		}
-		body = centered + strings.Repeat("\n", gap) + footerLine
+		body = content + strings.Repeat("\n", gap) + centeredFooter
 	} else {
-		body = centered
+		body = content
+	}
+
+	box := Box.
+		Width(innerW).
+		Height(innerH).
+		Render(body)
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// FullScreenLeft is like FullScreen but keeps content left-aligned inside
+// the box (no horizontal centering). Use for detail views and work output.
+func FullScreenLeft(content, footer string, width, height int) string {
+	innerW, innerH := fullScreenInner(width, height)
+
+	contentLines := strings.Count(content, "\n") + 1
+
+	var body string
+	if footer != "" {
+		footerW := lipgloss.Width(footer)
+		footerPad := (innerW - footerW) / 2
+		if footerPad < 0 {
+			footerPad = 0
+		}
+		centeredFooter := strings.Repeat(" ", footerPad) + footer
+
+		gap := innerH - contentLines - 1
+		if gap < 0 {
+			gap = 0
+		}
+		body = content + strings.Repeat("\n", gap) + centeredFooter
+	} else {
+		body = content
 	}
 
 	box := Box.
