@@ -32,12 +32,12 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
 **Description:** As a developer, I want the work loop to instruct Claude Code to append release-relevant notes to `.maggus/RELEASE_NOTES.md` after each task so that raw material for release notes accumulates during development.
 
 **Acceptance Criteria:**
-- [ ] `.maggus/RELEASE_NOTES.md` is added to the gitignore entries in `src/internal/gitignore/gitignore.go`
-- [ ] The prompt instructions in `src/internal/prompt/prompt.go` gain a new step (step 6) after the MEMORY.md instruction
-- [ ] The new instruction tells the agent: "Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. Use the format: `## TASK-NNN: Title` followed by 1-3 bullet points. Focus on what changed from the user's perspective, not implementation details. If the task has no user-visible changes, skip this step. Do NOT commit this file."
-- [ ] Existing prompt steps are unchanged (only a new step is added)
-- [ ] Unit tests verify the new instruction appears in the built prompt
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] `.maggus/RELEASE_NOTES.md` is added to the gitignore entries in `src/internal/gitignore/gitignore.go`
+- [x] The prompt instructions in `src/internal/prompt/prompt.go` gain a new step (step 6) after the MEMORY.md instruction
+- [x] The new instruction tells the agent: "Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. Use the format: `## TASK-NNN: Title` followed by 1-3 bullet points. Focus on what changed from the user's perspective, not implementation details. If the task has no user-visible changes, skip this step. Do NOT commit this file."
+- [x] Existing prompt steps are unchanged (only a new step is added)
+- [x] Unit tests verify the new instruction appears in the built prompt
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ### TASK-003: Create `release` internal package for changelog generation
 **Description:** As a developer, I want a `release` package that can gather git history since the last tag and parse conventional commit messages so that `maggus release` has the data it needs.

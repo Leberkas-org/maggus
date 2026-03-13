@@ -50,7 +50,7 @@ func CommitIteration(workDir string) (Result, error) {
 
 	// Safety gate: ensure internal files are never included in the commit.
 	// The agent may have staged them via `git add .` or `git add -A`.
-	for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md"} {
+	for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md", ".maggus/RELEASE_NOTES.md"} {
 		unstage := exec.Command("git", "reset", "HEAD", "--", pattern)
 		unstage.Dir = workDir
 		unstage.CombinedOutput() // ignore errors (files may not be staged)

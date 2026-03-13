@@ -222,6 +222,39 @@ func TestBuild_NoWorktree_OmitsWorktreeFields(t *testing.T) {
 	}
 }
 
+func TestBuild_ContainsReleaseNotesInstruction(t *testing.T) {
+	task := newTestTask()
+	opts := newTestOpts()
+	result := Build(task, opts)
+
+	releaseNotesChecks := []string{
+		"`.maggus/RELEASE_NOTES.md`",
+		"## TASK-NNN: Title",
+		"1-3 bullet points",
+		"user's perspective",
+		"Do NOT commit this file",
+	}
+
+	for _, want := range releaseNotesChecks {
+		if !strings.Contains(result, want) {
+			t.Errorf("prompt missing release notes instruction %q\n\nGot:\n%s", want, result)
+		}
+	}
+
+	// Verify it appears as step 6 (after step 5 about MEMORY.md)
+	memoryIdx := strings.Index(result, "5. Create or update `.maggus/MEMORY.md`")
+	releaseIdx := strings.Index(result, "6. Append a short release note entry")
+	if memoryIdx == -1 {
+		t.Fatal("step 5 (MEMORY.md) not found")
+	}
+	if releaseIdx == -1 {
+		t.Fatal("step 6 (RELEASE_NOTES.md) not found")
+	}
+	if releaseIdx <= memoryIdx {
+		t.Error("step 6 (release notes) should appear after step 5 (MEMORY.md)")
+	}
+}
+
 func TestBuild_SectionOrder(t *testing.T) {
 	task := newTestTask()
 	opts := newTestOpts()

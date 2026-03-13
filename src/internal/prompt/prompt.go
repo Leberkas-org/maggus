@@ -131,4 +131,10 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("Include: project structure changes, build/tooling changes, new conventions, ")
 	b.WriteString("architectural decisions, and important file paths. ")
 	b.WriteString("Keep it concise and organized by topic. Do NOT commit this file.\n")
+
+	// Append release notes
+	b.WriteString("6. Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. ")
+	b.WriteString("Use the format: `## TASK-NNN: Title` followed by 1-3 bullet points. ")
+	b.WriteString("Focus on what changed from the user's perspective, not implementation details. ")
+	b.WriteString("If the task has no user-visible changes, skip this step. Do NOT commit this file.\n")
 }
