@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
@@ -32,6 +33,7 @@ var (
 	countFlag       int
 	noBootstrapFlag bool
 	modelFlag       string
+	agentFlag       string
 	worktreeFlag    bool
 	noWorktreeFlag  bool
 )
@@ -87,6 +89,21 @@ Examples:
 			if !found {
 				includeWarnings = append(includeWarnings, fmt.Sprintf("Warning: included file not found: %s", inc))
 			}
+		}
+
+		// Resolve agent: CLI flag > config > default ("claude")
+		agentName := cfg.Agent
+		if agentFlag != "" {
+			agentName = agentFlag
+		}
+		activeAgent, err := agent.New(agentName)
+		if err != nil {
+			return err
+		}
+
+		// Validate agent CLI is installed before starting work
+		if err := activeAgent.Validate(); err != nil {
+			return fmt.Errorf("agent %q not available: %w", activeAgent.Name(), err)
 		}
 
 		// Resolve model: CLI flag overrides config file
@@ -210,6 +227,7 @@ Examples:
 			Branch:     run.Branch,
 			RunID:      run.ID,
 			RunDir:     run.RelativeDir(dir),
+			Agent:      activeAgent.Name(),
 		}
 		if useWorktree {
 			banner.Worktree = workDir
@@ -234,6 +252,9 @@ Examples:
 			}()
 
 			// Send startup info messages to the TUI.
+			if activeAgent.Name() == "claude" {
+				p.Send(runner.InfoMsg{Text: "⚠ Using --dangerously-skip-permissions (Claude Code)"})
+			}
 			for _, w := range includeWarnings {
 				p.Send(runner.InfoMsg{Text: w})
 			}
@@ -287,7 +308,7 @@ Examples:
 				}
 
 				builtPrompt := prompt.Build(next, opts)
-				if err := runner.RunClaude(workCtx, builtPrompt, resolvedModel, p); err != nil {
+				if err := activeAgent.Run(workCtx, builtPrompt, resolvedModel, p); err != nil {
 					if useWorktree {
 						lock.Release()
 					}
@@ -423,6 +444,7 @@ func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
+	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
 	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
 	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
 	rootCmd.AddCommand(workCmd)

@@ -87,16 +87,16 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want `maggus work --agent opencode` to use OpenCode, and the config file `agent:` field to be respected.
 
 **Acceptance Criteria:**
-- [ ] `cmd/work.go` uses `agent.New(agentName)` to instantiate the agent, where `agentName` comes from CLI flag > config > default
-- [ ] New `--agent` flag on `maggus work` command (string, default empty)
-- [ ] Precedence: `--agent` CLI flag > `config.yml` agent field > `"claude"` default
-- [ ] The agent's `Validate()` is called before the work loop starts — exits with a clear error if the CLI tool isn't installed
-- [ ] The agent's `Run()` replaces the direct `runner.RunClaude()` call
-- [ ] The agent's `RunOnce()` replaces any `runner.RunOnce()` calls
-- [ ] The TUI startup banner shows the active agent name (e.g. `Agent: claude` or `Agent: opencode`)
-- [ ] The `--dangerously-skip-permissions` warning is only shown for agents that use it (Claude Code)
-- [ ] Existing behavior is unchanged when no `agent` field is set (defaults to Claude Code)
-- [ ] Typecheck/lint passes
+- [x] `cmd/work.go` uses `agent.New(agentName)` to instantiate the agent, where `agentName` comes from CLI flag > config > default
+- [x] New `--agent` flag on `maggus work` command (string, default empty)
+- [x] Precedence: `--agent` CLI flag > `config.yml` agent field > `"claude"` default
+- [x] The agent's `Validate()` is called before the work loop starts — exits with a clear error if the CLI tool isn't installed
+- [x] The agent's `Run()` replaces the direct `runner.RunClaude()` call
+- [x] The agent's `RunOnce()` replaces any `runner.RunOnce()` calls
+- [x] The TUI startup banner shows the active agent name (e.g. `Agent: claude` or `Agent: opencode`)
+- [x] The `--dangerously-skip-permissions` warning is only shown for agents that use it (Claude Code)
+- [x] Existing behavior is unchanged when no `agent` field is set (defaults to Claude Code)
+- [x] Typecheck/lint passes
 
 ### TASK-007: Update `list` and `status` commands to show configured agent
 

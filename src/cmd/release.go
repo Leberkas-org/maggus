@@ -8,16 +8,19 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/release"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/spf13/cobra"
 )
 
 var releaseModelFlag string
 
-// runClaudeOnce is a package-level variable so tests can replace it.
-var runClaudeOnce = runner.RunOnce
+// runAgentOnce is a package-level variable so tests can replace it.
+// It accepts an agent.Agent so the release command can use the configured agent.
+var runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
+	return a.RunOnce(ctx, prompt, model)
+}
 
 var releaseCmd = &cobra.Command{
 	Use:   "release",
@@ -54,6 +57,12 @@ func runRelease(cmd *cobra.Command, dir string) error {
 	}
 	resolvedModel := config.ResolveModel(modelInput)
 
+	// Create agent from config
+	activeAgent, err := agent.New(cfg.Agent)
+	if err != nil {
+		return err
+	}
+
 	// Find last tag and commits
 	tag, err := release.FindLastTag(dir)
 	if err != nil {
@@ -84,16 +93,16 @@ func runRelease(cmd *cobra.Command, dir string) error {
 	// Get diff stat
 	diffStat := getDiffStat(dir, tag)
 
-	// Build prompt for Claude
+	// Build prompt for AI summary
 	prompt := buildReleasePrompt(changelog, releaseNotes, diffStat)
 
-	// Invoke Claude for AI summary
+	// Invoke agent for AI summary
 	fmt.Fprintln(out, "Generating AI summary...")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer cancel()
 
-	summary, err := runClaudeOnce(ctx, prompt, resolvedModel)
+	summary, err := runAgentOnce(ctx, activeAgent, prompt, resolvedModel)
 	if err != nil {
 		return fmt.Errorf("generate summary: %w", err)
 	}

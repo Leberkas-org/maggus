@@ -96,6 +96,7 @@ type BannerInfo struct {
 	RunID      string
 	RunDir     string
 	Worktree   string // empty if not using worktree
+	Agent      string // agent name (e.g. "claude", "opencode")
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.
@@ -371,6 +372,9 @@ func (m tuiModel) renderBannerView() string {
 	var b strings.Builder
 	b.WriteString(m.renderHeader())
 	b.WriteString("\n")
+	if m.banner.Agent != "" {
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
+	}
 	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Model:"), m.model))
 	b.WriteString(fmt.Sprintf("  %s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
 	if m.banner.Branch != "" {
