@@ -7,14 +7,36 @@ This guide walks you through installing Maggus and running your first automated 
 Before you begin, make sure you have:
 
 - **Go 1.22+** — [Download Go](https://go.dev/dl/)
-- **Claude Code CLI** — installed and available on your `PATH`. See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for setup instructions.
+- **An AI coding agent** — Maggus supports the following backends:
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic's coding agent **(default)**
+  - [OpenCode](https://opencode.ai) — Open-source coding agent supporting multiple providers
 
-Verify both are installed:
+Install at least one and make sure it is available on your `PATH`.
+
+Verify your setup:
 
 ```bash
 go version    # should print go1.22 or later
-claude --version
+claude --version   # if using Claude Code
+opencode --version # if using OpenCode
 ```
+
+## Choosing an Agent
+
+Maggus defaults to **Claude Code** as its AI backend. If you don't set anything, Claude Code is used automatically. To switch to OpenCode, set `agent: opencode` in your config file or pass `--agent opencode` on the command line:
+
+```yaml
+# .maggus/config.yml
+agent: opencode
+model: openai/gpt-4.1
+```
+
+```bash
+# Or override per-run via CLI flag
+maggus work --agent opencode
+```
+
+See the [Configuration reference](/reference/configuration) for full details on agent and model settings.
 
 ## Installation
 
@@ -90,6 +112,19 @@ Maggus will:
 6. Check for the next task (none left, so it stops)
 
 You'll see a TUI with a progress bar, live status updates, and tool history as Claude works through the task.
+
+::: tip Using OpenCode instead?
+If you prefer OpenCode, add a config file before running:
+
+```bash
+cat > .maggus/config.yml << 'EOF'
+agent: opencode
+model: openai/gpt-4.1
+EOF
+```
+
+Then run `maggus work` as normal — everything else works the same way.
+:::
 
 ::: tip
 Maggus shows a 3-second countdown before starting. Press **Ctrl+C** during this window to abort. Once running, press **Ctrl+C** once to stop gracefully after the current task, or twice to force-quit immediately.

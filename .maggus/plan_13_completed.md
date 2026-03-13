@@ -114,69 +114,69 @@ Maggus currently only supports Claude Code as its AI backend. This plan abstract
 **Description:** As a user, I want the configuration docs to explain the new `agent` and `provider/model` fields with examples for both Claude Code and OpenCode.
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/configuration.md` documents the new `agent` field with allowed values and default behavior
-- [ ] Model section is updated to show `provider/model` as the primary format with examples for multiple providers
-- [ ] Legacy alias table is preserved but marked as a convenience shorthand
-- [ ] Full config example shows both a Claude Code setup and an OpenCode setup side by side
-- [ ] CLI flag `--agent` is documented with precedence rules
-- [ ] Typecheck/lint passes (VitePress builds without errors: `npm run docs:build` in `docs/`)
+- [x] `docs/reference/configuration.md` documents the new `agent` field with allowed values and default behavior
+- [x] Model section is updated to show `provider/model` as the primary format with examples for multiple providers
+- [x] Legacy alias table is preserved but marked as a convenience shorthand
+- [x] Full config example shows both a Claude Code setup and an OpenCode setup side by side
+- [x] CLI flag `--agent` is documented with precedence rules
+- [x] Typecheck/lint passes (VitePress builds without errors: `npm run docs:build` in `docs/`)
 
 ### TASK-009: Update VitePress docs — Getting Started guide
 
 **Description:** As a new user, I want the Getting Started guide to explain that Maggus supports multiple agents and show how to set up either Claude Code or OpenCode.
 
 **Acceptance Criteria:**
-- [ ] Prerequisites section lists both Claude Code and OpenCode as supported backends, with links to their installation docs
-- [ ] A short section explains that Maggus defaults to Claude Code but can be switched to OpenCode via config or CLI flag
-- [ ] The "First Run" example still uses Claude Code as the default path (minimal change for simplicity)
-- [ ] A callout/tip box shows how to switch to OpenCode for users who prefer it
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] Prerequisites section lists both Claude Code and OpenCode as supported backends, with links to their installation docs
+- [x] A short section explains that Maggus defaults to Claude Code but can be switched to OpenCode via config or CLI flag
+- [x] The "First Run" example still uses Claude Code as the default path (minimal change for simplicity)
+- [x] A callout/tip box shows how to switch to OpenCode for users who prefer it
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-010: Update VitePress docs — CLI Commands reference
 
 **Description:** As a user, I want the CLI Commands reference to document the new `--agent` flag and show agent-aware example output.
 
 **Acceptance Criteria:**
-- [ ] `maggus work` section documents the `--agent` flag in the flags table
-- [ ] Example output section shows the `Agent:` line in the startup banner
-- [ ] Examples include `maggus work --agent opencode` usage
-- [ ] `maggus status` section mentions that it shows the configured agent
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] `maggus work` section documents the `--agent` flag in the flags table
+- [x] Example output section shows the `Agent:` line in the startup banner
+- [x] Examples include `maggus work --agent opencode` usage
+- [x] `maggus status` section mentions that it shows the configured agent
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-011: Update VitePress docs — Concepts page
 
 **Description:** As a user, I want the Concepts page to explain the agent abstraction and how different backends integrate.
 
 **Acceptance Criteria:**
-- [ ] New "Agents" section (after "Work Loop Lifecycle" or as a sub-section) explaining: what an agent is in Maggus, which agents are supported, and how they differ (permissions handling, model format, etc.)
-- [ ] Work Loop Lifecycle section is updated to say "Invoke the configured agent" instead of "Invoke Claude Code" where appropriate
-- [ ] Mentions that agent selection affects CLI flags and streaming format but not the plan/task workflow
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] New "Agents" section (after "Work Loop Lifecycle" or as a sub-section) explaining: what an agent is in Maggus, which agents are supported, and how they differ (permissions handling, model format, etc.)
+- [x] Work Loop Lifecycle section is updated to say "Invoke the configured agent" instead of "Invoke Claude Code" where appropriate
+- [x] Mentions that agent selection affects CLI flags and streaming format but not the plan/task workflow
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-012: Create VitePress docs page for the `maggus-plan` skill
 
 **Description:** As a user, I want a dedicated documentation page explaining the `maggus-plan` skill — what it is, how to use it, and how it integrates with the Maggus workflow.
 
 **Acceptance Criteria:**
-- [ ] New file `docs/guide/maggus-plan-skill.md` documenting the skill
-- [ ] Explains what the skill is: a Claude Code skill that generates `.maggus/plan_*.md` files interactively through clarifying questions
-- [ ] Documents the trigger: how to invoke it (e.g. `/maggus-plan <description>` in Claude Code)
-- [ ] Shows the question-and-answer flow with an example interaction
-- [ ] Documents the output format: plan file structure, TASK-NNN format, acceptance criteria conventions
-- [ ] Explains how the generated plan integrates with `maggus work` (the generated file is immediately usable)
-- [ ] Includes at least one complete example showing a feature description → questions → generated plan → running `maggus work`
-- [ ] VitePress sidebar in `.vitepress/config.ts` is updated to include the new page under Guide
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] New file `docs/guide/maggus-plan-skill.md` documenting the skill
+- [x] Explains what the skill is: a Claude Code skill that generates `.maggus/plan_*.md` files interactively through clarifying questions
+- [x] Documents the trigger: how to invoke it (e.g. `/maggus-plan <description>` in Claude Code)
+- [x] Shows the question-and-answer flow with an example interaction
+- [x] Documents the output format: plan file structure, TASK-NNN format, acceptance criteria conventions
+- [x] Explains how the generated plan integrates with `maggus work` (the generated file is immediately usable)
+- [x] Includes at least one complete example showing a feature description → questions → generated plan → running `maggus work`
+- [x] VitePress sidebar in `.vitepress/config.ts` is updated to include the new page under Guide
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ### TASK-013: Update VitePress site description and homepage
 
 **Description:** As a visitor, I want the homepage and site metadata to reflect that Maggus supports multiple AI agents, not just Claude Code.
 
 **Acceptance Criteria:**
-- [ ] `docs/.vitepress/config.ts` description is updated to mention multi-agent support (e.g., "AI-powered task automation CLI that orchestrates AI coding agents to work through implementation plans")
-- [ ] `docs/index.md` homepage is updated: hero description and feature bullets mention support for Claude Code and OpenCode
-- [ ] No breaking changes to existing navigation or links
-- [ ] Typecheck/lint passes (VitePress builds without errors)
+- [x] `docs/.vitepress/config.ts` description is updated to mention multi-agent support (e.g., "AI-powered task automation CLI that orchestrates AI coding agents to work through implementation plans")
+- [x] `docs/index.md` homepage is updated: hero description and feature bullets mention support for Claude Code and OpenCode
+- [x] No breaking changes to existing navigation or links
+- [x] Typecheck/lint passes (VitePress builds without errors)
 
 ## Functional Requirements
 

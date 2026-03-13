@@ -10,7 +10,7 @@ When you run `maggus work`, Maggus enters a loop that processes tasks one at a t
 2. **Find task** — Identify the next workable task (incomplete and not blocked) across all plans
 3. **Branch** — If on a protected branch (`main`, `master`, `dev`), create a feature branch
 4. **Prompt** — Assemble the prompt with bootstrap context files, run metadata, and task details
-5. **Run** — Invoke Claude Code as a subprocess with the assembled prompt
+5. **Run** — Invoke the configured agent as a subprocess with the assembled prompt
 6. **Commit** — Read the `COMMIT.md` file written by the agent, stage all changes, and commit
 7. **Repeat** — Loop back to step 2 for the next task
 
@@ -21,6 +21,38 @@ You can limit the number of iterations with the `--count` flag:
 ```bash
 maggus work --count 3   # stop after 3 tasks
 ```
+
+## Agents
+
+In Maggus, an **agent** is an AI coding assistant that executes tasks. Maggus doesn't talk to AI APIs directly — instead, it invokes the agent's CLI tool as a subprocess, passes it a prompt, and parses the streaming output.
+
+The agent abstraction means the plan/task workflow stays the same regardless of which backend you use. Switching agents only affects the CLI flags Maggus passes and how it parses the streaming response — your plan files, acceptance criteria, and work loop behavior are unchanged.
+
+### Supported Agents
+
+| | Claude Code | OpenCode |
+|---|---|---|
+| CLI tool | `claude` | `opencode` |
+| Streaming | Real-time JSON events | Single JSON response on completion |
+| Model flag | `--model` (passed by Maggus) | Configured via OpenCode's own config file |
+| Permissions | `--dangerously-skip-permissions` flag | Auto-approves in non-interactive mode |
+| Model format | Bare ID (e.g. `claude-sonnet-4-6`) | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
+
+### Selecting an Agent
+
+Set the agent in `.maggus/config.yml`:
+
+```yaml
+agent: opencode
+```
+
+Or override per-run with the CLI flag:
+
+```bash
+maggus work --agent opencode
+```
+
+If no agent is configured, Maggus defaults to `claude` (Claude Code) for backwards compatibility. See the [Configuration reference](/reference/configuration) for full details.
 
 ## Git Branch Behavior
 
@@ -41,8 +73,8 @@ Press **Ctrl+C** during this countdown to cancel the run before any work begins.
 
 Maggus handles interrupts gracefully:
 
-- **First Ctrl+C** — Signals a graceful stop. Maggus finishes processing the current Claude Code response, commits any pending work, and then exits cleanly.
-- **Second Ctrl+C** — Force-kills the process immediately, including any running Claude Code subprocess.
+- **First Ctrl+C** — Signals a graceful stop. Maggus finishes processing the current agent response, commits any pending work, and then exits cleanly.
+- **Second Ctrl+C** — Force-kills the process immediately, including any running agent subprocess.
 
 This two-stage approach ensures you don't lose work from a partially completed task. If you need to stop urgently, the double Ctrl+C always works.
 
@@ -65,12 +97,12 @@ Below the header, the current task ID and title are displayed in cyan, so you al
 
 The main area of the TUI shows:
 - **Spinner and status** — Current activity (e.g., "Running", "Writing file", "Done")
-- **Output** — Recent text output from Claude Code
-- **Tool history** — The last 10 tools Claude Code invoked, shown with `│` and `▶` prefixes
+- **Output** — Recent text output from the agent
+- **Tool history** — The last 10 tools the agent invoked, shown with `│` and `▶` prefixes
 - **Model** — Which Claude model is being used
 - **Elapsed time** — How long the current iteration has been running
 
-The status updates in real-time as Claude Code streams its response.
+The status updates in real-time as the agent streams its response.
 
 ### Recent Commits
 
