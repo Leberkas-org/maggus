@@ -164,6 +164,44 @@ func TestRunReleaseWritesFile(t *testing.T) {
 	if !strings.Contains(content, "Added a great new feature") {
 		t.Error("RELEASE.md should contain the AI summary")
 	}
+
+	// Verify RELEASE_NOTES.md was cleared
+	if _, err := os.Stat(filepath.Join(maggusDir, "RELEASE_NOTES.md")); !os.IsNotExist(err) {
+		t.Error("RELEASE_NOTES.md should be deleted after release")
+	}
+	if !strings.Contains(output, "Cleared .maggus/RELEASE_NOTES.md for next release cycle.") {
+		t.Errorf("expected cleared message, got:\n%s", output)
+	}
+}
+
+func TestRunReleaseNoReleaseNotes(t *testing.T) {
+	dir := t.TempDir()
+	gitInit(t, dir)
+	gitCommit(t, dir, "initial commit")
+	gitTag(t, dir, "v0.1.0")
+	gitCommit(t, dir, "feat: add something")
+
+	// No .maggus/RELEASE_NOTES.md — should not error
+
+	origRunner := runClaudeOnce
+	runClaudeOnce = func(ctx context.Context, prompt string, model string) (string, error) {
+		return "- Summary", nil
+	}
+	defer func() { runClaudeOnce = origRunner }()
+
+	var buf bytes.Buffer
+	cmd := *releaseCmd
+	cmd.SetOut(&buf)
+
+	err := runRelease(&cmd, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if strings.Contains(output, "Cleared .maggus/RELEASE_NOTES.md") {
+		t.Error("should not print cleared message when file didn't exist")
+	}
 }
 
 func TestRunReleaseOutputFormat(t *testing.T) {

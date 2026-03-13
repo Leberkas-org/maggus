@@ -82,10 +82,10 @@ Add two new CLI commands to Maggus: `maggus clean` for housekeeping (removing co
 **Description:** As a user, I want `.maggus/RELEASE_NOTES.md` to be cleared after running `maggus release` so that notes don't carry over to the next release cycle.
 
 **Acceptance Criteria:**
-- [ ] After `maggus release` successfully writes `RELEASE.md`, the command deletes `.maggus/RELEASE_NOTES.md` (or truncates it to empty)
-- [ ] If `.maggus/RELEASE_NOTES.md` doesn't exist, no error is raised
-- [ ] A message is printed: "Cleared .maggus/RELEASE_NOTES.md for next release cycle."
-- [ ] Typecheck/lint passes (`go vet ./...`)
+- [x] After `maggus release` successfully writes `RELEASE.md`, the command deletes `.maggus/RELEASE_NOTES.md` (or truncates it to empty)
+- [x] If `.maggus/RELEASE_NOTES.md` doesn't exist, no error is raised
+- [x] A message is printed: "Cleared .maggus/RELEASE_NOTES.md for next release cycle."
+- [x] Typecheck/lint passes (`go vet ./...`)
 
 ## Functional Requirements
 

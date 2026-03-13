@@ -111,6 +111,13 @@ func runRelease(cmd *cobra.Command, dir string) error {
 	fmt.Fprintln(out, "## Summary")
 	fmt.Fprintln(out, summary)
 
+	// Clear release notes for next cycle
+	if err := os.Remove(notesPath); err == nil {
+		fmt.Fprintln(out, "\nCleared .maggus/RELEASE_NOTES.md for next release cycle.")
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("clear release notes: %w", err)
+	}
+
 	return nil
 }
 
