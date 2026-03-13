@@ -76,25 +76,67 @@ func ProgressBarPlain(done, total, width int) string {
 	return strings.Repeat("#", filled) + strings.Repeat(".", width-filled)
 }
 
-// FullScreen wraps content in a bordered box that fills the terminal with a
-// small margin, then centers the result on screen. Use this as the outermost
-// wrapper in every View() to get a consistent layout across all commands.
-func FullScreen(content string, width, height int) string {
-	const margin = 2 // chars on each side
+// FullScreenMargin is the number of characters reserved on each side of the
+// full-screen box (outside the border).
+const FullScreenMargin = 2
 
-	innerW := width - margin*2 - 2  // 2 for border chars
-	innerH := height - margin*2 - 2 // 2 for border chars
-	if innerW < 0 {
-		innerW = 0
+// centerBlock horizontally centers a block of text within the given width.
+// All lines are shifted by the same amount so internal alignment is preserved.
+func centerBlock(text string, totalWidth int) string {
+	lines := strings.Split(text, "\n")
+
+	// Find the widest visible line (ANSI-aware).
+	maxW := 0
+	for _, l := range lines {
+		if w := lipgloss.Width(l); w > maxW {
+			maxW = w
+		}
 	}
-	if innerH < 0 {
-		innerH = 0
+
+	pad := (totalWidth - maxW) / 2
+	if pad <= 0 {
+		return text
+	}
+
+	prefix := strings.Repeat(" ", pad)
+	for i, l := range lines {
+		if l != "" {
+			lines[i] = prefix + l
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// FullScreen wraps content and an optional footer in a bordered box that fills
+// the terminal with a small margin. The content block is horizontally centered
+// as a whole (preserving internal column alignment) and the footer is pinned
+// to the bottom line inside the box.
+func FullScreen(content, footer string, width, height int) string {
+	innerW, innerH := fullScreenInner(width, height)
+
+	// Center the content block as a whole — columns stay aligned.
+	centered := centerBlock(content, innerW)
+
+	// Count content lines
+	contentLines := strings.Count(centered, "\n") + 1
+
+	// Build the composed body: centered content + gap + footer
+	var body string
+	if footer != "" {
+		footerLine := centerBlock(footer, innerW)
+		gap := innerH - contentLines - 1
+		if gap < 0 {
+			gap = 0
+		}
+		body = centered + strings.Repeat("\n", gap) + footerLine
+	} else {
+		body = centered
 	}
 
 	box := Box.
 		Width(innerW).
 		Height(innerH).
-		Render(content)
+		Render(body)
 
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
 }
@@ -102,9 +144,12 @@ func FullScreen(content string, width, height int) string {
 // FullScreenInnerSize returns the usable content width and height inside a
 // FullScreen box for the given terminal dimensions.
 func FullScreenInnerSize(width, height int) (int, int) {
-	const margin = 2
-	innerW := width - margin*2 - 2 - 2 // margin + border + padding
-	innerH := height - margin*2 - 2     // margin + border
+	return fullScreenInner(width, height)
+}
+
+func fullScreenInner(width, height int) (int, int) {
+	innerW := width - FullScreenMargin*2 - 2 - 2 // margin + border + padding
+	innerH := height - FullScreenMargin*2 - 2     // margin + border
 	if innerW < 0 {
 		innerW = 0
 	}

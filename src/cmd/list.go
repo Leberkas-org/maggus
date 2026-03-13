@@ -50,7 +50,7 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.showDetail {
 			w, h := styles.FullScreenInnerSize(msg.Width, msg.Height)
 			m.detailViewport.Width = w
-			m.detailViewport.Height = h - 2 // footer line + gap
+			m.detailViewport.Height = h - 1 // footer line
 			m.detailReady = true
 		}
 		return m, nil
@@ -104,7 +104,7 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showDetail = true
 		content := m.renderDetailContent(m.tasks[m.cursor])
 		w, h := styles.FullScreenInnerSize(m.width, m.height)
-		m.detailViewport = viewport.New(w, h-2)
+		m.detailViewport = viewport.New(w, h-1)
 		m.detailViewport.SetContent(content)
 		m.detailReady = true
 		return m, nil
@@ -217,7 +217,7 @@ func (m listModel) viewConfirmDelete() string {
 		mutedStyle.Render("n/esc: cancel")))
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(sb.String(), m.width, m.height)
+		return styles.FullScreen(sb.String(), "", m.width, m.height)
 	}
 	return styles.Box.Render(sb.String()) + "\n"
 }
@@ -261,13 +261,11 @@ func (m listModel) viewList() string {
 	}
 
 	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
-	sb.WriteString("\n")
-	sb.WriteString(footer)
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(sb.String(), m.width, m.height)
+		return styles.FullScreen(sb.String(), footer, m.width, m.height)
 	}
-	return styles.Box.Render(sb.String()) + "\n"
+	return styles.Box.Render(sb.String()+"\n\n"+footer) + "\n"
 }
 
 func (m listModel) renderDetailContent(t parser.Task) string {
@@ -341,11 +339,10 @@ func (m listModel) viewDetail() string {
 		footer = styles.StatusBar.Render("pgup/pgdn: prev/next task · alt+r: run · alt+bksp: delete · esc: back · q: exit")
 	}
 
-	content := m.detailViewport.View() + "\n" + footer
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(content, m.width, m.height)
+		return styles.FullScreen(m.detailViewport.View(), footer, m.width, m.height)
 	}
-	return styles.Box.Render(content) + "\n"
+	return styles.Box.Render(m.detailViewport.View()+"\n"+footer) + "\n"
 }
 
 // renderListPlain builds the plain-text list output (no ANSI, no TUI).

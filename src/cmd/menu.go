@@ -313,22 +313,22 @@ func (m menuModel) View() string {
 		)
 	}
 
-	var body string
+	var body, footer string
 	if m.inSubMenu {
-		body = m.viewSubMenu()
+		body, footer = m.viewSubMenu()
 	} else {
-		body = m.viewMainMenu()
+		body, footer = m.viewMainMenu()
 	}
 
 	content := header + "\n" + summaryLine + "\n\n" + body
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(content, m.width, m.height)
+		return styles.FullScreen(content, footer, m.width, m.height)
 	}
-	return styles.Box.Render(content) + "\n"
+	return styles.Box.Render(content+"\n\n"+footer) + "\n"
 }
 
-func (m menuModel) viewMainMenu() string {
+func (m menuModel) viewMainMenu() (string, string) {
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	descStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -351,10 +351,10 @@ func (m menuModel) viewMainMenu() string {
 	}
 
 	footer := styles.StatusBar.Render("↑/↓: navigate · enter: select · q/esc: exit")
-	return sb.String() + "\n" + footer
+	return sb.String(), footer
 }
 
-func (m menuModel) viewSubMenu() string {
+func (m menuModel) viewSubMenu() (string, string) {
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -411,5 +411,5 @@ func (m menuModel) viewSubMenu() string {
 	}
 
 	footer := styles.StatusBar.Render("↑/↓: navigate · ←/→: change value · enter: select/run · esc: back")
-	return sb.String() + "\n" + footer
+	return sb.String(), footer
 }
