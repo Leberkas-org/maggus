@@ -55,13 +55,13 @@ The current status view shows all plans and all tasks in a single long scrollabl
 **Description:** As a user, I want all existing status interactions (detail view, run, delete, toggle) to work in the new layout.
 
 **Acceptance Criteria:**
-- [ ] Pressing `enter` on a task opens the detail view (same as before, with criteria mode)
-- [ ] Pressing `alt+r` dispatches work on the selected task
-- [ ] Pressing `alt+bksp` shows the delete confirmation for the selected task
-- [ ] Pressing `alt+a` toggles `showAll`, reloads from disk, and rebuilds both tabs and task list
-- [ ] The footer shows all available keybindings including `ctrl+tab/ctrl+shift+tab: switch plan`
-- [ ] `esc`/`q` exits the status view
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] Pressing `enter` on a task opens the detail view (same as before, with criteria mode)
+- [x] Pressing `alt+r` dispatches work on the selected task
+- [x] Pressing `alt+bksp` shows the delete confirmation for the selected task
+- [x] Pressing `alt+a` toggles `showAll`, reloads from disk, and rebuilds both tabs and task list
+- [x] The footer shows all available keybindings including `ctrl+tab/ctrl+shift+tab: switch plan`
+- [x] `esc`/`q` exits the status view
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-005: Remove old status layout
 **Description:** As a developer, I want to remove the old status rendering code that is no longer needed after the redesign.
