@@ -75,6 +75,7 @@ type statusModel struct {
 	// Flat list of selectable tasks (index into plans/tasks)
 	selectableTasks []parser.Task
 	cursor          int
+	scrollOffset    int
 	width           int
 	height          int
 
@@ -149,6 +150,35 @@ func (m *statusModel) rebuildForSelectedPlan() {
 		m.selectableTasks = nil
 	}
 	m.cursor = 0
+	m.scrollOffset = 0
+}
+
+// visibleTaskLines returns how many task lines fit in the status task list area.
+func (m statusModel) visibleTaskLines() int {
+	// Header: title + blank + tab bar (estimate 2 lines) + separator + blank + progress + blank + tasks header + separator = ~9 lines
+	// Footer: 1 line
+	headerLines := 9
+	footerLines := 1
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	avail := innerH - headerLines - footerLines
+	if avail < 1 {
+		avail = 1
+	}
+	return avail
+}
+
+// ensureCursorVisible adjusts scrollOffset so cursor is within the visible window.
+func (m *statusModel) ensureCursorVisible() {
+	visible := m.visibleTaskLines()
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
 }
 
 func (m statusModel) Init() tea.Cmd {
@@ -238,6 +268,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.cursor = len(m.selectableTasks) - 1
 			}
+			m.ensureCursorVisible()
 		}
 	case "down", "j":
 		if len(m.selectableTasks) > 0 {
@@ -246,12 +277,15 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.cursor = 0
 			}
+			m.ensureCursorVisible()
 		}
 	case "home":
 		m.cursor = 0
+		m.ensureCursorVisible()
 	case "end":
 		if len(m.selectableTasks) > 0 {
 			m.cursor = len(m.selectableTasks) - 1
+			m.ensureCursorVisible()
 		}
 	case "enter":
 		if len(m.selectableTasks) > 0 {
@@ -599,11 +633,15 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString("\n")
 		sb.WriteString(" " + styles.Separator(42))
 
-		taskIdx := 0
-		for _, t := range p.tasks {
-			if !m.showAll && t.IsComplete() {
-				continue
-			}
+		// Determine visible window for scrolling
+		visibleLines := m.visibleTaskLines()
+		end := m.scrollOffset + visibleLines
+		if end > len(m.selectableTasks) {
+			end = len(m.selectableTasks)
+		}
+
+		for taskIdx := m.scrollOffset; taskIdx < end; taskIdx++ {
+			t := m.selectableTasks[taskIdx]
 
 			var icon string
 			var style lipgloss.Style
@@ -657,8 +695,13 @@ func (m statusModel) viewStatus() string {
 					sb.WriteString(statusRedStyle.Render(blockedLine))
 				}
 			}
+		}
 
-			taskIdx++
+		// Scroll indicator
+		if len(m.selectableTasks) > visibleLines {
+			scrollHint := fmt.Sprintf(" [%d-%d of %d]", m.scrollOffset+1, end, len(m.selectableTasks))
+			sb.WriteString("\n")
+			sb.WriteString(statusDimStyle.Render(scrollHint))
 		}
 	}
 

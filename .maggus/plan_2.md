@@ -42,14 +42,14 @@ The current status view shows all plans and all tasks in a single long scrollabl
 **Description:** As a user, I want the task list to only show tasks from the selected plan, so I can focus on one plan at a time without visual noise from other plans.
 
 **Acceptance Criteria:**
-- [ ] The task list below the progress bar only shows tasks from the currently selected plan
-- [ ] By default (showAll=false), completed tasks within the plan are hidden
-- [ ] Tasks are navigable with arrow keys (up/down/j/k), with cursor wrapping
-- [ ] Switching plans via `ctrl+tab/ctrl+shift+tab` resets the task cursor to 0 and rebuilds the task list
-- [ ] Blocked tasks show the `⚠` icon and are colored red; the next workable task shows `→` in cyan; pending tasks show `○` in muted
-- [ ] When `showAll` is toggled via `alt+a`, completed tasks (green `✓`) appear/disappear and plans reload from disk
-- [ ] The task list is scrollable via viewport when it exceeds the available height
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] The task list below the progress bar only shows tasks from the currently selected plan
+- [x] By default (showAll=false), completed tasks within the plan are hidden
+- [x] Tasks are navigable with arrow keys (up/down/j/k), with cursor wrapping
+- [x] Switching plans via `ctrl+tab/ctrl+shift+tab` resets the task cursor to 0 and rebuilds the task list
+- [x] Blocked tasks show the `⚠` icon and are colored red; the next workable task shows `→` in cyan; pending tasks show `○` in muted
+- [x] When `showAll` is toggled via `alt+a`, completed tasks (green `✓`) appear/disappear and plans reload from disk
+- [x] The task list is scrollable via viewport when it exceeds the available height
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-004: Preserve existing interactions in new layout
 **Description:** As a user, I want all existing status interactions (detail view, run, delete, toggle) to work in the new layout.
