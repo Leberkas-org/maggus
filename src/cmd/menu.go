@@ -90,12 +90,6 @@ func buildSubMenus() map[string]subMenuDef {
 			{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
 			{label: "Worktree", values: []string{"off", "on"}, current: 0},
 		}},
-		"list": {options: []subMenuOption{
-			{label: "Count", values: []string{"5", "10", "20", "all"}, current: 0},
-		}},
-		"status": {options: []subMenuOption{
-			{label: "All", values: []string{"off", "on"}, current: 0},
-		}},
 		"worktree": {options: []subMenuOption{
 			{label: "Action", values: []string{"list", "clean"}, current: 0},
 		}},
@@ -116,20 +110,6 @@ func buildArgs(cmdName string, opts []subMenuOption) []string {
 		// Worktree option
 		if opts[1].values[opts[1].current] == "on" {
 			args = append(args, "--worktree")
-		}
-		return args
-	case "list":
-		var args []string
-		if opts[0].values[opts[0].current] == "all" {
-			args = append(args, "--all")
-		} else {
-			args = append(args, "--count", opts[0].values[opts[0].current])
-		}
-		return args
-	case "status":
-		var args []string
-		if opts[0].values[opts[0].current] == "on" {
-			args = append(args, "--all")
 		}
 		return args
 	case "worktree":

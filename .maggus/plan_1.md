@@ -18,12 +18,12 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 **Description:** As a user, I want `list` and `status` to launch directly from the main menu without a settings dialog, so I get to the information faster.
 
 **Acceptance Criteria:**
-- [ ] Selecting "list" in the main menu launches the list TUI directly (no sub-menu)
-- [ ] Selecting "status" in the main menu launches the status TUI directly (no sub-menu)
-- [ ] The `buildSubMenus()` map no longer contains entries for "list" or "status"
-- [ ] The `buildArgs()` switch no longer contains cases for "list" or "status"
-- [ ] CLI flags (`--plain`, `--all`, `--count`) still work when running `maggus list` or `maggus status` directly from the command line
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] Selecting "list" in the main menu launches the list TUI directly (no sub-menu)
+- [x] Selecting "status" in the main menu launches the status TUI directly (no sub-menu)
+- [x] The `buildSubMenus()` map no longer contains entries for "list" or "status"
+- [x] The `buildArgs()` switch no longer contains cases for "list" or "status"
+- [x] CLI flags (`--plain`, `--all`, `--count`) still work when running `maggus list` or `maggus status` directly from the command line
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-002: List command shows all incomplete tasks with scrollable viewport
 **Description:** As a user, I want the `list` command to show all incomplete tasks (including blocked ones) in a scrollable list, so I can browse the full backlog without a count cap.
