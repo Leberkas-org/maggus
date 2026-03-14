@@ -17,21 +17,28 @@ type menuItem struct {
 	desc              string
 	requiresClaude    bool
 	hideIfInitialized bool
+	separator         bool // render a blank line before this item
+	isExit            bool // quit the menu instead of dispatching a command
 }
 
 var allMenuItems = []menuItem{
+	// Group 1: Core workflow
 	{name: "work", desc: "Work on the next N tasks from the implementation plan"},
-	{name: "plan", desc: "Open an interactive AI session to create a plan", requiresClaude: true},
-	{name: "vision", desc: "Open an interactive AI session to create VISION.md", requiresClaude: true},
-	{name: "architecture", desc: "Open an interactive AI session to create ARCHITECTURE.md", requiresClaude: true},
-	{name: "list", desc: "Preview the next N upcoming workable tasks"},
 	{name: "status", desc: "Show a compact summary of plan progress"},
-	{name: "blocked", desc: "Interactive wizard to manage blocked tasks"},
-	{name: "clean", desc: "Remove completed plan files and finished run directories"},
-	{name: "release", desc: "Generate RELEASE.md with changelog and AI summary"},
+	{name: "list", desc: "Preview upcoming workable tasks"},
+	// Group 2: AI-assisted creation
+	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true},
+	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true},
+	{name: "plan", desc: "Create an implementation plan", requiresClaude: true},
+	// Group 3: Project management
+	{name: "config", desc: "Edit project settings", separator: true},
 	{name: "worktree", desc: "Manage Maggus worktrees"},
-	{name: "config", desc: "Edit project settings interactively"},
-	{name: "init", desc: "Initialize a .maggus project in the current directory", hideIfInitialized: true},
+	{name: "release", desc: "Generate RELEASE.md with changelog"},
+	{name: "clean", desc: "Remove completed plans and finished runs"},
+	{name: "blocked", desc: "Interactive wizard to manage blocked tasks"},
+	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+	// Exit
+	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
 }
 
 // activeMenuItems returns the menu items filtered by available capabilities.
@@ -44,6 +51,10 @@ func activeMenuItems() []menuItem {
 		}
 		if item.hideIfInitialized && initialized {
 			continue
+		}
+		// Don't start with a separator if this is the first visible item.
+		if item.separator && len(items) == 0 {
+			item.separator = false
 		}
 		items = append(items, item)
 	}
@@ -222,8 +233,12 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "end":
 		m.cursor = len(m.items) - 1
 	case "enter":
-		name := m.items[m.cursor].name
-		if def, ok := m.subMenuDefs[name]; ok {
+		item := m.items[m.cursor]
+		if item.isExit {
+			m.quitting = true
+			return m, tea.Quit
+		}
+		if def, ok := m.subMenuDefs[item.name]; ok {
 			// Deep copy the sub-menu def so each entry resets
 			copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
 			for i, opt := range def.options {
@@ -239,7 +254,7 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// No sub-menu — launch directly
-		m.selected = name
+		m.selected = item.name
 		return m, tea.Quit
 	}
 	return m, nil
@@ -362,6 +377,9 @@ func (m menuModel) viewMainMenu() (string, string) {
 
 	var sb strings.Builder
 	for i, item := range m.items {
+		if item.separator {
+			sb.WriteString("\n")
+		}
 		if i == m.cursor {
 			fmt.Fprintf(&sb, "  %s %s  %s\n",
 				cursorStyle.Render("→"),
