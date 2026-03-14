@@ -568,19 +568,22 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString("\n")
 	}
 
-	// Summary for selected plan
+	// Progress bar and summary for selected plan
 	if m.selectedPlan < len(visible) {
 		p := visible[m.selectedPlan]
 		done := p.doneCount()
 		total := len(p.tasks)
 		blocked := p.blockedCount()
 		pending := total - done - blocked
-		summary := fmt.Sprintf(" %d/%d tasks complete · %d pending · %d blocked · Agent: %s",
-			done, total, pending, blocked, m.agentName)
-		sb.WriteString(summary)
+		sb.WriteString("\n " + buildProgressBar(done, total))
+		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
+			done, total, pending, blocked)
+		sb.WriteString(statusDimStyle.Render(summary))
 	} else {
-		fmt.Fprintf(&sb, " Summary: %d/%d tasks complete · %d pending · %d blocked · Agent: %s",
-			totalDone, totalTasks, totalPending, totalBlocked, m.agentName)
+		sb.WriteString("\n " + buildProgressBar(totalDone, totalTasks))
+		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
+			totalDone, totalTasks, totalPending, totalBlocked)
+		sb.WriteString(statusDimStyle.Render(summary))
 	}
 
 	// Task list for selected plan

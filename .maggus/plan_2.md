@@ -32,11 +32,11 @@ The current status view shows all plans and all tasks in a single long scrollabl
 **Description:** As a user, I want to see a progress bar for the currently selected plan, so I get a quick visual sense of how far along it is.
 
 **Acceptance Criteria:**
-- [ ] Below the tab row, a progress bar is rendered for the selected plan
-- [ ] The progress bar uses the existing `styles.ProgressBar` helper
-- [ ] Summary stats are scoped to the selected plan: `done/total tasks · N pending · N blocked`
-- [ ] The progress bar and stats update when switching plans via `ctrl+tab/ctrl+shift+tab`
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] Below the tab row, a progress bar is rendered for the selected plan
+- [x] The progress bar uses the existing `styles.ProgressBar` helper
+- [x] Summary stats are scoped to the selected plan: `done/total tasks · N pending · N blocked`
+- [x] The progress bar and stats update when switching plans via `ctrl+tab/ctrl+shift+tab`
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-003: Scoped task list for the selected plan
 **Description:** As a user, I want the task list to only show tasks from the selected plan, so I can focus on one plan at a time without visual noise from other plans.
