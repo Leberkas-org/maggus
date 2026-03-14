@@ -12,18 +12,34 @@ import (
 
 // menuItem represents a single entry in the main menu.
 type menuItem struct {
-	name string
-	desc string
+	name          string
+	desc          string
+	requiresClaude bool
 }
 
-var menuItems = []menuItem{
+var allMenuItems = []menuItem{
 	{name: "work", desc: "Work on the next N tasks from the implementation plan"},
+	{name: "plan", desc: "Open an interactive AI session to create a plan", requiresClaude: true},
+	{name: "vision", desc: "Open an interactive AI session to create VISION.md", requiresClaude: true},
+	{name: "architecture", desc: "Open an interactive AI session to create ARCHITECTURE.md", requiresClaude: true},
 	{name: "list", desc: "Preview the next N upcoming workable tasks"},
 	{name: "status", desc: "Show a compact summary of plan progress"},
 	{name: "blocked", desc: "Interactive wizard to manage blocked tasks"},
 	{name: "clean", desc: "Remove completed plan files and finished run directories"},
 	{name: "release", desc: "Generate RELEASE.md with changelog and AI summary"},
 	{name: "worktree", desc: "Manage Maggus worktrees"},
+}
+
+// activeMenuItems returns the menu items filtered by available capabilities.
+func activeMenuItems() []menuItem {
+	var items []menuItem
+	for _, item := range allMenuItems {
+		if item.requiresClaude && !caps.HasClaude {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 // subMenuOption represents a configurable option in a command's sub-menu.
@@ -133,6 +149,7 @@ func loadPlanSummary() planSummary {
 
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
+	items    []menuItem
 	cursor   int
 	selected string   // command name chosen by the user, empty if quit
 	args     []string // args to pass to the selected command
@@ -150,6 +167,7 @@ type menuModel struct {
 
 func newMenuModel(summary planSummary) menuModel {
 	return menuModel{
+		items:       activeMenuItems(),
 		summary:     summary,
 		subMenuDefs: buildSubMenus(),
 	}
@@ -183,10 +201,10 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		} else {
-			m.cursor = len(menuItems) - 1
+			m.cursor = len(m.items) - 1
 		}
 	case "down", "j":
-		if m.cursor < len(menuItems)-1 {
+		if m.cursor < len(m.items)-1 {
 			m.cursor++
 		} else {
 			m.cursor = 0
@@ -194,9 +212,9 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "home":
 		m.cursor = 0
 	case "end":
-		m.cursor = len(menuItems) - 1
+		m.cursor = len(m.items) - 1
 	case "enter":
-		name := menuItems[m.cursor].name
+		name := m.items[m.cursor].name
 		if def, ok := m.subMenuDefs[name]; ok {
 			// Deep copy the sub-menu def so each entry resets
 			copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
@@ -268,7 +286,7 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.subCursor == len(m.activeSubDef.options) {
 			// "Run" selected
-			name := menuItems[m.cursor].name
+			name := m.items[m.cursor].name
 			m.selected = name
 			m.args = buildArgs(name, m.activeSubDef.options)
 			return m, tea.Quit
@@ -335,7 +353,7 @@ func (m menuModel) viewMainMenu() (string, string) {
 	normalStyle := lipgloss.NewStyle()
 
 	var sb strings.Builder
-	for i, item := range menuItems {
+	for i, item := range m.items {
 		if i == m.cursor {
 			fmt.Fprintf(&sb, "  %s %s  %s\n",
 				cursorStyle.Render("→"),
@@ -361,8 +379,8 @@ func (m menuModel) viewSubMenu() (string, string) {
 	normalStyle := lipgloss.NewStyle()
 	activeValueStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
 
-	cmdName := menuItems[m.cursor].name
-	titleLine := selectedStyle.Render(cmdName) + "  " + mutedStyle.Render(menuItems[m.cursor].desc)
+	cmdName := m.items[m.cursor].name
+	titleLine := selectedStyle.Render(cmdName) + "  " + mutedStyle.Render(m.items[m.cursor].desc)
 
 	var sb strings.Builder
 	sb.WriteString(titleLine + "\n")

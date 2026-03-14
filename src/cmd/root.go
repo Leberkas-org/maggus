@@ -5,11 +5,15 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
+	"github.com/leberkas-org/maggus/internal/capabilities"
 	"github.com/spf13/cobra"
 )
 
 // Version is set at build time via -ldflags.
 var Version = "dev"
+
+// caps holds the detected tool capabilities for this run.
+var caps capabilities.Capabilities
 
 var rootCmd = &cobra.Command{
 	Use:     "maggus",
@@ -55,6 +59,16 @@ func runMenu(cmd *cobra.Command, args []string) error {
 }
 
 func Execute() {
+	// Detect and cache available CLI tools on startup.
+	caps = capabilities.Detect()
+
+	// Register skill commands only when claude is available.
+	if caps.HasClaude {
+		rootCmd.AddCommand(planCmd)
+		rootCmd.AddCommand(visionCmd)
+		rootCmd.AddCommand(architectureCmd)
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
