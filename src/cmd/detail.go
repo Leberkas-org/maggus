@@ -16,10 +16,11 @@ type criteriaAction int
 const (
 	criteriaActionUnblock criteriaAction = iota
 	criteriaActionResolve
+	criteriaActionDelete
 	criteriaActionSkip
 )
 
-var criteriaActions = []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionSkip}
+var criteriaActions = []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkip}
 
 func (a criteriaAction) String() string {
 	switch a {
@@ -27,8 +28,24 @@ func (a criteriaAction) String() string {
 		return "Unblock"
 	case criteriaActionResolve:
 		return "Resolve"
+	case criteriaActionDelete:
+		return "Delete"
 	case criteriaActionSkip:
 		return "Skip"
+	}
+	return ""
+}
+
+func (a criteriaAction) Description() string {
+	switch a {
+	case criteriaActionUnblock:
+		return "Remove BLOCKED: prefix, keep unchecked"
+	case criteriaActionResolve:
+		return "Mark as done (remove block + check)"
+	case criteriaActionDelete:
+		return "Remove criterion entirely"
+	case criteriaActionSkip:
+		return "Do nothing"
 	}
 	return ""
 }
@@ -88,6 +105,11 @@ func (d *detailState) performAction(task parser.Task, action criteriaAction) (mo
 		return true, nil
 	case criteriaActionResolve:
 		if err := parser.ResolveCriterion(task.SourceFile, c); err != nil {
+			return false, err
+		}
+		return true, nil
+	case criteriaActionDelete:
+		if err := parser.DeleteCriterion(task.SourceFile, c); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -207,6 +229,7 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 func renderInlineActionPicker(cursor int) string {
 	successStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
 	var sb strings.Builder
@@ -221,10 +244,13 @@ func renderInlineActionPicker(cursor int) string {
 			label = successStyle.Render(a.String())
 		case criteriaActionResolve:
 			label = warningStyle.Render(a.String())
+		case criteriaActionDelete:
+			label = errorStyle.Render(a.String())
 		default:
 			label = mutedStyle.Render(a.String())
 		}
-		sb.WriteString(fmt.Sprintf("      %s%s\n", prefix, label))
+		desc := mutedStyle.Render(" " + a.Description())
+		sb.WriteString(fmt.Sprintf("      %s%s%s\n", prefix, label, desc))
 	}
 	return sb.String()
 }

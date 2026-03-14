@@ -95,24 +95,33 @@ type statusModel struct {
 }
 
 func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
-	// Build flat list of selectable tasks
-	var selectable []parser.Task
-	for _, p := range plans {
-		if p.completed && !showAll {
-			continue
-		}
-		selectable = append(selectable, p.tasks...)
-	}
-
 	return statusModel{
 		plans:           plans,
 		showAll:         showAll,
 		nextTaskID:      nextTaskID,
 		nextTaskFile:    nextTaskFile,
 		agentName:       agentName,
-		selectableTasks: selectable,
+		selectableTasks: buildSelectableTasks(plans, showAll),
 		dir:             dir,
 	}
+}
+
+// buildSelectableTasks returns the flat list of tasks the cursor can navigate.
+// When showAll is false, completed plans and completed tasks are excluded.
+func buildSelectableTasks(plans []planInfo, showAll bool) []parser.Task {
+	var selectable []parser.Task
+	for _, p := range plans {
+		if p.completed && !showAll {
+			continue
+		}
+		for _, t := range p.tasks {
+			if !showAll && t.IsComplete() {
+				continue
+			}
+			selectable = append(selectable, t)
+		}
+	}
+	return selectable
 }
 
 func (m statusModel) Init() tea.Cmd {
@@ -159,14 +168,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err == nil {
 			m.plans = plans
 		}
-		var selectable []parser.Task
-		for _, p := range m.plans {
-			if p.completed && !m.showAll {
-				continue
-			}
-			selectable = append(selectable, p.tasks...)
-		}
-		m.selectableTasks = selectable
+		m.selectableTasks = buildSelectableTasks(m.plans, m.showAll)
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
 		m.cursor = 0
 		return m, nil
@@ -378,14 +380,7 @@ func (m statusModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		plans, err := parsePlans(m.dir)
 		if err == nil {
 			m.plans = plans
-			var selectable []parser.Task
-			for _, p := range plans {
-				if p.completed && !m.showAll {
-					continue
-				}
-				selectable = append(selectable, p.tasks...)
-			}
-			m.selectableTasks = selectable
+			m.selectableTasks = buildSelectableTasks(m.plans, m.showAll)
 			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
 		}
 		if m.cursor >= len(m.selectableTasks) && m.cursor > 0 {
@@ -470,6 +465,19 @@ func (m statusModel) viewStatus() string {
 		if p.completed && !m.showAll {
 			continue
 		}
+
+		// Check if this plan has any visible tasks
+		hasVisible := false
+		for _, t := range p.tasks {
+			if m.showAll || !t.IsComplete() {
+				hasVisible = true
+				break
+			}
+		}
+		if !hasVisible {
+			continue
+		}
+
 		sb.WriteString("\n\n")
 		if p.completed {
 			sb.WriteString(statusDimGreen.Render(fmt.Sprintf(" Tasks — %s (archived)", p.filename)))
@@ -480,6 +488,10 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString(" " + styles.Separator(42))
 
 		for _, t := range p.tasks {
+			if !m.showAll && t.IsComplete() {
+				continue
+			}
+
 			var icon string
 			var style lipgloss.Style
 

@@ -35,7 +35,6 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 - [x] The header shows the total count of displayed tasks (e.g. "All incomplete tasks (12)")
 - [x] Existing detail view (enter), run (alt+r), and delete (alt+backspace) still work
 - [x] `--plain` mode still works and respects `--count` and `--all` flags as before
-- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-003: Status command defaults to unfinished plans with alt+a toggle
 **Description:** As a user, I want the `status` command to show only unfinished plans by default, with `alt+a` to toggle showing completed plans, so I can focus on active work but still check history when needed.
