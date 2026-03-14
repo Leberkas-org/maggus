@@ -20,10 +20,12 @@ import (
 type listModel struct {
 	tasks     []parser.Task
 	agentName string
-	all       bool
 	cursor    int
 	width     int
 	height    int
+
+	// Scrollable list state
+	scrollOffset int
 
 	// Detail view state
 	showDetail     bool
@@ -73,6 +75,34 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// visibleTaskLines returns how many task lines fit in the list view.
+func (m listModel) visibleTaskLines() int {
+	// Header: title + agent + separator + blank = 4 lines
+	// Footer: 1 line
+	headerLines := 4
+	footerLines := 1
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	avail := innerH - headerLines - footerLines
+	if avail < 1 {
+		avail = 1
+	}
+	return avail
+}
+
+// ensureCursorVisible adjusts scrollOffset so cursor is within the visible window.
+func (m *listModel) ensureCursorVisible() {
+	visible := m.visibleTaskLines()
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
 func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "alt+r":
@@ -90,16 +120,20 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.cursor = len(m.tasks) - 1
 		}
+		m.ensureCursorVisible()
 	case "down", "j":
 		if m.cursor < len(m.tasks)-1 {
 			m.cursor++
 		} else {
 			m.cursor = 0
 		}
+		m.ensureCursorVisible()
 	case "home":
 		m.cursor = 0
+		m.ensureCursorVisible()
 	case "end":
 		m.cursor = len(m.tasks) - 1
+		m.ensureCursorVisible()
 	case "enter":
 		m.showDetail = true
 		content := m.renderDetailContent(m.tasks[m.cursor])
@@ -225,18 +259,14 @@ func (m listModel) viewConfirmDelete() string {
 func (m listModel) viewList() string {
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	blockedStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 	mutedStyle := lipgloss.NewStyle().Faint(true)
 	normalStyle := lipgloss.NewStyle()
 
 	var sb strings.Builder
 
-	// Header
-	var header string
-	if m.all {
-		header = styles.Title.Render(fmt.Sprintf("All upcoming tasks (%d)", len(m.tasks)))
-	} else {
-		header = styles.Title.Render(fmt.Sprintf("Next %d task(s)", len(m.tasks)))
-	}
+	// Header — always shows total incomplete count
+	header := styles.Title.Render(fmt.Sprintf("All incomplete tasks (%d)", len(m.tasks)))
 	sb.WriteString(header)
 	sb.WriteString("\n")
 	sb.WriteString(mutedStyle.Render(fmt.Sprintf(" Agent: %s", m.agentName)))
@@ -244,23 +274,53 @@ func (m listModel) viewList() string {
 	sb.WriteString(" " + styles.Separator(42))
 	sb.WriteString("\n")
 
-	for i, t := range m.tasks {
+	// Determine visible window
+	visible := m.visibleTaskLines()
+	end := m.scrollOffset + visible
+	if end > len(m.tasks) {
+		end = len(m.tasks)
+	}
+
+	for i := m.scrollOffset; i < end; i++ {
+		t := m.tasks[i]
 		planFile := mutedStyle.Render(filepath.Base(t.SourceFile))
+		blocked := t.IsBlocked()
+
+		var icon string
+		if blocked {
+			icon = blockedStyle.Render("⊘")
+		} else {
+			icon = " "
+		}
+
 		label := fmt.Sprintf("#%-2d %s: %s", i+1, t.ID, t.Title)
 
 		if i == m.cursor {
-			fmt.Fprintf(&sb, " %s %s  %s\n",
+			fmt.Fprintf(&sb, " %s %s %s  %s\n",
 				cursorStyle.Render("→"),
+				icon,
 				selectedStyle.Render(label),
 				planFile)
+		} else if blocked {
+			fmt.Fprintf(&sb, "   %s %s  %s\n",
+				icon,
+				blockedStyle.Render(label),
+				planFile)
 		} else {
-			fmt.Fprintf(&sb, "   %s  %s\n",
+			fmt.Fprintf(&sb, "   %s %s  %s\n",
+				icon,
 				normalStyle.Render(label),
 				planFile)
 		}
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
+	// Scroll indicator
+	scrollHint := ""
+	if len(m.tasks) > visible {
+		scrollHint = fmt.Sprintf(" [%d-%d of %d]", m.scrollOffset+1, end, len(m.tasks))
+	}
+
+	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit" + scrollHint)
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
@@ -420,8 +480,9 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 		return fmt.Errorf("glob plans: %w", err)
 	}
 
-	// Collect workable tasks in order
+	// Collect tasks from all active plan files
 	var workable []parser.Task
+	var incomplete []parser.Task
 	for _, f := range files {
 		tasks, err := parser.ParseFile(f)
 		if err != nil {
@@ -431,26 +492,32 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 			if t.IsWorkable() {
 				workable = append(workable, t)
 			}
+			if !t.IsComplete() {
+				incomplete = append(incomplete, t)
+			}
 		}
 	}
 
-	if len(workable) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
-		return nil
-	}
-
-	// Cap to count unless --all is set
-	if !all && count < len(workable) {
-		workable = workable[:count]
-	}
-
 	if plain {
+		// Plain mode: workable only, respects --count and --all
+		if len(workable) == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
+			return nil
+		}
+		if !all && count < len(workable) {
+			workable = workable[:count]
+		}
 		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, all, agentName))
 		return nil
 	}
 
-	// TUI mode: interactive list with detail view
-	m := listModel{tasks: workable, agentName: agentName, all: all}
+	// TUI mode: all incomplete tasks (workable + blocked), no count cap
+	if len(incomplete) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
+		return nil
+	}
+
+	m := listModel{tasks: incomplete, agentName: agentName}
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := prog.Run()
 	if err != nil {

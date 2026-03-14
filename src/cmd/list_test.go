@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -277,5 +278,104 @@ func TestListFirstTaskHighlightedInTUI(t *testing.T) {
 	}
 	if !strings.Contains(content, "TASK-002") {
 		t.Errorf("expected TASK-002 in TUI content, got:\n%s", content)
+	}
+}
+
+func TestListTUIShowsBlockedTasks(t *testing.T) {
+	// Blocked tasks should appear in TUI list with ⊘ icon
+	tasks := []parser.Task{
+		{ID: "TASK-001", Title: "Workable task", SourceFile: "plan_1.md",
+			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
+		{ID: "TASK-002", Title: "Blocked task", SourceFile: "plan_1.md",
+			Criteria: []parser.Criterion{{Text: "BLOCKED: waiting on something", Checked: false, Blocked: true}}},
+	}
+	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	content := m.viewList()
+
+	if !strings.Contains(content, "TASK-001") {
+		t.Errorf("expected TASK-001 in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "TASK-002") {
+		t.Errorf("expected blocked TASK-002 in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "⊘") {
+		t.Errorf("expected ⊘ icon for blocked task in TUI content, got:\n%s", content)
+	}
+}
+
+func TestListTUIHeaderShowsIncompleteCount(t *testing.T) {
+	tasks := []parser.Task{
+		{ID: "TASK-001", Title: "First", SourceFile: "plan_1.md"},
+		{ID: "TASK-002", Title: "Second", SourceFile: "plan_1.md"},
+		{ID: "TASK-003", Title: "Third", SourceFile: "plan_1.md"},
+	}
+	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	content := m.viewList()
+
+	if !strings.Contains(content, "All incomplete tasks (3)") {
+		t.Errorf("expected 'All incomplete tasks (3)' in header, got:\n%s", content)
+	}
+}
+
+func TestListTUIScrolling(t *testing.T) {
+	// Create more tasks than can fit in a small terminal
+	var tasks []parser.Task
+	for i := 1; i <= 50; i++ {
+		tasks = append(tasks, parser.Task{
+			ID:         fmt.Sprintf("TASK-%03d", i),
+			Title:      fmt.Sprintf("Task number %d", i),
+			SourceFile: "plan_1.md",
+		})
+	}
+	// Small terminal: only ~5 task lines visible (height=15 minus header/footer)
+	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 15}
+
+	// Move cursor to the bottom
+	m.cursor = 10
+	m.ensureCursorVisible()
+	content := m.viewList()
+
+	// TASK-011 should be visible (cursor is there)
+	if !strings.Contains(content, "TASK-011") {
+		t.Errorf("expected TASK-011 visible after scrolling, got:\n%s", content)
+	}
+	// TASK-001 should NOT be visible (scrolled past)
+	if strings.Contains(content, "TASK-001") {
+		t.Errorf("expected TASK-001 NOT visible after scrolling, got:\n%s", content)
+	}
+}
+
+func TestListPlainStillShowsWorkableOnly(t *testing.T) {
+	dir := t.TempDir()
+	plan := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Workable task
+**Description:** Do thing.
+**Acceptance Criteria:**
+- [ ] Criterion A
+
+### TASK-002: Blocked task
+**Description:** Blocked thing.
+**Acceptance Criteria:**
+- [ ] BLOCKED: waiting on dep
+
+### TASK-003: Completed task
+**Description:** Done thing.
+**Acceptance Criteria:**
+- [x] Done
+`
+	writeListPlan(t, dir, "plan_1.md", plan)
+	out := runListCmd(t, dir, "--all")
+
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected TASK-001 in plain output, got:\n%s", out)
+	}
+	if strings.Contains(out, "TASK-002") {
+		t.Errorf("expected blocked TASK-002 NOT in plain output, got:\n%s", out)
+	}
+	if strings.Contains(out, "TASK-003") {
+		t.Errorf("expected completed TASK-003 NOT in plain output, got:\n%s", out)
 	}
 }

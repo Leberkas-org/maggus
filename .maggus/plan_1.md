@@ -29,13 +29,13 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 **Description:** As a user, I want the `list` command to show all incomplete tasks (including blocked ones) in a scrollable list, so I can browse the full backlog without a count cap.
 
 **Acceptance Criteria:**
-- [ ] In TUI mode (no `--plain`), `list` shows all incomplete tasks (both workable and blocked) — no count cap
-- [ ] Blocked tasks are visually distinguishable from workable tasks (e.g. different icon or color)
-- [ ] The task list uses a viewport-based scrollable list: the cursor moves freely, and the visible window scrolls when the cursor reaches the edge
-- [ ] The header shows the total count of displayed tasks (e.g. "All incomplete tasks (12)")
-- [ ] Existing detail view (enter), run (alt+r), and delete (alt+backspace) still work
-- [ ] `--plain` mode still works and respects `--count` and `--all` flags as before
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] In TUI mode (no `--plain`), `list` shows all incomplete tasks (both workable and blocked) — no count cap
+- [x] Blocked tasks are visually distinguishable from workable tasks (e.g. different icon or color)
+- [x] The task list uses a viewport-based scrollable list: the cursor moves freely, and the visible window scrolls when the cursor reaches the edge
+- [x] The header shows the total count of displayed tasks (e.g. "All incomplete tasks (12)")
+- [x] Existing detail view (enter), run (alt+r), and delete (alt+backspace) still work
+- [x] `--plain` mode still works and respects `--count` and `--all` flags as before
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-003: Status command defaults to unfinished plans with alt+a toggle
 **Description:** As a user, I want the `status` command to show only unfinished plans by default, with `alt+a` to toggle showing completed plans, so I can focus on active work but still check history when needed.
