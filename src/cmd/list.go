@@ -38,6 +38,9 @@ type listModel struct {
 	// Delete confirmation
 	confirmDelete bool
 	deleteErr     string
+
+	// Criteria mode state (shared detail component)
+	detail detailState
 }
 
 func (m listModel) Init() tea.Cmd {
@@ -136,7 +139,8 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ensureCursorVisible()
 	case "enter":
 		m.showDetail = true
-		content := m.renderDetailContent(m.tasks[m.cursor])
+		m.detail = detailState{}
+		content := renderDetailContent(m.tasks[m.cursor], &m.detail)
 		w, h := styles.FullScreenInnerSize(m.width, m.height)
 		m.detailViewport = viewport.New(w, h-1)
 		m.detailViewport.SetContent(content)
@@ -147,6 +151,16 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m listModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle action picker mode
+	if m.detail.showActionPicker {
+		return m.updateActionPicker(msg)
+	}
+
+	// Handle criteria mode
+	if m.detail.criteriaMode {
+		return m.updateCriteriaMode(msg)
+	}
+
 	switch msg.String() {
 	case "alt+r":
 		m.runTaskID = m.tasks[m.cursor].ID
@@ -160,23 +174,31 @@ func (m listModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc", "backspace":
 		m.showDetail = false
 		m.detailReady = false
+		m.detail.exitCriteriaMode()
 		return m, nil
 	case "ctrl+c":
 		return m, tea.Quit
+	case "tab", "b":
+		m.detail.noBlockedMsg = false
+		if !m.detail.initCriteriaMode(m.tasks[m.cursor]) {
+			m.detail.noBlockedMsg = true
+			m.refreshDetailViewport()
+			return m, nil
+		}
+		m.refreshDetailViewport()
+		return m, nil
 	case "pgdown":
 		if m.cursor < len(m.tasks)-1 {
 			m.cursor++
-			content := m.renderDetailContent(m.tasks[m.cursor])
-			m.detailViewport.SetContent(content)
-			m.detailViewport.GotoTop()
+			m.detail.exitCriteriaMode()
+			m.refreshDetailViewport()
 		}
 		return m, nil
 	case "pgup":
 		if m.cursor > 0 {
 			m.cursor--
-			content := m.renderDetailContent(m.tasks[m.cursor])
-			m.detailViewport.SetContent(content)
-			m.detailViewport.GotoTop()
+			m.detail.exitCriteriaMode()
+			m.refreshDetailViewport()
 		}
 		return m, nil
 	case "home":
@@ -196,6 +218,79 @@ func (m listModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m listModel) updateCriteriaMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.detail.criteriaCursor > 0 {
+			m.detail.criteriaCursor--
+			m.refreshDetailViewport()
+		}
+	case "down", "j":
+		if m.detail.criteriaCursor < len(m.detail.blockedIndices)-1 {
+			m.detail.criteriaCursor++
+			m.refreshDetailViewport()
+		}
+	case "enter":
+		m.detail.showActionPicker = true
+		m.detail.actionCursor = 0
+		m.refreshDetailViewport()
+	case "tab":
+		m.detail.exitCriteriaMode()
+		m.refreshDetailViewport()
+	case "esc", "backspace":
+		m.showDetail = false
+		m.detailReady = false
+		m.detail.exitCriteriaMode()
+		return m, nil
+	case "q":
+		return m, tea.Quit
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m listModel) updateActionPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.detail.actionCursor > 0 {
+			m.detail.actionCursor--
+			m.refreshDetailViewport()
+		}
+	case "down", "j":
+		if m.detail.actionCursor < len(criteriaActions)-1 {
+			m.detail.actionCursor++
+			m.refreshDetailViewport()
+		}
+	case "enter":
+		action := criteriaActions[m.detail.actionCursor]
+		modified, _ := m.detail.performAction(m.tasks[m.cursor], action)
+		m.detail.showActionPicker = false
+		if modified {
+			// Reload task from disk
+			if updated := reloadTask(m.tasks[m.cursor].SourceFile, m.tasks[m.cursor].ID); updated != nil {
+				m.tasks[m.cursor] = *updated
+			}
+			// Re-init criteria mode with updated task
+			if !m.detail.initCriteriaMode(m.tasks[m.cursor]) {
+				m.detail.exitCriteriaMode()
+			}
+		}
+		m.refreshDetailViewport()
+	case "esc":
+		m.detail.showActionPicker = false
+		m.refreshDetailViewport()
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m *listModel) refreshDetailViewport() {
+	content := renderDetailContent(m.tasks[m.cursor], &m.detail)
+	m.detailViewport.SetContent(content)
 }
 
 func (m listModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -328,76 +423,14 @@ func (m listModel) viewList() string {
 	return styles.Box.Render(sb.String()+"\n\n"+footer) + "\n"
 }
 
-func (m listModel) renderDetailContent(t parser.Task) string {
-	var sb strings.Builder
-
-	titleStyle := styles.Title
-	labelStyle := styles.Label.Width(10).Align(lipgloss.Right)
-	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	successStyle := lipgloss.NewStyle().Foreground(styles.Success)
-	warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
-
-	sb.WriteString(titleStyle.Render(fmt.Sprintf("%s: %s", t.ID, t.Title)))
-	sb.WriteString("\n\n")
-
-	// Metadata
-	sb.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Plan:"), mutedStyle.Render(filepath.Base(t.SourceFile))))
-
-	// Criteria counts
-	done := 0
-	blocked := 0
-	for _, c := range t.Criteria {
-		if c.Checked {
-			done++
-		}
-		if c.Blocked {
-			blocked++
-		}
-	}
-	sb.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Criteria:"),
-		mutedStyle.Render(fmt.Sprintf("%d total, %d done, %d blocked", len(t.Criteria), done, blocked))))
-
-	// Description
-	if t.Description != "" {
-		sb.WriteString("\n")
-		sb.WriteString(styles.Subtitle.Render("Description"))
-		sb.WriteString("\n")
-		// Wrap description lines
-		for _, line := range strings.Split(strings.TrimSpace(t.Description), "\n") {
-			sb.WriteString("  " + line + "\n")
-		}
-	}
-
-	// Acceptance criteria
-	if len(t.Criteria) > 0 {
-		sb.WriteString("\n")
-		sb.WriteString(styles.Subtitle.Render("Acceptance Criteria"))
-		sb.WriteString("\n")
-		for _, c := range t.Criteria {
-			var checkbox string
-			if c.Checked {
-				checkbox = successStyle.Render("✓")
-			} else if c.Blocked {
-				checkbox = warningStyle.Render("⊘")
-			} else {
-				checkbox = mutedStyle.Render("○")
-			}
-			sb.WriteString(fmt.Sprintf("  %s %s\n", checkbox, c.Text))
-		}
-	}
-
-	return sb.String()
-}
 
 func (m listModel) viewDetail() string {
 	if !m.detailReady {
 		return ""
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: scroll · pgup/pgdn: prev/next task · alt+r: run · alt+bksp: delete · esc: back · q: exit")
-	if m.detailViewport.TotalLineCount() <= m.detailViewport.Height {
-		footer = styles.StatusBar.Render("pgup/pgdn: prev/next task · alt+r: run · alt+bksp: delete · esc: back · q: exit")
-	}
+	scrollable := m.detailViewport.TotalLineCount() > m.detailViewport.Height
+	footer := detailFooter(&m.detail, scrollable)
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeft(m.detailViewport.View(), footer, m.width, m.height)

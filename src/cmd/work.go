@@ -172,6 +172,17 @@ Examples:
 			return nil
 		}
 
+		// Cap count to the number of workable tasks so the progress bar is accurate.
+		workable := 0
+		for i := range tasks {
+			if tasks[i].IsWorkable() {
+				workable++
+			}
+		}
+		if workable < count {
+			count = workable
+		}
+
 		// Create run tracker
 		run, err := runtracker.New(dir, modelDisplay, count)
 		if err != nil {

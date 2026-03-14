@@ -320,3 +320,58 @@ func DeleteTask(filePath string, taskID string) error {
 	result := append(lines[:start], lines[end:]...)
 	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0644)
 }
+
+// UnblockCriterion reads the plan file, removes the "BLOCKED: " prefix from the
+// matching criterion line, and writes the file back. Returns an error if the
+// exact line cannot be found.
+func UnblockCriterion(filePath string, c Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read plan file: %w", err)
+	}
+
+	oldLine := "- [ ] " + c.Text
+	// Remove "BLOCKED: " or "⚠️ BLOCKED: " prefix from criterion text
+	newText := c.Text
+	if strings.HasPrefix(newText, "⚠️ BLOCKED: ") {
+		newText = strings.TrimPrefix(newText, "⚠️ BLOCKED: ")
+	} else if strings.HasPrefix(newText, "BLOCKED: ") {
+		newText = strings.TrimPrefix(newText, "BLOCKED: ")
+	}
+	newLine := "- [ ] " + newText
+
+	content := string(data)
+	if !strings.Contains(content, oldLine) {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	content = strings.Replace(content, oldLine, newLine, 1)
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// ResolveCriterion reads the plan file, removes the entire criterion line,
+// and writes the file back. Returns an error if the exact line cannot be found.
+func ResolveCriterion(filePath string, c Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read plan file: %w", err)
+	}
+
+	targetLine := "- [ ] " + c.Text
+	lines := strings.Split(string(data), "\n")
+	found := false
+	var result []string
+	for _, line := range lines {
+		if !found && strings.TrimSpace(line) == targetLine {
+			found = true
+			continue // skip this line
+		}
+		result = append(result, line)
+	}
+
+	if !found {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0o644)
+}

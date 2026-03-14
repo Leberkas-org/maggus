@@ -35,8 +35,7 @@ var allMenuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 	{name: "release", desc: "Generate RELEASE.md with changelog"},
 	{name: "clean", desc: "Remove completed plans and finished runs"},
-	{name: "blocked", desc: "Interactive wizard to manage blocked tasks"},
-	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
 }

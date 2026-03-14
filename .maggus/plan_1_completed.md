@@ -53,15 +53,15 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 **Description:** As a user, I want to manage blocked criteria directly from the task detail view (in both `list` and `status`), so I don't need a separate `blocked` command.
 
 **Acceptance Criteria:**
-- [ ] The task detail view (opened via `enter` in both `list` and `status`) supports two modes: **scroll mode** (default) and **criteria mode**
-- [ ] Pressing `tab` or `b` in the detail view toggles into criteria mode, where the cursor moves between blocked criteria
-- [ ] In criteria mode, pressing `enter` on a blocked criterion shows an inline action picker with three options: Unblock (remove BLOCKED: prefix), Resolve (delete the criterion line), Skip
-- [ ] After an action is performed, the plan file is updated on disk and the detail view refreshes to reflect the change
-- [ ] The footer updates to show mode-specific hints: scroll mode shows "tab: manage blocked", criteria mode shows "enter: action | tab: scroll mode | esc: back"
-- [ ] If a task has no blocked criteria, pressing `tab`/`b` does nothing (or shows a brief message)
-- [ ] The standalone `blocked` command is removed from `cmd/blocked.go` and from the main menu
-- [ ] The `unblockCriterion` and `resolveCriterion` helper functions are moved to a shared location (e.g. `internal/parser`) or kept in a shared file accessible by both `list` and `status`
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] The task detail view (opened via `enter` in both `list` and `status`) supports two modes: **scroll mode** (default) and **criteria mode**
+- [x] Pressing `tab` or `b` in the detail view toggles into criteria mode, where the cursor moves between blocked criteria
+- [x] In criteria mode, pressing `enter` on a blocked criterion shows an inline action picker with three options: Unblock (remove BLOCKED: prefix), Resolve (delete the criterion line), Skip
+- [x] After an action is performed, the plan file is updated on disk and the detail view refreshes to reflect the change
+- [x] The footer updates to show mode-specific hints: scroll mode shows "tab: manage blocked", criteria mode shows "enter: action | tab: scroll mode | esc: back"
+- [x] If a task has no blocked criteria, pressing `tab`/`b` does nothing (or shows a brief message)
+- [x] The standalone `blocked` command is removed from `cmd/blocked.go` and from the main menu
+- [x] The `unblockCriterion` and `resolveCriterion` helper functions are moved to a shared location (e.g. `internal/parser`) or kept in a shared file accessible by both `list` and `status`
+- [x] `go build ./...` and `go test ./...` pass
 
 ## Functional Requirements
 
