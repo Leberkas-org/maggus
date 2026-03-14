@@ -41,13 +41,13 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 **Description:** As a user, I want the `status` command to show only unfinished plans by default, with `alt+a` to toggle showing completed plans, so I can focus on active work but still check history when needed.
 
 **Acceptance Criteria:**
-- [ ] In TUI mode, `status` defaults to `showAll: false` (only unfinished plans visible)
-- [ ] Pressing `alt+a` toggles `showAll` and reloads plan data from disk (picks up external changes)
-- [ ] After toggling, the selectable task list is rebuilt and cursor is reset to 0
-- [ ] The footer shows the `alt+a` hint (e.g. "alt+a: show all" or "alt+a: hide completed")
-- [ ] `--plain` mode still works and respects `--all` flag as before
-- [ ] `--all` CLI flag still works for TUI mode (starts with showAll: true)
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] In TUI mode, `status` defaults to `showAll: false` (only unfinished plans visible)
+- [x] Pressing `alt+a` toggles `showAll` and reloads plan data from disk (picks up external changes)
+- [x] After toggling, the selectable task list is rebuilt and cursor is reset to 0
+- [x] The footer shows the `alt+a` hint (e.g. "alt+a: show all" or "alt+a: hide completed")
+- [x] `--plain` mode still works and respects `--all` flag as before
+- [x] `--all` CLI flag still works for TUI mode (starts with showAll: true)
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-004: Integrate blocked-task management into the detail view
 **Description:** As a user, I want to manage blocked criteria directly from the task detail view (in both `list` and `status`), so I don't need a separate `blocked` command.

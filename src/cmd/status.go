@@ -149,7 +149,28 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "alt+a":
+		m.showAll = !m.showAll
+		// Reload plans from disk to pick up external changes
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+		}
+		var selectable []parser.Task
+		for _, p := range m.plans {
+			if p.completed && !m.showAll {
+				continue
+			}
+			selectable = append(selectable, p.tasks...)
+		}
+		m.selectableTasks = selectable
+		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
+		m.cursor = 0
+		return m, nil
 	case "alt+r":
+		if len(m.selectableTasks) == 0 {
+			return m, nil
+		}
 		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
 	case "alt+backspace":
@@ -482,7 +503,11 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString(style.Render(labelPart) + bar + style.Render(afterPart))
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · alt+r: run · alt+bksp: delete · q/esc: exit")
+	toggleHint := "alt+a: show all"
+	if m.showAll {
+		toggleHint = "alt+a: hide completed"
+	}
+	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · " + toggleHint + " · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
