@@ -18,50 +18,49 @@ The `list` and `status` commands currently require a sub-menu dialog in the TUI 
 **Description:** As a user, I want `list` and `status` to launch directly from the main menu without a settings dialog, so I get to the information faster.
 
 **Acceptance Criteria:**
-- [ ] Selecting "list" in the main menu launches the list TUI directly (no sub-menu)
-- [ ] Selecting "status" in the main menu launches the status TUI directly (no sub-menu)
-- [ ] The `buildSubMenus()` map no longer contains entries for "list" or "status"
-- [ ] The `buildArgs()` switch no longer contains cases for "list" or "status"
-- [ ] CLI flags (`--plain`, `--all`, `--count`) still work when running `maggus list` or `maggus status` directly from the command line
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] Selecting "list" in the main menu launches the list TUI directly (no sub-menu)
+- [x] Selecting "status" in the main menu launches the status TUI directly (no sub-menu)
+- [x] The `buildSubMenus()` map no longer contains entries for "list" or "status"
+- [x] The `buildArgs()` switch no longer contains cases for "list" or "status"
+- [x] CLI flags (`--plain`, `--all`, `--count`) still work when running `maggus list` or `maggus status` directly from the command line
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-002: List command shows all incomplete tasks with scrollable viewport
 **Description:** As a user, I want the `list` command to show all incomplete tasks (including blocked ones) in a scrollable list, so I can browse the full backlog without a count cap.
 
 **Acceptance Criteria:**
-- [ ] In TUI mode (no `--plain`), `list` shows all incomplete tasks (both workable and blocked) — no count cap
-- [ ] Blocked tasks are visually distinguishable from workable tasks (e.g. different icon or color)
-- [ ] The task list uses a viewport-based scrollable list: the cursor moves freely, and the visible window scrolls when the cursor reaches the edge
-- [ ] The header shows the total count of displayed tasks (e.g. "All incomplete tasks (12)")
-- [ ] Existing detail view (enter), run (alt+r), and delete (alt+backspace) still work
-- [ ] `--plain` mode still works and respects `--count` and `--all` flags as before
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] In TUI mode (no `--plain`), `list` shows all incomplete tasks (both workable and blocked) — no count cap
+- [x] Blocked tasks are visually distinguishable from workable tasks (e.g. different icon or color)
+- [x] The task list uses a viewport-based scrollable list: the cursor moves freely, and the visible window scrolls when the cursor reaches the edge
+- [x] The header shows the total count of displayed tasks (e.g. "All incomplete tasks (12)")
+- [x] Existing detail view (enter), run (alt+r), and delete (alt+backspace) still work
+- [x] `--plain` mode still works and respects `--count` and `--all` flags as before
 
 ### TASK-003: Status command defaults to unfinished plans with alt+a toggle
 **Description:** As a user, I want the `status` command to show only unfinished plans by default, with `alt+a` to toggle showing completed plans, so I can focus on active work but still check history when needed.
 
 **Acceptance Criteria:**
-- [ ] In TUI mode, `status` defaults to `showAll: false` (only unfinished plans visible)
-- [ ] Pressing `alt+a` toggles `showAll` and reloads plan data from disk (picks up external changes)
-- [ ] After toggling, the selectable task list is rebuilt and cursor is reset to 0
-- [ ] The footer shows the `alt+a` hint (e.g. "alt+a: show all" or "alt+a: hide completed")
-- [ ] `--plain` mode still works and respects `--all` flag as before
-- [ ] `--all` CLI flag still works for TUI mode (starts with showAll: true)
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] In TUI mode, `status` defaults to `showAll: false` (only unfinished plans visible)
+- [x] Pressing `alt+a` toggles `showAll` and reloads plan data from disk (picks up external changes)
+- [x] After toggling, the selectable task list is rebuilt and cursor is reset to 0
+- [x] The footer shows the `alt+a` hint (e.g. "alt+a: show all" or "alt+a: hide completed")
+- [x] `--plain` mode still works and respects `--all` flag as before
+- [x] `--all` CLI flag still works for TUI mode (starts with showAll: true)
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-004: Integrate blocked-task management into the detail view
 **Description:** As a user, I want to manage blocked criteria directly from the task detail view (in both `list` and `status`), so I don't need a separate `blocked` command.
 
 **Acceptance Criteria:**
-- [ ] The task detail view (opened via `enter` in both `list` and `status`) supports two modes: **scroll mode** (default) and **criteria mode**
-- [ ] Pressing `tab` or `b` in the detail view toggles into criteria mode, where the cursor moves between blocked criteria
-- [ ] In criteria mode, pressing `enter` on a blocked criterion shows an inline action picker with three options: Unblock (remove BLOCKED: prefix), Resolve (delete the criterion line), Skip
-- [ ] After an action is performed, the plan file is updated on disk and the detail view refreshes to reflect the change
-- [ ] The footer updates to show mode-specific hints: scroll mode shows "tab: manage blocked", criteria mode shows "enter: action | tab: scroll mode | esc: back"
-- [ ] If a task has no blocked criteria, pressing `tab`/`b` does nothing (or shows a brief message)
-- [ ] The standalone `blocked` command is removed from `cmd/blocked.go` and from the main menu
-- [ ] The `unblockCriterion` and `resolveCriterion` helper functions are moved to a shared location (e.g. `internal/parser`) or kept in a shared file accessible by both `list` and `status`
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] The task detail view (opened via `enter` in both `list` and `status`) supports two modes: **scroll mode** (default) and **criteria mode**
+- [x] Pressing `tab` or `b` in the detail view toggles into criteria mode, where the cursor moves between blocked criteria
+- [x] In criteria mode, pressing `enter` on a blocked criterion shows an inline action picker with three options: Unblock (remove BLOCKED: prefix), Resolve (delete the criterion line), Skip
+- [x] After an action is performed, the plan file is updated on disk and the detail view refreshes to reflect the change
+- [x] The footer updates to show mode-specific hints: scroll mode shows "tab: manage blocked", criteria mode shows "enter: action | tab: scroll mode | esc: back"
+- [x] If a task has no blocked criteria, pressing `tab`/`b` does nothing (or shows a brief message)
+- [x] The standalone `blocked` command is removed from `cmd/blocked.go` and from the main menu
+- [x] The `unblockCriterion` and `resolveCriterion` helper functions are moved to a shared location (e.g. `internal/parser`) or kept in a shared file accessible by both `list` and `status`
+- [x] `go build ./...` and `go test ./...` pass
 
 ## Functional Requirements
 
