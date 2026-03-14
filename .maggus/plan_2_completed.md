@@ -67,11 +67,11 @@ The current status view shows all plans and all tasks in a single long scrollabl
 **Description:** As a developer, I want to remove the old status rendering code that is no longer needed after the redesign.
 
 **Acceptance Criteria:**
-- [ ] The old `viewStatus()` method rendering flat plan sections and the plans table at the bottom is removed
-- [ ] The old plans table rendering code (progress bars per plan at the bottom) is removed
-- [ ] No dead code remains from the old layout
-- [ ] The `--plain` output (`renderStatusPlain`) is unchanged — it keeps the old flat format for scripting
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] The old `viewStatus()` method rendering flat plan sections and the plans table at the bottom is removed
+- [x] The old plans table rendering code (progress bars per plan at the bottom) is removed
+- [x] No dead code remains from the old layout
+- [x] The `--plain` output (`renderStatusPlain`) is unchanged — it keeps the old flat format for scripting
+- [x] `go build ./...` and `go test ./...` pass
 
 ## Functional Requirements
 
