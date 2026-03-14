@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,9 +13,10 @@ import (
 
 // menuItem represents a single entry in the main menu.
 type menuItem struct {
-	name          string
-	desc          string
-	requiresClaude bool
+	name              string
+	desc              string
+	requiresClaude    bool
+	hideIfInitialized bool
 }
 
 var allMenuItems = []menuItem{
@@ -28,18 +30,34 @@ var allMenuItems = []menuItem{
 	{name: "clean", desc: "Remove completed plan files and finished run directories"},
 	{name: "release", desc: "Generate RELEASE.md with changelog and AI summary"},
 	{name: "worktree", desc: "Manage Maggus worktrees"},
+	{name: "config", desc: "Edit project settings interactively"},
+	{name: "init", desc: "Initialize a .maggus project in the current directory", hideIfInitialized: true},
 }
 
 // activeMenuItems returns the menu items filtered by available capabilities.
 func activeMenuItems() []menuItem {
+	initialized := isInitialized()
 	var items []menuItem
 	for _, item := range allMenuItems {
 		if item.requiresClaude && !caps.HasClaude {
 			continue
 		}
+		if item.hideIfInitialized && initialized {
+			continue
+		}
 		items = append(items, item)
 	}
 	return items
+}
+
+// isInitialized returns true if the .maggus/ directory exists in the current working directory.
+func isInitialized() bool {
+	dir, err := os.Getwd()
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, ".maggus"))
+	return err == nil && info.IsDir()
 }
 
 // subMenuOption represents a configurable option in a command's sub-menu.
@@ -63,11 +81,9 @@ func buildSubMenus() map[string]subMenuDef {
 		}},
 		"list": {options: []subMenuOption{
 			{label: "Count", values: []string{"5", "10", "20", "all"}, current: 0},
-			{label: "Plain", values: []string{"off", "on"}, current: 0},
 		}},
 		"status": {options: []subMenuOption{
 			{label: "All", values: []string{"off", "on"}, current: 0},
-			{label: "Plain", values: []string{"off", "on"}, current: 0},
 		}},
 		"worktree": {options: []subMenuOption{
 			{label: "Action", values: []string{"list", "clean"}, current: 0},
@@ -93,24 +109,16 @@ func buildArgs(cmdName string, opts []subMenuOption) []string {
 		return args
 	case "list":
 		var args []string
-		// Count option
 		if opts[0].values[opts[0].current] == "all" {
 			args = append(args, "--all")
 		} else {
 			args = append(args, "--count", opts[0].values[opts[0].current])
-		}
-		// Plain option
-		if opts[1].values[opts[1].current] == "on" {
-			args = append(args, "--plain")
 		}
 		return args
 	case "status":
 		var args []string
 		if opts[0].values[opts[0].current] == "on" {
 			args = append(args, "--all")
-		}
-		if opts[1].values[opts[1].current] == "on" {
-			args = append(args, "--plain")
 		}
 		return args
 	case "worktree":
