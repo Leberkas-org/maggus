@@ -175,6 +175,7 @@ type TUIModel struct {
 	startTime   time.Time
 	frame       int
 	width       int
+	height      int
 	cancelFunc  func() // called on Ctrl+C to cancel the context
 	quitting    bool
 }
@@ -193,6 +194,7 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		model:       model,
 		startTime:   time.Now(),
 		width:       120,
+		height:      40,
 		cancelFunc:  cancelFunc,
 	}
 }
@@ -265,6 +267,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		m.height = msg.Height
 		return m, tea.ClearScreen
 
 	case tickMsg:
@@ -409,29 +412,37 @@ func (m TUIModel) View() string {
 }
 
 func (m TUIModel) renderBannerView() string {
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+
 	var b strings.Builder
-	b.WriteString(m.renderHeader())
+	b.WriteString(m.renderHeaderInner(innerW))
 	b.WriteString("\n")
 	if m.banner.Agent != "" {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
+		b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
 	}
-	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Model:"), m.model))
-	b.WriteString(fmt.Sprintf("  %s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
+	b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Model:"), m.model))
+	b.WriteString(fmt.Sprintf("%s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
 	if m.banner.Branch != "" {
-		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
+		b.WriteString(fmt.Sprintf("%s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
 	}
-	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Run ID:"), m.banner.RunID))
+	b.WriteString(fmt.Sprintf("%s %s\n", boldStyle.Render("Run ID:"), m.banner.RunID))
 	if m.banner.Worktree != "" {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Worktree:"), m.banner.Worktree))
+		b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Worktree:"), m.banner.Worktree))
 	}
 	b.WriteString("\n")
 	for _, msg := range m.infoMessages {
-		b.WriteString(fmt.Sprintf("  %s\n", msg))
+		b.WriteString(fmt.Sprintf("%s\n", msg))
 	}
 	if len(m.infoMessages) == 0 {
-		b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render("Starting...")))
+		b.WriteString(fmt.Sprintf("%s\n", grayStyle.Render("Starting...")))
 	}
-	return b.String()
+
+	footer := styles.StatusBar.Render("ctrl+c stop")
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(b.String()) + "\n"
 }
 
 func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -517,18 +528,15 @@ func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m TUIModel) renderSummaryView() string {
-	w := m.width
-	if w < 50 {
-		w = 50
-	}
-
-	// Build the inner content of the summary box.
-	boxWidth := w - 4 // account for box border + padding
-	if boxWidth < 40 {
-		boxWidth = 40
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+	if innerW < 40 {
+		innerW = 40
 	}
 
 	var content strings.Builder
+
+	// Header inside box
+	content.WriteString(m.renderHeaderInner(innerW))
 
 	// Title
 	elapsed := m.summaryElapsed
@@ -583,7 +591,7 @@ func (m TUIModel) renderSummaryView() string {
 		for _, c := range m.commits {
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				styles.Truncate(c, boxWidth-4)))
+				styles.Truncate(c, innerW-4)))
 		}
 	}
 
@@ -602,7 +610,7 @@ func (m TUIModel) renderSummaryView() string {
 			}
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, boxWidth-len(t.ID)-6))))
+				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, innerW-len(t.ID)-6))))
 		}
 	}
 
@@ -615,21 +623,18 @@ func (m TUIModel) renderSummaryView() string {
 		content.WriteString(fmt.Sprintf("%s %s\n", spinner, m.pushStatus))
 	}
 
-	// Render inside a lipgloss box
-	box := styles.Box.Width(boxWidth)
-	var out strings.Builder
-	out.WriteString(m.renderHeader())
-	out.WriteString("\n")
-	out.WriteString(box.Render(content.String()))
-	out.WriteString("\n\n")
-
+	// Footer: summary menu or waiting message
+	var footer string
 	if m.done {
-		out.WriteString(m.renderSummaryMenu())
+		footer = m.renderSummaryMenu()
 	} else {
-		out.WriteString(fmt.Sprintf("  %s\n", lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")))
+		footer = lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")
 	}
 
-	return out.String()
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreenLeft(content.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(content.String()) + "\n"
 }
 
 func (m TUIModel) renderSummaryMenu() string {
@@ -670,12 +675,13 @@ func (m TUIModel) renderSummaryMenu() string {
 	return menu.String()
 }
 
-func (m TUIModel) renderHeader() string {
-	var b strings.Builder
-	w := m.width
+// renderHeaderInner renders the header content for use inside a bordered box.
+func (m TUIModel) renderHeaderInner(w int) string {
 	if w < 40 {
 		w = 40
 	}
+
+	var b strings.Builder
 
 	// Line 1: version left, fingerprint right
 	left := boldStyle.Render(fmt.Sprintf("Maggus v%s", m.version))
@@ -683,36 +689,33 @@ func (m TUIModel) renderHeader() string {
 	if m.fingerprint != "" {
 		right = grayStyle.Render(m.fingerprint)
 	}
-	// Pad between left and right to fill width
-	// Use raw lengths for spacing calculation (lipgloss adds ANSI escapes)
-	leftRaw := fmt.Sprintf("  Maggus v%s", m.version)
+	leftRaw := fmt.Sprintf("Maggus v%s", m.version)
 	rightRaw := m.fingerprint
-	padding := w - len(leftRaw) - len(rightRaw) - 2
+	padding := w - len(leftRaw) - len(rightRaw)
 	if padding < 2 {
 		padding = 2
 	}
-	b.WriteString(fmt.Sprintf("  %s%s%s\n", left, strings.Repeat(" ", padding), right))
+	b.WriteString(fmt.Sprintf("%s%s%s\n", left, strings.Repeat(" ", padding), right))
 
 	// Line 2: progress bar
 	if m.totalIters > 0 {
 		barWidth := 20
 		bar := styles.ProgressBar(m.currentIter, m.totalIters, barWidth)
-		progress := fmt.Sprintf("  [%s] %s", bar,
+		progress := fmt.Sprintf("[%s] %s", bar,
 			greenStyle.Render(fmt.Sprintf("%d/%d Tasks", m.currentIter, m.totalIters)))
 		b.WriteString(progress + "\n")
 	}
 
 	// Separator line
-	sep := strings.Repeat("─", w)
-	b.WriteString(grayStyle.Render(sep) + "\n")
+	b.WriteString(styles.Separator(w) + "\n")
 
 	return b.String()
 }
 
 func (m TUIModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
-	w := m.width
-	contentWidth := w - 13
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+	contentWidth := innerW - 11
 	if contentWidth < 20 {
 		contentWidth = 20
 	}
@@ -737,53 +740,58 @@ func (m TUIModel) renderView() string {
 
 	var b strings.Builder
 
-	// Render header
-	b.WriteString(m.renderHeader())
+	// Render header inside the box
+	b.WriteString(m.renderHeaderInner(innerW))
 
 	// Render task info
 	if m.taskID != "" {
-		taskLine := fmt.Sprintf("  %s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
+		taskLine := fmt.Sprintf("%s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
 		b.WriteString(taskLine + "\n\n")
 	}
 
-	b.WriteString(fmt.Sprintf("  %s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+	b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
 
-	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
+	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
 	for i, t := range m.toolHistory {
 		prefix := grayStyle.Render("│")
 		if i == len(m.toolHistory)-1 {
 			prefix = blueStyle.Render("▶")
 		}
-		b.WriteString(fmt.Sprintf("    %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
+		b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
 	}
 	// Pad empty lines for consistent layout
 	for i := len(m.toolHistory); i < maxToolHistory; i++ {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-	b.WriteString(fmt.Sprintf("    %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
 	// Token usage
 	if m.hasUsageData {
 		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
-		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
 	} else {
-		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
 	}
 
 	// Recent commits section
 	if len(m.commits) > 0 {
 		b.WriteString("\n")
-		b.WriteString(grayStyle.Render(strings.Repeat("─", w)) + "\n")
-		b.WriteString(grayStyle.Render("  Commits:") + "\n")
+		b.WriteString(styles.Separator(innerW) + "\n")
+		b.WriteString(grayStyle.Render("Commits:") + "\n")
 		for _, c := range m.commits {
-			line := styles.Truncate(c, w-6)
-			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(line)))
+			line := styles.Truncate(c, innerW-4)
+			b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render(line)))
 		}
 	}
 
-	return b.String()
+	footer := styles.StatusBar.Render("ctrl+c stop")
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(b.String()) + "\n"
 }
