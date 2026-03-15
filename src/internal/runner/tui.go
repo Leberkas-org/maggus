@@ -166,6 +166,7 @@ type TUIModel struct {
 
 	status      string
 	toolHistory []string
+	toolEntries []agent.ToolMsg // full tool messages for detail panel
 	output      string
 	extras      string
 	model       string
@@ -177,6 +178,7 @@ type TUIModel struct {
 	width       int
 	height      int
 	activeTab   int    // 0 = Progress, 1 = Commits
+	showDetail  bool   // true when right-side detail panel is visible
 	cancelFunc  func() // called on Ctrl+C to cancel the context
 	quitting    bool
 }
@@ -265,6 +267,11 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		// Alt+I toggles the detail panel
+		if msg.Alt && len(msg.Runes) == 1 && (msg.Runes[0] == 'i' || msg.Runes[0] == 'I') {
+			m.showDetail = !m.showDetail
+			return m, nil
+		}
 		// Tab switching in work view (only when a task is active)
 		if m.taskID != "" {
 			switch msg.Type {
@@ -343,6 +350,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Starting..."
 		m.output = "-"
 		m.toolHistory = nil
+		m.toolEntries = nil
 		m.toolCount = 0
 		m.extras = ""
 		m.skills = nil
@@ -368,6 +376,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.toolHistory) > maxToolHistory {
 			m.toolHistory = m.toolHistory[len(m.toolHistory)-maxToolHistory:]
 		}
+		m.toolEntries = append(m.toolEntries, msg)
 		m.toolCount++
 
 	case agent.SkillMsg:
@@ -464,7 +473,7 @@ func (m TUIModel) renderBannerView() string {
 		b.WriteString(fmt.Sprintf("%s\n", grayStyle.Render("Starting...")))
 	}
 
-	footer := styles.StatusBar.Render("ctrl+c stop")
+	footer := styles.StatusBar.Render("alt+i detail · ctrl+c stop")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
@@ -764,13 +773,92 @@ func (m TUIModel) renderTabBar(w int) string {
 	return tabs[0] + sep + tabs[1] + "\n" + styles.Separator(w) + "\n"
 }
 
+// toolIcon returns a short icon for a tool type.
+func toolIcon(toolType string) string {
+	switch toolType {
+	case "Read":
+		return "📖"
+	case "Edit":
+		return "✏️"
+	case "Write":
+		return "📝"
+	case "Bash":
+		return "⚡"
+	case "Glob":
+		return "🔍"
+	case "Grep":
+		return "🔎"
+	case "Skill":
+		return "🎯"
+	case "Agent":
+		return "🤖"
+	default:
+		if strings.HasPrefix(toolType, "mcp__") {
+			return "🔌"
+		}
+		return "▶"
+	}
+}
+
+// renderDetailPanel renders the right-side tool detail panel content.
+func (m TUIModel) renderDetailPanel(w, h int) string {
+	if w < 10 {
+		w = 10
+	}
+
+	var b strings.Builder
+	b.WriteString(boldStyle.Render("Tool Detail") + "\n")
+	b.WriteString(styles.Separator(w) + "\n")
+
+	if len(m.toolEntries) == 0 {
+		b.WriteString(grayStyle.Render("No tool invocations yet.") + "\n")
+	} else {
+		// Render entries, auto-scrolled to show latest entries that fit
+		var entryLines []string
+		for i, entry := range m.toolEntries {
+			if i > 0 {
+				entryLines = append(entryLines, grayStyle.Render(styles.Truncate(strings.Repeat("·", w), w)))
+			}
+
+			// Header: icon + description + timestamp
+			icon := toolIcon(entry.Type)
+			ts := entry.Timestamp.Format("15:04:05")
+			desc := entry.Description
+			// Available width for description = w - icon - timestamp - spaces
+			maxDesc := w - len(ts) - 4
+			if maxDesc > 0 {
+				desc = styles.Truncate(desc, maxDesc)
+			}
+			header := fmt.Sprintf("%s %s  %s", icon, blueStyle.Render(desc), grayStyle.Render(ts))
+			entryLines = append(entryLines, header)
+
+			// Parameter detail lines
+			for k, v := range entry.Params {
+				paramLine := fmt.Sprintf("  %s %s", grayStyle.Render(k+":"), styles.Truncate(v, w-len(k)-4))
+				entryLines = append(entryLines, paramLine)
+			}
+		}
+
+		// Auto-scroll: show the last lines that fit in the available height
+		available := h - 3 // header + separator + margin
+		if available < 1 {
+			available = 1
+		}
+		start := 0
+		if len(entryLines) > available {
+			start = len(entryLines) - available
+		}
+		for _, line := range entryLines[start:] {
+			b.WriteString(line + "\n")
+		}
+	}
+
+	return b.String()
+}
+
 func (m TUIModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
-	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
-	contentWidth := innerW - 11
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
+	innerW, innerH := styles.FullScreenInnerSize(m.width, m.height)
 
 	spinner := cyanStyle.Render(spinnerFrames[m.frame])
 	sColor := statusStyle
@@ -790,64 +878,128 @@ func (m TUIModel) renderView() string {
 		extrasStr = "-"
 	}
 
+	// Calculate panel widths
+	leftW := innerW
+	var rightW int
+	if m.showDetail && innerW > 60 {
+		leftW = innerW * 40 / 100
+		rightW = innerW - leftW - 1 // -1 for divider
+		if leftW < 30 {
+			leftW = 30
+			rightW = innerW - leftW - 1
+		}
+	}
+
+	contentWidth := leftW - 11
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
 	var b strings.Builder
 
-	// Render header inside the box
+	// Render header inside the box (full width)
 	b.WriteString(m.renderHeaderInner(innerW))
 
-	// Render task info
+	// Render task info (full width)
 	if m.taskID != "" {
 		taskLine := fmt.Sprintf("%s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
 		b.WriteString(taskLine + "\n\n")
 	}
 
-	// Tab bar
-	b.WriteString(m.renderTabBar(innerW))
+	// Tab bar (left panel width when split, otherwise full)
+	tabBarW := leftW
+	if !m.showDetail || innerW <= 60 {
+		tabBarW = innerW
+	}
+
+	// Build left panel content (tab bar + tab content)
+	var left strings.Builder
+	left.WriteString(m.renderTabBar(tabBarW))
 
 	if m.activeTab == 0 {
-		// Progress tab content
-		b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+		left.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+		left.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
 
-		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
+		left.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
 		for i, t := range m.toolHistory {
 			prefix := grayStyle.Render("│")
 			if i == len(m.toolHistory)-1 {
 				prefix = blueStyle.Render("▶")
 			}
-			b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
+			left.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
 		}
-		// Pad empty lines for consistent layout
 		for i := len(m.toolHistory); i < maxToolHistory; i++ {
-			b.WriteString("\n")
+			left.WriteString("\n")
 		}
 
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+		left.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+		left.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+		left.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
-		// Token usage
 		if m.hasUsageData {
 			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+			left.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
 		} else {
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+			left.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
 		}
 	} else {
-		// Commits tab content
 		if len(m.commits) == 0 {
-			b.WriteString(grayStyle.Render("No commits yet.") + "\n")
+			left.WriteString(grayStyle.Render("No commits yet.") + "\n")
 		} else {
 			for _, c := range m.commits {
-				line := styles.Truncate(c, innerW-4)
-				b.WriteString(fmt.Sprintf("  %s %s\n",
+				line := styles.Truncate(c, tabBarW-4)
+				left.WriteString(fmt.Sprintf("  %s %s\n",
 					grayStyle.Render("•"),
 					grayStyle.Render(line)))
 			}
 		}
 	}
 
-	footer := styles.StatusBar.Render("1/2 tabs · ctrl+c stop")
+	if m.showDetail && innerW > 60 {
+		// Split layout: left + divider + right
+		leftContent := left.String()
+		rightContent := m.renderDetailPanel(rightW, innerH-6) // reserve lines for header/task/footer
+
+		// Build the divider column
+		leftLines := strings.Split(strings.TrimRight(leftContent, "\n"), "\n")
+		rightLines := strings.Split(strings.TrimRight(rightContent, "\n"), "\n")
+
+		// Ensure both have the same number of lines
+		maxLines := len(leftLines)
+		if len(rightLines) > maxLines {
+			maxLines = len(rightLines)
+		}
+		for len(leftLines) < maxLines {
+			leftLines = append(leftLines, "")
+		}
+		for len(rightLines) < maxLines {
+			rightLines = append(rightLines, "")
+		}
+
+		divider := grayStyle.Render("│")
+		for i := 0; i < maxLines; i++ {
+			// Pad left line to leftW
+			leftLine := leftLines[i]
+			leftVisible := lipgloss.Width(leftLine)
+			if leftVisible < leftW {
+				leftLine += strings.Repeat(" ", leftW-leftVisible)
+			}
+			b.WriteString(leftLine + divider + rightLines[i] + "\n")
+		}
+	} else {
+		b.WriteString(left.String())
+	}
+
+	// Footer with context-sensitive keybindings
+	var footerParts []string
+	footerParts = append(footerParts, "1/2 tabs")
+	if m.showDetail {
+		footerParts = append(footerParts, "alt+i hide detail")
+	} else {
+		footerParts = append(footerParts, "alt+i detail")
+	}
+	footerParts = append(footerParts, "ctrl+c stop")
+	footer := styles.StatusBar.Render(strings.Join(footerParts, " · "))
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)

@@ -45,16 +45,16 @@ The work view (`maggus work`) currently renders as flat, unstyled text — no bo
 **Description:** As a user, I want to toggle a detail panel on the right side of the work view that shows a rolling structured log of each tool invocation, so I can see what Claude is doing in more detail.
 
 **Acceptance Criteria:**
-- [ ] Pressing Alt+I toggles a right-side detail panel on/off
-- [ ] When the detail panel is hidden, the left panel uses the full box width (current behavior)
-- [ ] When the detail panel is visible, the layout splits into left (summary, ~40% width) and right (detail, ~60% width) separated by a vertical `│` divider
-- [ ] The detail panel shows a rolling log where each tool invocation gets a structured section:
+- [x] Pressing Alt+I toggles a right-side detail panel on/off
+- [x] When the detail panel is hidden, the left panel uses the full box width (current behavior)
+- [x] When the detail panel is visible, the layout splits into left (summary, ~40% width) and right (detail, ~60% width) separated by a vertical `│` divider
+- [x] The detail panel shows a rolling log where each tool invocation gets a structured section:
   - Header line: tool type icon + tool description + timestamp (e.g., `▶ Read: src/cmd/work.go  12:34:05`)
   - Indented detail lines showing parameters (file path, command, pattern, etc.) when available
   - A subtle separator (`·····`) between tool entries
-- [ ] The detail panel auto-scrolls to the latest entry as new tools are invoked
-- [ ] The footer bar updates to reflect the current keybindings (shows `alt+i hide detail` when panel is open)
-- [ ] Typecheck and vet pass (`go vet ./...`)
+- [x] The detail panel auto-scrolls to the latest entry as new tools are invoked
+- [x] The footer bar updates to reflect the current keybindings (shows `alt+i hide detail` when panel is open)
+- [x] Typecheck and vet pass (`go vet ./...`)
 
 ### TASK-004: Enrich tool messages with structured metadata
 **Description:** As a developer, I want tool messages to carry structured metadata (tool type, parameters, timestamp) so that the detail panel can render rich per-tool sections.

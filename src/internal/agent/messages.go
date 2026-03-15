@@ -1,6 +1,9 @@
 package agent
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // ErrInterrupted is returned when the user presses Ctrl+C.
 var ErrInterrupted = fmt.Errorf("interrupted by user")
@@ -20,6 +23,9 @@ type OutputMsg struct {
 // ToolMsg is sent when a new tool use is detected.
 type ToolMsg struct {
 	Description string
+	Type        string            // tool name, e.g. "Read", "Bash", "Grep"
+	Params      map[string]string // key detail parameters for the detail panel
+	Timestamp   time.Time         // when the tool was invoked
 }
 
 // SkillMsg is sent when a skill is used.
