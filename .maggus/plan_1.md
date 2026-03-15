@@ -31,15 +31,15 @@ The work view (`maggus work`) currently renders as flat, unstyled text — no bo
 **Description:** As a user, I want a tab bar in the work view so that I can switch between the main progress view and a commits view without cluttering the main display.
 
 **Acceptance Criteria:**
-- [ ] A horizontal tab bar renders below the header/progress bar area, showing "Progress" and "Commits" tabs
-- [ ] The currently active tab is bold + primary color; inactive tabs are muted
-- [ ] Tabs are separated by `│` characters, matching the status view convention
-- [ ] The "Progress" tab shows the existing status/tools/tokens/elapsed content
-- [ ] The "Commits" tab shows the list of recent commits (moved from the bottom of the progress view)
-- [ ] The commits tab shows a "(N)" count badge next to the tab label when commits exist
-- [ ] Tab switching works via number keys (1/2) or left/right arrow keys
-- [ ] The tab state persists across ticker updates (does not reset on each render)
-- [ ] Typecheck and vet pass (`go vet ./...`)
+- [x] A horizontal tab bar renders below the header/progress bar area, showing "Progress" and "Commits" tabs
+- [x] The currently active tab is bold + primary color; inactive tabs are muted
+- [x] Tabs are separated by `│` characters, matching the status view convention
+- [x] The "Progress" tab shows the existing status/tools/tokens/elapsed content
+- [x] The "Commits" tab shows the list of recent commits (moved from the bottom of the progress view)
+- [x] The commits tab shows a "(N)" count badge next to the tab label when commits exist
+- [x] Tab switching works via number keys (1/2) or left/right arrow keys
+- [x] The tab state persists across ticker updates (does not reset on each render)
+- [x] Typecheck and vet pass (`go vet ./...`)
 
 ### TASK-003: Add tool detail panel (right side, toggleable with Alt+I)
 **Description:** As a user, I want to toggle a detail panel on the right side of the work view that shows a rolling structured log of each tool invocation, so I can see what Claude is doing in more detail.

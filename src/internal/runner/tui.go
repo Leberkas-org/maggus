@@ -176,6 +176,7 @@ type TUIModel struct {
 	frame       int
 	width       int
 	height      int
+	activeTab   int    // 0 = Progress, 1 = Commits
 	cancelFunc  func() // called on Ctrl+C to cancel the context
 	quitting    bool
 }
@@ -263,6 +264,32 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cancelFunc = nil // prevent double-cancel
 			}
 			return m, nil
+		}
+		// Tab switching in work view (only when a task is active)
+		if m.taskID != "" {
+			switch msg.Type {
+			case tea.KeyLeft:
+				if m.activeTab > 0 {
+					m.activeTab--
+				}
+				return m, nil
+			case tea.KeyRight:
+				if m.activeTab < 1 {
+					m.activeTab++
+				}
+				return m, nil
+			default:
+				if len(msg.Runes) == 1 {
+					switch msg.Runes[0] {
+					case '1':
+						m.activeTab = 0
+						return m, nil
+					case '2':
+						m.activeTab = 1
+						return m, nil
+					}
+				}
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -712,6 +739,31 @@ func (m TUIModel) renderHeaderInner(w int) string {
 	return b.String()
 }
 
+// renderTabBar renders the horizontal tab bar for the work view.
+func (m TUIModel) renderTabBar(w int) string {
+	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	sep := grayStyle.Render("│")
+
+	// Build tab labels
+	progressLabel := " Progress "
+	commitsLabel := " Commits "
+	if len(m.commits) > 0 {
+		commitsLabel = fmt.Sprintf(" Commits (%d) ", len(m.commits))
+	}
+
+	var tabs [2]string
+	if m.activeTab == 0 {
+		tabs[0] = selectedStyle.Render(progressLabel)
+		tabs[1] = unselectedStyle.Render(commitsLabel)
+	} else {
+		tabs[0] = unselectedStyle.Render(progressLabel)
+		tabs[1] = selectedStyle.Render(commitsLabel)
+	}
+
+	return tabs[0] + sep + tabs[1] + "\n" + styles.Separator(w) + "\n"
+}
+
 func (m TUIModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
 	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
@@ -749,46 +801,53 @@ func (m TUIModel) renderView() string {
 		b.WriteString(taskLine + "\n\n")
 	}
 
-	b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+	// Tab bar
+	b.WriteString(m.renderTabBar(innerW))
 
-	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
-	for i, t := range m.toolHistory {
-		prefix := grayStyle.Render("│")
-		if i == len(m.toolHistory)-1 {
-			prefix = blueStyle.Render("▶")
+	if m.activeTab == 0 {
+		// Progress tab content
+		b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+
+		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
+		for i, t := range m.toolHistory {
+			prefix := grayStyle.Render("│")
+			if i == len(m.toolHistory)-1 {
+				prefix = blueStyle.Render("▶")
+			}
+			b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
 		}
-		b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
-	}
-	// Pad empty lines for consistent layout
-	for i := len(m.toolHistory); i < maxToolHistory; i++ {
-		b.WriteString("\n")
-	}
+		// Pad empty lines for consistent layout
+		for i := len(m.toolHistory); i < maxToolHistory; i++ {
+			b.WriteString("\n")
+		}
 
-	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
-	// Token usage
-	if m.hasUsageData {
-		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+		// Token usage
+		if m.hasUsageData {
+			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+		} else {
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+		}
 	} else {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
-	}
-
-	// Recent commits section
-	if len(m.commits) > 0 {
-		b.WriteString("\n")
-		b.WriteString(styles.Separator(innerW) + "\n")
-		b.WriteString(grayStyle.Render("Commits:") + "\n")
-		for _, c := range m.commits {
-			line := styles.Truncate(c, innerW-4)
-			b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render(line)))
+		// Commits tab content
+		if len(m.commits) == 0 {
+			b.WriteString(grayStyle.Render("No commits yet.") + "\n")
+		} else {
+			for _, c := range m.commits {
+				line := styles.Truncate(c, innerW-4)
+				b.WriteString(fmt.Sprintf("  %s %s\n",
+					grayStyle.Render("•"),
+					grayStyle.Render(line)))
+			}
 		}
 	}
 
-	footer := styles.StatusBar.Render("ctrl+c stop")
+	footer := styles.StatusBar.Render("1/2 tabs · ctrl+c stop")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
