@@ -115,15 +115,10 @@ func FullScreen(content, footer string, width, height int) string {
 	// Build the composed body: content + gap + footer (centered independently)
 	var body string
 	if footer != "" {
-		// Center footer within the full inner width
-		footerW := lipgloss.Width(footer)
-		footerPad := (innerW - footerW) / 2
-		if footerPad < 0 {
-			footerPad = 0
-		}
-		centeredFooter := strings.Repeat(" ", footerPad) + footer
+		centeredFooter := centerFooter(footer, innerW)
+		footerLineCount := strings.Count(centeredFooter, "\n") + 1
 
-		gap := innerH - contentLines - 1
+		gap := innerH - contentLines - footerLineCount
 		if gap < 0 {
 			gap = 0
 		}
@@ -132,8 +127,9 @@ func FullScreen(content, footer string, width, height int) string {
 		body = content
 	}
 
+	// Box has Padding(0,1) — add 2 to Width so the content area equals innerW.
 	box := Box.
-		Width(innerW).
+		Width(innerW + 2).
 		Height(innerH).
 		Render(body)
 
@@ -143,20 +139,21 @@ func FullScreen(content, footer string, width, height int) string {
 // FullScreenLeft is like FullScreen but keeps content left-aligned inside
 // the box (no horizontal centering). Use for detail views and work output.
 func FullScreenLeft(content, footer string, width, height int) string {
+	return FullScreenLeftColor(content, footer, width, height, Primary)
+}
+
+// FullScreenLeftColor is like FullScreenLeft but allows overriding the border color.
+func FullScreenLeftColor(content, footer string, width, height int, borderColor lipgloss.Color) string {
 	innerW, innerH := fullScreenInner(width, height)
 
 	contentLines := strings.Count(content, "\n") + 1
 
 	var body string
 	if footer != "" {
-		footerW := lipgloss.Width(footer)
-		footerPad := (innerW - footerW) / 2
-		if footerPad < 0 {
-			footerPad = 0
-		}
-		centeredFooter := strings.Repeat(" ", footerPad) + footer
+		centeredFooter := centerFooter(footer, innerW)
+		footerLineCount := strings.Count(centeredFooter, "\n") + 1
 
-		gap := innerH - contentLines - 1
+		gap := innerH - contentLines - footerLineCount
 		if gap < 0 {
 			gap = 0
 		}
@@ -165,12 +162,29 @@ func FullScreenLeft(content, footer string, width, height int) string {
 		body = content
 	}
 
+	// Box has Padding(0,1) — add 2 to Width so the content area equals innerW.
 	box := Box.
-		Width(innerW).
+		BorderForeground(borderColor).
+		Width(innerW + 2).
 		Height(innerH).
 		Render(body)
 
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// centerFooter trims trailing newlines, then centers each line independently.
+func centerFooter(footer string, innerW int) string {
+	footer = strings.TrimRight(footer, "\n")
+	lines := strings.Split(footer, "\n")
+	for i, line := range lines {
+		lineW := lipgloss.Width(line)
+		pad := (innerW - lineW) / 2
+		if pad < 0 {
+			pad = 0
+		}
+		lines[i] = strings.Repeat(" ", pad) + line
+	}
+	return strings.Join(lines, "\n")
 }
 
 // FullScreenInnerSize returns the usable content width and height inside a

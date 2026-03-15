@@ -479,6 +479,9 @@ func (m statusModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) View() string {
+	if len(m.plans) == 0 {
+		return m.viewEmpty()
+	}
 	if m.confirmDelete {
 		return m.viewConfirmDelete()
 	}
@@ -486,6 +489,24 @@ func (m statusModel) View() string {
 		return m.viewDetail()
 	}
 	return m.viewStatus()
+}
+
+func (m statusModel) viewEmpty() string {
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString(styles.Title.Render("Status") + "\n\n")
+	sb.WriteString(mutedStyle.Render("No plans found.") + "\n\n")
+	sb.WriteString(mutedStyle.Render("Create a plan with ") +
+		lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render("maggus plan") +
+		mutedStyle.Render(" to get started.") + "\n")
+
+	footer := styles.StatusBar.Render("q/esc: exit")
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(sb.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(sb.String()) + "\n"
 }
 
 func (m statusModel) viewConfirmDelete() string {
@@ -912,8 +933,12 @@ var statusCmd = &cobra.Command{
 		}
 
 		if len(plans) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No plans found.")
-			return nil
+			if plain {
+				fmt.Fprintln(cmd.OutOrStdout(), "No plans found.")
+				return nil
+			}
+			// TUI mode: show empty status view
+			plans = []planInfo{}
 		}
 
 		nextTaskID, nextTaskFile := findNextTask(plans)
