@@ -22,10 +22,8 @@ const progressBarWidth = 10
 var (
 	statusGreenStyle  = lipgloss.NewStyle().Foreground(styles.Success)
 	statusCyanStyle   = lipgloss.NewStyle().Foreground(styles.Primary)
-	statusYellowStyle = lipgloss.NewStyle().Foreground(styles.Warning)
-	statusRedStyle    = lipgloss.NewStyle().Foreground(styles.Error)
-	statusBlueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	statusDimStyle    = lipgloss.NewStyle().Faint(true)
+	statusRedStyle = lipgloss.NewStyle().Foreground(styles.Error)
+	statusDimStyle = lipgloss.NewStyle().Faint(true)
 	statusDimGreen    = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
 )
 
@@ -71,9 +69,13 @@ type statusModel struct {
 	nextTaskFile string
 	agentName   string
 
+	// Plan tab selection
+	selectedPlan int // index into visiblePlans()
+
 	// Flat list of selectable tasks (index into plans/tasks)
 	selectableTasks []parser.Task
 	cursor          int
+	scrollOffset    int
 	width           int
 	height          int
 
@@ -95,33 +97,88 @@ type statusModel struct {
 }
 
 func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
-	return statusModel{
-		plans:           plans,
-		showAll:         showAll,
-		nextTaskID:      nextTaskID,
-		nextTaskFile:    nextTaskFile,
-		agentName:       agentName,
-		selectableTasks: buildSelectableTasks(plans, showAll),
-		dir:             dir,
+	m := statusModel{
+		plans:        plans,
+		showAll:      showAll,
+		nextTaskID:   nextTaskID,
+		nextTaskFile: nextTaskFile,
+		agentName:    agentName,
+		dir:          dir,
 	}
+	visible := m.visiblePlans()
+	if len(visible) > 0 {
+		m.selectableTasks = buildSelectableTasksForPlan(visible[0], showAll)
+	}
+	return m
 }
 
-// buildSelectableTasks returns the flat list of tasks the cursor can navigate.
-// When showAll is false, completed plans and completed tasks are excluded.
-func buildSelectableTasks(plans []planInfo, showAll bool) []parser.Task {
-	var selectable []parser.Task
-	for _, p := range plans {
-		if p.completed && !showAll {
+// visiblePlans returns the plans that should be shown based on the showAll flag.
+func (m statusModel) visiblePlans() []planInfo {
+	var visible []planInfo
+	for _, p := range m.plans {
+		if p.completed && !m.showAll {
 			continue
 		}
-		for _, t := range p.tasks {
-			if !showAll && t.IsComplete() {
-				continue
-			}
-			selectable = append(selectable, t)
+		visible = append(visible, p)
+	}
+	return visible
+}
+
+// buildSelectableTasksForPlan returns the flat list of tasks for a single plan.
+// When showAll is false, completed tasks are excluded.
+func buildSelectableTasksForPlan(plan planInfo, showAll bool) []parser.Task {
+	var selectable []parser.Task
+	for _, t := range plan.tasks {
+		if !showAll && t.IsComplete() {
+			continue
 		}
+		selectable = append(selectable, t)
 	}
 	return selectable
+}
+
+// rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
+// for the currently selected plan.
+func (m *statusModel) rebuildForSelectedPlan() {
+	visible := m.visiblePlans()
+	if m.selectedPlan >= len(visible) {
+		m.selectedPlan = 0
+	}
+	if len(visible) > 0 {
+		m.selectableTasks = buildSelectableTasksForPlan(visible[m.selectedPlan], m.showAll)
+	} else {
+		m.selectableTasks = nil
+	}
+	m.cursor = 0
+	m.scrollOffset = 0
+}
+
+// visibleTaskLines returns how many task lines fit in the status task list area.
+func (m statusModel) visibleTaskLines() int {
+	// Header: title + blank + tab bar (estimate 2 lines) + separator + blank + progress + blank + tasks header + separator = ~9 lines
+	// Footer: 1 line
+	headerLines := 9
+	footerLines := 1
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	avail := innerH - headerLines - footerLines
+	if avail < 1 {
+		avail = 1
+	}
+	return avail
+}
+
+// ensureCursorVisible adjusts scrollOffset so cursor is within the visible window.
+func (m *statusModel) ensureCursorVisible() {
+	visible := m.visibleTaskLines()
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
 }
 
 func (m statusModel) Init() tea.Cmd {
@@ -161,6 +218,25 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab", "right":
+		// Next plan tab (wraps around)
+		visible := m.visiblePlans()
+		if len(visible) > 1 {
+			m.selectedPlan = (m.selectedPlan + 1) % len(visible)
+			m.rebuildForSelectedPlan()
+		}
+		return m, nil
+	case "shift+tab", "left":
+		// Previous plan tab (wraps around)
+		visible := m.visiblePlans()
+		if len(visible) > 1 {
+			m.selectedPlan--
+			if m.selectedPlan < 0 {
+				m.selectedPlan = len(visible) - 1
+			}
+			m.rebuildForSelectedPlan()
+		}
+		return m, nil
 	case "alt+a":
 		m.showAll = !m.showAll
 		// Reload plans from disk to pick up external changes
@@ -168,9 +244,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err == nil {
 			m.plans = plans
 		}
-		m.selectableTasks = buildSelectableTasks(m.plans, m.showAll)
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
-		m.cursor = 0
+		m.rebuildForSelectedPlan()
 		return m, nil
 	case "alt+r":
 		if len(m.selectableTasks) == 0 {
@@ -193,6 +268,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.cursor = len(m.selectableTasks) - 1
 			}
+			m.ensureCursorVisible()
 		}
 	case "down", "j":
 		if len(m.selectableTasks) > 0 {
@@ -201,12 +277,15 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.cursor = 0
 			}
+			m.ensureCursorVisible()
 		}
 	case "home":
 		m.cursor = 0
+		m.ensureCursorVisible()
 	case "end":
 		if len(m.selectableTasks) > 0 {
 			m.cursor = len(m.selectableTasks) - 1
+			m.ensureCursorVisible()
 		}
 	case "enter":
 		if len(m.selectableTasks) > 0 {
@@ -380,9 +459,9 @@ func (m statusModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		plans, err := parsePlans(m.dir)
 		if err == nil {
 			m.plans = plans
-			m.selectableTasks = buildSelectableTasks(m.plans, m.showAll)
 			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
 		}
+		m.rebuildForSelectedPlan()
 		if m.cursor >= len(m.selectableTasks) && m.cursor > 0 {
 			m.cursor--
 		}
@@ -430,8 +509,69 @@ func (m statusModel) viewConfirmDelete() string {
 	return styles.Box.Render(sb.String()) + "\n"
 }
 
+// renderTabBar renders the horizontal plan tab bar.
+func (m statusModel) renderTabBar() string {
+	visible := m.visiblePlans()
+	if len(visible) == 0 {
+		return ""
+	}
+
+	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var tabs []string
+	for i, p := range visible {
+		done := p.doneCount()
+		total := len(p.tasks)
+		name := strings.TrimSuffix(p.filename, ".md")
+		label := fmt.Sprintf(" %s %d/%d ", name, done, total)
+		if i == m.selectedPlan {
+			tabs = append(tabs, selectedStyle.Render(label))
+		} else {
+			tabs = append(tabs, unselectedStyle.Render(label))
+		}
+	}
+
+	// Join tabs with a separator, wrapping to next line if needed
+	sep := statusDimStyle.Render("│")
+	maxWidth := m.width - 8 // account for box border/padding
+	if maxWidth <= 0 {
+		maxWidth = 80
+	}
+
+	var lines []string
+	var currentLine string
+	currentVisualWidth := 0
+	for _, tab := range tabs {
+		tabWidth := lipgloss.Width(tab)
+		sepWidth := 0
+		if currentLine != "" {
+			sepWidth = 1 // separator character
+		}
+		if currentVisualWidth+sepWidth+tabWidth > maxWidth && currentLine != "" {
+			lines = append(lines, currentLine)
+			currentLine = tab
+			currentVisualWidth = tabWidth
+		} else {
+			if currentLine != "" {
+				currentLine += sep
+				currentVisualWidth += sepWidth
+			}
+			currentLine += tab
+			currentVisualWidth += tabWidth
+		}
+	}
+	if currentLine != "" {
+		lines = append(lines, currentLine)
+	}
+
+	return " " + strings.Join(lines, "\n ")
+}
+
 func (m statusModel) viewStatus() string {
 	var sb strings.Builder
+
+	visible := m.visiblePlans()
 
 	// Compute totals
 	totalTasks := 0
@@ -454,29 +594,35 @@ func (m statusModel) viewStatus() string {
 	sb.WriteString(header)
 	sb.WriteString("\n\n")
 
-	// Summary
-	summary := fmt.Sprintf(" Summary: %d/%d tasks complete · %d pending · %d blocked · Agent: %s",
-		totalDone, totalTasks, totalPending, totalBlocked, m.agentName)
-	sb.WriteString(summary)
+	// Tab bar
+	if len(visible) > 0 {
+		sb.WriteString(m.renderTabBar())
+		sb.WriteString("\n")
+		sb.WriteString(" " + styles.Separator(42))
+		sb.WriteString("\n")
+	}
 
-	// Task sections with cursor
-	taskIdx := 0
-	for _, p := range m.plans {
-		if p.completed && !m.showAll {
-			continue
-		}
+	// Progress bar and summary for selected plan
+	if m.selectedPlan < len(visible) {
+		p := visible[m.selectedPlan]
+		done := p.doneCount()
+		total := len(p.tasks)
+		blocked := p.blockedCount()
+		pending := total - done - blocked
+		sb.WriteString("\n " + buildProgressBar(done, total))
+		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
+			done, total, pending, blocked)
+		sb.WriteString(statusDimStyle.Render(summary))
+	} else {
+		sb.WriteString("\n " + buildProgressBar(totalDone, totalTasks))
+		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
+			totalDone, totalTasks, totalPending, totalBlocked)
+		sb.WriteString(statusDimStyle.Render(summary))
+	}
 
-		// Check if this plan has any visible tasks
-		hasVisible := false
-		for _, t := range p.tasks {
-			if m.showAll || !t.IsComplete() {
-				hasVisible = true
-				break
-			}
-		}
-		if !hasVisible {
-			continue
-		}
+	// Task list for selected plan
+	if m.selectedPlan < len(visible) {
+		p := visible[m.selectedPlan]
 
 		sb.WriteString("\n\n")
 		if p.completed {
@@ -487,10 +633,15 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString("\n")
 		sb.WriteString(" " + styles.Separator(42))
 
-		for _, t := range p.tasks {
-			if !m.showAll && t.IsComplete() {
-				continue
-			}
+		// Determine visible window for scrolling
+		visibleLines := m.visibleTaskLines()
+		end := m.scrollOffset + visibleLines
+		if end > len(m.selectableTasks) {
+			end = len(m.selectableTasks)
+		}
+
+		for taskIdx := m.scrollOffset; taskIdx < end; taskIdx++ {
+			t := m.selectableTasks[taskIdx]
 
 			var icon string
 			var style lipgloss.Style
@@ -521,7 +672,6 @@ func (m statusModel) viewStatus() string {
 			var prefix string
 			if taskIdx == m.cursor {
 				prefix = " ▸ "
-				// Override style for selected row
 				if !p.completed {
 					style = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 				}
@@ -545,76 +695,21 @@ func (m statusModel) viewStatus() string {
 					sb.WriteString(statusRedStyle.Render(blockedLine))
 				}
 			}
-
-			taskIdx++
-		}
-	}
-
-	// Plans table
-	sb.WriteString("\n\n")
-	sb.WriteString(" Plans")
-	sb.WriteString("\n")
-	sb.WriteString(" " + styles.Separator(42))
-
-	maxCountWidth := 0
-	for _, p := range m.plans {
-		if p.completed && !m.showAll {
-			continue
-		}
-		w := len(fmt.Sprintf("%d/%d", p.doneCount(), len(p.tasks)))
-		if w > maxCountWidth {
-			maxCountWidth = w
-		}
-	}
-	countFmt := fmt.Sprintf("%%-%ds", maxCountWidth)
-
-	for _, p := range m.plans {
-		if p.completed && !m.showAll {
-			continue
 		}
 
-		done := p.doneCount()
-		total := len(p.tasks)
-		bar := buildProgressBar(done, total)
-
-		var prefix, suffix string
-		var style lipgloss.Style
-
-		if p.completed {
-			prefix = " ✓ "
-			style = statusDimGreen
-			suffix = "done"
-		} else if p.blockedCount() > 0 {
-			prefix = "   "
-			style = statusRedStyle
-			suffix = "blocked"
-		} else if total > 0 && done == total {
-			prefix = "   "
-			style = statusGreenStyle
-			suffix = "done"
-		} else if done == 0 {
-			prefix = "   "
-			style = statusBlueStyle
-			suffix = "new"
-		} else {
-			prefix = "   "
-			style = statusYellowStyle
-			suffix = "in progress"
+		// Scroll indicator
+		if len(m.selectableTasks) > visibleLines {
+			scrollHint := fmt.Sprintf(" [%d-%d of %d]", m.scrollOffset+1, end, len(m.selectableTasks))
+			sb.WriteString("\n")
+			sb.WriteString(statusDimStyle.Render(scrollHint))
 		}
-
-		countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
-		// Render parts separately so the progress bar keeps its own colors
-		labelPart := fmt.Sprintf("%s%-32s [", prefix, p.filename)
-		afterPart := fmt.Sprintf("]  %s   %s", countStr, suffix)
-		sb.WriteString("\n")
-		sb.WriteString(style.Render(labelPart) + bar + style.Render(afterPart))
 	}
 
 	toggleHint := "alt+a: show all"
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: details · " + toggleHint + " · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
