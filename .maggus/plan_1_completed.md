@@ -86,15 +86,15 @@ The work view (`maggus work`) currently renders as flat, unstyled text — no bo
 **Description:** As a developer, I want to verify the full work view renders correctly across all states (banner, progress, summary) and that all interactions work together.
 
 **Acceptance Criteria:**
-- [ ] The banner view renders inside the bordered box with correct padding
-- [ ] Switching tabs while the detail panel is open works correctly (tabs affect left panel only)
-- [ ] The summary view continues to render in its own bordered box (not affected by work view changes)
-- [ ] Ctrl+C still works in all states (banner, progress with/without detail panel, summary)
-- [ ] The detail panel toggle state resets between iterations (or persists — pick one and be consistent)
-- [ ] No visual glitches when terminal is narrower than 80 columns (graceful degradation)
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` passes
-- [ ] `go test ./...` passes
+- [x] The banner view renders inside the bordered box with correct padding
+- [x] Switching tabs while the detail panel is open works correctly (tabs affect left panel only)
+- [x] The summary view continues to render in its own bordered box (not affected by work view changes)
+- [x] Ctrl+C still works in all states (banner, progress with/without detail panel, summary)
+- [x] The detail panel toggle state resets between iterations (or persists — pick one and be consistent)
+- [x] No visual glitches when terminal is narrower than 80 columns (graceful degradation)
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` passes
+- [x] `go test ./...` passes
 
 ## Functional Requirements
 
