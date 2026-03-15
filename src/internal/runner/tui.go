@@ -162,6 +162,7 @@ type TUIModel struct {
 	totalOutputTokens int         // cumulative output tokens
 	hasUsageData      bool        // true if any usage data was received
 	taskUsages        []TaskUsage // per-task usage history
+	onTaskUsage       func(TaskUsage) // called immediately when a task's usage is finalized
 
 	status      string
 	toolHistory []string
@@ -193,6 +194,32 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		startTime:   time.Now(),
 		width:       120,
 		cancelFunc:  cancelFunc,
+	}
+}
+
+// SetOnTaskUsage sets a callback that is invoked each time a task's usage is finalized.
+func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
+	m.onTaskUsage = fn
+}
+
+// saveIterationUsage saves the current iteration's token usage and invokes the callback.
+// Called from Update (value receiver), so it must operate on the value directly.
+func saveIterationUsage(m *TUIModel) {
+	if m.taskID == "" || (m.iterInputTokens == 0 && m.iterOutputTokens == 0) {
+		return
+	}
+	tu := TaskUsage{
+		TaskID:       m.taskID,
+		TaskTitle:    m.taskTitle,
+		PlanFile:     m.taskPlanFile,
+		InputTokens:  m.iterInputTokens,
+		OutputTokens: m.iterOutputTokens,
+		StartTime:    m.startTime,
+		EndTime:      time.Now(),
+	}
+	m.taskUsages = append(m.taskUsages, tu)
+	if m.onTaskUsage != nil {
+		m.onTaskUsage(tu)
 	}
 }
 
@@ -246,17 +273,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case SummaryMsg:
 		// Save last iteration's usage before transitioning to summary.
-		if m.taskID != "" && (m.iterInputTokens > 0 || m.iterOutputTokens > 0) {
-			m.taskUsages = append(m.taskUsages, TaskUsage{
-				TaskID:       m.taskID,
-				TaskTitle:    m.taskTitle,
-				PlanFile:     m.taskPlanFile,
-				InputTokens:  m.iterInputTokens,
-				OutputTokens: m.iterOutputTokens,
-				StartTime:    m.startTime,
-				EndTime:      time.Now(),
-			})
-		}
+		saveIterationUsage(&m)
 		m.showSummary = true
 		m.summary = msg.Data
 		m.summaryElapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)
@@ -286,17 +303,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case IterationStartMsg:
 		// Save previous iteration's usage before resetting.
-		if m.taskID != "" && (m.iterInputTokens > 0 || m.iterOutputTokens > 0) {
-			m.taskUsages = append(m.taskUsages, TaskUsage{
-				TaskID:       m.taskID,
-				TaskTitle:    m.taskTitle,
-				PlanFile:     m.taskPlanFile,
-				InputTokens:  m.iterInputTokens,
-				OutputTokens: m.iterOutputTokens,
-				StartTime:    m.startTime,
-				EndTime:      time.Now(),
-			})
-		}
+		saveIterationUsage(&m)
 		m.currentIter = msg.Current
 		m.totalIters = msg.Total
 		m.taskID = msg.TaskID

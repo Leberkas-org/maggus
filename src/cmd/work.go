@@ -252,6 +252,24 @@ Examples:
 			banner.Worktree = workDir
 		}
 		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel, banner)
+		m.SetOnTaskUsage(func(tu runner.TaskUsage) {
+			planRel := tu.PlanFile
+			if rel, err := filepath.Rel(dir, tu.PlanFile); err == nil {
+				planRel = rel
+			}
+			_ = usage.Append(dir, []usage.Record{{
+				RunID:        run.ID,
+				TaskID:       tu.TaskID,
+				TaskTitle:    tu.TaskTitle,
+				PlanFile:     planRel,
+				Model:        modelDisplay,
+				Agent:        activeAgent.Name(),
+				InputTokens:  tu.InputTokens,
+				OutputTokens: tu.OutputTokens,
+				StartTime:    tu.StartTime,
+				EndTime:      tu.EndTime,
+			}})
+		})
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
 		// Capture the starting commit hash before work begins.
@@ -463,32 +481,8 @@ Examples:
 			return workErr
 		}
 
-		// Persist per-task usage to .maggus/usage.csv.
+		// Usage is now written per-task via the onTaskUsage callback.
 		if tm, ok := finalModel.(runner.TUIModel); ok {
-			usages := tm.TaskUsages()
-			if len(usages) > 0 {
-				var records []usage.Record
-				for _, u := range usages {
-					planRel := u.PlanFile
-					if rel, err := filepath.Rel(dir, u.PlanFile); err == nil {
-						planRel = rel
-					}
-					records = append(records, usage.Record{
-						RunID:        run.ID,
-						TaskID:       u.TaskID,
-						TaskTitle:    u.TaskTitle,
-						PlanFile:     planRel,
-						Model:        modelDisplay,
-						Agent:        activeAgent.Name(),
-						InputTokens:  u.InputTokens,
-						OutputTokens: u.OutputTokens,
-						StartTime:    u.StartTime,
-						EndTime:      u.EndTime,
-					})
-				}
-				_ = usage.Append(dir, records)
-			}
-
 			// Check if user chose "Run again" from the summary menu.
 			result := tm.Result()
 			if result.RunAgain {
