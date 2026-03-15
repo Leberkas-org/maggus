@@ -73,14 +73,14 @@ The work view (`maggus work`) currently renders as flat, unstyled text — no bo
 **Description:** As a user, I want to scroll through the tool detail panel history while execution continues, so I can review earlier tool invocations.
 
 **Acceptance Criteria:**
-- [ ] When the detail panel is visible, Up/Down arrow keys scroll the detail panel viewport
-- [ ] Home/End keys jump to the top/bottom of the detail log
-- [ ] When scrolled to the bottom (default), new tool entries auto-scroll the view
-- [ ] When the user has scrolled up, auto-scroll is paused — new entries appear but the viewport stays in place
-- [ ] A scroll indicator shows position (e.g., `[3-15 of 42]`) at the top-right of the detail panel
-- [ ] Pressing `End` or scrolling to the bottom re-enables auto-scroll
-- [ ] Arrow keys only affect the detail panel when it is visible; otherwise they pass through to tab switching
-- [ ] Typecheck and vet pass (`go vet ./...`)
+- [x] When the detail panel is visible, Up/Down arrow keys scroll the detail panel viewport
+- [x] Home/End keys jump to the top/bottom of the detail log
+- [x] When scrolled to the bottom (default), new tool entries auto-scroll the view
+- [x] When the user has scrolled up, auto-scroll is paused — new entries appear but the viewport stays in place
+- [x] A scroll indicator shows position (e.g., `[3-15 of 42]`) at the top-right of the detail panel
+- [x] Pressing `End` or scrolling to the bottom re-enables auto-scroll
+- [x] Arrow keys only affect the detail panel when it is visible; otherwise they pass through to tab switching
+- [x] Typecheck and vet pass (`go vet ./...`)
 
 ### TASK-006: Integration testing and polish
 **Description:** As a developer, I want to verify the full work view renders correctly across all states (banner, progress, summary) and that all interactions work together.

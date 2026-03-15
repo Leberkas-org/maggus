@@ -176,10 +176,13 @@ type TUIModel struct {
 	frame       int
 	width       int
 	height      int
-	activeTab   int    // 0 = Progress, 1 = Commits
-	showDetail  bool   // true when right-side detail panel is visible
-	cancelFunc  func() // called on Ctrl+C to cancel the context
-	quitting    bool
+	activeTab          int    // 0 = Progress, 1 = Commits
+	showDetail         bool   // true when right-side detail panel is visible
+	detailScrollOffset int    // scroll offset for the detail panel (in lines)
+	detailAutoScroll   bool   // true when detail panel auto-scrolls to bottom
+	detailTotalLines   int    // total rendered lines in last detail render (for scroll indicator)
+	cancelFunc         func() // called on Ctrl+C to cancel the context
+	quitting           bool
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
@@ -188,16 +191,17 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		model = "default"
 	}
 	return TUIModel{
-		version:     version,
-		fingerprint: fingerprint,
-		banner:      banner,
-		status:      "Waiting...",
-		output:      "-",
-		model:       model,
-		startTime:   time.Now(),
-		width:       120,
-		height:      40,
-		cancelFunc:  cancelFunc,
+		version:          version,
+		fingerprint:      fingerprint,
+		banner:           banner,
+		status:           "Waiting...",
+		output:           "-",
+		model:            model,
+		startTime:        time.Now(),
+		width:            120,
+		height:           40,
+		detailAutoScroll: true,
+		cancelFunc:       cancelFunc,
 	}
 }
 
@@ -271,8 +275,32 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showDetail = !m.showDetail
 			return m, nil
 		}
-		// Tab switching in work view (only when a task is active)
-		if m.taskID != "" {
+		// Detail panel scrolling (when visible)
+		if m.showDetail && m.taskID != "" {
+			switch msg.Type {
+			case tea.KeyUp:
+				if m.detailScrollOffset > 0 {
+					m.detailScrollOffset--
+					m.detailAutoScroll = false
+				}
+				return m, nil
+			case tea.KeyDown:
+				m.detailScrollOffset++
+				clampDetailScroll(&m)
+				return m, nil
+			case tea.KeyHome:
+				m.detailScrollOffset = 0
+				m.detailAutoScroll = false
+				return m, nil
+			case tea.KeyEnd:
+				m.detailScrollOffset = m.detailTotalLines
+				m.detailAutoScroll = true
+				clampDetailScroll(&m)
+				return m, nil
+			}
+		}
+		// Tab switching in work view (only when a task is active, and arrow keys only when detail is hidden)
+		if m.taskID != "" && !m.showDetail {
 			switch msg.Type {
 			case tea.KeyLeft:
 				if m.activeTab > 0 {
@@ -284,16 +312,17 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.activeTab++
 				}
 				return m, nil
-			default:
-				if len(msg.Runes) == 1 {
-					switch msg.Runes[0] {
-					case '1':
-						m.activeTab = 0
-						return m, nil
-					case '2':
-						m.activeTab = 1
-						return m, nil
-					}
+			}
+		}
+		if m.taskID != "" {
+			if len(msg.Runes) == 1 {
+				switch msg.Runes[0] {
+				case '1':
+					m.activeTab = 0
+					return m, nil
+				case '2':
+					m.activeTab = 1
+					return m, nil
 				}
 			}
 		}
@@ -301,6 +330,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		clampDetailScroll(&m)
 		return m, tea.ClearScreen
 
 	case tickMsg:
@@ -355,6 +385,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mcps = nil
 		m.iterInputTokens = 0
 		m.iterOutputTokens = 0
+		m.detailScrollOffset = 0
+		m.detailAutoScroll = true
+		m.detailTotalLines = 0
 		m.startTime = time.Now()
 
 	case agent.StatusMsg:
@@ -372,6 +405,12 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agent.ToolMsg:
 		m.toolEntries = append(m.toolEntries, msg)
 		m.toolCount++
+		// Update total lines and auto-scroll if enabled
+		m.detailTotalLines = m.countDetailLines()
+		if m.detailAutoScroll {
+			m.detailScrollOffset = m.detailTotalLines // will be clamped
+		}
+		clampDetailScroll(&m)
 
 	case agent.SkillMsg:
 		for _, s := range m.skills {
@@ -794,6 +833,49 @@ func toolIcon(toolType string) string {
 	}
 }
 
+// detailAvailableHeight returns the number of visible lines in the detail panel viewport.
+func (m TUIModel) detailAvailableHeight() int {
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	// Reserve lines for: header section (~5), task info (2), detail header+separator (2), footer (1)
+	available := innerH - 10
+	if available < 1 {
+		available = 1
+	}
+	return available
+}
+
+// clampDetailScroll ensures detailScrollOffset is within valid bounds and updates auto-scroll state.
+func clampDetailScroll(m *TUIModel) {
+	available := m.detailAvailableHeight()
+	maxOffset := m.detailTotalLines - available
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.detailScrollOffset > maxOffset {
+		m.detailScrollOffset = maxOffset
+	}
+	if m.detailScrollOffset < 0 {
+		m.detailScrollOffset = 0
+	}
+	// Re-enable auto-scroll if scrolled to bottom
+	if m.detailScrollOffset >= maxOffset && maxOffset > 0 {
+		m.detailAutoScroll = true
+	}
+}
+
+// countDetailLines calculates the total number of rendered lines for the current tool entries.
+func (m TUIModel) countDetailLines() int {
+	total := 0
+	for i, entry := range m.toolEntries {
+		if i > 0 {
+			total++ // separator line
+		}
+		total++ // header line
+		total += len(entry.Params)
+	}
+	return total
+}
+
 // renderDetailPanel renders the right-side tool detail panel content.
 func (m TUIModel) renderDetailPanel(w, h int) string {
 	if w < 10 {
@@ -801,50 +883,81 @@ func (m TUIModel) renderDetailPanel(w, h int) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(boldStyle.Render("Tool Detail") + "\n")
-	b.WriteString(styles.Separator(w) + "\n")
 
 	if len(m.toolEntries) == 0 {
+		b.WriteString(boldStyle.Render("Tool Detail") + "\n")
+		b.WriteString(styles.Separator(w) + "\n")
 		b.WriteString(grayStyle.Render("No tool invocations yet.") + "\n")
+		return b.String()
+	}
+
+	// Build all entry lines
+	var entryLines []string
+	for i, entry := range m.toolEntries {
+		if i > 0 {
+			entryLines = append(entryLines, grayStyle.Render(styles.Truncate(strings.Repeat("·", w), w)))
+		}
+
+		icon := toolIcon(entry.Type)
+		ts := entry.Timestamp.Format("15:04:05")
+		desc := entry.Description
+		maxDesc := w - len(ts) - 4
+		if maxDesc > 0 {
+			desc = styles.Truncate(desc, maxDesc)
+		}
+		header := fmt.Sprintf("%s %s  %s", icon, blueStyle.Render(desc), grayStyle.Render(ts))
+		entryLines = append(entryLines, header)
+
+		for k, v := range entry.Params {
+			paramLine := fmt.Sprintf("  %s %s", grayStyle.Render(k+":"), styles.Truncate(v, w-len(k)-4))
+			entryLines = append(entryLines, paramLine)
+		}
+	}
+
+	// Viewport calculation
+	available := h - 3 // header + separator lines
+	if available < 1 {
+		available = 1
+	}
+
+	// Clamp offset for this render
+	offset := m.detailScrollOffset
+	maxOffset := len(entryLines) - available
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Header line with scroll indicator
+	headerLeft := boldStyle.Render("Tool Detail")
+	if len(entryLines) > available {
+		end := offset + available
+		if end > len(entryLines) {
+			end = len(entryLines)
+		}
+		indicator := grayStyle.Render(fmt.Sprintf("[%d-%d of %d]", offset+1, end, len(entryLines)))
+		headerPad := w - lipgloss.Width(headerLeft) - lipgloss.Width(indicator)
+		if headerPad < 1 {
+			headerPad = 1
+		}
+		b.WriteString(headerLeft + strings.Repeat(" ", headerPad) + indicator + "\n")
 	} else {
-		// Render entries, auto-scrolled to show latest entries that fit
-		var entryLines []string
-		for i, entry := range m.toolEntries {
-			if i > 0 {
-				entryLines = append(entryLines, grayStyle.Render(styles.Truncate(strings.Repeat("·", w), w)))
-			}
+		b.WriteString(headerLeft + "\n")
+	}
+	b.WriteString(styles.Separator(w) + "\n")
 
-			// Header: icon + description + timestamp
-			icon := toolIcon(entry.Type)
-			ts := entry.Timestamp.Format("15:04:05")
-			desc := entry.Description
-			// Available width for description = w - icon - timestamp - spaces
-			maxDesc := w - len(ts) - 4
-			if maxDesc > 0 {
-				desc = styles.Truncate(desc, maxDesc)
-			}
-			header := fmt.Sprintf("%s %s  %s", icon, blueStyle.Render(desc), grayStyle.Render(ts))
-			entryLines = append(entryLines, header)
-
-			// Parameter detail lines
-			for k, v := range entry.Params {
-				paramLine := fmt.Sprintf("  %s %s", grayStyle.Render(k+":"), styles.Truncate(v, w-len(k)-4))
-				entryLines = append(entryLines, paramLine)
-			}
-		}
-
-		// Auto-scroll: show the last lines that fit in the available height
-		available := h - 3 // header + separator + margin
-		if available < 1 {
-			available = 1
-		}
-		start := 0
-		if len(entryLines) > available {
-			start = len(entryLines) - available
-		}
-		for _, line := range entryLines[start:] {
-			b.WriteString(line + "\n")
-		}
+	// Render visible window
+	end := offset + available
+	if end > len(entryLines) {
+		end = len(entryLines)
+	}
+	for _, line := range entryLines[offset:end] {
+		b.WriteString(line + "\n")
 	}
 
 	return b.String()
@@ -994,6 +1107,7 @@ func (m TUIModel) renderView() string {
 	var footerParts []string
 	footerParts = append(footerParts, "1/2 tabs")
 	if m.showDetail {
+		footerParts = append(footerParts, "↑/↓ scroll · home/end jump")
 		footerParts = append(footerParts, "alt+i hide detail")
 	} else {
 		footerParts = append(footerParts, "alt+i detail")
