@@ -17,8 +17,11 @@ maggus work [count] [flags]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--count` | `-c` | `5` | Number of tasks to work on |
+| `--task` | | | Run a specific task by ID (e.g. `TASK-001`). Sets count to 1. |
 | `--agent` | | *(from config)* | Agent backend to use (`claude` or `opencode`) |
 | `--model` | | *(from config)* | Model to use (e.g. `opus`, `sonnet`, `anthropic/claude-sonnet-4-6`, or a full model ID) |
+| `--worktree` | | *(from config)* | Run in an isolated git worktree |
+| `--no-worktree` | | `false` | Force disable worktree mode (overrides config) |
 | `--no-bootstrap` | | `false` | Skip reading CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, and TOOLING.md |
 
 The positional `[count]` argument and `--count` flag are interchangeable. The positional argument takes precedence.
@@ -41,31 +44,57 @@ maggus work --model opus
 # Use OpenCode as the agent backend
 maggus work --agent opencode
 
+# Run a specific task
+maggus work --task TASK-003
+
+# Run in an isolated worktree
+maggus work --worktree
+
 # Skip bootstrap context files
 maggus work --no-bootstrap
 ```
 
-### Example Output
+### TUI
 
-```
-══════════════════════════════════════════
-  Maggus Work Session (v1.0.0)
-══════════════════════════════════════════
-  Agent:        claude
-  Model:        claude-opus-4-6
-  Iterations:   5
-  Branch:       feature/maggustask-042
-  Run ID:       20260312-143000
-  Run Dir:      .maggus/runs/20260312-143000
-  Permissions:  --dangerously-skip-permissions
-══════════════════════════════════════════
+The work view displays inside a bordered full-screen box. A **tab bar** lets you switch between four views:
 
-WARNING: Running with --dangerously-skip-permissions
+| Tab | Key | Content |
+|-----|-----|---------|
+| **Progress** | `1` | Live status, recent tool list, model, elapsed time, token usage |
+| **Detail** | `2` | Scrollable structured log of every tool invocation with timestamps and parameters |
+| **Task** | `3` | Current task description and acceptance criteria with completion status |
+| **Commits** | `4` | List of commits made during the run |
 
-Press Ctrl+C within 3 seconds to abort...
-```
+Switch tabs with `←/→` arrow keys or number keys `1`–`4`. The Detail tab supports `↑/↓/Home/End` scrolling.
 
-After the 3-second safety window, Maggus enters the TUI and begins working through tasks.
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `←/→` or `1-4` | Switch tabs |
+| `↑/↓` | Scroll detail log (on Detail tab) |
+| `Home/End` | Jump to top/bottom of detail log |
+| `Alt+S` | Stop after current task (with confirmation) |
+| `Alt+S` (when stopping) | Cancel the stop and resume |
+| `Ctrl+C` | Interrupt immediately |
+
+### Stop After Task
+
+Press **Alt+S** during execution to request a graceful stop after the current task completes. A confirmation prompt appears: `Stop after current task? (y/n)`. When active, the box border turns yellow as a visual indicator. Press **Alt+S** again to revert and continue.
+
+### Summary Screen
+
+After all tasks complete (or the run is stopped/interrupted), a summary screen shows run details, token usage per task, commits, and remaining tasks. The title reflects the stop reason:
+
+| Title | When |
+|-------|------|
+| **✓ Work Complete** | All requested tasks finished successfully |
+| **⊘ Stopped by User** | User pressed Alt+S to stop after a task |
+| **⊘ Work Interrupted** | User pressed Ctrl+C during execution |
+| **✗ Work Failed** | A task or commit failed (shows error detail) |
+| **⊘ No Tasks Available** | No workable tasks found |
+
+From the summary screen you can choose **Exit** or **Run again** (with a custom task count).
 
 ---
 
@@ -118,6 +147,8 @@ Next 5 task(s):
 ```
 
 The first task is highlighted in cyan (unless `--plain` is used).
+
+In TUI mode (without `--plain`), the list is displayed in a full-screen bordered view with keyboard navigation. If no pending tasks exist, a friendly "All done!" screen is shown instead of exiting immediately.
 
 ---
 
@@ -178,67 +209,26 @@ Maggus Status — 3 plans (2 active), 24 tasks total
 - `→` marks the next task that `maggus work` will pick up
 - With `--plain`, symbols are replaced: `[x]` for done, `[!]` for blocked, `->` for next
 
----
+In TUI mode (without `--plain`), the status is displayed in a full-screen bordered view with tabbed plan sections, keyboard navigation, and a detail view for individual tasks. If no plans exist, a helpful empty state screen is shown with a hint to run `maggus plan`.
 
-## maggus blocked
+### Managing Blocked Tasks
 
-Interactive wizard for managing blocked tasks. Walks through each blocked criterion and lets you choose an action.
+Blocked tasks can be managed directly from the task detail view in both `maggus status` and `maggus list`. When viewing a task with blocked criteria:
 
-### Usage
+1. Press **Enter** on a task to open its detail view
+2. Press **Enter** again to enter **criteria mode** — blocked criteria are highlighted
+3. Navigate between blocked criteria with **↑/↓**
+4. Press **Enter** on a blocked criterion to open the **action picker**
 
-```bash
-maggus blocked
-```
-
-This command takes no flags. It scans all active plan files for blocked tasks and presents an interactive picker for each blocked criterion.
-
-### Actions
-
-For each blocked criterion, you can choose:
+The action picker offers four options:
 
 | Action | Description |
 |--------|-------------|
 | **Unblock** | Removes the `BLOCKED:` prefix, turning it back into a normal unchecked criterion |
-| **Resolve** | Removes the entire criterion line from the plan file |
-| **Skip** | Leaves the criterion unchanged and moves to the next one |
-| **Abort** | Stops the wizard immediately (changes already made are preserved) |
+| **Resolve** | Marks the criterion as done (removes the block and checks it) |
+| **Delete** | Removes the criterion entirely from the plan file |
+| **Skip** | Leaves the criterion unchanged |
 
-### Examples
+Changes are applied immediately to the plan file. Press **Esc** at any point to go back.
 
-```bash
-# Launch the blocked task wizard
-maggus blocked
-```
-
-### Example Output
-
-```
-Found 2 blocked task(s).
-
-Blocked task 1 of 2
-
-──────────────────────────────────────────
- Plan: plan_8.md
- TASK-002: Apply Simpsons-inspired theme
-
- Acceptance Criteria:
-   ✓ VitePress theme config uses Simpsons yellow (#FDD835) as the primary brand color
-   ✓ Custom CSS overrides are in docs/.vitepress/theme/custom.css
-   >>> ⚠ BLOCKED: Verify in browser using dev-browser skill
-
-   Choose action:
-
-   > Unblock
-     Resolve
-     Skip
-     Abort
-
-   ↑/↓ navigate • enter select • q abort
-```
-
-After processing all blocked criteria:
-
-```
-──────────────────────────────────────────
- Done. Summary: 1 unblocked, 0 resolved, 1 skipped
-```
+---
