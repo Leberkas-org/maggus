@@ -165,8 +165,7 @@ type TUIModel struct {
 	onTaskUsage       func(TaskUsage) // called immediately when a task's usage is finalized
 
 	status      string
-	toolHistory []string
-	toolEntries []agent.ToolMsg // full tool messages for detail panel
+	toolEntries []agent.ToolMsg // full tool messages for left-side list and detail panel
 	output      string
 	extras      string
 	model       string
@@ -349,7 +348,6 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset per-iteration state
 		m.status = "Starting..."
 		m.output = "-"
-		m.toolHistory = nil
 		m.toolEntries = nil
 		m.toolCount = 0
 		m.extras = ""
@@ -372,10 +370,6 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case agent.ToolMsg:
-		m.toolHistory = append(m.toolHistory, msg.Description)
-		if len(m.toolHistory) > maxToolHistory {
-			m.toolHistory = m.toolHistory[len(m.toolHistory)-maxToolHistory:]
-		}
 		m.toolEntries = append(m.toolEntries, msg)
 		m.toolCount++
 
@@ -921,14 +915,20 @@ func (m TUIModel) renderView() string {
 		left.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
 
 		left.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
-		for i, t := range m.toolHistory {
+		// Show the last maxToolHistory entries from toolEntries
+		recentStart := 0
+		if len(m.toolEntries) > maxToolHistory {
+			recentStart = len(m.toolEntries) - maxToolHistory
+		}
+		recentTools := m.toolEntries[recentStart:]
+		for i, entry := range recentTools {
 			prefix := grayStyle.Render("│")
-			if i == len(m.toolHistory)-1 {
+			if i == len(recentTools)-1 {
 				prefix = blueStyle.Render("▶")
 			}
-			left.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
+			left.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(entry.Description, contentWidth))))
 		}
-		for i := len(m.toolHistory); i < maxToolHistory; i++ {
+		for i := len(recentTools); i < maxToolHistory; i++ {
 			left.WriteString("\n")
 		}
 

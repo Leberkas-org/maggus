@@ -60,14 +60,14 @@ The work view (`maggus work`) currently renders as flat, unstyled text — no bo
 **Description:** As a developer, I want tool messages to carry structured metadata (tool type, parameters, timestamp) so that the detail panel can render rich per-tool sections.
 
 **Acceptance Criteria:**
-- [ ] The `agent.ToolMsg` struct is extended with fields: `Type` (string, e.g. "Read", "Bash", "Grep"), `Params` (map[string]string for key details), and `Timestamp` (time.Time)
-- [ ] The `DescribeToolUse()` function (or the calling code in `claude.go`) populates these new fields when parsing tool_use blocks from the streaming JSON
-- [ ] Existing `Description` field remains for backward compatibility with the left-side tool list
-- [ ] The TUI model stores the enriched tool messages (not just description strings) for the detail panel to consume
-- [ ] The `toolHistory` in `TUIModel` stores full `agent.ToolMsg` structs (or a new `ToolEntry` struct) instead of plain strings
-- [ ] The existing left-side tool list still renders from `Description` as before
-- [ ] Unit tests for `DescribeToolUse` still pass
-- [ ] Typecheck and vet pass (`go vet ./...`)
+- [x] The `agent.ToolMsg` struct is extended with fields: `Type` (string, e.g. "Read", "Bash", "Grep"), `Params` (map[string]string for key details), and `Timestamp` (time.Time)
+- [x] The `DescribeToolUse()` function (or the calling code in `claude.go`) populates these new fields when parsing tool_use blocks from the streaming JSON
+- [x] Existing `Description` field remains for backward compatibility with the left-side tool list
+- [x] The TUI model stores the enriched tool messages (not just description strings) for the detail panel to consume
+- [x] The `toolHistory` in `TUIModel` stores full `agent.ToolMsg` structs (or a new `ToolEntry` struct) instead of plain strings
+- [x] The existing left-side tool list still renders from `Description` as before
+- [x] Unit tests for `DescribeToolUse` still pass
+- [x] Typecheck and vet pass (`go vet ./...`)
 
 ### TASK-005: Make detail panel scrollable
 **Description:** As a user, I want to scroll through the tool detail panel history while execution continues, so I can review earlier tool invocations.
