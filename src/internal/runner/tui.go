@@ -2,8 +2,10 @@ package runner
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -50,6 +52,17 @@ type InfoMsg struct {
 }
 
 // SummaryData holds information displayed on the post-completion summary screen.
+// StopReason describes why the work loop ended.
+type StopReason int
+
+const (
+	StopReasonComplete    StopReason = iota // all requested tasks finished
+	StopReasonUserStop                      // user pressed 's' (stop after task)
+	StopReasonInterrupted                   // user pressed Ctrl+C
+	StopReasonError                         // a task or commit failed
+	StopReasonNoTasks                       // no workable tasks found
+)
+
 type SummaryData struct {
 	RunID          string
 	Branch         string
@@ -60,6 +73,8 @@ type SummaryData struct {
 	CommitStart    string // short hash of first commit
 	CommitEnd      string // short hash of last commit
 	RemainingTasks []RemainingTask
+	Reason         StopReason // why the run ended
+	ErrorDetail    string     // error message when Reason == StopReasonError
 }
 
 // RemainingTask is a task that was not completed during the run.
@@ -82,13 +97,22 @@ type PushStatusMsg struct {
 // QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
 type QuitMsg struct{}
 
+// TaskCriterion holds a single acceptance criterion for display in the task detail view.
+type TaskCriterion struct {
+	Text    string
+	Checked bool
+	Blocked bool
+}
+
 // IterationStartMsg resets per-iteration state when a new iteration begins.
 type IterationStartMsg struct {
-	Current   int
-	Total     int
-	TaskID    string
-	TaskTitle string
-	PlanFile  string
+	Current         int
+	Total           int
+	TaskID          string
+	TaskTitle       string
+	PlanFile        string
+	TaskDescription string
+	TaskCriteria    []TaskCriterion
 }
 
 // RunAgainResult holds the user's choice from the summary menu.
@@ -148,7 +172,9 @@ type TUIModel struct {
 	runAgain     RunAgainResult
 
 	// Task info
-	taskID       string
+	taskDescription string
+	taskCriteria    []TaskCriterion
+	taskID          string
 	taskTitle    string
 	taskPlanFile string
 
@@ -165,7 +191,7 @@ type TUIModel struct {
 	onTaskUsage       func(TaskUsage) // called immediately when a task's usage is finalized
 
 	status      string
-	toolHistory []string
+	toolEntries []agent.ToolMsg // full tool messages for left-side list and detail panel
 	output      string
 	extras      string
 	model       string
@@ -175,8 +201,16 @@ type TUIModel struct {
 	startTime   time.Time
 	frame       int
 	width       int
-	cancelFunc  func() // called on Ctrl+C to cancel the context
-	quitting    bool
+	height      int
+	activeTab          int    // 0 = Progress, 1 = Detail, 2 = Task, 3 = Commits
+	detailScrollOffset int    // scroll offset for the detail tab (in lines)
+	detailAutoScroll   bool   // true when detail tab auto-scrolls to bottom
+	detailTotalLines   int    // total rendered lines in last detail render (for scroll indicator)
+	stopAfterTask      bool          // when true, work stops after current task completes
+	confirmingStop     bool          // when true, showing "stop after task?" confirmation prompt
+	stopFlag           *atomic.Bool  // shared flag readable from the work loop goroutine
+	cancelFunc         func()        // called on Ctrl+C to cancel the context
+	quitting           bool
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
@@ -185,15 +219,18 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		model = "default"
 	}
 	return TUIModel{
-		version:     version,
-		fingerprint: fingerprint,
-		banner:      banner,
-		status:      "Waiting...",
-		output:      "-",
-		model:       model,
-		startTime:   time.Now(),
-		width:       120,
-		cancelFunc:  cancelFunc,
+		version:          version,
+		fingerprint:      fingerprint,
+		banner:           banner,
+		status:           "Waiting...",
+		output:           "-",
+		model:            model,
+		startTime:        time.Now(),
+		width:            120,
+		height:           40,
+		detailAutoScroll: true,
+		stopFlag:         &atomic.Bool{},
+		cancelFunc:       cancelFunc,
 	}
 }
 
@@ -233,6 +270,12 @@ func (m TUIModel) TaskUsages() []TaskUsage {
 	return m.taskUsages
 }
 
+// StopFlag returns the shared atomic flag that the work loop can poll
+// to check if the user requested to stop after the current task.
+func (m TUIModel) StopFlag() *atomic.Bool {
+	return m.stopFlag
+}
+
 func (m TUIModel) Init() tea.Cmd {
 	return tickCmd()
 }
@@ -255,6 +298,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.Type == tea.KeyCtrlC {
+			m.confirmingStop = false
 			m.status = "Interrupting..."
 			if m.cancelFunc != nil {
 				m.cancelFunc()
@@ -262,9 +306,97 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		// Handle stop-after-task confirmation prompt
+		if m.confirmingStop {
+			if len(msg.Runes) == 1 {
+				switch msg.Runes[0] {
+				case 'y', 'Y':
+					m.confirmingStop = false
+					m.stopAfterTask = true
+					m.stopFlag.Store(true)
+					return m, nil
+				case 'n', 'N':
+					m.confirmingStop = false
+					return m, nil
+				}
+			}
+			if msg.Type == tea.KeyEscape {
+				m.confirmingStop = false
+				return m, nil
+			}
+			return m, nil
+		}
+		// Alt+S toggles stop-after-task (confirm to enable, instant to revert)
+		if m.taskID != "" && !m.showSummary && msg.Alt && len(msg.Runes) == 1 && (msg.Runes[0] == 's' || msg.Runes[0] == 'S') {
+			if m.stopAfterTask {
+				m.stopAfterTask = false
+				m.stopFlag.Store(false)
+			} else {
+				m.confirmingStop = true
+			}
+			return m, nil
+		}
+		// Detail tab scrolling (tab 1)
+		if m.activeTab == 1 && m.taskID != "" {
+			switch msg.Type {
+			case tea.KeyUp:
+				if m.detailScrollOffset > 0 {
+					m.detailScrollOffset--
+					m.detailAutoScroll = false
+				}
+				return m, nil
+			case tea.KeyDown:
+				m.detailScrollOffset++
+				clampDetailScroll(&m)
+				return m, nil
+			case tea.KeyHome:
+				m.detailScrollOffset = 0
+				m.detailAutoScroll = false
+				return m, nil
+			case tea.KeyEnd:
+				m.detailScrollOffset = m.detailTotalLines
+				m.detailAutoScroll = true
+				clampDetailScroll(&m)
+				return m, nil
+			}
+		}
+		// Tab switching: arrow keys and number keys
+		if m.taskID != "" {
+			const maxTab = 3
+			switch msg.Type {
+			case tea.KeyLeft:
+				if m.activeTab > 0 {
+					m.activeTab--
+				}
+				return m, nil
+			case tea.KeyRight:
+				if m.activeTab < maxTab {
+					m.activeTab++
+				}
+				return m, nil
+			}
+			if len(msg.Runes) == 1 {
+				switch msg.Runes[0] {
+				case '1':
+					m.activeTab = 0
+					return m, nil
+				case '2':
+					m.activeTab = 1
+					return m, nil
+				case '3':
+					m.activeTab = 2
+					return m, nil
+				case '4':
+					m.activeTab = 3
+					return m, nil
+				}
+			}
+		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		m.height = msg.Height
+		clampDetailScroll(&m)
 		return m, tea.ClearScreen
 
 	case tickMsg:
@@ -309,16 +441,21 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskID = msg.TaskID
 		m.taskTitle = msg.TaskTitle
 		m.taskPlanFile = msg.PlanFile
+		m.taskDescription = msg.TaskDescription
+		m.taskCriteria = msg.TaskCriteria
 		// Reset per-iteration state
 		m.status = "Starting..."
 		m.output = "-"
-		m.toolHistory = nil
+		m.toolEntries = nil
 		m.toolCount = 0
 		m.extras = ""
 		m.skills = nil
 		m.mcps = nil
 		m.iterInputTokens = 0
 		m.iterOutputTokens = 0
+		m.detailScrollOffset = 0
+		m.detailAutoScroll = true
+		m.detailTotalLines = 0
 		m.startTime = time.Now()
 
 	case agent.StatusMsg:
@@ -334,11 +471,14 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case agent.ToolMsg:
-		m.toolHistory = append(m.toolHistory, msg.Description)
-		if len(m.toolHistory) > maxToolHistory {
-			m.toolHistory = m.toolHistory[len(m.toolHistory)-maxToolHistory:]
-		}
+		m.toolEntries = append(m.toolEntries, msg)
 		m.toolCount++
+		// Update total lines and auto-scroll if enabled
+		m.detailTotalLines = m.countDetailLines()
+		if m.detailAutoScroll {
+			m.detailScrollOffset = m.detailTotalLines // will be clamped
+		}
+		clampDetailScroll(&m)
 
 	case agent.SkillMsg:
 		for _, s := range m.skills {
@@ -409,29 +549,37 @@ func (m TUIModel) View() string {
 }
 
 func (m TUIModel) renderBannerView() string {
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+
 	var b strings.Builder
-	b.WriteString(m.renderHeader())
+	b.WriteString(m.renderHeaderInner(innerW))
 	b.WriteString("\n")
 	if m.banner.Agent != "" {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
+		b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
 	}
-	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Model:"), m.model))
-	b.WriteString(fmt.Sprintf("  %s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
+	b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Model:"), m.model))
+	b.WriteString(fmt.Sprintf("%s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
 	if m.banner.Branch != "" {
-		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
+		b.WriteString(fmt.Sprintf("%s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
 	}
-	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Run ID:"), m.banner.RunID))
+	b.WriteString(fmt.Sprintf("%s %s\n", boldStyle.Render("Run ID:"), m.banner.RunID))
 	if m.banner.Worktree != "" {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Worktree:"), m.banner.Worktree))
+		b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Worktree:"), m.banner.Worktree))
 	}
 	b.WriteString("\n")
 	for _, msg := range m.infoMessages {
-		b.WriteString(fmt.Sprintf("  %s\n", msg))
+		b.WriteString(fmt.Sprintf("%s\n", msg))
 	}
 	if len(m.infoMessages) == 0 {
-		b.WriteString(fmt.Sprintf("  %s\n", grayStyle.Render("Starting...")))
+		b.WriteString(fmt.Sprintf("%s\n", grayStyle.Render("Starting...")))
 	}
-	return b.String()
+
+	footer := styles.StatusBar.Render("ctrl+c stop")
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(b.String()) + "\n"
 }
 
 func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -517,26 +665,49 @@ func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m TUIModel) renderSummaryView() string {
-	w := m.width
-	if w < 50 {
-		w = 50
-	}
-
-	// Build the inner content of the summary box.
-	boxWidth := w - 4 // account for box border + padding
-	if boxWidth < 40 {
-		boxWidth = 40
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+	if innerW < 40 {
+		innerW = 40
 	}
 
 	var content strings.Builder
 
-	// Title
+	// Header inside box
+	content.WriteString(m.renderHeaderInner(innerW))
+
+	// Title and reason
 	elapsed := m.summaryElapsed
-	title := styles.Title.Render("✓ Work Complete")
-	if m.summary.TasksCompleted == 0 {
+	var title string
+	switch m.summary.Reason {
+	case StopReasonComplete:
+		title = styles.Title.Render("✓ Work Complete")
+	case StopReasonUserStop:
+		title = styles.Title.Foreground(styles.Warning).Render("⊘ Stopped by User")
+		content.WriteString(title + "\n")
+		content.WriteString(grayStyle.Render("  You requested to stop after the completed task.") + "\n\n")
+		goto afterTitle
+	case StopReasonInterrupted:
+		title = styles.Title.Foreground(styles.Error).Render("⊘ Work Interrupted")
+		content.WriteString(title + "\n")
+		content.WriteString(grayStyle.Render("  Cancelled via Ctrl+C — the in-progress task was aborted.") + "\n\n")
+		goto afterTitle
+	case StopReasonError:
+		title = styles.Title.Foreground(styles.Error).Render("✗ Work Failed")
+		content.WriteString(title + "\n")
+		if m.summary.ErrorDetail != "" {
+			content.WriteString(redStyle.Render("  "+m.summary.ErrorDetail) + "\n\n")
+		}
+		goto afterTitle
+	case StopReasonNoTasks:
+		title = styles.Title.Foreground(styles.Warning).Render("⊘ No Tasks Available")
+		content.WriteString(title + "\n")
+		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete or blocked.") + "\n\n")
+		goto afterTitle
+	default:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
 	}
 	content.WriteString(title + "\n\n")
+afterTitle:
 
 	// Key-value pairs
 	labelStyle := styles.Label.Width(10).Align(lipgloss.Right)
@@ -583,7 +754,7 @@ func (m TUIModel) renderSummaryView() string {
 		for _, c := range m.commits {
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				styles.Truncate(c, boxWidth-4)))
+				styles.Truncate(c, innerW-4)))
 		}
 	}
 
@@ -602,7 +773,7 @@ func (m TUIModel) renderSummaryView() string {
 			}
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, boxWidth-len(t.ID)-6))))
+				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, innerW-len(t.ID)-6))))
 		}
 	}
 
@@ -615,21 +786,18 @@ func (m TUIModel) renderSummaryView() string {
 		content.WriteString(fmt.Sprintf("%s %s\n", spinner, m.pushStatus))
 	}
 
-	// Render inside a lipgloss box
-	box := styles.Box.Width(boxWidth)
-	var out strings.Builder
-	out.WriteString(m.renderHeader())
-	out.WriteString("\n")
-	out.WriteString(box.Render(content.String()))
-	out.WriteString("\n\n")
-
+	// Footer: summary menu or waiting message
+	var footer string
 	if m.done {
-		out.WriteString(m.renderSummaryMenu())
+		footer = m.renderSummaryMenu()
 	} else {
-		out.WriteString(fmt.Sprintf("  %s\n", lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")))
+		footer = lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")
 	}
 
-	return out.String()
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreenLeft(content.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(content.String()) + "\n"
 }
 
 func (m TUIModel) renderSummaryMenu() string {
@@ -670,12 +838,13 @@ func (m TUIModel) renderSummaryMenu() string {
 	return menu.String()
 }
 
-func (m TUIModel) renderHeader() string {
-	var b strings.Builder
-	w := m.width
+// renderHeaderInner renders the header content for use inside a bordered box.
+func (m TUIModel) renderHeaderInner(w int) string {
 	if w < 40 {
 		w = 40
 	}
+
+	var b strings.Builder
 
 	// Line 1: version left, fingerprint right
 	left := boldStyle.Render(fmt.Sprintf("Maggus v%s", m.version))
@@ -683,39 +852,292 @@ func (m TUIModel) renderHeader() string {
 	if m.fingerprint != "" {
 		right = grayStyle.Render(m.fingerprint)
 	}
-	// Pad between left and right to fill width
-	// Use raw lengths for spacing calculation (lipgloss adds ANSI escapes)
-	leftRaw := fmt.Sprintf("  Maggus v%s", m.version)
+	leftRaw := fmt.Sprintf("Maggus v%s", m.version)
 	rightRaw := m.fingerprint
-	padding := w - len(leftRaw) - len(rightRaw) - 2
+	padding := w - len(leftRaw) - len(rightRaw)
 	if padding < 2 {
 		padding = 2
 	}
-	b.WriteString(fmt.Sprintf("  %s%s%s\n", left, strings.Repeat(" ", padding), right))
+	b.WriteString(fmt.Sprintf("%s%s%s\n", left, strings.Repeat(" ", padding), right))
 
 	// Line 2: progress bar
 	if m.totalIters > 0 {
 		barWidth := 20
 		bar := styles.ProgressBar(m.currentIter, m.totalIters, barWidth)
-		progress := fmt.Sprintf("  [%s] %s", bar,
+		progress := fmt.Sprintf("[%s] %s", bar,
 			greenStyle.Render(fmt.Sprintf("%d/%d Tasks", m.currentIter, m.totalIters)))
 		b.WriteString(progress + "\n")
 	}
 
 	// Separator line
-	sep := strings.Repeat("─", w)
-	b.WriteString(grayStyle.Render(sep) + "\n")
+	b.WriteString(styles.Separator(w) + "\n")
+
+	return b.String()
+}
+
+// renderTabBar renders the horizontal tab bar for the work view.
+func (m TUIModel) renderTabBar(w int) string {
+	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	sep := grayStyle.Render("│")
+
+	labels := []string{
+		" Progress ",
+		fmt.Sprintf(" Detail (%d) ", m.toolCount),
+		" Task ",
+		" Commits ",
+	}
+	if len(m.commits) > 0 {
+		labels[3] = fmt.Sprintf(" Commits (%d) ", len(m.commits))
+	}
+
+	var parts []string
+	for i, label := range labels {
+		if i == m.activeTab {
+			parts = append(parts, selectedStyle.Render(label))
+		} else {
+			parts = append(parts, unselectedStyle.Render(label))
+		}
+	}
+
+	return strings.Join(parts, sep) + "\n" + styles.Separator(w) + "\n"
+}
+
+// toolIcon returns an emoji icon for a tool type.
+func toolIcon(toolType string) string {
+	switch toolType {
+	case "Read":
+		return "📖"
+	case "Edit":
+		return "✏️"
+	case "Write":
+		return "📝"
+	case "Bash":
+		return "⚡"
+	case "Glob":
+		return "🔍"
+	case "Grep":
+		return "🔎"
+	case "Skill":
+		return "🎯"
+	case "Agent":
+		return "🤖"
+	default:
+		if strings.HasPrefix(toolType, "mcp__") {
+			return "🔌"
+		}
+		return "▶️"
+	}
+}
+
+// detailAvailableHeight returns the number of visible lines in the detail panel viewport.
+func (m TUIModel) detailAvailableHeight() int {
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	// Reserve lines for: header section (~5), task info (2), detail header+separator (2), footer (1)
+	available := innerH - 10
+	if available < 1 {
+		available = 1
+	}
+	return available
+}
+
+// clampDetailScroll ensures detailScrollOffset is within valid bounds and updates auto-scroll state.
+func clampDetailScroll(m *TUIModel) {
+	available := m.detailAvailableHeight()
+	maxOffset := m.detailTotalLines - available
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.detailScrollOffset > maxOffset {
+		m.detailScrollOffset = maxOffset
+	}
+	if m.detailScrollOffset < 0 {
+		m.detailScrollOffset = 0
+	}
+	// Re-enable auto-scroll if scrolled to bottom
+	if m.detailScrollOffset >= maxOffset && maxOffset > 0 {
+		m.detailAutoScroll = true
+	}
+}
+
+// countDetailLines calculates the total number of rendered lines for the current tool entries.
+func (m TUIModel) countDetailLines() int {
+	total := 0
+	for i, entry := range m.toolEntries {
+		if i > 0 {
+			total++ // separator line
+		}
+		total++ // header line
+		total += len(entry.Params)
+	}
+	return total
+}
+
+// renderDetailPanel renders the right-side tool detail panel content.
+func (m TUIModel) renderDetailPanel(w, h int) string {
+	if w < 10 {
+		w = 10
+	}
+
+	var b strings.Builder
+
+	if len(m.toolEntries) == 0 {
+		b.WriteString(grayStyle.Render("No tool invocations yet.") + "\n")
+		return b.String()
+	}
+
+	// Build all entry lines
+	var entryLines []string
+	for i, entry := range m.toolEntries {
+		if i > 0 {
+			entryLines = append(entryLines, grayStyle.Render(strings.Repeat("·", w)))
+		}
+
+		icon := toolIcon(entry.Type)
+		styledIcon := cyanStyle.Render(icon)
+		ts := entry.Timestamp.Format("15:04:05")
+		styledTs := grayStyle.Render(ts)
+		desc := entry.Description
+		// Reserve 2 extra chars of margin so emojis with inconsistent
+		// terminal widths don't push the timestamp to the next line.
+		const emojiMargin = 2
+		iconW := lipgloss.Width(styledIcon)
+		tsW := 8 // "15:04:05" is always 8 chars
+		fixedCols := iconW + 1 + 1 + tsW + emojiMargin
+		maxDesc := w - fixedCols
+		if maxDesc < 0 {
+			maxDesc = 0
+		}
+		desc = styles.Truncate(desc, maxDesc)
+		styledDesc := blueStyle.Render(desc)
+		// Right-align timestamp: measure the composed left part and pad.
+		// Subtract emojiMargin from available width so the ts sits 2 chars from the edge.
+		leftW := lipgloss.Width(styledIcon) + 1 + lipgloss.Width(styledDesc)
+		pad := (w - emojiMargin) - leftW - tsW
+		if pad < 1 {
+			pad = 1
+		}
+		header := styledIcon + " " + styledDesc + strings.Repeat(" ", pad) + styledTs
+		entryLines = append(entryLines, header)
+
+		// Sort param keys for stable render order
+		paramKeys := make([]string, 0, len(entry.Params))
+		for k := range entry.Params {
+			paramKeys = append(paramKeys, k)
+		}
+		sort.Strings(paramKeys)
+		for _, k := range paramKeys {
+			v := entry.Params[k]
+			// "  " indent=2 + key + ":" + space=1 = len(k)+4
+			maxVal := w - len(k) - 4
+			if maxVal < 0 {
+				maxVal = 0
+			}
+			paramLine := fmt.Sprintf("  %s %s", grayStyle.Render(k+":"), styles.Truncate(v, maxVal))
+			entryLines = append(entryLines, paramLine)
+		}
+	}
+
+	// Viewport calculation
+	available := h - 3 // header + separator lines
+	if available < 1 {
+		available = 1
+	}
+
+	// Clamp offset for this render
+	offset := m.detailScrollOffset
+	maxOffset := len(entryLines) - available
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Scroll indicator when content overflows
+	if len(entryLines) > available {
+		end := offset + available
+		if end > len(entryLines) {
+			end = len(entryLines)
+		}
+		indicator := grayStyle.Render(fmt.Sprintf("[%d-%d of %d]", offset+1, end, len(entryLines)))
+		b.WriteString(indicator + "\n")
+	}
+
+	// Render visible window
+	end := offset + available
+	if end > len(entryLines) {
+		end = len(entryLines)
+	}
+	for _, line := range entryLines[offset:end] {
+		b.WriteString(line + "\n")
+	}
+
+	return b.String()
+}
+
+// renderTaskTab renders the task description and acceptance criteria for the Task tab.
+func (m TUIModel) renderTaskTab(w int) string {
+	var b strings.Builder
+
+	// Task metadata
+	labelStyle := styles.Label.Width(12).Align(lipgloss.Right)
+	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Plan:"), valStyle.Render(m.taskPlanFile)))
+
+	done := 0
+	for _, c := range m.taskCriteria {
+		if c.Checked {
+			done++
+		}
+	}
+	b.WriteString(fmt.Sprintf("%s  %s\n",
+		labelStyle.Render("Criteria:"),
+		valStyle.Render(fmt.Sprintf("%d/%d", done, len(m.taskCriteria)))))
+
+	b.WriteString("\n")
+
+	// Description
+	if m.taskDescription != "" {
+		b.WriteString(styles.Subtitle.Render("Description") + "\n")
+		b.WriteString(styles.Separator(w) + "\n")
+		for _, line := range strings.Split(m.taskDescription, "\n") {
+			if len(line) > w {
+				line = styles.Truncate(line, w)
+			}
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Acceptance criteria
+	if len(m.taskCriteria) > 0 {
+		b.WriteString(styles.Subtitle.Render("Acceptance Criteria") + "\n")
+		b.WriteString(styles.Separator(w) + "\n")
+		for _, c := range m.taskCriteria {
+			var icon string
+			if c.Checked {
+				icon = greenStyle.Render("✓")
+			} else if c.Blocked {
+				icon = redStyle.Render("⚠")
+			} else {
+				icon = grayStyle.Render("○")
+			}
+			text := styles.Truncate(c.Text, w-4)
+			b.WriteString(fmt.Sprintf("  %s %s\n", icon, text))
+		}
+	}
 
 	return b.String()
 }
 
 func (m TUIModel) renderView() string {
 	elapsed := time.Since(m.startTime).Truncate(time.Second)
-	w := m.width
-	contentWidth := w - 13
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
+	innerW, innerH := styles.FullScreenInnerSize(m.width, m.height)
 
 	spinner := cyanStyle.Render(spinnerFrames[m.frame])
 	sColor := statusStyle
@@ -735,55 +1157,104 @@ func (m TUIModel) renderView() string {
 		extrasStr = "-"
 	}
 
+	contentWidth := innerW - 11
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
 	var b strings.Builder
 
-	// Render header
-	b.WriteString(m.renderHeader())
+	// Render header inside the box (full width)
+	b.WriteString(m.renderHeaderInner(innerW))
 
-	// Render task info
+	// Render task info (full width)
 	if m.taskID != "" {
-		taskLine := fmt.Sprintf("  %s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
+		taskLine := fmt.Sprintf("%s %s", cyanStyle.Render(m.taskID+":"), m.taskTitle)
 		b.WriteString(taskLine + "\n\n")
 	}
 
-	b.WriteString(fmt.Sprintf("  %s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+	// Tab bar
+	b.WriteString(m.renderTabBar(innerW))
 
-	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
-	for i, t := range m.toolHistory {
-		prefix := grayStyle.Render("│")
-		if i == len(m.toolHistory)-1 {
-			prefix = blueStyle.Render("▶")
+	// Tab content
+	switch m.activeTab {
+	case 0: // Progress
+		b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+
+		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
+		recentStart := 0
+		if len(m.toolEntries) > maxToolHistory {
+			recentStart = len(m.toolEntries) - maxToolHistory
 		}
-		b.WriteString(fmt.Sprintf("    %s %s\n", prefix, blueStyle.Render(styles.Truncate(t, contentWidth))))
-	}
-	// Pad empty lines for consistent layout
-	for i := len(m.toolHistory); i < maxToolHistory; i++ {
-		b.WriteString("\n")
+		recentTools := m.toolEntries[recentStart:]
+		for i, entry := range recentTools {
+			prefix := grayStyle.Render("│")
+			if i == len(recentTools)-1 {
+				prefix = blueStyle.Render("▶")
+			}
+			b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(entry.Description, contentWidth))))
+		}
+		for i := len(recentTools); i < maxToolHistory; i++ {
+			b.WriteString("\n")
+		}
+
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+
+		if m.hasUsageData {
+			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+		} else {
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+		}
+
+	case 1: // Detail (tool log)
+		b.WriteString(m.renderDetailPanel(innerW, innerH-8))
+
+	case 2: // Task
+		b.WriteString(m.renderTaskTab(innerW))
+
+	case 3: // Commits
+		if len(m.commits) == 0 {
+			b.WriteString(grayStyle.Render("No commits yet.") + "\n")
+		} else {
+			for _, c := range m.commits {
+				line := styles.Truncate(c, innerW-4)
+				b.WriteString(fmt.Sprintf("  %s %s\n",
+					grayStyle.Render("•"),
+					grayStyle.Render(line)))
+			}
+		}
 	}
 
-	b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-	b.WriteString(fmt.Sprintf("    %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-	b.WriteString(fmt.Sprintf("    %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
-
-	// Token usage
-	if m.hasUsageData {
-		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
-		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+	// Footer with context-sensitive keybindings
+	var footer string
+	if m.confirmingStop {
+		footer = lipgloss.NewStyle().Foreground(styles.Warning).Bold(true).Render("Stop after current task? (y/n)")
 	} else {
-		b.WriteString(fmt.Sprintf("    %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
-	}
-
-	// Recent commits section
-	if len(m.commits) > 0 {
-		b.WriteString("\n")
-		b.WriteString(grayStyle.Render(strings.Repeat("─", w)) + "\n")
-		b.WriteString(grayStyle.Render("  Commits:") + "\n")
-		for _, c := range m.commits {
-			line := styles.Truncate(c, w-6)
-			b.WriteString(fmt.Sprintf("    %s\n", grayStyle.Render(line)))
+		var footerParts []string
+		footerParts = append(footerParts, "←/→ tabs")
+		if m.activeTab == 1 {
+			footerParts = append(footerParts, "↑/↓ scroll · home/end jump")
 		}
+		if m.stopAfterTask {
+			footerParts = append(footerParts, "alt+s resume")
+		} else {
+			footerParts = append(footerParts, "alt+s stop after task")
+		}
+		footerParts = append(footerParts, "ctrl+c stop now")
+		footer = styles.StatusBar.Render(strings.Join(footerParts, " · "))
 	}
 
-	return b.String()
+	// Use warning border color when stop-after-task is active
+	if m.width > 0 && m.height > 0 {
+		borderColor := styles.Primary
+		if m.stopAfterTask || m.confirmingStop {
+			borderColor = styles.Warning
+		}
+		return styles.FullScreenLeftColor(b.String(), footer, m.width, m.height, borderColor)
+	}
+	return styles.Box.Render(b.String()) + "\n"
 }

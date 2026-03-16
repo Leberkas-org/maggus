@@ -115,7 +115,12 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 						json.Unmarshal(block.Input, &input)
 						desc := DescribeToolUse(block.Name, input)
 						p.Send(StatusMsg{Status: "Running tool"})
-						p.Send(ToolMsg{Description: desc})
+						p.Send(ToolMsg{
+						Description: desc,
+						Type:        block.Name,
+						Params:      buildToolParams(block.Name, input),
+						Timestamp:   time.Now(),
+					})
 
 						if block.Name == "Skill" && input.Skill != "" {
 							p.Send(SkillMsg{Name: input.Skill})
@@ -268,6 +273,45 @@ type stderrWriter struct {
 func (w *stderrWriter) Write(p []byte) (n int, err error) {
 	w.buf.Write(p)
 	return w.tee.Write(p)
+}
+
+// buildToolParams extracts key parameters from a tool invocation for display in the detail panel.
+func buildToolParams(tool string, input ToolInput) map[string]string {
+	params := make(map[string]string)
+	switch tool {
+	case "Bash":
+		if input.Command != "" {
+			params["command"] = input.Command
+		}
+		if input.Description != "" {
+			params["description"] = input.Description
+		}
+	case "Read":
+		if input.FilePath != "" {
+			params["file"] = input.FilePath
+		}
+	case "Edit":
+		if input.FilePath != "" {
+			params["file"] = input.FilePath
+		}
+	case "Write":
+		if input.FilePath != "" {
+			params["file"] = input.FilePath
+		}
+	case "Glob":
+		if input.Pattern != "" {
+			params["pattern"] = input.Pattern
+		}
+	case "Grep":
+		if input.Pattern != "" {
+			params["pattern"] = input.Pattern
+		}
+	case "Skill":
+		if input.Skill != "" {
+			params["skill"] = input.Skill
+		}
+	}
+	return params
 }
 
 // DescribeToolUse returns a human-readable description for a tool invocation.

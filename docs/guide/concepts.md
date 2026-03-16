@@ -63,50 +63,66 @@ Maggus automatically manages branches to keep your main branch clean:
 
 This means you can either let Maggus manage branches automatically, or check out a specific branch beforehand to control where changes land.
 
-## Startup Safety Pause
+## Stopping a Run
 
-When `maggus work` starts, it shows a **3-second countdown** before beginning the first task. This gives you a window to review what's about to happen and abort if needed.
+Maggus provides two ways to stop a running work session:
 
-Press **Ctrl+C** during this countdown to cancel the run before any work begins.
+### Stop After Task (Alt+S)
 
-## Ctrl+C Behavior
+Press **Alt+S** during execution to request a graceful stop after the current task finishes. A confirmation prompt appears (`y/n`). While active, the border turns yellow. Press **Alt+S** again to cancel the stop and continue working.
 
-Maggus handles interrupts gracefully:
+This is the recommended way to stop — no work is lost and the current task completes cleanly.
 
-- **First Ctrl+C** — Signals a graceful stop. Maggus finishes processing the current agent response, commits any pending work, and then exits cleanly.
-- **Second Ctrl+C** — Force-kills the process immediately, including any running agent subprocess.
+### Ctrl+C (Immediate Stop)
 
-This two-stage approach ensures you don't lose work from a partially completed task. If you need to stop urgently, the double Ctrl+C always works.
+- **First Ctrl+C** — Signals an immediate stop. The in-progress agent subprocess is cancelled and the run transitions to the summary screen.
+- **Second Ctrl+C** — Force-kills the process immediately.
 
 ## The TUI
 
-When Maggus is running, it displays a full-screen terminal UI (built with [Bubbletea](https://github.com/charmbracelet/bubbletea)) that keeps you informed about progress.
+When Maggus is running, it displays a full-screen terminal UI (built with [Bubbletea](https://github.com/charmbracelet/bubbletea)) inside a bordered box that keeps you informed about progress.
 
 ### Header
 
 The top section shows:
 - **Version** (left) and **host fingerprint** (right)
 - **Progress bar** showing overall task completion: `[████████░░░░] N/M Tasks`
-- A gray separator line
+- **Current task** ID and title in cyan
 
-### Task Info
+### Tab Bar
 
-Below the header, the current task ID and title are displayed in cyan, so you always know which task is being worked on.
+Below the header, a tab bar lets you switch between four views:
 
-### Status Section
+| Tab | Key | Content |
+|-----|-----|---------|
+| **Progress** | `1` | Live spinner, status, recent tool list, extras, model, elapsed time, token usage |
+| **Detail** | `2` | Scrollable structured log of every tool invocation — each entry shows an icon, description, timestamp, and parameters |
+| **Task** | `3` | Current task's plan file, description, and acceptance criteria with status icons (✓ done, ⚠ blocked, ○ pending) |
+| **Commits** | `4` | List of commits made during the current run |
 
-The main area of the TUI shows:
-- **Spinner and status** — Current activity (e.g., "Running", "Writing file", "Done")
-- **Output** — Recent text output from the agent
-- **Tool history** — The last 10 tools the agent invoked, shown with `│` and `▶` prefixes
-- **Model** — Which Claude model is being used
-- **Elapsed time** — How long the current iteration has been running
+Switch tabs with `←/→` arrow keys or number keys `1`–`4`. The Detail tab supports `↑/↓/Home/End` scrolling with auto-scroll that pauses when you scroll up.
 
-The status updates in real-time as the agent streams its response.
+### Keyboard Shortcuts
 
-### Recent Commits
+| Key | Action |
+|-----|--------|
+| `←/→` or `1-4` | Switch tabs |
+| `↑/↓` | Scroll (on Detail tab) |
+| `Home/End` | Jump to top/bottom |
+| `Alt+S` | Toggle stop-after-task |
+| `Ctrl+C` | Interrupt immediately |
 
-At the bottom of the TUI, a "Recent Commits" section shows the commit messages from completed iterations. These persist across iterations so you can track what's been done in the current run.
+### Summary Screen
+
+After the run ends, a summary screen shows the outcome with a title reflecting the stop reason:
+
+- **✓ Work Complete** — All requested tasks finished
+- **⊘ Stopped by User** — Graceful stop via Alt+S
+- **⊘ Work Interrupted** — Cancelled via Ctrl+C
+- **✗ Work Failed** — A task or commit error (with detail)
+- **⊘ No Tasks Available** — Nothing workable found
+
+The summary includes run ID, branch, model, elapsed time, per-task token breakdown, commit list, and remaining tasks. You can choose to **Exit** or **Run again** with a custom task count.
 
 ## Run Logs
 

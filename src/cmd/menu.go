@@ -315,7 +315,7 @@ const logo = `
 func (m menuModel) View() string {
 	logoStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	header := logoStyle.Render(logo) + "\n" + versionStyle.Render(fmt.Sprintf("  v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
+	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
 	// Plan summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -340,12 +340,40 @@ func (m menuModel) View() string {
 		body, footer = m.viewMainMenu()
 	}
 
-	content := header + "\n" + summaryLine + "\n\n" + body
+	// Center the logo, version, and summary lines within the content column.
+	// FullScreen left-pads all content into a maxContentWidth (90) column,
+	// so center relative to that width, not the full inner width.
+	const contentW = 90
+	styledLogo := logoStyle.Render(logo)
+	header := centerBlock(styledLogo, contentW) + "\n" +
+		centerLine(versionLine, contentW) + "\n" +
+		centerLine(summaryLine, contentW)
+
+	content := header + "\n\n" + body
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(content, footer, m.width, m.height)
 	}
 	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+}
+
+// centerLine centers a single line of text within the given width.
+func centerLine(line string, width int) string {
+	w := lipgloss.Width(line)
+	pad := (width - w) / 2
+	if pad < 0 {
+		pad = 0
+	}
+	return strings.Repeat(" ", pad) + line
+}
+
+// centerBlock centers each line of a multi-line string independently.
+func centerBlock(block string, width int) string {
+	lines := strings.Split(strings.TrimRight(block, "\n"), "\n")
+	for i, line := range lines {
+		lines[i] = centerLine(line, width)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m menuModel) viewMainMenu() (string, string) {
@@ -354,20 +382,56 @@ func (m menuModel) viewMainMenu() (string, string) {
 	descStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	normalStyle := lipgloss.NewStyle()
 
+	// Measure columns: left = "→ " + name, right = desc
+	maxNameW := 0
+	maxDescW := 0
+	for _, item := range m.items {
+		if len(item.name) > maxNameW {
+			maxNameW = len(item.name)
+		}
+		if len(item.desc) > maxDescW {
+			maxDescW = len(item.desc)
+		}
+	}
+
+	// Total row width: cursor(4) + name(maxNameW) + gap(2) + desc(maxDescW)
+	// cursor column is "  → " (4 chars) for selected, "    " (4 chars) for others
+	const cursorCol = 4
+	const gap = 2
+	tableW := cursorCol + maxNameW + gap + maxDescW
+
+	// Center the table within the content column (90 chars, matching FullScreen)
+	const contentW = 90
+	leftPad := (contentW - tableW) / 2
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	indent := strings.Repeat(" ", leftPad)
+
 	var sb strings.Builder
 	for i, item := range m.items {
 		if item.separator {
 			sb.WriteString("\n")
 		}
+		// Right-align the name within the column.
+		padded := fmt.Sprintf("%*s", maxNameW, item.name)
 		if i == m.cursor {
-			fmt.Fprintf(&sb, "  %s %s  %s\n",
-				cursorStyle.Render("→"),
-				selectedStyle.Render(item.name),
+			nameStyle := selectedStyle
+			cursor := cursorStyle
+			if item.isExit {
+				nameStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Error)
+				cursor = nameStyle
+			}
+			fmt.Fprintf(&sb, "%s%s %s  %s\n",
+				indent,
+				cursor.Render("→"),
+				nameStyle.Render(padded),
 				descStyle.Render(item.desc),
 			)
 		} else {
-			fmt.Fprintf(&sb, "    %s  %s\n",
-				normalStyle.Render(item.name),
+			fmt.Fprintf(&sb, "%s  %s  %s\n",
+				indent,
+				normalStyle.Render(padded),
 				descStyle.Render(item.desc),
 			)
 		}

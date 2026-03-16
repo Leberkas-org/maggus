@@ -252,6 +252,7 @@ Examples:
 			banner.Worktree = workDir
 		}
 		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel, banner)
+		stopFlag := m.StopFlag()
 		m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 			planRel := tu.PlanFile
 			if rel, err := filepath.Rel(dir, tu.PlanFile); err == nil {
@@ -299,8 +300,17 @@ Examples:
 				p.Send(runner.InfoMsg{Text: branchMsg})
 			}
 
+			stopReason := runner.StopReasonComplete
+			var errorDetail string
+
 			for i := 0; i < count; i++ {
 				if workCtx.Err() != nil {
+					stopReason = runner.StopReasonInterrupted
+					break
+				}
+				// Check if user requested stop after previous task
+				if i > 0 && stopFlag.Load() {
+					stopReason = runner.StopReasonUserStop
 					break
 				}
 
@@ -314,6 +324,9 @@ Examples:
 					next = parser.FindNextIncomplete(tasks)
 				}
 				if next == nil {
+					if completed == 0 {
+						stopReason = runner.StopReasonNoTasks
+					}
 					break
 				}
 
@@ -330,12 +343,23 @@ Examples:
 				}
 
 				// Signal iteration start to the TUI (resets per-iteration state).
+				// Convert parser criteria to runner criteria for the TUI.
+				tuiCriteria := make([]runner.TaskCriterion, len(next.Criteria))
+				for ci, c := range next.Criteria {
+					tuiCriteria[ci] = runner.TaskCriterion{
+						Text:    c.Text,
+						Checked: c.Checked,
+						Blocked: c.Blocked,
+					}
+				}
 				p.Send(runner.IterationStartMsg{
-					Current:   i + 1,
-					Total:     count,
-					TaskID:    next.ID,
-					TaskTitle: next.Title,
-					PlanFile:  next.SourceFile,
+					Current:         i + 1,
+					Total:           count,
+					TaskID:          next.ID,
+					TaskTitle:       next.Title,
+					PlanFile:        next.SourceFile,
+					TaskDescription: next.Description,
+					TaskCriteria:    tuiCriteria,
 				})
 
 				opts := prompt.Options{
@@ -353,10 +377,13 @@ Examples:
 						lock.Release()
 					}
 					if workCtx.Err() != nil {
+						stopReason = runner.StopReasonInterrupted
 						break
 					}
 					notifier.PlayError()
-					workErr = fmt.Errorf("task %s failed: %w", next.ID, err)
+					stopReason = runner.StopReasonError
+					errorDetail = fmt.Sprintf("task %s failed: %v", next.ID, err)
+					workErr = fmt.Errorf("%s", errorDetail)
 					return
 				}
 
@@ -367,7 +394,9 @@ Examples:
 					if useWorktree {
 						lock.Release()
 					}
-					workErr = fmt.Errorf("re-parse plans: %w", parseErr)
+					stopReason = runner.StopReasonError
+					errorDetail = fmt.Sprintf("re-parse plans: %v", parseErr)
+					workErr = fmt.Errorf("%s", errorDetail)
 					return
 				}
 
@@ -387,7 +416,9 @@ Examples:
 					if useWorktree {
 						lock.Release()
 					}
-					workErr = fmt.Errorf("commit after %s: %w", next.ID, commitErr)
+					stopReason = runner.StopReasonError
+					errorDetail = fmt.Sprintf("commit after %s: %v", next.ID, commitErr)
+					workErr = fmt.Errorf("%s", errorDetail)
 					return
 				}
 				if commitResult.Committed {
@@ -437,6 +468,8 @@ Examples:
 				CommitStart:    startHash,
 				CommitEnd:      endHash,
 				RemainingTasks: remaining,
+				Reason:         stopReason,
+				ErrorDetail:    errorDetail,
 			}
 
 			// Notify run complete.

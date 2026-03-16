@@ -321,6 +321,9 @@ func (m listModel) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m listModel) View() string {
+	if len(m.tasks) == 0 {
+		return m.viewEmpty()
+	}
 	if m.confirmDelete {
 		return m.viewConfirmDelete()
 	}
@@ -328,6 +331,22 @@ func (m listModel) View() string {
 		return m.viewDetail()
 	}
 	return m.viewList()
+}
+
+func (m listModel) viewEmpty() string {
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString(styles.Title.Render("Task List") + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(styles.Success).Render("All done!") + "\n\n")
+	sb.WriteString(mutedStyle.Render("No pending tasks found. All tasks are complete or no plans exist.") + "\n")
+
+	footer := styles.StatusBar.Render("q/esc: exit")
+
+	if m.width > 0 && m.height > 0 {
+		return styles.FullScreen(sb.String(), footer, m.width, m.height)
+	}
+	return styles.Box.Render(sb.String()) + "\n"
 }
 
 func (m listModel) viewConfirmDelete() string {
@@ -545,11 +564,6 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	}
 
 	// TUI mode: all incomplete tasks (workable + blocked), no count cap
-	if len(incomplete) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
-		return nil
-	}
-
 	m := listModel{tasks: incomplete, agentName: agentName}
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := prog.Run()
