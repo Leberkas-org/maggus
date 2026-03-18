@@ -101,7 +101,116 @@ func findPlanFile(dir string, planID string) (string, planState, error) {
 	return "", planStateNotFound, nil
 }
 
+var ignoreTaskCmd = &cobra.Command{
+	Use:   "task <TASK-NNN>",
+	Short: "Ignore a single task",
+	Long:  `Rewrites the task heading from "### TASK-NNN:" to "### IGNORED TASK-NNN:" so that it is skipped by the work loop.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get working directory: %w", err)
+		}
+		return runIgnoreTask(cmd, dir, args[0])
+	},
+}
+
+func runIgnoreTask(cmd *cobra.Command, dir string, taskID string) error {
+	// Normalize: accept both "TASK-007" and "007"
+	if !strings.HasPrefix(taskID, "TASK-") {
+		taskID = "TASK-" + taskID
+	}
+
+	// Search all plan files (including ignored, excluding completed) for this task
+	files, err := parser.GlobPlanFiles(dir, false)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		tasks, err := parser.ParseFile(f)
+		if err != nil {
+			return err
+		}
+
+		for _, t := range tasks {
+			if t.ID != taskID {
+				continue
+			}
+
+			// Found the task
+			if t.Ignored {
+				cmd.Println(fmt.Sprintf("Task %s is already ignored", taskID))
+				return nil
+			}
+
+			// Warn if plan is ignored
+			if parser.IsIgnoredFile(f) {
+				cmd.PrintErrln(fmt.Sprintf("Warning: plan is already ignored (%s)", filepath.Base(f)))
+			}
+
+			// Rewrite the heading atomically
+			if err := rewriteTaskHeading(f, taskID, false); err != nil {
+				return err
+			}
+
+			cmd.Println(fmt.Sprintf("Ignored task %s in %s", taskID, filepath.Base(f)))
+			return nil
+		}
+	}
+
+	cmd.PrintErrln(fmt.Sprintf("Error: task %s not found", taskID))
+	return fmt.Errorf("task %s not found", taskID)
+}
+
+// rewriteTaskHeading rewrites a task heading to add or remove the IGNORED prefix.
+// If addIgnored is false, it changes "### TASK-NNN:" to "### IGNORED TASK-NNN:".
+// If addIgnored is true, it changes "### IGNORED TASK-NNN:" to "### TASK-NNN:".
+// The file is written atomically (write to temp file, then rename).
+func rewriteTaskHeading(filePath string, taskID string, removeIgnored bool) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", filePath, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	found := false
+
+	for i, line := range lines {
+		m := parser.TaskHeadingRe.FindStringSubmatch(line)
+		if m == nil || m[2] != taskID {
+			continue
+		}
+
+		found = true
+		title := m[3]
+		if removeIgnored {
+			lines[i] = fmt.Sprintf("### %s: %s", taskID, title)
+		} else {
+			lines[i] = fmt.Sprintf("### IGNORED %s: %s", taskID, title)
+		}
+		break
+	}
+
+	if !found {
+		return fmt.Errorf("task heading %s not found in %s", taskID, filePath)
+	}
+
+	// Atomic write: temp file + rename
+	tmpFile := filePath + ".tmp"
+	if err := os.WriteFile(tmpFile, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		os.Remove(tmpFile) // best-effort cleanup
+		return fmt.Errorf("rename temp file: %w", err)
+	}
+
+	return nil
+}
+
 func init() {
 	ignoreCmd.AddCommand(ignorePlanCmd)
+	ignoreCmd.AddCommand(ignoreTaskCmd)
 	rootCmd.AddCommand(ignoreCmd)
 }

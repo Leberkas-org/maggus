@@ -80,12 +80,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user, I want to run `maggus ignore task <task-id>` to exclude a single task from the work loop.
 
 **Acceptance Criteria:**
-- [ ] `maggus ignore task <TASK-NNN>` finds the task heading `### TASK-NNN:` in its plan file and rewrites it to `### IGNORED TASK-NNN:`
-- [ ] If the task does not exist, print an error and exit non-zero
-- [ ] If the task is already ignored, print a message ("already ignored") and exit zero
-- [ ] If the task is inside an `_ignored` plan, print a warning ("plan is already ignored") but still apply the marker
-- [ ] The file is written back atomically (write to temp, rename)
-- [ ] Typecheck/lint passes
+- [x] `maggus ignore task <TASK-NNN>` finds the task heading `### TASK-NNN:` in its plan file and rewrites it to `### IGNORED TASK-NNN:`
+- [x] If the task does not exist, print an error and exit non-zero
+- [x] If the task is already ignored, print a message ("already ignored") and exit zero
+- [x] If the task is inside an `_ignored` plan, print a warning ("plan is already ignored") but still apply the marker
+- [x] The file is written back atomically (write to temp, rename)
+- [x] Typecheck/lint passes
 
 ### TASK-008: `maggus unignore` command for tasks
 **Description:** As a user, I want to run `maggus unignore task <task-id>` to re-include an ignored task in the work loop.

@@ -13,6 +13,9 @@ import (
 
 var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?(TASK-[\w-]+?):\s+(.+)$`)
 
+// TaskHeadingRe is the exported task heading regex for use by other packages (e.g. ignore/unignore commands).
+var TaskHeadingRe = taskHeadingRe
+
 type Criterion struct {
 	Text    string
 	Checked bool
