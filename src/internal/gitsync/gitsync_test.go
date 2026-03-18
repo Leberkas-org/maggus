@@ -1,6 +1,7 @@
 package gitsync
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -206,5 +207,153 @@ func TestFetchRemote_InvalidDir(t *testing.T) {
 	err := FetchRemote(filepath.Join(os.TempDir(), "nonexistent-dir-gitsync-test"))
 	if err == nil {
 		t.Fatal("expected error for nonexistent directory")
+	}
+}
+
+// writeFile creates a file with the given content in dir.
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWorkingTreeStatus_CleanTree(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.HasUncommittedChanges {
+		t.Error("expected HasUncommittedChanges=false")
+	}
+	if wt.HasUntrackedFiles {
+		t.Error("expected HasUntrackedFiles=false")
+	}
+	if wt.TotalModified != 0 {
+		t.Errorf("TotalModified = %d, want 0", wt.TotalModified)
+	}
+	if len(wt.ModifiedFiles) != 0 {
+		t.Errorf("ModifiedFiles = %v, want empty", wt.ModifiedFiles)
+	}
+}
+
+func TestWorkingTreeStatus_StagedChanges(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	writeFile(t, clone, "staged.txt", "hello")
+	run(t, clone, "git", "add", "staged.txt")
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wt.HasUncommittedChanges {
+		t.Error("expected HasUncommittedChanges=true for staged file")
+	}
+	if wt.HasUntrackedFiles {
+		t.Error("expected HasUntrackedFiles=false")
+	}
+	if wt.TotalModified != 1 {
+		t.Errorf("TotalModified = %d, want 1", wt.TotalModified)
+	}
+}
+
+func TestWorkingTreeStatus_UnstagedChanges(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	// Create a tracked file, commit it, then modify it
+	writeFile(t, clone, "tracked.txt", "original")
+	run(t, clone, "git", "add", "tracked.txt")
+	commitInDir(t, clone, "add tracked file")
+	writeFile(t, clone, "tracked.txt", "modified")
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wt.HasUncommittedChanges {
+		t.Error("expected HasUncommittedChanges=true for unstaged modification")
+	}
+	if wt.HasUntrackedFiles {
+		t.Error("expected HasUntrackedFiles=false")
+	}
+	if wt.TotalModified != 1 {
+		t.Errorf("TotalModified = %d, want 1", wt.TotalModified)
+	}
+}
+
+func TestWorkingTreeStatus_UntrackedFiles(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	writeFile(t, clone, "newfile.txt", "untracked")
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.HasUncommittedChanges {
+		t.Error("expected HasUncommittedChanges=false for untracked-only")
+	}
+	if !wt.HasUntrackedFiles {
+		t.Error("expected HasUntrackedFiles=true")
+	}
+	if wt.TotalModified != 1 {
+		t.Errorf("TotalModified = %d, want 1", wt.TotalModified)
+	}
+}
+
+func TestWorkingTreeStatus_MixedState(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	// Create and commit a tracked file, then modify it (unstaged change)
+	writeFile(t, clone, "tracked.txt", "original")
+	run(t, clone, "git", "add", "tracked.txt")
+	commitInDir(t, clone, "add tracked")
+	writeFile(t, clone, "tracked.txt", "modified")
+
+	// Staged new file (added but not committed)
+	writeFile(t, clone, "staged.txt", "staged")
+	run(t, clone, "git", "add", "staged.txt")
+
+	// Untracked
+	writeFile(t, clone, "untracked.txt", "new")
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wt.HasUncommittedChanges {
+		t.Error("expected HasUncommittedChanges=true")
+	}
+	if !wt.HasUntrackedFiles {
+		t.Error("expected HasUntrackedFiles=true")
+	}
+	if wt.TotalModified != 3 {
+		t.Errorf("TotalModified = %d, want 3", wt.TotalModified)
+	}
+	if len(wt.ModifiedFiles) != 3 {
+		t.Errorf("len(ModifiedFiles) = %d, want 3", len(wt.ModifiedFiles))
+	}
+}
+
+func TestWorkingTreeStatus_CapsAt10(t *testing.T) {
+	clone, _ := initBareAndClone(t)
+
+	// Create 15 untracked files
+	for i := 0; i < 15; i++ {
+		writeFile(t, clone, fmt.Sprintf("file%02d.txt", i), "content")
+	}
+
+	wt, err := WorkingTreeStatus(clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.TotalModified != 15 {
+		t.Errorf("TotalModified = %d, want 15", wt.TotalModified)
+	}
+	if len(wt.ModifiedFiles) != 10 {
+		t.Errorf("len(ModifiedFiles) = %d, want 10 (capped)", len(wt.ModifiedFiles))
 	}
 }

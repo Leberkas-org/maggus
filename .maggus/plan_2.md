@@ -30,12 +30,12 @@ Integrate git remote synchronization checks into the `maggus work` flow. Before 
 **Description:** As a developer, I want Maggus to detect uncommitted local changes so that I'm warned before a pull would fail or overwrite my work.
 
 **Acceptance Criteria:**
-- [ ] `WorkingTreeStatus(dir string) (WorkTree, error)` function added to `gitsync` package
-- [ ] `WorkTree` struct contains: `HasUncommittedChanges bool`, `HasUntrackedFiles bool`, `ModifiedFiles []string`
-- [ ] Uses `git status --porcelain` to detect changes
-- [ ] `ModifiedFiles` is capped to first 10 entries (for display purposes, full count reported separately)
-- [ ] `TotalModified int` field reports the total count
-- [ ] Unit tests cover: clean tree, staged changes, unstaged changes, untracked files, mixed state
+- [x] `WorkingTreeStatus(dir string) (WorkTree, error)` function added to `gitsync` package
+- [x] `WorkTree` struct contains: `HasUncommittedChanges bool`, `HasUntrackedFiles bool`, `ModifiedFiles []string`
+- [x] Uses `git status --porcelain` to detect changes
+- [x] `ModifiedFiles` is capped to first 10 entries (for display purposes, full count reported separately)
+- [x] `TotalModified int` field reports the total count
+- [x] Unit tests cover: clean tree, staged changes, unstaged changes, untracked files, mixed state
 
 ### TASK-003: Implement pull resolution actions in `gitsync`
 **Description:** As a developer, I want Maggus to perform various git pull strategies so that I can choose how to sync with the remote.

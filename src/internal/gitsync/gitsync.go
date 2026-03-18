@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// WorkTree represents the local working tree state.
+type WorkTree struct {
+	HasUncommittedChanges bool
+	HasUntrackedFiles     bool
+	ModifiedFiles         []string // capped to first 10 entries
+	TotalModified         int
+}
+
 // Status represents the relationship between the local branch and its remote tracking branch.
 type Status struct {
 	Behind       int
@@ -77,4 +85,47 @@ func RemoteStatus(dir string) (Status, error) {
 		RemoteBranch: remoteBranch,
 		HasRemote:    true,
 	}, nil
+}
+
+// WorkingTreeStatus detects uncommitted local changes using `git status --porcelain`.
+func WorkingTreeStatus(dir string) (WorkTree, error) {
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return WorkTree{}, fmt.Errorf("git status: %w", err)
+	}
+
+	var wt WorkTree
+	var allFiles []string
+
+	for _, line := range strings.Split(string(out), "\n") {
+		if line == "" {
+			continue
+		}
+		// Porcelain format: XY filename
+		// X = index status, Y = work-tree status
+		// "??" = untracked
+		if len(line) < 2 {
+			continue
+		}
+		xy := line[:2]
+		file := strings.TrimSpace(line[2:])
+
+		if xy == "??" {
+			wt.HasUntrackedFiles = true
+		} else {
+			wt.HasUncommittedChanges = true
+		}
+		allFiles = append(allFiles, file)
+	}
+
+	wt.TotalModified = len(allFiles)
+	if len(allFiles) > 10 {
+		wt.ModifiedFiles = allFiles[:10]
+	} else {
+		wt.ModifiedFiles = allFiles
+	}
+
+	return wt, nil
 }
