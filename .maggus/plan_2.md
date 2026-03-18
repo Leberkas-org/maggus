@@ -54,17 +54,17 @@ Integrate git remote synchronization checks into the `maggus work` flow. Before 
 **Description:** As a user, I want to see a pre-work TUI screen that shows me the git sync status and lets me choose how to resolve it, so that I can stay in the TUI flow without switching to a separate terminal.
 
 **Acceptance Criteria:**
-- [ ] New TUI view/state added that displays before the work loop begins
-- [ ] Shows: current branch, remote status (ahead/behind counts), uncommitted changes summary
-- [ ] When up-to-date and clean: auto-proceeds to work after brief display (e.g. 1-2 seconds or immediately with a status line)
-- [ ] When behind remote: shows resolution menu with options: Pull, Pull with rebase, Force pull (reset to remote), Stash & pull, Skip (continue without pulling), Abort
-- [ ] When local uncommitted changes exist AND behind remote: warns about uncommitted changes before showing pull options; Pull and Pull with rebase are shown but marked with a warning; Stash & pull is highlighted as recommended
-- [ ] When only local uncommitted changes exist but up-to-date with remote: shows a warning but allows proceeding
-- [ ] "Force pull" option shows a confirmation prompt ("This will discard ALL local commits and changes. Are you sure?")
-- [ ] "Abort" exits `maggus work` cleanly
-- [ ] After successful pull action: shows result message and proceeds to work
-- [ ] If pull action fails: shows error and returns to resolution menu
-- [ ] Keyboard navigation: arrow keys to select, Enter to confirm, `q` or Esc for Abort
+- [x] New TUI view/state added that displays before the work loop begins
+- [x] Shows: current branch, remote status (ahead/behind counts), uncommitted changes summary
+- [x] When up-to-date and clean: auto-proceeds to work after brief display (e.g. 1-2 seconds or immediately with a status line)
+- [x] When behind remote: shows resolution menu with options: Pull, Pull with rebase, Force pull (reset to remote), Stash & pull, Skip (continue without pulling), Abort
+- [x] When local uncommitted changes exist AND behind remote: warns about uncommitted changes before showing pull options; Pull and Pull with rebase are shown but marked with a warning; Stash & pull is highlighted as recommended
+- [x] When only local uncommitted changes exist but up-to-date with remote: shows a warning but allows proceeding
+- [x] "Force pull" option shows a confirmation prompt ("This will discard ALL local commits and changes. Are you sure?")
+- [x] "Abort" exits `maggus work` cleanly
+- [x] After successful pull action: shows result message and proceeds to work
+- [x] If pull action fails: shows error and returns to resolution menu
+- [x] Keyboard navigation: arrow keys to select, Enter to confirm, `q` or Esc for Abort
 
 ### TASK-005: Integrate sync check at the start of `maggus work`
 **Description:** As a developer, I want the git sync check to run automatically when I start `maggus work`, so that I always begin with an up-to-date codebase.
