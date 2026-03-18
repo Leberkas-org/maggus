@@ -359,6 +359,45 @@ func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
+	case "alt+i":
+		t := m.selectableTasks[m.cursor]
+		if t.IsComplete() {
+			m.statusNote = "cannot ignore a completed task"
+			m.refreshDetailViewport()
+			return m, nil
+		}
+		m.statusNote = ""
+		// Show note if plan is ignored
+		visible := m.visiblePlans()
+		if m.selectedPlan < len(visible) && visible[m.selectedPlan].ignored {
+			m.statusNote = "plan is already ignored"
+		}
+		if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
+			m.statusNote = "error: " + err.Error()
+			m.refreshDetailViewport()
+			return m, nil
+		}
+		cursorTaskID := t.ID
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		m.rebuildForSelectedPlan()
+		for i, st := range m.selectableTasks {
+			if st.ID == cursorTaskID {
+				m.cursor = i
+				break
+			}
+		}
+		m.ensureCursorVisible()
+		// Reload task and refresh detail viewport
+		if updated := reloadTask(m.selectableTasks[m.cursor].SourceFile, m.selectableTasks[m.cursor].ID); updated != nil {
+			m.selectableTasks[m.cursor] = *updated
+		}
+		m.detail.exitCriteriaMode()
+		m.refreshDetailViewport()
+		return m, nil
 	case "alt+r":
 		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
@@ -487,6 +526,10 @@ func (m statusModel) updateActionPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *statusModel) refreshDetailViewport() {
 	content := renderDetailContent(m.selectableTasks[m.cursor], &m.detail)
+	if m.statusNote != "" {
+		mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		content += "\n" + mutedStyle.Render("  "+m.statusNote)
+	}
 	m.detailViewport.SetContent(content)
 }
 

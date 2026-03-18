@@ -120,12 +120,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user viewing a task's detail screen, I want to see whether the task is ignored and be able to toggle it with `alt+i` so that I have full context and control without going back to the list.
 
 **Acceptance Criteria:**
-- [ ] The `Status:` metadata row in `renderDetailContent` shows `"Ignored"` (with a distinct muted/yellow style) when `task.Ignored == true`, in addition to the existing Pending / Blocked / Complete states
-- [ ] Pressing `alt+i` in the detail view toggles the task's ignored state (same file rewrite as TASK-010)
-- [ ] After toggling, the detail viewport refreshes to reflect the new status without navigating away
-- [ ] The detail footer (`detailFooter`) includes `alt+i: ignore/unignore` in its hint line
-- [ ] Pressing `alt+i` on a completed task is a no-op with a brief inline note ("cannot ignore a completed task")
-- [ ] Typecheck/lint passes
+- [x] The `Status:` metadata row in `renderDetailContent` shows `"Ignored"` (with a distinct muted/yellow style) when `task.Ignored == true`, in addition to the existing Pending / Blocked / Complete states
+- [x] Pressing `alt+i` in the detail view toggles the task's ignored state (same file rewrite as TASK-010)
+- [x] After toggling, the detail viewport refreshes to reflect the new status without navigating away
+- [x] The detail footer (`detailFooter`) includes `alt+i: ignore/unignore` in its hint line
+- [x] Pressing `alt+i` on a completed task is a no-op with a brief inline note ("cannot ignore a completed task")
+- [x] Typecheck/lint passes
 
 ### TASK-012: TUI list view — toggle plan ignore with `alt+p`
 **Description:** As a user in the `maggus status` list view, I want to press `alt+p` to toggle the ignored state of the currently selected plan tab so that I can exclude or re-include an entire plan without using the CLI.
