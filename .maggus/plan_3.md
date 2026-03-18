@@ -109,12 +109,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user in the `maggus status` list view, I want to press `alt+i` on a selected task to toggle its ignored state so that I can ignore or unignore tasks without leaving the TUI.
 
 **Acceptance Criteria:**
-- [ ] Pressing `alt+i` in the list view calls `parser.ToggleTaskIgnore(task.SourceFile, task.ID)` (or equivalent) to flip the `### IGNORED TASK-NNN:` prefix in the plan file
-- [ ] After the file is written, plans are reloaded from disk and the list refreshes in place — the cursor stays on the same logical task if it still exists
-- [ ] Ignored tasks show the `~` icon and distinct style in the list (consistent with TASK-004)
-- [ ] The footer bar is updated to include `alt+i: ignore/unignore`
-- [ ] If the selected plan is an `_ignored` plan, `alt+i` on a task shows a note ("plan is already ignored") but still toggles the heading prefix
-- [ ] Typecheck/lint passes
+- [x] Pressing `alt+i` in the list view calls `parser.ToggleTaskIgnore(task.SourceFile, task.ID)` (or equivalent) to flip the `### IGNORED TASK-NNN:` prefix in the plan file
+- [x] After the file is written, plans are reloaded from disk and the list refreshes in place — the cursor stays on the same logical task if it still exists
+- [x] Ignored tasks show the `~` icon and distinct style in the list (consistent with TASK-004)
+- [x] The footer bar is updated to include `alt+i: ignore/unignore`
+- [x] If the selected plan is an `_ignored` plan, `alt+i` on a task shows a note ("plan is already ignored") but still toggles the heading prefix
+- [x] Typecheck/lint passes
 
 ### TASK-011: TUI detail view — show ignored status and toggle with `alt+i`
 **Description:** As a user viewing a task's detail screen, I want to see whether the task is ignored and be able to toggle it with `alt+i` so that I have full context and control without going back to the list.

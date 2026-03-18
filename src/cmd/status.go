@@ -94,6 +94,9 @@ type statusModel struct {
 	deleteErr     string
 	dir           string // working directory for file operations
 
+	// Temporary status note (e.g. "plan is already ignored")
+	statusNote string
+
 	// Criteria mode state (shared detail component)
 	detail detailState
 }
@@ -219,6 +222,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Clear status note on any key except alt+i itself
+	if msg.String() != "alt+i" {
+		m.statusNote = ""
+	}
 	switch msg.String() {
 	case "tab", "right":
 		// Next plan tab (wraps around)
@@ -255,6 +262,41 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+i":
+		if len(m.selectableTasks) == 0 {
+			return m, nil
+		}
+		t := m.selectableTasks[m.cursor]
+		// Clear any previous note
+		m.statusNote = ""
+		// Show note if plan is ignored, but still toggle
+		visible := m.visiblePlans()
+		if m.selectedPlan < len(visible) && visible[m.selectedPlan].ignored {
+			m.statusNote = "plan is already ignored"
+		}
+		// Toggle: if task is ignored, remove prefix; if not, add prefix
+		if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
+			m.statusNote = "error: " + err.Error()
+			return m, nil
+		}
+		// Remember current task ID for cursor restore
+		cursorTaskID := t.ID
+		// Reload plans from disk
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		m.rebuildForSelectedPlan()
+		// Restore cursor to same logical task
+		for i, st := range m.selectableTasks {
+			if st.ID == cursorTaskID {
+				m.cursor = i
+				break
+			}
+		}
+		m.ensureCursorVisible()
+		return m, nil
 	case "alt+backspace":
 		if len(m.selectableTasks) > 0 {
 			m.confirmDelete = true
@@ -744,11 +786,17 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 
+	// Status note (e.g. "plan is already ignored")
+	if m.statusNote != "" {
+		sb.WriteString("\n")
+		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
+	}
+
 	toggleHint := "alt+a: show all"
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
