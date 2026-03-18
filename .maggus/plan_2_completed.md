@@ -82,13 +82,13 @@ Integrate git remote synchronization checks into the `maggus work` flow. Before 
 **Description:** As a developer, I want Maggus to re-check the remote between tasks so that if someone else pushed while I was working, I find out before the next task rather than at push time.
 
 **Acceptance Criteria:**
-- [ ] Between task iterations in the work loop, `gitsync.FetchRemote` and `gitsync.RemoteStatus` are called
-- [ ] Only the remote check is performed between tasks (not working tree status — Maggus itself manages the working tree at this point)
-- [ ] If remote is ahead: the sync TUI screen is shown with resolution options before continuing to the next task
-- [ ] If up-to-date: work continues without interruption (no message needed)
-- [ ] If fetch fails: a warning is sent to the TUI info area and work continues
-- [ ] The check does NOT run after the final task (unnecessary since push happens next)
-- [ ] Context cancellation (Ctrl+C) during the sync check is handled gracefully
+- [x] Between task iterations in the work loop, `gitsync.FetchRemote` and `gitsync.RemoteStatus` are called
+- [x] Only the remote check is performed between tasks (not working tree status — Maggus itself manages the working tree at this point)
+- [x] If remote is ahead: the sync TUI screen is shown with resolution options before continuing to the next task
+- [x] If up-to-date: work continues without interruption (no message needed)
+- [x] If fetch fails: a warning is sent to the TUI info area and work continues
+- [x] The check does NOT run after the final task (unnecessary since push happens next)
+- [x] Context cancellation (Ctrl+C) during the sync check is handled gracefully
 
 ## Functional Requirements
 

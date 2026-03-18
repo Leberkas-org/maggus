@@ -299,7 +299,11 @@ Examples:
 		if useWorktree {
 			banner.Worktree = workDir
 		}
+		// Wire gitsync functions into the runner TUI for between-task sync checks.
+		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
+
 		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel, banner)
+		m.SetSyncDir(workDir)
 		stopFlag := m.StopFlag()
 		m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 			planRel := tu.PlanFile
@@ -486,6 +490,48 @@ Examples:
 
 				// Update progress to reflect completed iteration.
 				p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
+
+				// Between-task sync check: detect if remote changed while working.
+				// Skip on the final iteration (push happens next anyway).
+				if i < count-1 {
+					if workCtx.Err() != nil {
+						break
+					}
+					fetchErr := gitsync.FetchRemote(workDir)
+					if fetchErr != nil {
+						// Fetch failed (offline) — warn and continue
+						p.Send(runner.InfoMsg{Text: "⚠ Could not reach remote between tasks — continuing offline"})
+					} else {
+						rs, rsErr := gitsync.RemoteStatus(workDir)
+						if rsErr == nil && rs.HasRemote && rs.Behind > 0 {
+							// Remote is ahead — show sync TUI and block until resolved
+							resultCh := make(chan runner.SyncCheckResult, 1)
+							p.Send(runner.SyncCheckMsg{
+								Behind:       rs.Behind,
+								Ahead:        rs.Ahead,
+								RemoteBranch: rs.RemoteBranch,
+								ResultCh:     resultCh,
+							})
+							// Wait for user's choice (or context cancellation)
+							select {
+							case result := <-resultCh:
+								if result.Action == runner.SyncAbort {
+									stopReason = runner.StopReasonInterrupted
+									break
+								}
+								if result.Message != "" {
+									p.Send(runner.InfoMsg{Text: result.Message})
+								}
+							case <-workCtx.Done():
+								stopReason = runner.StopReasonInterrupted
+							}
+							if stopReason == runner.StopReasonInterrupted {
+								break
+							}
+						}
+						// Up-to-date: continue without interruption
+					}
+				}
 			}
 
 			// Build summary data.
