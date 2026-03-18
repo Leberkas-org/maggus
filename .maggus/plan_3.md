@@ -61,11 +61,11 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user, I want to run `maggus ignore plan <plan-id>` to exclude an entire plan from the work loop.
 
 **Acceptance Criteria:**
-- [ ] `maggus ignore plan <plan-id>` renames `plan_<N>.md` → `plan_<N>_ignored.md`
-- [ ] If the plan is already completed (`_completed.md`) or does not exist, print an error and exit non-zero
-- [ ] If the plan is already ignored, print a message ("already ignored") and exit zero
-- [ ] Plan ID can be given as a number (e.g. `3`) and resolved to the correct filename
-- [ ] Typecheck/lint passes
+- [x] `maggus ignore plan <plan-id>` renames `plan_<N>.md` → `plan_<N>_ignored.md`
+- [x] If the plan is already completed (`_completed.md`) or does not exist, print an error and exit non-zero
+- [x] If the plan is already ignored, print a message ("already ignored") and exit zero
+- [x] Plan ID can be given as a number (e.g. `3`) and resolved to the correct filename
+- [x] Typecheck/lint passes
 
 ### TASK-006: `maggus unignore` command for plans
 **Description:** As a user, I want to run `maggus unignore plan <plan-id>` to re-include an ignored plan in the work loop.
