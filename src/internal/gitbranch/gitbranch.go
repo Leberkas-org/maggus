@@ -14,7 +14,7 @@ var protectedBranches = map[string]bool{
 	"dev":    true,
 }
 
-var taskNumberRe = regexp.MustCompile(`TASK-(\d+)`)
+var taskIDSuffixRe = regexp.MustCompile(`^TASK-(.+)$`)
 
 // IsProtected returns true if the branch name is a protected branch.
 func IsProtected(branch string) bool {
@@ -22,13 +22,14 @@ func IsProtected(branch string) bool {
 }
 
 // FeatureBranchName generates a feature branch name from a task ID.
-// For example, "TASK-003" becomes "feature/maggustask-003".
+// For example, "TASK-003" becomes "feature/maggustask-003",
+// and "TASK-1-E05" becomes "feature/maggustask-1-e05".
 func FeatureBranchName(taskID string) string {
-	m := taskNumberRe.FindStringSubmatch(taskID)
+	m := taskIDSuffixRe.FindStringSubmatch(taskID)
 	if m == nil {
 		return "feature/maggustask-000"
 	}
-	return fmt.Sprintf("feature/maggustask-%s", m[1])
+	return fmt.Sprintf("feature/maggustask-%s", strings.ToLower(m[1]))
 }
 
 // EnsureFeatureBranch checks the current branch and creates a feature branch if on a protected branch.

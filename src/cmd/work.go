@@ -165,22 +165,38 @@ Examples:
 		// Mark any fully completed plan files before checking for work
 		_ = parser.MarkCompletedPlans(dir)
 
-		// Check if there are any incomplete tasks
-		nextTask := parser.FindNextIncomplete(tasks)
-		if nextTask == nil {
-			cmd.Println("All tasks are complete! Nothing to do.")
-			return nil
+		// Check if there are any tasks to work on.
+		// When --task targets a specific task, look for that task directly;
+		// otherwise find the next workable (incomplete + not blocked) task.
+		var nextTask *parser.Task
+		if taskFlag != "" {
+			nextTask = findTaskByID(tasks, taskFlag)
+			if nextTask == nil {
+				cmd.Printf("Task %s not found or already complete.\n", taskFlag)
+				return nil
+			}
+		} else {
+			nextTask = parser.FindNextIncomplete(tasks)
+			if nextTask == nil {
+				cmd.Println("All tasks are complete! Nothing to do.")
+				return nil
+			}
 		}
 
 		// Cap count to the number of workable tasks so the progress bar is accurate.
-		workable := 0
-		for i := range tasks {
-			if tasks[i].IsWorkable() {
-				workable++
+		// When --task is set, always allow at least 1 (the user explicitly chose it).
+		if taskFlag != "" {
+			count = 1
+		} else {
+			workable := 0
+			for i := range tasks {
+				if tasks[i].IsWorkable() {
+					workable++
+				}
 			}
-		}
-		if workable < count {
-			count = workable
+			if workable < count {
+				count = workable
+			}
 		}
 
 		// Create run tracker
