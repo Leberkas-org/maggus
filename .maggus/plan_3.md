@@ -40,11 +40,11 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user running `maggus work`, I want ignored plans and tasks to be skipped so that the work loop only works on active tasks.
 
 **Acceptance Criteria:**
-- [ ] `maggus work` skips tasks where `Ignored == true` when searching for the next workable task
-- [ ] Skipped ignored tasks are logged/printed similarly to blocked tasks ("Skipping TASK-003: ignored")
-- [ ] If all remaining tasks are ignored or blocked, `maggus work` exits with an appropriate message
-- [ ] No regression: non-ignored, non-blocked tasks are still picked up correctly
-- [ ] Typecheck/lint passes
+- [x] `maggus work` skips tasks where `Ignored == true` when searching for the next workable task
+- [x] Skipped ignored tasks are logged/printed similarly to blocked tasks ("Skipping TASK-003: ignored")
+- [x] If all remaining tasks are ignored or blocked, `maggus work` exits with an appropriate message
+- [x] No regression: non-ignored, non-blocked tasks are still picked up correctly
+- [x] Typecheck/lint passes
 
 ### TASK-004: Status and list commands show ignored items with [~] marker
 **Description:** As a user, I want `maggus status` and `maggus list` to display ignored plans and tasks with a `[~]` marker so I always know what is being skipped.

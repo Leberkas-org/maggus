@@ -630,6 +630,69 @@ func TestParsePlans_IgnoredPlanAllTasksIgnored(t *testing.T) {
 	}
 }
 
+func TestIgnoredTask_NotWorkable(t *testing.T) {
+	task := Task{
+		ID:      "TASK-001",
+		Ignored: true,
+		Criteria: []Criterion{
+			{Text: "Do something", Checked: false},
+		},
+	}
+
+	if task.IsWorkable() {
+		t.Error("ignored task should not be workable")
+	}
+}
+
+func TestFindNextIncomplete_SkipsIgnored(t *testing.T) {
+	tasks := []Task{
+		{
+			ID:      "TASK-001",
+			Ignored: true,
+			Criteria: []Criterion{
+				{Text: "Do something", Checked: false},
+			},
+		},
+		{
+			ID: "TASK-002",
+			Criteria: []Criterion{
+				{Text: "Do something else", Checked: false},
+			},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+func TestFindNextIncomplete_AllIgnoredOrBlocked(t *testing.T) {
+	tasks := []Task{
+		{
+			ID:      "TASK-001",
+			Ignored: true,
+			Criteria: []Criterion{
+				{Text: "Do something", Checked: false},
+			},
+		},
+		{
+			ID: "TASK-002",
+			Criteria: []Criterion{
+				{Text: "BLOCKED: needs API", Checked: false, Blocked: true},
+			},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next != nil {
+		t.Errorf("expected nil, got %s", next.ID)
+	}
+}
+
 func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	// Task has unchecked criteria AND a blocked criterion — should be skipped
 	tasks := []Task{

@@ -1048,7 +1048,7 @@ func (m TUIModel) renderSummaryView() string {
 	case StopReasonNoTasks:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ No Tasks Available")
 		content.WriteString(title + "\n")
-		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete or blocked.") + "\n\n")
+		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete, blocked, or ignored.") + "\n\n")
 		goto afterTitle
 	default:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")

@@ -210,7 +210,33 @@ Examples:
 		} else {
 			nextTask = parser.FindNextIncomplete(tasks)
 			if nextTask == nil {
-				cmd.Println("All tasks are complete! Nothing to do.")
+				// Distinguish between "all complete" and "remaining are blocked/ignored".
+				hasIgnored := false
+				hasBlocked := false
+				for i := range tasks {
+					if !tasks[i].IsComplete() {
+						if tasks[i].Ignored {
+							hasIgnored = true
+						}
+						if tasks[i].IsBlocked() {
+							hasBlocked = true
+						}
+					}
+				}
+				if hasIgnored || hasBlocked {
+					msg := "No workable tasks — remaining tasks are"
+					switch {
+					case hasBlocked && hasIgnored:
+						msg += " blocked or ignored."
+					case hasIgnored:
+						msg += " ignored."
+					default:
+						msg += " blocked."
+					}
+					cmd.Println(msg)
+				} else {
+					cmd.Println("All tasks are complete! Nothing to do.")
+				}
 				return nil
 			}
 		}
@@ -357,6 +383,13 @@ Examples:
 
 			stopReason := runner.StopReasonComplete
 			var errorDetail string
+
+			// Log ignored tasks at the start so the user knows what's being skipped.
+			for i := range tasks {
+				if !tasks[i].IsComplete() && tasks[i].Ignored {
+					p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", tasks[i].ID)})
+				}
+			}
 
 			for i := 0; i < count; i++ {
 				if workCtx.Err() != nil {

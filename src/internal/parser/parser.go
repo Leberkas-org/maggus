@@ -56,9 +56,9 @@ func (t *Task) IsBlocked() bool {
 	return false
 }
 
-// IsWorkable returns true if the task is incomplete and not blocked.
+// IsWorkable returns true if the task is incomplete, not blocked, and not ignored.
 func (t *Task) IsWorkable() bool {
-	return !t.IsComplete() && !t.IsBlocked()
+	return !t.IsComplete() && !t.IsBlocked() && !t.Ignored
 }
 
 // ParseFile parses a single plan markdown file and returns all tasks found in it.
