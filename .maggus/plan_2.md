@@ -70,13 +70,13 @@ Integrate git remote synchronization checks into the `maggus work` flow. Before 
 **Description:** As a developer, I want the git sync check to run automatically when I start `maggus work`, so that I always begin with an up-to-date codebase.
 
 **Acceptance Criteria:**
-- [ ] `cmd/work.go` calls `gitsync.FetchRemote` and `gitsync.RemoteStatus` before entering the work loop
-- [ ] `gitsync.WorkingTreeStatus` is also checked
-- [ ] If behind or dirty: the sync TUI screen (TASK-004) is shown before the main work TUI starts
-- [ ] If up-to-date and clean: a brief info message is shown in the work TUI banner (e.g. "Branch up to date with origin/master")
-- [ ] If fetch fails (no network): shows a warning "Could not reach remote — working offline" and proceeds
-- [ ] If no remote is configured: silently skips the remote check (no warning needed)
-- [ ] Worktree mode: sync check runs against the main repo before creating the worktree
+- [x] `cmd/work.go` calls `gitsync.FetchRemote` and `gitsync.RemoteStatus` before entering the work loop
+- [x] `gitsync.WorkingTreeStatus` is also checked
+- [x] If behind or dirty: the sync TUI screen (TASK-004) is shown before the main work TUI starts
+- [x] If up-to-date and clean: a brief info message is shown in the work TUI banner (e.g. "Branch up to date with origin/master")
+- [x] If fetch fails (no network): shows a warning "Could not reach remote — working offline" and proceeds
+- [x] If no remote is configured: silently skips the remote check (no warning needed)
+- [x] Worktree mode: sync check runs against the main repo before creating the worktree
 
 ### TASK-006: Integrate sync check between task iterations
 **Description:** As a developer, I want Maggus to re-check the remote between tasks so that if someone else pushed while I was working, I find out before the next task rather than at push time.
