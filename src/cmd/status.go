@@ -20,17 +20,19 @@ const progressBarWidth = 10
 
 // Lipgloss styles for the status command.
 var (
-	statusGreenStyle  = lipgloss.NewStyle().Foreground(styles.Success)
-	statusCyanStyle   = lipgloss.NewStyle().Foreground(styles.Primary)
-	statusRedStyle = lipgloss.NewStyle().Foreground(styles.Error)
-	statusDimStyle = lipgloss.NewStyle().Faint(true)
-	statusDimGreen    = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
+	statusGreenStyle   = lipgloss.NewStyle().Foreground(styles.Success)
+	statusCyanStyle    = lipgloss.NewStyle().Foreground(styles.Primary)
+	statusRedStyle     = lipgloss.NewStyle().Foreground(styles.Error)
+	statusDimStyle     = lipgloss.NewStyle().Faint(true)
+	statusDimGreen     = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
+	statusIgnoredStyle = lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 )
 
 type planInfo struct {
 	filename  string
 	tasks     []parser.Task
 	completed bool // filename contains _completed
+	ignored   bool // filename contains _ignored
 }
 
 func (p *planInfo) doneCount() int {
@@ -539,17 +541,30 @@ func (m statusModel) renderTabBar() string {
 
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	ignoredTabStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 
 	var tabs []string
 	for i, p := range visible {
 		done := p.doneCount()
 		total := len(p.tasks)
 		name := strings.TrimSuffix(p.filename, ".md")
-		label := fmt.Sprintf(" %s %d/%d ", name, done, total)
+		prefix := ""
+		if p.ignored {
+			prefix = "~"
+		}
+		label := fmt.Sprintf(" %s%s %d/%d ", prefix, name, done, total)
 		if i == m.selectedPlan {
-			tabs = append(tabs, selectedStyle.Render(label))
+			if p.ignored {
+				tabs = append(tabs, ignoredTabStyle.Bold(true).Render(label))
+			} else {
+				tabs = append(tabs, selectedStyle.Render(label))
+			}
 		} else {
-			tabs = append(tabs, unselectedStyle.Render(label))
+			if p.ignored {
+				tabs = append(tabs, ignoredTabStyle.Render(label))
+			} else {
+				tabs = append(tabs, unselectedStyle.Render(label))
+			}
 		}
 	}
 
@@ -667,7 +682,10 @@ func (m statusModel) viewStatus() string {
 			var icon string
 			var style lipgloss.Style
 
-			if t.IsComplete() {
+			if t.Ignored {
+				icon = "~"
+				style = statusIgnoredStyle
+			} else if t.IsComplete() {
 				icon = "✓"
 				if p.completed {
 					style = statusDimGreen
@@ -781,6 +799,8 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		fmt.Fprintln(w)
 		if p.completed {
 			fmt.Fprintf(w, " Tasks — %s (archived)\n", p.filename)
+		} else if p.ignored {
+			fmt.Fprintf(w, " Tasks — [~] %s (ignored)\n", p.filename)
 		} else {
 			fmt.Fprintf(w, " Tasks — %s\n", p.filename)
 		}
@@ -789,7 +809,10 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		for _, t := range p.tasks {
 			var icon, prefix string
 
-			if t.IsComplete() {
+			if t.Ignored {
+				icon = "[~]"
+				prefix = "  "
+			} else if t.IsComplete() {
 				icon = "[x]"
 				prefix = "  "
 			} else if t.IsBlocked() {
@@ -849,6 +872,9 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		if p.completed {
 			prefix = " [x] "
 			suffix = "done"
+		} else if p.ignored {
+			prefix = " [~] "
+			suffix = "ignored"
 		} else if p.blockedCount() > 0 {
 			prefix = "   "
 			suffix = "blocked"
@@ -880,10 +906,17 @@ func parsePlans(dir string) ([]planInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
+		ignored := parser.IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
 		plans = append(plans, planInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
+			ignored:   ignored,
 		})
 	}
 	return plans, nil

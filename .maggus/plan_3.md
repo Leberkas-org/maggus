@@ -50,12 +50,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user, I want `maggus status` and `maggus list` to display ignored plans and tasks with a `[~]` marker so I always know what is being skipped.
 
 **Acceptance Criteria:**
-- [ ] `maggus status` renders ignored tasks with `[~]` instead of `[ ]`, `[x]`, or `[!]`
-- [ ] `maggus status` renders the header of an ignored plan with a `[~]` marker on the plan name
-- [ ] `maggus list` shows ignored tasks with a `[~]` marker (they are never omitted from the list)
-- [ ] The `[~]` marker is visually distinct — use a different color or style if the terminal supports it
-- [ ] Ignored items appear inline in their natural order (not moved to a separate section)
-- [ ] Typecheck/lint passes
+- [x] `maggus status` renders ignored tasks with `[~]` instead of `[ ]`, `[x]`, or `[!]`
+- [x] `maggus status` renders the header of an ignored plan with a `[~]` marker on the plan name
+- [x] `maggus list` shows ignored tasks with a `[~]` marker (they are never omitted from the list)
+- [x] The `[~]` marker is visually distinct — use a different color or style if the terminal supports it
+- [x] Ignored items appear inline in their natural order (not moved to a separate section)
+- [x] Typecheck/lint passes
 
 ### TASK-005: `maggus ignore` command for plans
 **Description:** As a user, I want to run `maggus ignore plan <plan-id>` to exclude an entire plan from the work loop.
