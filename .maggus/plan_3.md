@@ -18,12 +18,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a developer, I want the parser to detect `_ignored` plan files so that they are loaded but flagged as ignored.
 
 **Acceptance Criteria:**
-- [ ] Parser detects plan files matching `plan_*_ignored.md` (in addition to `plan_*.md` and `plan_*_completed.md`)
-- [ ] Plans loaded from `_ignored` files have an `Ignored: true` field on the plan struct
-- [ ] All tasks inside an ignored plan are also considered ignored (no per-task override)
-- [ ] Ignored plans are NOT skipped during load — they are included in the full plan list
-- [ ] Unit tests cover: ignored plan detected, tasks inside inherit ignored status
-- [ ] Typecheck/lint passes
+- [x] Parser detects plan files matching `plan_*_ignored.md` (in addition to `plan_*.md` and `plan_*_completed.md`)
+- [x] Plans loaded from `_ignored` files have an `Ignored: true` field on the plan struct
+- [x] All tasks inside an ignored plan are also considered ignored (no per-task override)
+- [x] Ignored plans are NOT skipped during load — they are included in the full plan list
+- [x] Unit tests cover: ignored plan detected, tasks inside inherit ignored status
+- [x] Typecheck/lint passes
 
 ### TASK-002: Parser recognizes ignored tasks within a plan
 **Description:** As a developer, I want the parser to detect `### IGNORED TASK-NNN: Title` markers so that individual tasks can be excluded.

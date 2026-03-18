@@ -25,6 +25,13 @@ type Task struct {
 	Description string
 	Criteria    []Criterion
 	SourceFile  string
+	Ignored     bool
+}
+
+type Plan struct {
+	File    string
+	Ignored bool
+	Tasks   []Task
 }
 
 func (t *Task) IsComplete() bool {
@@ -201,9 +208,15 @@ func GlobPlanFiles(dir string, includeCompleted bool) ([]string, error) {
 	return filtered, nil
 }
 
+// IsIgnoredFile returns true if the given path is an ignored plan file (ends with _ignored.md).
+func IsIgnoredFile(path string) bool {
+	return strings.HasSuffix(path, "_ignored.md")
+}
+
 // ParsePlans finds all .maggus/plan_*.md files in the given directory and parses them.
 // Files ending in _completed.md are excluded.
 // Tasks are returned in order: files sorted by name, tasks in document order within each file.
+// Tasks from _ignored plan files have Ignored set to true.
 func ParsePlans(dir string) ([]Task, error) {
 	files, err := GlobPlanFiles(dir, false)
 	if err != nil {
@@ -216,10 +229,47 @@ func ParsePlans(dir string) ([]Task, error) {
 		if err != nil {
 			return nil, err
 		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
 		allTasks = append(allTasks, tasks...)
 	}
 
 	return allTasks, nil
+}
+
+// ParsePlansGrouped finds all .maggus/plan_*.md files and returns them as Plan structs.
+// Files ending in _completed.md are excluded.
+// Plans from _ignored files have Ignored set to true, and all their tasks inherit this flag.
+func ParsePlansGrouped(dir string) ([]Plan, error) {
+	files, err := GlobPlanFiles(dir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var plans []Plan
+	for _, f := range files {
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return nil, err
+		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		plans = append(plans, Plan{
+			File:    f,
+			Ignored: ignored,
+			Tasks:   tasks,
+		})
+	}
+
+	return plans, nil
 }
 
 // planNumberRe extracts the numeric part from plan filenames like "plan_10.md" or "plan_3_completed.md".
