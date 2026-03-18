@@ -41,14 +41,14 @@ Integrate git remote synchronization checks into the `maggus work` flow. Before 
 **Description:** As a developer, I want Maggus to perform various git pull strategies so that I can choose how to sync with the remote.
 
 **Acceptance Criteria:**
-- [ ] `Pull(dir string) error` — standard `git pull` (fast-forward merge)
-- [ ] `PullRebase(dir string) error` — `git pull --rebase`
-- [ ] `ForcePull(dir string) error` — `git fetch origin && git reset --hard @{upstream}` (discards local commits and changes)
-- [ ] `StashAndPull(dir string) error` — `git stash push -m "maggus: auto-stash before pull" && git pull && git stash pop`
-- [ ] `StashAndPull` returns a specific error type if stash pop has conflicts, so the TUI can inform the user
-- [ ] `ForcePull` requires an explicit confirmation parameter (e.g. `confirm bool`) — returns error if `false`
-- [ ] Unit tests cover success and failure paths for each action
-- [ ] Unit tests verify `ForcePull` refuses to run without confirmation
+- [x] `Pull(dir string) error` — standard `git pull` (fast-forward merge)
+- [x] `PullRebase(dir string) error` — `git pull --rebase`
+- [x] `ForcePull(dir string) error` — `git fetch origin && git reset --hard @{upstream}` (discards local commits and changes)
+- [x] `StashAndPull(dir string) error` — `git stash push -m "maggus: auto-stash before pull" && git pull && git stash pop`
+- [x] `StashAndPull` returns a specific error type if stash pop has conflicts, so the TUI can inform the user
+- [x] `ForcePull` requires an explicit confirmation parameter (e.g. `confirm bool`) — returns error if `false`
+- [x] Unit tests cover success and failure paths for each action
+- [x] Unit tests verify `ForcePull` refuses to run without confirmation
 
 ### TASK-004: Add git sync TUI screen to the Bubbletea work flow
 **Description:** As a user, I want to see a pre-work TUI screen that shows me the git sync status and lets me choose how to resolve it, so that I can stay in the TUI flow without switching to a separate terminal.

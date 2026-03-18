@@ -1,11 +1,24 @@
 package gitsync
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
 )
+
+// ErrStashPopConflict is returned when `git stash pop` results in merge conflicts.
+type ErrStashPopConflict struct {
+	Output string
+}
+
+func (e *ErrStashPopConflict) Error() string {
+	return fmt.Sprintf("stash pop resulted in merge conflicts: %s", e.Output)
+}
+
+// ErrForcePullNotConfirmed is returned when ForcePull is called without confirmation.
+var ErrForcePullNotConfirmed = errors.New("force pull requires explicit confirmation")
 
 // WorkTree represents the local working tree state.
 type WorkTree struct {
@@ -128,4 +141,81 @@ func WorkingTreeStatus(dir string) (WorkTree, error) {
 	}
 
 	return wt, nil
+}
+
+// Pull performs a standard `git pull` (fast-forward merge).
+func Pull(dir string) error {
+	cmd := exec.Command("git", "pull")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// PullRebase performs `git pull --rebase`.
+func PullRebase(dir string) error {
+	cmd := exec.Command("git", "pull", "--rebase")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git pull --rebase: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// ForcePull fetches from origin and resets to the upstream branch, discarding
+// all local commits and changes. The confirm parameter must be true or
+// ErrForcePullNotConfirmed is returned.
+func ForcePull(dir string, confirm bool) error {
+	if !confirm {
+		return ErrForcePullNotConfirmed
+	}
+
+	fetchCmd := exec.Command("git", "fetch", "origin")
+	fetchCmd.Dir = dir
+	if out, err := fetchCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch origin: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	resetCmd := exec.Command("git", "reset", "--hard", "@{upstream}")
+	resetCmd.Dir = dir
+	if out, err := resetCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git reset --hard @{upstream}: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	return nil
+}
+
+// StashAndPull stashes local changes, pulls, then pops the stash.
+// Returns *ErrStashPopConflict if stash pop results in merge conflicts.
+func StashAndPull(dir string) error {
+	stashCmd := exec.Command("git", "stash", "push", "-m", "maggus: auto-stash before pull")
+	stashCmd.Dir = dir
+	if out, err := stashCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git stash push: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	pullCmd := exec.Command("git", "pull")
+	pullCmd.Dir = dir
+	if out, err := pullCmd.CombinedOutput(); err != nil {
+		// Pull failed — try to restore the stash
+		popCmd := exec.Command("git", "stash", "pop")
+		popCmd.Dir = dir
+		_ = popCmd.Run()
+		return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	popCmd := exec.Command("git", "stash", "pop")
+	popCmd.Dir = dir
+	popOut, err := popCmd.CombinedOutput()
+	if err != nil {
+		output := strings.TrimSpace(string(popOut))
+		// Check if this is a conflict situation
+		if strings.Contains(output, "CONFLICT") || strings.Contains(output, "conflict") {
+			return &ErrStashPopConflict{Output: output}
+		}
+		return fmt.Errorf("git stash pop: %w: %s", err, output)
+	}
+
+	return nil
 }
