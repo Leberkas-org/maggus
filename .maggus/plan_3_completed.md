@@ -131,13 +131,13 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user in the `maggus status` list view, I want to press `alt+p` to toggle the ignored state of the currently selected plan tab so that I can exclude or re-include an entire plan without using the CLI.
 
 **Acceptance Criteria:**
-- [ ] Pressing `alt+p` in the list view renames the currently selected plan file: `plan_<N>.md` ↔ `plan_<N>_ignored.md`
-- [ ] After the rename, plans are reloaded and the tab bar refreshes; the tab selection stays on the same plan (by filename base, not index)
-- [ ] The tab bar label for an ignored plan shows a `~` prefix (e.g. ` ~plan_3 0/5 `) to distinguish it from active plans
-- [ ] Pressing `alt+p` on a completed plan is a no-op with no visible error (completed plans cannot be ignored)
-- [ ] The footer bar is updated to include `alt+p: ignore/unignore plan`
-- [ ] `planInfo` struct gains an `ignored bool` field, set by `parsePlans` when the filename contains `_ignored`
-- [ ] Typecheck/lint passes
+- [x] Pressing `alt+p` in the list view renames the currently selected plan file: `plan_<N>.md` ↔ `plan_<N>_ignored.md`
+- [x] After the rename, plans are reloaded and the tab bar refreshes; the tab selection stays on the same plan (by filename base, not index)
+- [x] The tab bar label for an ignored plan shows a `~` prefix (e.g. ` ~plan_3 0/5 `) to distinguish it from active plans
+- [x] Pressing `alt+p` on a completed plan is a no-op with no visible error (completed plans cannot be ignored)
+- [x] The footer bar is updated to include `alt+p: ignore/unignore plan`
+- [x] `planInfo` struct gains an `ignored bool` field, set by `parsePlans` when the filename contains `_ignored`
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

@@ -222,8 +222,8 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Clear status note on any key except alt+i itself
-	if msg.String() != "alt+i" {
+	// Clear status note on any key except alt+i/alt+p
+	if msg.String() != "alt+i" && msg.String() != "alt+p" {
 		m.statusNote = ""
 	}
 	switch msg.String() {
@@ -296,6 +296,48 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.ensureCursorVisible()
+		return m, nil
+	case "alt+p":
+		m.statusNote = ""
+		visible := m.visiblePlans()
+		if m.selectedPlan >= len(visible) {
+			return m, nil
+		}
+		p := visible[m.selectedPlan]
+		// Completed plans cannot be ignored — silent no-op
+		if p.completed {
+			return m, nil
+		}
+		// Toggle: rename file
+		fullPath := filepath.Join(m.dir, ".maggus", p.filename)
+		var newPath string
+		if p.ignored {
+			newPath = strings.TrimSuffix(fullPath, "_ignored.md") + ".md"
+		} else {
+			newPath = strings.TrimSuffix(fullPath, ".md") + "_ignored.md"
+		}
+		if err := os.Rename(fullPath, newPath); err != nil {
+			m.statusNote = "error: " + err.Error()
+			return m, nil
+		}
+		// Remember the new filename base for cursor restore
+		newBase := filepath.Base(newPath)
+		// Reload plans from disk
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		// Restore tab selection to the same plan (by new filename)
+		newVisible := m.visiblePlans()
+		m.selectedPlan = 0
+		for i, vp := range newVisible {
+			if vp.filename == newBase {
+				m.selectedPlan = i
+				break
+			}
+		}
+		m.rebuildForSelectedPlan()
 		return m, nil
 	case "alt+backspace":
 		if len(m.selectableTasks) > 0 {
@@ -839,7 +881,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore plan · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
