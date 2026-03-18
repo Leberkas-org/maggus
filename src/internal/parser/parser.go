@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+(TASK-[\w-]+?):\s+(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?(TASK-[\w-]+?):\s+(.+)$`)
 
 type Criterion struct {
 	Text    string
@@ -85,9 +85,10 @@ func ParseFile(path string) ([]Task, error) {
 				tasks = append(tasks, *current)
 			}
 			current = &Task{
-				ID:         m[1],
-				Title:      strings.TrimSpace(m[2]),
+				ID:         m[2],
+				Title:      strings.TrimSpace(m[3]),
 				SourceFile: path,
+				Ignored:    m[1] == "IGNORED",
 			}
 			inDescription = false
 
@@ -349,7 +350,7 @@ func DeleteTask(filePath string, taskID string) error {
 
 	for i, line := range lines {
 		if m := taskHeadingRe.FindStringSubmatch(line); m != nil {
-			if m[1] == taskID {
+			if m[2] == taskID {
 				// Found the task — also consume blank lines before the heading
 				start = i
 				for start > 0 && strings.TrimSpace(lines[start-1]) == "" {

@@ -517,6 +517,119 @@ func TestParsePlansGrouped_IgnoredPlan(t *testing.T) {
 	}
 }
 
+func TestParseFile_IgnoredTask(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### IGNORED TASK-001: Skipped feature
+**Description:** This task is ignored.
+
+**Acceptance Criteria:**
+- [ ] Something
+
+### TASK-002: Active feature
+**Description:** This task is active.
+
+**Acceptance Criteria:**
+- [ ] Do it
+`)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// TASK-001 should be ignored with clean title (no IGNORED prefix)
+	if tasks[0].ID != "TASK-001" {
+		t.Errorf("task 0 ID = %q, want TASK-001", tasks[0].ID)
+	}
+	if tasks[0].Title != "Skipped feature" {
+		t.Errorf("task 0 Title = %q, want 'Skipped feature'", tasks[0].Title)
+	}
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 should be ignored")
+	}
+
+	// TASK-002 should NOT be ignored
+	if tasks[1].ID != "TASK-002" {
+		t.Errorf("task 1 ID = %q, want TASK-002", tasks[1].ID)
+	}
+	if tasks[1].Title != "Active feature" {
+		t.Errorf("task 1 Title = %q, want 'Active feature'", tasks[1].Title)
+	}
+	if tasks[1].Ignored {
+		t.Error("TASK-002 should not be ignored")
+	}
+}
+
+func TestParsePlans_IgnoredTaskInActivePlan(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### IGNORED TASK-001: Skipped task
+**Acceptance Criteria:**
+- [ ] Something
+
+### TASK-002: Active task
+**Acceptance Criteria:**
+- [ ] Do it
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// Ignored task in active plan
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 with IGNORED prefix should be ignored")
+	}
+	// Active task in active plan
+	if tasks[1].Ignored {
+		t.Error("TASK-002 without IGNORED prefix should not be ignored")
+	}
+}
+
+func TestParsePlans_IgnoredPlanAllTasksIgnored(t *testing.T) {
+	dir := t.TempDir()
+	// Tasks in an ignored plan are ignored regardless of their own IGNORED prefix
+	writeTempPlan(t, dir, "plan_1_ignored.md", `# Plan
+
+### TASK-001: Normal heading in ignored plan
+**Acceptance Criteria:**
+- [ ] Something
+
+### IGNORED TASK-002: Explicitly ignored in ignored plan
+**Acceptance Criteria:**
+- [ ] Something else
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// Both tasks should be ignored (plan-level takes precedence)
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 in ignored plan should be ignored")
+	}
+	if !tasks[1].Ignored {
+		t.Error("TASK-002 in ignored plan should be ignored")
+	}
+}
+
 func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	// Task has unchecked criteria AND a blocked criterion — should be skipped
 	tasks := []Task{

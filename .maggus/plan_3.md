@@ -29,12 +29,12 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a developer, I want the parser to detect `### IGNORED TASK-NNN: Title` markers so that individual tasks can be excluded.
 
 **Acceptance Criteria:**
-- [ ] Task title parsing strips the `IGNORED ` prefix and sets `Ignored: true` on the task struct
-- [ ] The stored task title does NOT include the `IGNORED` prefix (display is handled by the UI layer)
-- [ ] A task with `IGNORED` prefix inside a non-ignored plan is treated as ignored, not active
-- [ ] A task without the prefix inside a non-ignored plan is treated as active (no regression)
-- [ ] Unit tests cover: ignored task detected, non-ignored task unaffected, ignored plan + any task = ignored
-- [ ] Typecheck/lint passes
+- [x] Task title parsing strips the `IGNORED ` prefix and sets `Ignored: true` on the task struct
+- [x] The stored task title does NOT include the `IGNORED` prefix (display is handled by the UI layer)
+- [x] A task with `IGNORED` prefix inside a non-ignored plan is treated as ignored, not active
+- [x] A task without the prefix inside a non-ignored plan is treated as active (no regression)
+- [x] Unit tests cover: ignored task detected, non-ignored task unaffected, ignored plan + any task = ignored
+- [x] Typecheck/lint passes
 
 ### TASK-003: Work loop skips ignored plans and tasks
 **Description:** As a user running `maggus work`, I want ignored plans and tasks to be skipped so that the work loop only works on active tasks.
