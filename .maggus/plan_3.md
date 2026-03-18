@@ -91,10 +91,10 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a user, I want to run `maggus unignore task <task-id>` to re-include an ignored task in the work loop.
 
 **Acceptance Criteria:**
-- [ ] `maggus unignore task <TASK-NNN>` finds `### IGNORED TASK-NNN:` and rewrites it to `### TASK-NNN:`
-- [ ] If the task does not exist or is not currently ignored, print an error and exit non-zero
-- [ ] File is written back atomically
-- [ ] Typecheck/lint passes
+- [x] `maggus unignore task <TASK-NNN>` finds `### IGNORED TASK-NNN:` and rewrites it to `### TASK-NNN:`
+- [x] If the task does not exist or is not currently ignored, print an error and exit non-zero
+- [x] File is written back atomically
+- [x] Typecheck/lint passes
 
 ### TASK-009: Wire up ignore/unignore commands in CLI root
 **Description:** As a developer, I want `ignore` and `unignore` registered as top-level cobra commands so that users can discover and run them.

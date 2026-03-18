@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +58,65 @@ func runUnignorePlan(cmd *cobra.Command, dir string, planID string) error {
 	return nil
 }
 
+var unignoreTaskCmd = &cobra.Command{
+	Use:   "task <TASK-NNN>",
+	Short: "Unignore a single task",
+	Long:  `Rewrites the task heading from "### IGNORED TASK-NNN:" to "### TASK-NNN:" so that it is picked up by the work loop again.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get working directory: %w", err)
+		}
+		return runUnignoreTask(cmd, dir, args[0])
+	},
+}
+
+func runUnignoreTask(cmd *cobra.Command, dir string, taskID string) error {
+	// Normalize: accept both "TASK-007" and "007"
+	if !strings.HasPrefix(taskID, "TASK-") {
+		taskID = "TASK-" + taskID
+	}
+
+	// Search all plan files (including ignored, excluding completed) for this task
+	files, err := parser.GlobPlanFiles(dir, false)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		tasks, err := parser.ParseFile(f)
+		if err != nil {
+			return err
+		}
+
+		for _, t := range tasks {
+			if t.ID != taskID {
+				continue
+			}
+
+			// Found the task — must be ignored to unignore
+			if !t.Ignored {
+				cmd.PrintErrln(fmt.Sprintf("Error: task %s is not currently ignored", taskID))
+				return fmt.Errorf("task %s is not currently ignored", taskID)
+			}
+
+			// Rewrite the heading atomically (removeIgnored=true)
+			if err := rewriteTaskHeading(f, taskID, true); err != nil {
+				return err
+			}
+
+			cmd.Println(fmt.Sprintf("Unignored task %s in %s", taskID, filepath.Base(f)))
+			return nil
+		}
+	}
+
+	cmd.PrintErrln(fmt.Sprintf("Error: task %s not found", taskID))
+	return fmt.Errorf("task %s not found", taskID)
+}
+
 func init() {
 	unignoreCmd.AddCommand(unignorePlanCmd)
+	unignoreCmd.AddCommand(unignoreTaskCmd)
 	rootCmd.AddCommand(unignoreCmd)
 }
