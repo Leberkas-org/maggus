@@ -11,9 +11,14 @@ import (
 )
 
 var ignoreCmd = &cobra.Command{
-	Use:   "ignore",
-	Short: "Exclude plans or tasks from the work loop",
-	Long:  `Ignore a plan or task so that it is skipped by maggus work.`,
+	Use:          "ignore",
+	Short:        "Exclude plans or tasks from the work loop",
+	Long:         `Ignore a plan or task so that it is skipped by maggus work.`,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = cmd.Help()
+		return fmt.Errorf("a subcommand is required")
+	},
 }
 
 var ignorePlanCmd = &cobra.Command{

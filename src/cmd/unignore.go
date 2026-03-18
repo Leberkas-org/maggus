@@ -11,9 +11,14 @@ import (
 )
 
 var unignoreCmd = &cobra.Command{
-	Use:   "unignore",
-	Short: "Re-include ignored plans or tasks in the work loop",
-	Long:  `Unignore a plan or task so that it is picked up again by maggus work.`,
+	Use:          "unignore",
+	Short:        "Re-include ignored plans or tasks in the work loop",
+	Long:         `Unignore a plan or task so that it is picked up again by maggus work.`,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = cmd.Help()
+		return fmt.Errorf("a subcommand is required")
+	},
 }
 
 var unignorePlanCmd = &cobra.Command{

@@ -100,10 +100,10 @@ Add an ignore mechanism to Maggus that allows users to exclude entire plan files
 **Description:** As a developer, I want `ignore` and `unignore` registered as top-level cobra commands so that users can discover and run them.
 
 **Acceptance Criteria:**
-- [ ] `maggus ignore` and `maggus unignore` appear in `maggus --help`
-- [ ] Both commands show usage for `plan <id>` and `task <TASK-NNN>` subcommands
-- [ ] Running `maggus ignore` with no subcommand prints usage and exits non-zero
-- [ ] Typecheck/lint passes
+- [x] `maggus ignore` and `maggus unignore` appear in `maggus --help`
+- [x] Both commands show usage for `plan <id>` and `task <TASK-NNN>` subcommands
+- [x] Running `maggus ignore` with no subcommand prints usage and exits non-zero
+- [x] Typecheck/lint passes
 
 ### TASK-010: TUI list view — toggle task ignore with `alt+i`
 **Description:** As a user in the `maggus status` list view, I want to press `alt+i` on a selected task to toggle its ignored state so that I can ignore or unignore tasks without leaving the TUI.
