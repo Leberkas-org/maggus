@@ -244,7 +244,7 @@ func (m Model) View() string {
 			}
 		} else {
 			if i == m.cursor {
-				b.WriteString(selectedStyle.Render(prefix+folderIcon+name))
+				b.WriteString(selectedStyle.Render(prefix + folderIcon + name))
 			} else {
 				b.WriteString(normalStyle.Render(prefix + folderIcon + name))
 			}

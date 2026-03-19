@@ -18,22 +18,24 @@ type fakeDirEntry struct {
 	isDir bool
 }
 
-func (f fakeDirEntry) Name() string              { return f.name }
-func (f fakeDirEntry) IsDir() bool               { return f.isDir }
-func (f fakeDirEntry) Type() fs.FileMode         { return 0 }
-func (f fakeDirEntry) Info() (fs.FileInfo, error) { return fakeFileInfo{name: f.name, isDir: f.isDir}, nil }
+func (f fakeDirEntry) Name() string      { return f.name }
+func (f fakeDirEntry) IsDir() bool       { return f.isDir }
+func (f fakeDirEntry) Type() fs.FileMode { return 0 }
+func (f fakeDirEntry) Info() (fs.FileInfo, error) {
+	return fakeFileInfo{name: f.name, isDir: f.isDir}, nil
+}
 
 type fakeFileInfo struct {
 	name  string
 	isDir bool
 }
 
-func (f fakeFileInfo) Name() string      { return f.name }
-func (f fakeFileInfo) Size() int64       { return 0 }
-func (f fakeFileInfo) Mode() fs.FileMode { return 0 }
+func (f fakeFileInfo) Name() string       { return f.name }
+func (f fakeFileInfo) Size() int64        { return 0 }
+func (f fakeFileInfo) Mode() fs.FileMode  { return 0 }
 func (f fakeFileInfo) ModTime() time.Time { return time.Time{} }
-func (f fakeFileInfo) IsDir() bool       { return f.isDir }
-func (f fakeFileInfo) Sys() any          { return nil }
+func (f fakeFileInfo) IsDir() bool        { return f.isDir }
+func (f fakeFileInfo) Sys() any           { return nil }
 
 func dirEntries(names ...string) []os.DirEntry {
 	var entries []os.DirEntry

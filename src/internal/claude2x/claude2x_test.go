@@ -11,9 +11,9 @@ import (
 func TestFetchStatus_Success2x(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                      true,
-			"2xWindowExpiresIn":         "17h 54m 44s",
-			"2xWindowExpiresInSeconds":  64484,
+			"is2x":                     true,
+			"2xWindowExpiresIn":        "17h 54m 44s",
+			"2xWindowExpiresInSeconds": 64484,
 		})
 	}))
 	defer srv.Close()
@@ -33,9 +33,9 @@ func TestFetchStatus_Success2x(t *testing.T) {
 func TestFetchStatus_SuccessNot2x(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                      false,
-			"2xWindowExpiresIn":         nil,
-			"2xWindowExpiresInSeconds":  0,
+			"is2x":                     false,
+			"2xWindowExpiresIn":        nil,
+			"2xWindowExpiresInSeconds": 0,
 		})
 	}))
 	defer srv.Close()
@@ -99,12 +99,12 @@ func TestFetchStatus_Timeout(t *testing.T) {
 func TestFetchStatus_ExtraFieldsIgnored(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                      true,
-			"2xWindowExpiresIn":         "1h 2m 3s",
-			"2xWindowExpiresInSeconds":  3723,
-			"promoActive":               true,
-			"isPeak":                    false,
-			"currentTimeET":             "2026-03-19T19:15:42",
+			"is2x":                     true,
+			"2xWindowExpiresIn":        "1h 2m 3s",
+			"2xWindowExpiresInSeconds": 3723,
+			"promoActive":              true,
+			"isPeak":                   false,
+			"currentTimeET":            "2026-03-19T19:15:42",
 		})
 	}))
 	defer srv.Close()

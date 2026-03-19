@@ -195,7 +195,7 @@ func FullScreenInnerSize(width, height int) (int, int) {
 
 func fullScreenInner(width, height int) (int, int) {
 	innerW := width - FullScreenMargin*2 - 2 - 2 // margin + border + padding
-	innerH := height - FullScreenMargin*2 - 2     // margin + border
+	innerH := height - FullScreenMargin*2 - 2    // margin + border
 	if innerW < 0 {
 		innerW = 0
 	}

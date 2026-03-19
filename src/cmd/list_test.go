@@ -402,7 +402,7 @@ func TestListTUIShowsIgnoredTasks(t *testing.T) {
 		{ID: "TASK-001", Title: "Workable task", SourceFile: "plan_1.md",
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
 		{ID: "TASK-002", Title: "Ignored task", SourceFile: "plan_1.md",
-			Ignored: true,
+			Ignored:  true,
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
 	}
 	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}

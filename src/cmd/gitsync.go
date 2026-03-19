@@ -28,9 +28,9 @@ type syncResult struct {
 
 // syncOption represents one item in the resolution menu.
 type syncOption struct {
-	label   string
-	desc    string
-	warning bool // show a warning marker
+	label       string
+	desc        string
+	warning     bool // show a warning marker
 	recommended bool
 }
 
@@ -38,14 +38,14 @@ type syncOption struct {
 type syncState int
 
 const (
-	syncStateLoading       syncState = iota // fetching remote status
-	syncStateClean                          // up-to-date and clean, auto-proceeding
-	syncStateMenu                           // showing resolution menu
-	syncStateDirtyOnly                      // uncommitted changes but up-to-date
-	syncStateConfirmForce                   // confirming force pull
-	syncStateRunning                        // executing a pull action
-	syncStateDone                           // action complete, proceeding
-	syncStateError                          // action failed, returning to menu
+	syncStateLoading      syncState = iota // fetching remote status
+	syncStateClean                         // up-to-date and clean, auto-proceeding
+	syncStateMenu                          // showing resolution menu
+	syncStateDirtyOnly                     // uncommitted changes but up-to-date
+	syncStateConfirmForce                  // confirming force pull
+	syncStateRunning                       // executing a pull action
+	syncStateDone                          // action complete, proceeding
+	syncStateError                         // action failed, returning to menu
 )
 
 var syncSpinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -57,10 +57,10 @@ type syncModel struct {
 	height int
 	frame  int
 
-	state   syncState
-	result  syncResult
-	branch  string
-	remote  gitsync.Status
+	state    syncState
+	result   syncResult
+	branch   string
+	remote   gitsync.Status
 	workTree gitsync.WorkTree
 	fetchErr error // non-nil if fetch failed (offline mode)
 

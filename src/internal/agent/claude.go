@@ -116,11 +116,11 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 						desc := DescribeToolUse(block.Name, input)
 						p.Send(StatusMsg{Status: "Running tool"})
 						p.Send(ToolMsg{
-						Description: desc,
-						Type:        block.Name,
-						Params:      buildToolParams(block.Name, input),
-						Timestamp:   time.Now(),
-					})
+							Description: desc,
+							Type:        block.Name,
+							Params:      buildToolParams(block.Name, input),
+							Timestamp:   time.Now(),
+						})
 
 						if block.Name == "Skill" && input.Skill != "" {
 							p.Send(SkillMsg{Name: input.Skill})

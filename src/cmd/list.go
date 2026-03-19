@@ -451,7 +451,6 @@ func (m listModel) viewList() string {
 	return styles.Box.Render(sb.String()+"\n\n"+footer) + "\n"
 }
 
-
 func (m listModel) viewDetail() string {
 	if !m.detailReady {
 		return ""

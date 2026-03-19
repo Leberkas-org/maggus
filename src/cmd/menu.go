@@ -41,7 +41,9 @@ var allMenuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 	{name: "release", desc: "Generate RELEASE.md with changelog"},
 	{name: "clean", desc: "Remove completed plans and finished runs"},
-{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+	// Group 4: Repository management
+	{name: "repos", desc: "Manage configured repositories", separator: true},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
 }
@@ -153,14 +155,15 @@ func loadPlanSummary() planSummary {
 
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
-	items    []menuItem
-	cursor   int
-	selected string   // command name chosen by the user, empty if quit
-	args     []string // args to pass to the selected command
-	quitting bool
-	summary  planSummary
-	width    int
-	height   int
+	items         []menuItem
+	cursor        int
+	selected      string   // command name chosen by the user, empty if quit
+	args          []string // args to pass to the selected command
+	quitting      bool
+	summary       planSummary
+	width         int
+	height        int
+	cwd           string // current working directory, shown in header
 	is2x          bool   // true when Claude is in 2x mode (logo/border turn yellow)
 	twoXExpiresIn string // e.g. "17h 54m 44s" — only set when is2x is true
 
@@ -172,9 +175,11 @@ type menuModel struct {
 }
 
 func newMenuModel(summary planSummary) menuModel {
+	cwd, _ := os.Getwd()
 	return menuModel{
 		items:       activeMenuItems(),
 		summary:     summary,
+		cwd:         cwd,
 		subMenuDefs: buildSubMenus(),
 	}
 }
@@ -364,6 +369,13 @@ func (m menuModel) View() string {
 		centerLine(versionLine, contentW) + "\n" +
 		centerLine(summaryLine, contentW)
 
+	// Show current working directory below the summary
+	if m.cwd != "" {
+		cwdStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		cwdDisplay := truncateLeft(m.cwd, contentW-4)
+		header += "\n" + centerLine(cwdStyle.Render(cwdDisplay), contentW)
+	}
+
 	// Show 2x remaining time below the summary when active
 	if m.is2x && m.twoXExpiresIn != "" {
 		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
@@ -396,6 +408,17 @@ func centerBlock(block string, width int) string {
 		lines[i] = centerLine(line, width)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// truncateLeft truncates a path from the left, adding "..." prefix.
+func truncateLeft(path string, maxWidth int) string {
+	if maxWidth <= 0 || len(path) <= maxWidth {
+		return path
+	}
+	if maxWidth <= 3 {
+		return path[len(path)-maxWidth:]
+	}
+	return "..." + path[len(path)-(maxWidth-3):]
 }
 
 func (m menuModel) viewMainMenu() (string, string) {

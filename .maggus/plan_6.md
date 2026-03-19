@@ -61,16 +61,16 @@ Add a repository switching feature to Maggus so users can manage multiple projec
 **Description:** As a user, I want a "Repositories" entry in the main menu so I can switch between repos, add new ones, or remove existing ones.
 
 **Acceptance Criteria:**
-- [ ] New menu item "repos" added to the main menu between the project management group and exit
-- [ ] Selecting "repos" opens a repository management screen (not a sub-menu with options, but a dedicated bubbletea view)
-- [ ] The repository screen shows: a list of all configured repos with their paths, the currently active repo highlighted
-- [ ] Actions available: "Switch" (enter on a repo), "Add" (opens the file browser from TASK-003), "Remove" (removes selected repo from config)
-- [ ] Switching to a repo calls `os.Chdir()`, updates `last_opened`, reloads the plan summary, and returns to the main menu
-- [ ] Adding a repo via the file browser validates that the selected directory is a git repo before adding
-- [ ] If the selected directory is a git repo but has no `.maggus/` directory, ask whether to initialize it
-- [ ] Removing a repo only removes it from the global config — does not delete any files on disk
-- [ ] The current working directory is shown in the main menu header (e.g., below the plan summary line) so the user always knows which repo is active
-- [ ] Uses the existing styles package for consistent theming
+- [x] New menu item "repos" added to the main menu between the project management group and exit
+- [x] Selecting "repos" opens a repository management screen (not a sub-menu with options, but a dedicated bubbletea view)
+- [x] The repository screen shows: a list of all configured repos with their paths, the currently active repo highlighted
+- [x] Actions available: "Switch" (enter on a repo), "Add" (opens the file browser from TASK-003), "Remove" (removes selected repo from config)
+- [x] Switching to a repo calls `os.Chdir()`, updates `last_opened`, reloads the plan summary, and returns to the main menu
+- [x] Adding a repo via the file browser validates that the selected directory is a git repo before adding
+- [x] If the selected directory is a git repo but has no `.maggus/` directory, ask whether to initialize it
+- [x] Removing a repo only removes it from the global config — does not delete any files on disk
+- [x] The current working directory is shown in the main menu header (e.g., below the plan summary line) so the user always knows which repo is active
+- [x] Uses the existing styles package for consistent theming
 
 ### TASK-005: Display active repository in menu header
 **Description:** As a user, I want to see which repository I'm currently working in displayed in the main menu so I always have context.
