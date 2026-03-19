@@ -30,14 +30,14 @@ Add a repository switching feature to Maggus so users can manage multiple projec
 **Description:** As a user, I want Maggus to intelligently determine which repository to work in on startup so that I land in the right project automatically.
 
 **Acceptance Criteria:**
-- [ ] On startup, Maggus checks if the current working directory matches a configured repository — if yes, use it
-- [ ] If the current directory is a git repo but NOT in the configured list, prompt the user: "Add this repository?" (yes adds it and continues, no continues without adding)
-- [ ] If the current directory is neither a configured repo nor a git repo, switch to the `last_opened` repository from the global config
-- [ ] If `last_opened` is set but the path no longer exists, fall back to the first available configured repo
-- [ ] If no repositories are configured at all, stay in the current directory (existing behavior)
-- [ ] When a repository is selected (by any path), update `last_opened` in the global config
-- [ ] The actual `os.Chdir()` call is made so all subsequent operations (plan loading, config loading, git operations) work relative to the new directory
-- [ ] Unit tests cover all resolution branches (configured repo, unconfigured git repo, non-git directory, missing last_opened)
+- [x] On startup, Maggus checks if the current working directory matches a configured repository — if yes, use it
+- [x] If the current directory is a git repo but NOT in the configured list, prompt the user: "Add this repository?" (yes adds it and continues, no continues without adding)
+- [x] If the current directory is neither a configured repo nor a git repo, switch to the `last_opened` repository from the global config
+- [x] If `last_opened` is set but the path no longer exists, fall back to the first available configured repo
+- [x] If no repositories are configured at all, stay in the current directory (existing behavior)
+- [x] When a repository is selected (by any path), update `last_opened` in the global config
+- [x] The actual `os.Chdir()` call is made so all subsequent operations (plan loading, config loading, git operations) work relative to the new directory
+- [x] Unit tests cover all resolution branches (configured repo, unconfigured git repo, non-git directory, missing last_opened)
 
 ### TASK-003: TUI file browser for directory selection
 **Description:** As a user, I want a TUI file browser so I can navigate the filesystem and select a repository directory to add.
