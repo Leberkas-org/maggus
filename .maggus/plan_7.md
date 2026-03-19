@@ -105,13 +105,13 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a new user, I want a step-by-step tutorial that walks me through a real example project so that I can see maggus in action end-to-end.
 
 **Acceptance Criteria:**
-- [ ] New file `docs/guide/tutorial.md`
-- [ ] Walks through a concrete example: creating a small project, writing a plan with 2-3 tasks, running `maggus work`, inspecting the results
-- [ ] Includes the example plan inline (something simple like "add a greeting function and a test")
-- [ ] Shows expected terminal output at each step (simplified/abbreviated)
-- [ ] Explains how to check task status with `maggus status`
-- [ ] Explains what happens when a task is blocked and how to resolve it
-- [ ] Added to the VitePress sidebar navigation
+- [x] New file `docs/guide/tutorial.md`
+- [x] Walks through a concrete example: creating a small project, writing a plan with 2-3 tasks, running `maggus work`, inspecting the results
+- [x] Includes the example plan inline (something simple like "add a greeting function and a test")
+- [x] Shows expected terminal output at each step (simplified/abbreviated)
+- [x] Explains how to check task status with `maggus status`
+- [x] Explains what happens when a task is blocked and how to resolve it
+- [x] Added to the VitePress sidebar navigation
 
 ### TASK-009: Update configuration reference docs
 **Description:** As a user, I want up-to-date configuration reference docs so that I can understand all available settings.
