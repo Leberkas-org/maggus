@@ -15,11 +15,13 @@ type UpdateInfo struct {
 	TagName     string
 	DownloadURL string
 	IsNewer     bool
+	Body        string
 }
 
 // githubRelease represents the relevant fields from the GitHub Releases API.
 type githubRelease struct {
 	TagName string        `json:"tag_name"`
+	Body    string        `json:"body"`
 	Assets  []githubAsset `json:"assets"`
 }
 
@@ -76,6 +78,7 @@ func CheckLatestVersion(currentVersion string) UpdateInfo {
 		TagName:     release.TagName,
 		DownloadURL: downloadURL,
 		IsNewer:     isNewer,
+		Body:        release.Body,
 	}
 }
 

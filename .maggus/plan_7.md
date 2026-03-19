@@ -42,14 +42,14 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a user, I want a `maggus update` command so that I can manually check for and install updates.
 
 **Acceptance Criteria:**
-- [ ] New cobra command `update` registered in `src/cmd/update.go`
-- [ ] Calls `updater.CheckLatestVersion()` and displays current vs latest version
-- [ ] If no update available, prints "Already up to date (vX.Y.Z)"
-- [ ] If update available, shows changelog summary and asks for confirmation (y/n)
-- [ ] On confirmation, calls `updater.Apply()` with a progress indicator
-- [ ] Prints success message with new version and suggests restarting
-- [ ] When version is "dev", prints "Skipping update check — running a local dev build" and exits
-- [ ] Unit tests for the command output in each scenario (mock updater)
+- [x] New cobra command `update` registered in `src/cmd/update.go`
+- [x] Calls `updater.CheckLatestVersion()` and displays current vs latest version
+- [x] If no update available, prints "Already up to date (vX.Y.Z)"
+- [x] If update available, shows changelog summary and asks for confirmation (y/n)
+- [x] On confirmation, calls `updater.Apply()` with a progress indicator
+- [x] Prints success message with new version and suggests restarting
+- [x] When version is "dev", prints "Skipping update check — running a local dev build" and exits
+- [x] Unit tests for the command output in each scenario (mock updater)
 
 ### TASK-004: Add auto-update config option
 **Description:** As a user, I want to configure automatic updates in my global config so that maggus stays up-to-date without me running a command.

@@ -41,6 +41,7 @@ var allMenuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 	{name: "release", desc: "Generate RELEASE.md with changelog"},
 	{name: "clean", desc: "Remove completed plans and finished runs"},
+	{name: "update", desc: "Check for and install updates"},
 	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
 	// Group 4: Repository management
 	{name: "repos", desc: "Manage configured repositories", separator: true},
