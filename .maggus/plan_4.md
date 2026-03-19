@@ -92,9 +92,9 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `cmd/dispatch.go` so that the `dispatchWork` function is verified.
 
 **Acceptance Criteria:**
-- [ ] Test `dispatchWork` correctly finds and configures the work subcommand
-- [ ] Test that the `--task` flag is correctly set on the subcommand
-- [ ] Unit tests are written and successful
+- [x] Test `dispatchWork` correctly finds and configures the work subcommand
+- [x] Test that the `--task` flag is correctly set on the subcommand
+- [x] Unit tests are written and successful
 
 ### TASK-008: Add tests for init command
 **Description:** As a developer, I want tests for `cmd/init.go` so that project initialization is verified.
