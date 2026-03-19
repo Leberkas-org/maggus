@@ -55,10 +55,10 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a user, I want to configure automatic updates in my global config so that maggus stays up-to-date without me running a command.
 
 **Acceptance Criteria:**
-- [ ] New field `auto_update` in global config (`~/.maggus/config.yml`) with values: `"off"`, `"notify"` (default), `"auto"`
-- [ ] `globalconfig` package updated to read/write the new field
-- [ ] A `lastUpdateCheck` timestamp is stored in `~/.maggus/update_state.json` to enforce a 24h cooldown
-- [ ] Unit tests for config parsing with all three values and the cooldown logic
+- [x] New field `auto_update` in global config (`~/.maggus/config.yml`) with values: `"off"`, `"notify"` (default), `"auto"`
+- [x] `globalconfig` package updated to read/write the new field
+- [x] A `lastUpdateCheck` timestamp is stored in `~/.maggus/update_state.json` to enforce a 24h cooldown
+- [x] Unit tests for config parsing with all three values and the cooldown logic
 
 ### TASK-005: Integrate update check into startup
 **Description:** As a user, I want maggus to check for updates on startup so that I'm notified or auto-updated based on my config.

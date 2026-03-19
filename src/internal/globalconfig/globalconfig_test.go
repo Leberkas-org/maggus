@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoadFrom_NonExistent(t *testing.T) {
@@ -199,5 +200,170 @@ func TestLoadSaveRoundTrip_EmptyConfig(t *testing.T) {
 	}
 	if loaded.LastOpened != "" {
 		t.Fatalf("expected empty last_opened, got %q", loaded.LastOpened)
+	}
+}
+
+// --- Settings tests ---
+
+func TestLoadSettingsFrom_NonExistent(t *testing.T) {
+	s, err := LoadSettingsFrom(filepath.Join(t.TempDir(), "nope.yml"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if s.AutoUpdate != AutoUpdateNotify {
+		t.Fatalf("expected default notify, got %q", s.AutoUpdate)
+	}
+}
+
+func TestLoadSettingsFrom_AllValues(t *testing.T) {
+	for _, mode := range []AutoUpdateMode{AutoUpdateOff, AutoUpdateNotify, AutoUpdateAuto} {
+		path := filepath.Join(t.TempDir(), string(mode)+".yml")
+		os.WriteFile(path, []byte("auto_update: "+string(mode)+"\n"), 0o644)
+
+		s, err := LoadSettingsFrom(path)
+		if err != nil {
+			t.Fatalf("mode %q: %v", mode, err)
+		}
+		if s.AutoUpdate != mode {
+			t.Fatalf("expected %q, got %q", mode, s.AutoUpdate)
+		}
+	}
+}
+
+func TestLoadSettingsFrom_EmptyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "empty.yml")
+	os.WriteFile(path, []byte(""), 0o644)
+
+	s, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.AutoUpdate != AutoUpdateNotify {
+		t.Fatalf("expected default notify for empty file, got %q", s.AutoUpdate)
+	}
+}
+
+func TestLoadSettingsFrom_InvalidValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.yml")
+	os.WriteFile(path, []byte("auto_update: bogus\n"), 0o644)
+
+	_, err := LoadSettingsFrom(path)
+	if err == nil {
+		t.Fatal("expected error for invalid auto_update value")
+	}
+}
+
+func TestLoadSettingsFrom_InvalidYAML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.yml")
+	os.WriteFile(path, []byte(":::not yaml\n\t\tbad"), 0o644)
+
+	_, err := LoadSettingsFrom(path)
+	if err == nil {
+		t.Fatal("expected error for invalid YAML")
+	}
+}
+
+func TestSaveAndLoadSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+
+	s := Settings{AutoUpdate: AutoUpdateAuto}
+	if err := SaveSettingsTo(s, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.AutoUpdate != AutoUpdateAuto {
+		t.Fatalf("expected auto, got %q", loaded.AutoUpdate)
+	}
+}
+
+// --- UpdateState tests ---
+
+func TestLoadUpdateStateFrom_NonExistent(t *testing.T) {
+	state, err := LoadUpdateStateFrom(filepath.Join(t.TempDir(), "nope.json"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !state.LastUpdateCheck.IsZero() {
+		t.Fatalf("expected zero time, got %v", state.LastUpdateCheck)
+	}
+}
+
+func TestSaveAndLoadUpdateState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	now := time.Date(2026, 3, 19, 12, 0, 0, 0, time.UTC)
+
+	if err := SaveUpdateStateTo(UpdateState{LastUpdateCheck: now}, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	state, err := LoadUpdateStateFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !state.LastUpdateCheck.Equal(now) {
+		t.Fatalf("expected %v, got %v", now, state.LastUpdateCheck)
+	}
+}
+
+func TestLoadUpdateStateFrom_InvalidJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.json")
+	os.WriteFile(path, []byte("{invalid"), 0o644)
+
+	_, err := LoadUpdateStateFrom(path)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// --- Cooldown tests ---
+
+func TestShouldCheckUpdate_ZeroTime(t *testing.T) {
+	if !ShouldCheckUpdate(UpdateState{}, time.Now()) {
+		t.Fatal("should check when LastUpdateCheck is zero")
+	}
+}
+
+func TestShouldCheckUpdate_RecentCheck(t *testing.T) {
+	now := time.Now()
+	state := UpdateState{LastUpdateCheck: now.Add(-1 * time.Hour)}
+	if ShouldCheckUpdate(state, now) {
+		t.Fatal("should NOT check when last check was 1 hour ago")
+	}
+}
+
+func TestShouldCheckUpdate_OldCheck(t *testing.T) {
+	now := time.Now()
+	state := UpdateState{LastUpdateCheck: now.Add(-25 * time.Hour)}
+	if !ShouldCheckUpdate(state, now) {
+		t.Fatal("should check when last check was 25 hours ago")
+	}
+}
+
+func TestShouldCheckUpdate_Exactly24h(t *testing.T) {
+	now := time.Now()
+	state := UpdateState{LastUpdateCheck: now.Add(-24 * time.Hour)}
+	if !ShouldCheckUpdate(state, now) {
+		t.Fatal("should check when exactly 24h have passed")
+	}
+}
+
+// --- AutoUpdateMode validation ---
+
+func TestAutoUpdateMode_IsValid(t *testing.T) {
+	if !AutoUpdateOff.IsValid() {
+		t.Fatal("off should be valid")
+	}
+	if !AutoUpdateNotify.IsValid() {
+		t.Fatal("notify should be valid")
+	}
+	if !AutoUpdateAuto.IsValid() {
+		t.Fatal("auto should be valid")
+	}
+	if AutoUpdateMode("bogus").IsValid() {
+		t.Fatal("bogus should not be valid")
 	}
 }
