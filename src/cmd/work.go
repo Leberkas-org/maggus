@@ -12,11 +12,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitignore"
+	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
@@ -150,6 +152,37 @@ Examples:
 		repoDir := dir
 		workDir := dir
 
+		// Git sync check: detect remote changes and uncommitted work before starting.
+		syncDir := dir
+		var syncInfoMsg string
+
+		fetchErr := gitsync.FetchRemote(syncDir)
+		remoteStatus, _ := gitsync.RemoteStatus(syncDir)
+		workTreeStatus, _ := gitsync.WorkingTreeStatus(syncDir)
+
+		hasDirty := workTreeStatus.HasUncommittedChanges || workTreeStatus.HasUntrackedFiles
+		isBehind := remoteStatus.HasRemote && remoteStatus.Behind > 0
+
+		if !remoteStatus.HasRemote {
+			// No remote configured: silently skip
+		} else if isBehind || hasDirty {
+			// Behind remote or uncommitted changes: show interactive sync TUI
+			result, syncErr := runGitSyncTUI(syncDir)
+			if syncErr != nil {
+				return syncErr
+			}
+			if result.action == syncAbort {
+				return nil
+			}
+			if result.message != "" {
+				syncInfoMsg = result.message
+			}
+		} else if fetchErr != nil {
+			syncInfoMsg = "⚠ Could not reach remote — working offline"
+		} else {
+			syncInfoMsg = fmt.Sprintf("✓ Branch up to date with %s", remoteStatus.RemoteBranch)
+		}
+
 		// Run-again loop: allows the user to start another batch from the summary screen.
 		for {
 		tasks, err := parser.ParsePlans(dir)
@@ -165,22 +198,64 @@ Examples:
 		// Mark any fully completed plan files before checking for work
 		_ = parser.MarkCompletedPlans(dir)
 
-		// Check if there are any incomplete tasks
-		nextTask := parser.FindNextIncomplete(tasks)
-		if nextTask == nil {
-			cmd.Println("All tasks are complete! Nothing to do.")
-			return nil
+		// Check if there are any tasks to work on.
+		// When --task targets a specific task, look for that task directly;
+		// otherwise find the next workable (incomplete + not blocked) task.
+		var nextTask *parser.Task
+		if taskFlag != "" {
+			nextTask = findTaskByID(tasks, taskFlag)
+			if nextTask == nil {
+				cmd.Printf("Task %s not found or already complete.\n", taskFlag)
+				return nil
+			}
+		} else {
+			nextTask = parser.FindNextIncomplete(tasks)
+			if nextTask == nil {
+				// Distinguish between "all complete" and "remaining are blocked/ignored".
+				hasIgnored := false
+				hasBlocked := false
+				for i := range tasks {
+					if !tasks[i].IsComplete() {
+						if tasks[i].Ignored {
+							hasIgnored = true
+						}
+						if tasks[i].IsBlocked() {
+							hasBlocked = true
+						}
+					}
+				}
+				if hasIgnored || hasBlocked {
+					msg := "No workable tasks — remaining tasks are"
+					switch {
+					case hasBlocked && hasIgnored:
+						msg += " blocked or ignored."
+					case hasIgnored:
+						msg += " ignored."
+					default:
+						msg += " blocked."
+					}
+					cmd.Println(msg)
+				} else {
+					cmd.Println("All tasks are complete! Nothing to do.")
+				}
+				return nil
+			}
 		}
 
 		// Cap count to the number of workable tasks so the progress bar is accurate.
-		workable := 0
-		for i := range tasks {
-			if tasks[i].IsWorkable() {
-				workable++
+		// When --task is set, always allow at least 1 (the user explicitly chose it).
+		if taskFlag != "" {
+			count = 1
+		} else {
+			workable := 0
+			for i := range tasks {
+				if tasks[i].IsWorkable() {
+					workable++
+				}
 			}
-		}
-		if workable < count {
-			count = workable
+			if workable < count {
+				count = workable
+			}
 		}
 
 		// Create run tracker
@@ -240,6 +315,9 @@ Examples:
 			workCancel()
 		}
 
+		// Fetch 2x status (non-blocking with 3s timeout inside FetchStatus).
+		twoXStatus := claude2x.FetchStatus()
+
 		// Create the persistent TUI with banner info — starts immediately, no countdown.
 		banner := runner.BannerInfo{
 			Iterations: count,
@@ -251,7 +329,14 @@ Examples:
 		if useWorktree {
 			banner.Worktree = workDir
 		}
+		if twoXStatus.Is2x {
+			banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
+		}
+		// Wire gitsync functions into the runner TUI for between-task sync checks.
+		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
+
 		m := runner.NewTUIModel(resolvedModel, Version, hostFingerprint, tuiCancel, banner)
+		m.SetSyncDir(workDir)
 		stopFlag := m.StopFlag()
 		m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 			planRel := tu.PlanFile
@@ -299,9 +384,19 @@ Examples:
 			if branchMsg != "" {
 				p.Send(runner.InfoMsg{Text: branchMsg})
 			}
+			if syncInfoMsg != "" {
+				p.Send(runner.InfoMsg{Text: syncInfoMsg})
+			}
 
 			stopReason := runner.StopReasonComplete
 			var errorDetail string
+
+			// Log ignored tasks at the start so the user knows what's being skipped.
+			for i := range tasks {
+				if !tasks[i].IsComplete() && tasks[i].Ignored {
+					p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", tasks[i].ID)})
+				}
+			}
 
 			for i := 0; i < count; i++ {
 				if workCtx.Err() != nil {
@@ -435,6 +530,48 @@ Examples:
 
 				// Update progress to reflect completed iteration.
 				p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
+
+				// Between-task sync check: detect if remote changed while working.
+				// Skip on the final iteration (push happens next anyway).
+				if i < count-1 {
+					if workCtx.Err() != nil {
+						break
+					}
+					fetchErr := gitsync.FetchRemote(workDir)
+					if fetchErr != nil {
+						// Fetch failed (offline) — warn and continue
+						p.Send(runner.InfoMsg{Text: "⚠ Could not reach remote between tasks — continuing offline"})
+					} else {
+						rs, rsErr := gitsync.RemoteStatus(workDir)
+						if rsErr == nil && rs.HasRemote && rs.Behind > 0 {
+							// Remote is ahead — show sync TUI and block until resolved
+							resultCh := make(chan runner.SyncCheckResult, 1)
+							p.Send(runner.SyncCheckMsg{
+								Behind:       rs.Behind,
+								Ahead:        rs.Ahead,
+								RemoteBranch: rs.RemoteBranch,
+								ResultCh:     resultCh,
+							})
+							// Wait for user's choice (or context cancellation)
+							select {
+							case result := <-resultCh:
+								if result.Action == runner.SyncAbort {
+									stopReason = runner.StopReasonInterrupted
+									break
+								}
+								if result.Message != "" {
+									p.Send(runner.InfoMsg{Text: result.Message})
+								}
+							case <-workCtx.Done():
+								stopReason = runner.StopReasonInterrupted
+							}
+							if stopReason == runner.StopReasonInterrupted {
+								break
+							}
+						}
+						// Up-to-date: continue without interruption
+					}
+				}
 			}
 
 			// Build summary data.

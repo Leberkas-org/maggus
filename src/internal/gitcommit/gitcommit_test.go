@@ -200,11 +200,19 @@ func TestCommitIteration_NothingStaged(t *testing.T) {
 	// Unstage it so nothing is staged
 	run(t, dir, "git", "reset", "HEAD", commitFile)
 
-	_, err := CommitIteration(dir)
-	if err == nil {
-		t.Error("expected error when nothing is staged")
+	result, err := CommitIteration(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "git commit failed") {
-		t.Errorf("expected git commit failure, got: %v", err)
+	if result.Committed {
+		t.Error("expected Committed=false when nothing is staged")
+	}
+	if !strings.Contains(result.Message, "No changes to commit") {
+		t.Errorf("expected 'No changes to commit' message, got: %s", result.Message)
+	}
+
+	// Verify COMMIT.md was cleaned up
+	if _, err := os.Stat(filepath.Join(dir, commitFile)); !os.IsNotExist(err) {
+		t.Error("expected COMMIT.md to be deleted after no-op commit")
 	}
 }

@@ -345,6 +345,80 @@ func TestListTUIScrolling(t *testing.T) {
 	}
 }
 
+func TestListPlainShowsIgnoredTasks(t *testing.T) {
+	dir := t.TempDir()
+	plan := `# Plan: Test
+
+## User Stories
+
+### TASK-001: Workable task
+**Description:** Do thing.
+**Acceptance Criteria:**
+- [ ] Criterion A
+
+### IGNORED TASK-002: Ignored task
+**Description:** Skipped thing.
+**Acceptance Criteria:**
+- [ ] Criterion B
+`
+	writeListPlan(t, dir, "plan_1.md", plan)
+	out := runListCmd(t, dir, "--all")
+
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected TASK-001 in plain output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TASK-002") {
+		t.Errorf("expected ignored TASK-002 in plain output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[~]") {
+		t.Errorf("expected [~] marker for ignored task, got:\n%s", out)
+	}
+}
+
+func TestListPlainShowsIgnoredPlanTasks(t *testing.T) {
+	dir := t.TempDir()
+	plan := `# Plan: Ignored Plan
+
+## User Stories
+
+### TASK-001: Task in ignored plan
+**Description:** Do thing.
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	writeListPlan(t, dir, "plan_1_ignored.md", plan)
+	out := runListCmd(t, dir, "--all")
+
+	if !strings.Contains(out, "TASK-001") {
+		t.Errorf("expected TASK-001 from ignored plan in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[~]") {
+		t.Errorf("expected [~] marker for task from ignored plan, got:\n%s", out)
+	}
+}
+
+func TestListTUIShowsIgnoredTasks(t *testing.T) {
+	tasks := []parser.Task{
+		{ID: "TASK-001", Title: "Workable task", SourceFile: "plan_1.md",
+			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
+		{ID: "TASK-002", Title: "Ignored task", SourceFile: "plan_1.md",
+			Ignored: true,
+			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
+	}
+	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	content := m.viewList()
+
+	if !strings.Contains(content, "TASK-001") {
+		t.Errorf("expected TASK-001 in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "TASK-002") {
+		t.Errorf("expected ignored TASK-002 in TUI content, got:\n%s", content)
+	}
+	if !strings.Contains(content, "~") {
+		t.Errorf("expected ~ icon for ignored task in TUI content, got:\n%s", content)
+	}
+}
+
 func TestListPlainStillShowsWorkableOnly(t *testing.T) {
 	dir := t.TempDir()
 	plan := `# Plan: Test

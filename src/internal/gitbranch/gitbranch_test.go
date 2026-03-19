@@ -37,6 +37,9 @@ func TestFeatureBranchName(t *testing.T) {
 		{"TASK-003", "feature/maggustask-003"},
 		{"TASK-042", "feature/maggustask-042"},
 		{"TASK-100", "feature/maggustask-100"},
+		{"TASK-008", "feature/maggustask-008"},
+		{"TASK-1-E05", "feature/maggustask-1-e05"},
+		{"TASK-2-A01", "feature/maggustask-2-a01"},
 		{"INVALID", "feature/maggustask-000"},
 	}
 

@@ -205,6 +205,60 @@ func fullScreenInner(width, height int) (int, int) {
 	return innerW, innerH
 }
 
+// ThemeColor returns Warning (yellow) when is2x is true, otherwise Primary (cyan).
+// Used to dynamically switch logo and border colors based on Claude 2x status.
+func ThemeColor(is2x bool) lipgloss.Color {
+	if is2x {
+		return Warning
+	}
+	return Primary
+}
+
+// FullScreenColor is like FullScreen but allows overriding the border color.
+func FullScreenColor(content, footer string, width, height int, borderColor lipgloss.Color) string {
+	innerW, innerH := fullScreenInner(width, height)
+
+	padLeft := (innerW - maxContentWidth) / 2
+	if padLeft < 0 {
+		padLeft = 0
+	}
+
+	if padLeft > 0 {
+		prefix := strings.Repeat(" ", padLeft)
+		lines := strings.Split(content, "\n")
+		for i, l := range lines {
+			if l != "" {
+				lines[i] = prefix + l
+			}
+		}
+		content = strings.Join(lines, "\n")
+	}
+
+	contentLines := strings.Count(content, "\n") + 1
+
+	var body string
+	if footer != "" {
+		centeredFooter := centerFooter(footer, innerW)
+		footerLineCount := strings.Count(centeredFooter, "\n") + 1
+
+		gap := innerH - contentLines - footerLineCount
+		if gap < 0 {
+			gap = 0
+		}
+		body = content + strings.Repeat("\n", gap) + centeredFooter
+	} else {
+		body = content
+	}
+
+	box := Box.
+		BorderForeground(borderColor).
+		Width(innerW + 2).
+		Height(innerH).
+		Render(body)
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+}
+
 // Truncate truncates text to maxWidth characters, adding "..." if truncated.
 func Truncate(text string, maxWidth int) string {
 	if maxWidth <= 0 {

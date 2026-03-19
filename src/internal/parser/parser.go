@@ -11,7 +11,10 @@ import (
 	"strings"
 )
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+(TASK-[\w-]+?):\s+(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?(TASK-[\w-]+?):\s+(.+)$`)
+
+// TaskHeadingRe is the exported task heading regex for use by other packages (e.g. ignore/unignore commands).
+var TaskHeadingRe = taskHeadingRe
 
 type Criterion struct {
 	Text    string
@@ -25,6 +28,13 @@ type Task struct {
 	Description string
 	Criteria    []Criterion
 	SourceFile  string
+	Ignored     bool
+}
+
+type Plan struct {
+	File    string
+	Ignored bool
+	Tasks   []Task
 }
 
 func (t *Task) IsComplete() bool {
@@ -49,9 +59,9 @@ func (t *Task) IsBlocked() bool {
 	return false
 }
 
-// IsWorkable returns true if the task is incomplete and not blocked.
+// IsWorkable returns true if the task is incomplete, not blocked, and not ignored.
 func (t *Task) IsWorkable() bool {
-	return !t.IsComplete() && !t.IsBlocked()
+	return !t.IsComplete() && !t.IsBlocked() && !t.Ignored
 }
 
 // ParseFile parses a single plan markdown file and returns all tasks found in it.
@@ -78,9 +88,10 @@ func ParseFile(path string) ([]Task, error) {
 				tasks = append(tasks, *current)
 			}
 			current = &Task{
-				ID:         m[1],
-				Title:      strings.TrimSpace(m[2]),
+				ID:         m[2],
+				Title:      strings.TrimSpace(m[3]),
 				SourceFile: path,
+				Ignored:    m[1] == "IGNORED",
 			}
 			inDescription = false
 
@@ -201,9 +212,15 @@ func GlobPlanFiles(dir string, includeCompleted bool) ([]string, error) {
 	return filtered, nil
 }
 
+// IsIgnoredFile returns true if the given path is an ignored plan file (ends with _ignored.md).
+func IsIgnoredFile(path string) bool {
+	return strings.HasSuffix(path, "_ignored.md")
+}
+
 // ParsePlans finds all .maggus/plan_*.md files in the given directory and parses them.
 // Files ending in _completed.md are excluded.
 // Tasks are returned in order: files sorted by name, tasks in document order within each file.
+// Tasks from _ignored plan files have Ignored set to true.
 func ParsePlans(dir string) ([]Task, error) {
 	files, err := GlobPlanFiles(dir, false)
 	if err != nil {
@@ -216,10 +233,47 @@ func ParsePlans(dir string) ([]Task, error) {
 		if err != nil {
 			return nil, err
 		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
 		allTasks = append(allTasks, tasks...)
 	}
 
 	return allTasks, nil
+}
+
+// ParsePlansGrouped finds all .maggus/plan_*.md files and returns them as Plan structs.
+// Files ending in _completed.md are excluded.
+// Plans from _ignored files have Ignored set to true, and all their tasks inherit this flag.
+func ParsePlansGrouped(dir string) ([]Plan, error) {
+	files, err := GlobPlanFiles(dir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var plans []Plan
+	for _, f := range files {
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return nil, err
+		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		plans = append(plans, Plan{
+			File:    f,
+			Ignored: ignored,
+			Tasks:   tasks,
+		})
+	}
+
+	return plans, nil
 }
 
 // planNumberRe extracts the numeric part from plan filenames like "plan_10.md" or "plan_3_completed.md".
@@ -299,7 +353,7 @@ func DeleteTask(filePath string, taskID string) error {
 
 	for i, line := range lines {
 		if m := taskHeadingRe.FindStringSubmatch(line); m != nil {
-			if m[1] == taskID {
+			if m[2] == taskID {
 				// Found the task — also consume blank lines before the heading
 				start = i
 				for start > 0 && strings.TrimSpace(lines[start-1]) == "" {

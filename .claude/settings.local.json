@@ -16,7 +16,13 @@
       "Read(*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:opencode.ai)"
+      "WebFetch(domain:opencode.ai)",
+      "Bash(done)",
+      "Bash(find /c/Users/11001103/GIT/maggus/src -type d -name testdata -o -type d -name fixtures -o -name *_test.go -o -name *helpers*.go)",
+      "Bash(wc -l /c/Users/11001103/GIT/maggus/src/internal/*/*.go /c/Users/11001103/GIT/maggus/src/cmd/*.go)",
+      "Bash(__NEW_LINE_e8c73d84caf5a8ed__ echo:*)",
+      "Bash(while read:*)",
+      "Bash(do wc:*)"
     ]
   }
 }

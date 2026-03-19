@@ -374,6 +374,7 @@ func (m listModel) viewList() string {
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	blockedStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+	ignoredStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 	mutedStyle := lipgloss.NewStyle().Faint(true)
 	normalStyle := lipgloss.NewStyle()
 
@@ -399,9 +400,12 @@ func (m listModel) viewList() string {
 		t := m.tasks[i]
 		planFile := mutedStyle.Render(filepath.Base(t.SourceFile))
 		blocked := t.IsBlocked()
+		ignored := t.Ignored
 
 		var icon string
-		if blocked {
+		if ignored {
+			icon = ignoredStyle.Render("~")
+		} else if blocked {
 			icon = blockedStyle.Render("⊘")
 		} else {
 			icon = " "
@@ -414,6 +418,11 @@ func (m listModel) viewList() string {
 				cursorStyle.Render("→"),
 				icon,
 				selectedStyle.Render(label),
+				planFile)
+		} else if ignored {
+			fmt.Fprintf(&sb, "   %s %s  %s\n",
+				icon,
+				ignoredStyle.Render(label),
 				planFile)
 		} else if blocked {
 			fmt.Fprintf(&sb, "   %s %s  %s\n",
@@ -458,7 +467,7 @@ func (m listModel) viewDetail() string {
 }
 
 // renderListPlain builds the plain-text list output (no ANSI, no TUI).
-func renderListPlain(workable []parser.Task, all bool, agentName string) string {
+func renderListPlain(workable []parser.Task, ignored []parser.Task, all bool, agentName string) string {
 	var sb strings.Builder
 
 	if all {
@@ -469,13 +478,21 @@ func renderListPlain(workable []parser.Task, all bool, agentName string) string 
 	fmt.Fprintf(&sb, "Agent: %s\n", agentName)
 	fmt.Fprintln(&sb)
 
+	idx := 1
+	// Merge workable and ignored tasks in order, but workable first then ignored
 	for i, t := range workable {
 		planFile := filepath.Base(t.SourceFile)
 		if i == 0 {
-			fmt.Fprintf(&sb, " -> #%-2d %s: %s  %s\n", i+1, t.ID, t.Title, planFile)
+			fmt.Fprintf(&sb, " -> #%-2d %s: %s  %s\n", idx, t.ID, t.Title, planFile)
 		} else {
-			fmt.Fprintf(&sb, "    #%-2d %s: %s  %s\n", i+1, t.ID, t.Title, planFile)
+			fmt.Fprintf(&sb, "    #%-2d %s: %s  %s\n", idx, t.ID, t.Title, planFile)
 		}
+		idx++
+	}
+	for _, t := range ignored {
+		planFile := filepath.Base(t.SourceFile)
+		fmt.Fprintf(&sb, " [~]#%-2d %s: %s  %s\n", idx, t.ID, t.Title, planFile)
+		idx++
 	}
 
 	return sb.String()
@@ -534,14 +551,23 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 
 	// Collect tasks from all active plan files
 	var workable []parser.Task
+	var ignored []parser.Task
 	var incomplete []parser.Task
 	for _, f := range files {
 		tasks, err := parser.ParseFile(f)
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", f, err)
 		}
+		fileIgnored := parser.IsIgnoredFile(f)
+		for i := range tasks {
+			if fileIgnored {
+				tasks[i].Ignored = true
+			}
+		}
 		for _, t := range tasks {
-			if t.IsWorkable() {
+			if t.Ignored {
+				ignored = append(ignored, t)
+			} else if t.IsWorkable() {
 				workable = append(workable, t)
 			}
 			if !t.IsComplete() {
@@ -551,15 +577,15 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	}
 
 	if plain {
-		// Plain mode: workable only, respects --count and --all
-		if len(workable) == 0 {
+		// Plain mode: workable + ignored, respects --count and --all for workable
+		if len(workable) == 0 && len(ignored) == 0 {
 			fmt.Fprintln(cmd.OutOrStdout(), "No pending tasks found. All done!")
 			return nil
 		}
 		if !all && count < len(workable) {
 			workable = workable[:count]
 		}
-		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, all, agentName))
+		fmt.Fprint(cmd.OutOrStdout(), renderListPlain(workable, ignored, all, agentName))
 		return nil
 	}
 

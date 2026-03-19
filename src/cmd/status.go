@@ -20,17 +20,19 @@ const progressBarWidth = 10
 
 // Lipgloss styles for the status command.
 var (
-	statusGreenStyle  = lipgloss.NewStyle().Foreground(styles.Success)
-	statusCyanStyle   = lipgloss.NewStyle().Foreground(styles.Primary)
-	statusRedStyle = lipgloss.NewStyle().Foreground(styles.Error)
-	statusDimStyle = lipgloss.NewStyle().Faint(true)
-	statusDimGreen    = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
+	statusGreenStyle   = lipgloss.NewStyle().Foreground(styles.Success)
+	statusCyanStyle    = lipgloss.NewStyle().Foreground(styles.Primary)
+	statusRedStyle     = lipgloss.NewStyle().Foreground(styles.Error)
+	statusDimStyle     = lipgloss.NewStyle().Faint(true)
+	statusDimGreen     = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
+	statusIgnoredStyle = lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 )
 
 type planInfo struct {
 	filename  string
 	tasks     []parser.Task
 	completed bool // filename contains _completed
+	ignored   bool // filename contains _ignored
 }
 
 func (p *planInfo) doneCount() int {
@@ -91,6 +93,9 @@ type statusModel struct {
 	confirmDelete bool
 	deleteErr     string
 	dir           string // working directory for file operations
+
+	// Temporary status note (e.g. "plan is already ignored")
+	statusNote string
 
 	// Criteria mode state (shared detail component)
 	detail detailState
@@ -217,6 +222,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Clear status note on any key except alt+i/alt+p
+	if msg.String() != "alt+i" && msg.String() != "alt+p" {
+		m.statusNote = ""
+	}
 	switch msg.String() {
 	case "tab", "right":
 		// Next plan tab (wraps around)
@@ -253,6 +262,83 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
+	case "alt+i":
+		if len(m.selectableTasks) == 0 {
+			return m, nil
+		}
+		t := m.selectableTasks[m.cursor]
+		// Clear any previous note
+		m.statusNote = ""
+		// Show note if plan is ignored, but still toggle
+		visible := m.visiblePlans()
+		if m.selectedPlan < len(visible) && visible[m.selectedPlan].ignored {
+			m.statusNote = "plan is already ignored"
+		}
+		// Toggle: if task is ignored, remove prefix; if not, add prefix
+		if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
+			m.statusNote = "error: " + err.Error()
+			return m, nil
+		}
+		// Remember current task ID for cursor restore
+		cursorTaskID := t.ID
+		// Reload plans from disk
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		m.rebuildForSelectedPlan()
+		// Restore cursor to same logical task
+		for i, st := range m.selectableTasks {
+			if st.ID == cursorTaskID {
+				m.cursor = i
+				break
+			}
+		}
+		m.ensureCursorVisible()
+		return m, nil
+	case "alt+p":
+		m.statusNote = ""
+		visible := m.visiblePlans()
+		if m.selectedPlan >= len(visible) {
+			return m, nil
+		}
+		p := visible[m.selectedPlan]
+		// Completed plans cannot be ignored — silent no-op
+		if p.completed {
+			return m, nil
+		}
+		// Toggle: rename file
+		fullPath := filepath.Join(m.dir, ".maggus", p.filename)
+		var newPath string
+		if p.ignored {
+			newPath = strings.TrimSuffix(fullPath, "_ignored.md") + ".md"
+		} else {
+			newPath = strings.TrimSuffix(fullPath, ".md") + "_ignored.md"
+		}
+		if err := os.Rename(fullPath, newPath); err != nil {
+			m.statusNote = "error: " + err.Error()
+			return m, nil
+		}
+		// Remember the new filename base for cursor restore
+		newBase := filepath.Base(newPath)
+		// Reload plans from disk
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		// Restore tab selection to the same plan (by new filename)
+		newVisible := m.visiblePlans()
+		m.selectedPlan = 0
+		for i, vp := range newVisible {
+			if vp.filename == newBase {
+				m.selectedPlan = i
+				break
+			}
+		}
+		m.rebuildForSelectedPlan()
+		return m, nil
 	case "alt+backspace":
 		if len(m.selectableTasks) > 0 {
 			m.confirmDelete = true
@@ -315,6 +401,45 @@ func (m statusModel) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
+	case "alt+i":
+		t := m.selectableTasks[m.cursor]
+		if t.IsComplete() {
+			m.statusNote = "cannot ignore a completed task"
+			m.refreshDetailViewport()
+			return m, nil
+		}
+		m.statusNote = ""
+		// Show note if plan is ignored
+		visible := m.visiblePlans()
+		if m.selectedPlan < len(visible) && visible[m.selectedPlan].ignored {
+			m.statusNote = "plan is already ignored"
+		}
+		if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
+			m.statusNote = "error: " + err.Error()
+			m.refreshDetailViewport()
+			return m, nil
+		}
+		cursorTaskID := t.ID
+		plans, err := parsePlans(m.dir)
+		if err == nil {
+			m.plans = plans
+			m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		}
+		m.rebuildForSelectedPlan()
+		for i, st := range m.selectableTasks {
+			if st.ID == cursorTaskID {
+				m.cursor = i
+				break
+			}
+		}
+		m.ensureCursorVisible()
+		// Reload task and refresh detail viewport
+		if updated := reloadTask(m.selectableTasks[m.cursor].SourceFile, m.selectableTasks[m.cursor].ID); updated != nil {
+			m.selectableTasks[m.cursor] = *updated
+		}
+		m.detail.exitCriteriaMode()
+		m.refreshDetailViewport()
+		return m, nil
 	case "alt+r":
 		m.runTaskID = m.selectableTasks[m.cursor].ID
 		return m, tea.Quit
@@ -443,6 +568,10 @@ func (m statusModel) updateActionPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *statusModel) refreshDetailViewport() {
 	content := renderDetailContent(m.selectableTasks[m.cursor], &m.detail)
+	if m.statusNote != "" {
+		mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		content += "\n" + mutedStyle.Render("  "+m.statusNote)
+	}
 	m.detailViewport.SetContent(content)
 }
 
@@ -539,17 +668,30 @@ func (m statusModel) renderTabBar() string {
 
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	ignoredTabStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 
 	var tabs []string
 	for i, p := range visible {
 		done := p.doneCount()
 		total := len(p.tasks)
 		name := strings.TrimSuffix(p.filename, ".md")
-		label := fmt.Sprintf(" %s %d/%d ", name, done, total)
+		prefix := ""
+		if p.ignored {
+			prefix = "~"
+		}
+		label := fmt.Sprintf(" %s%s %d/%d ", prefix, name, done, total)
 		if i == m.selectedPlan {
-			tabs = append(tabs, selectedStyle.Render(label))
+			if p.ignored {
+				tabs = append(tabs, ignoredTabStyle.Bold(true).Render(label))
+			} else {
+				tabs = append(tabs, selectedStyle.Render(label))
+			}
 		} else {
-			tabs = append(tabs, unselectedStyle.Render(label))
+			if p.ignored {
+				tabs = append(tabs, ignoredTabStyle.Render(label))
+			} else {
+				tabs = append(tabs, unselectedStyle.Render(label))
+			}
 		}
 	}
 
@@ -667,7 +809,10 @@ func (m statusModel) viewStatus() string {
 			var icon string
 			var style lipgloss.Style
 
-			if t.IsComplete() {
+			if t.Ignored {
+				icon = "~"
+				style = statusIgnoredStyle
+			} else if t.IsComplete() {
 				icon = "✓"
 				if p.completed {
 					style = statusDimGreen
@@ -726,11 +871,17 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 
+	// Status note (e.g. "plan is already ignored")
+	if m.statusNote != "" {
+		sb.WriteString("\n")
+		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
+	}
+
 	toggleHint := "alt+a: show all"
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore plan · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.width, m.height)
@@ -781,6 +932,8 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		fmt.Fprintln(w)
 		if p.completed {
 			fmt.Fprintf(w, " Tasks — %s (archived)\n", p.filename)
+		} else if p.ignored {
+			fmt.Fprintf(w, " Tasks — [~] %s (ignored)\n", p.filename)
 		} else {
 			fmt.Fprintf(w, " Tasks — %s\n", p.filename)
 		}
@@ -789,7 +942,10 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		for _, t := range p.tasks {
 			var icon, prefix string
 
-			if t.IsComplete() {
+			if t.Ignored {
+				icon = "[~]"
+				prefix = "  "
+			} else if t.IsComplete() {
 				icon = "[x]"
 				prefix = "  "
 			} else if t.IsBlocked() {
@@ -849,6 +1005,9 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		if p.completed {
 			prefix = " [x] "
 			suffix = "done"
+		} else if p.ignored {
+			prefix = " [~] "
+			suffix = "ignored"
 		} else if p.blockedCount() > 0 {
 			prefix = "   "
 			suffix = "blocked"
@@ -880,10 +1039,17 @@ func parsePlans(dir string) ([]planInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
+		ignored := parser.IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
 		plans = append(plans, planInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
+			ignored:   ignored,
 		})
 	}
 	return plans, nil

@@ -417,6 +417,282 @@ func TestBlockedOnlyMatchesPrefix(t *testing.T) {
 	}
 }
 
+func TestIsIgnoredFile(t *testing.T) {
+	if !IsIgnoredFile("plan_3_ignored.md") {
+		t.Error("plan_3_ignored.md should be detected as ignored")
+	}
+	if !IsIgnoredFile("/some/path/.maggus/plan_10_ignored.md") {
+		t.Error("full path to ignored file should be detected")
+	}
+	if IsIgnoredFile("plan_3.md") {
+		t.Error("plan_3.md should not be detected as ignored")
+	}
+	if IsIgnoredFile("plan_3_completed.md") {
+		t.Error("plan_3_completed.md should not be detected as ignored")
+	}
+}
+
+func TestParsePlans_IgnoredPlanDetected(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+### TASK-001: Active task
+**Acceptance Criteria:**
+- [ ] Do something
+`)
+	writeTempPlan(t, dir, "plan_2_ignored.md", `# Plan 2
+### TASK-010: Ignored task
+**Acceptance Criteria:**
+- [ ] Something else
+
+### TASK-011: Another ignored task
+**Acceptance Criteria:**
+- [ ] More stuff
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks (ignored plans are included), got %d", len(tasks))
+	}
+
+	// Active plan task should NOT be ignored
+	if tasks[0].Ignored {
+		t.Error("TASK-001 from active plan should not be ignored")
+	}
+
+	// All tasks from ignored plan should be ignored
+	if !tasks[1].Ignored {
+		t.Errorf("TASK-010 from ignored plan should be ignored")
+	}
+	if !tasks[2].Ignored {
+		t.Errorf("TASK-011 from ignored plan should be ignored")
+	}
+}
+
+func TestParsePlansGrouped_IgnoredPlan(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan 1
+### TASK-001: Active task
+**Acceptance Criteria:**
+- [ ] Do something
+`)
+	writeTempPlan(t, dir, "plan_2_ignored.md", `# Plan 2
+### TASK-010: Ignored task
+**Acceptance Criteria:**
+- [ ] Something else
+`)
+
+	plans, err := ParsePlansGrouped(dir)
+	if err != nil {
+		t.Fatalf("ParsePlansGrouped error: %v", err)
+	}
+
+	if len(plans) != 2 {
+		t.Fatalf("expected 2 plans, got %d", len(plans))
+	}
+
+	// Plan 1 should not be ignored
+	if plans[0].Ignored {
+		t.Error("plan_1 should not be ignored")
+	}
+	if len(plans[0].Tasks) != 1 {
+		t.Fatalf("plan_1 should have 1 task, got %d", len(plans[0].Tasks))
+	}
+	if plans[0].Tasks[0].Ignored {
+		t.Error("TASK-001 in plan_1 should not be ignored")
+	}
+
+	// Plan 2 should be ignored, and its tasks should inherit ignored status
+	if !plans[1].Ignored {
+		t.Error("plan_2_ignored should be ignored")
+	}
+	if len(plans[1].Tasks) != 1 {
+		t.Fatalf("plan_2_ignored should have 1 task, got %d", len(plans[1].Tasks))
+	}
+	if !plans[1].Tasks[0].Ignored {
+		t.Error("TASK-010 in ignored plan should inherit ignored status")
+	}
+}
+
+func TestParseFile_IgnoredTask(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### IGNORED TASK-001: Skipped feature
+**Description:** This task is ignored.
+
+**Acceptance Criteria:**
+- [ ] Something
+
+### TASK-002: Active feature
+**Description:** This task is active.
+
+**Acceptance Criteria:**
+- [ ] Do it
+`)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// TASK-001 should be ignored with clean title (no IGNORED prefix)
+	if tasks[0].ID != "TASK-001" {
+		t.Errorf("task 0 ID = %q, want TASK-001", tasks[0].ID)
+	}
+	if tasks[0].Title != "Skipped feature" {
+		t.Errorf("task 0 Title = %q, want 'Skipped feature'", tasks[0].Title)
+	}
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 should be ignored")
+	}
+
+	// TASK-002 should NOT be ignored
+	if tasks[1].ID != "TASK-002" {
+		t.Errorf("task 1 ID = %q, want TASK-002", tasks[1].ID)
+	}
+	if tasks[1].Title != "Active feature" {
+		t.Errorf("task 1 Title = %q, want 'Active feature'", tasks[1].Title)
+	}
+	if tasks[1].Ignored {
+		t.Error("TASK-002 should not be ignored")
+	}
+}
+
+func TestParsePlans_IgnoredTaskInActivePlan(t *testing.T) {
+	dir := t.TempDir()
+	writeTempPlan(t, dir, "plan_1.md", `# Plan
+
+### IGNORED TASK-001: Skipped task
+**Acceptance Criteria:**
+- [ ] Something
+
+### TASK-002: Active task
+**Acceptance Criteria:**
+- [ ] Do it
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// Ignored task in active plan
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 with IGNORED prefix should be ignored")
+	}
+	// Active task in active plan
+	if tasks[1].Ignored {
+		t.Error("TASK-002 without IGNORED prefix should not be ignored")
+	}
+}
+
+func TestParsePlans_IgnoredPlanAllTasksIgnored(t *testing.T) {
+	dir := t.TempDir()
+	// Tasks in an ignored plan are ignored regardless of their own IGNORED prefix
+	writeTempPlan(t, dir, "plan_1_ignored.md", `# Plan
+
+### TASK-001: Normal heading in ignored plan
+**Acceptance Criteria:**
+- [ ] Something
+
+### IGNORED TASK-002: Explicitly ignored in ignored plan
+**Acceptance Criteria:**
+- [ ] Something else
+`)
+
+	tasks, err := ParsePlans(dir)
+	if err != nil {
+		t.Fatalf("ParsePlans error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+
+	// Both tasks should be ignored (plan-level takes precedence)
+	if !tasks[0].Ignored {
+		t.Error("TASK-001 in ignored plan should be ignored")
+	}
+	if !tasks[1].Ignored {
+		t.Error("TASK-002 in ignored plan should be ignored")
+	}
+}
+
+func TestIgnoredTask_NotWorkable(t *testing.T) {
+	task := Task{
+		ID:      "TASK-001",
+		Ignored: true,
+		Criteria: []Criterion{
+			{Text: "Do something", Checked: false},
+		},
+	}
+
+	if task.IsWorkable() {
+		t.Error("ignored task should not be workable")
+	}
+}
+
+func TestFindNextIncomplete_SkipsIgnored(t *testing.T) {
+	tasks := []Task{
+		{
+			ID:      "TASK-001",
+			Ignored: true,
+			Criteria: []Criterion{
+				{Text: "Do something", Checked: false},
+			},
+		},
+		{
+			ID: "TASK-002",
+			Criteria: []Criterion{
+				{Text: "Do something else", Checked: false},
+			},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+func TestFindNextIncomplete_AllIgnoredOrBlocked(t *testing.T) {
+	tasks := []Task{
+		{
+			ID:      "TASK-001",
+			Ignored: true,
+			Criteria: []Criterion{
+				{Text: "Do something", Checked: false},
+			},
+		},
+		{
+			ID: "TASK-002",
+			Criteria: []Criterion{
+				{Text: "BLOCKED: needs API", Checked: false, Blocked: true},
+			},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next != nil {
+		t.Errorf("expected nil, got %s", next.ID)
+	}
+}
+
 func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	// Task has unchecked criteria AND a blocked criterion — should be skipped
 	tasks := []Task{

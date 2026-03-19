@@ -8,8 +8,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
+
+// claude2xResultMsg carries the result of the async 2x status fetch.
+type claude2xResultMsg struct {
+	status claude2x.Status
+}
 
 // menuItem represents a single entry in the main menu.
 type menuItem struct {
@@ -155,6 +161,8 @@ type menuModel struct {
 	summary  planSummary
 	width    int
 	height   int
+	is2x          bool   // true when Claude is in 2x mode (logo/border turn yellow)
+	twoXExpiresIn string // e.g. "17h 54m 44s" — only set when is2x is true
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -172,7 +180,9 @@ func newMenuModel(summary planSummary) menuModel {
 }
 
 func (m menuModel) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		return claude2xResultMsg{status: claude2x.FetchStatus()}
+	}
 }
 
 func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -180,6 +190,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
+		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
 		return m, nil
 	case tea.KeyMsg:
 		if m.inSubMenu {
@@ -313,7 +327,8 @@ const logo = `
  ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝`
 
 func (m menuModel) View() string {
-	logoStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+	themeColor := styles.ThemeColor(m.is2x)
+	logoStyle := lipgloss.NewStyle().Foreground(themeColor).Bold(true)
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
@@ -349,12 +364,19 @@ func (m menuModel) View() string {
 		centerLine(versionLine, contentW) + "\n" +
 		centerLine(summaryLine, contentW)
 
+	// Show 2x remaining time below the summary when active
+	if m.is2x && m.twoXExpiresIn != "" {
+		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+		twoXLine := twoXStyle.Render(fmt.Sprintf("2x expires in: %s", m.twoXExpiresIn))
+		header += "\n" + centerLine(twoXLine, contentW)
+	}
+
 	content := header + "\n\n" + body
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(content, footer, m.width, m.height)
+		return styles.FullScreenColor(content, footer, m.width, m.height, themeColor)
 	}
-	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(themeColor).Render(content+"\n\n"+footer) + "\n"
 }
 
 // centerLine centers a single line of text within the given width.
