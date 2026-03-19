@@ -31,12 +31,12 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a developer, I want a function that downloads a release asset and replaces the running binary so that updates can be applied.
 
 **Acceptance Criteria:**
-- [ ] `updater.Apply(downloadURL string)` downloads the asset to a temp file
-- [ ] Extracts the binary from the archive (tar.gz on Linux/macOS, zip on Windows)
-- [ ] Replaces the currently running executable (`os.Executable()` path) using a safe rename-swap strategy
-- [ ] On Windows, uses the rename-on-next-start pattern (rename old binary to `.old`, write new one, old gets cleaned up on next run)
-- [ ] Returns an error if permissions prevent writing to the binary location
-- [ ] Unit tests cover: successful replacement (using temp dir), permission error, corrupt archive
+- [x] `updater.Apply(downloadURL string)` downloads the asset to a temp file
+- [x] Extracts the binary from the archive (tar.gz on Linux/macOS, zip on Windows)
+- [x] Replaces the currently running executable (`os.Executable()` path) using a safe rename-swap strategy
+- [x] On Windows, uses the rename-on-next-start pattern (rename old binary to `.old`, write new one, old gets cleaned up on next run)
+- [x] Returns an error if permissions prevent writing to the binary location
+- [x] Unit tests cover: successful replacement (using temp dir), permission error, corrupt archive
 
 ### TASK-003: Add `maggus update` command
 **Description:** As a user, I want a `maggus update` command so that I can manually check for and install updates.
