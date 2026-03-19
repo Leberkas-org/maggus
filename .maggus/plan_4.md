@@ -100,13 +100,11 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `cmd/init.go` so that project initialization is verified.
 
 **Acceptance Criteria:**
-- [ ] Test that `maggus init` creates `.maggus/` directory
-- [ ] Test that `maggus init` creates default `config.yml`
-- [ ] Test that `maggus init` is idempotent (running twice does not error or overwrite)
-- [ ] Test that `.gitignore` entries are added
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read init.go to understand the exact initialization logic and whether it can be tested without git
+- [x] Test that `maggus init` creates `.maggus/` directory
+- [x] Test that `maggus init` creates default `config.yml`
+- [x] Test that `maggus init` is idempotent (running twice does not error or overwrite)
+- [x] Test that `.gitignore` entries are added
+- [x] Unit tests are written and successful
 
 ### TASK-009: Add tests for gitsync command (TUI-free parts)
 **Description:** As a developer, I want tests for the non-TUI logic in `cmd/gitsync.go` so that sync result handling is verified.
