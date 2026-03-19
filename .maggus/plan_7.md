@@ -18,14 +18,14 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a developer, I want an internal package that checks the GitHub Releases API for the latest maggus version so that other commands can use it.
 
 **Acceptance Criteria:**
-- [ ] New package `src/internal/updater/` created
-- [ ] `CheckLatestVersion()` function calls `https://api.github.com/repos/leberkas-org/maggus/releases/latest` (unauthenticated)
-- [ ] Returns a struct with `TagName`, `DownloadURL` (for the current OS/arch), and `IsNewer` bool
-- [ ] Compares semver of current `cmd.Version` against the release tag
-- [ ] Returns `IsNewer = false` immediately when `cmd.Version == "dev"` (skip check for local builds)
-- [ ] Handles network errors gracefully (returns no-update, no error surfaced to user)
-- [ ] Selects the correct asset URL based on `runtime.GOOS` and `runtime.GOARCH`
-- [ ] Unit tests with mocked HTTP responses cover: newer version available, already up-to-date, dev version, network error, malformed response
+- [x] New package `src/internal/updater/` created
+- [x] `CheckLatestVersion()` function calls `https://api.github.com/repos/leberkas-org/maggus/releases/latest` (unauthenticated)
+- [x] Returns a struct with `TagName`, `DownloadURL` (for the current OS/arch), and `IsNewer` bool
+- [x] Compares semver of current `cmd.Version` against the release tag
+- [x] Returns `IsNewer = false` immediately when `cmd.Version == "dev"` (skip check for local builds)
+- [x] Handles network errors gracefully (returns no-update, no error surfaced to user)
+- [x] Selects the correct asset URL based on `runtime.GOOS` and `runtime.GOARCH`
+- [x] Unit tests with mocked HTTP responses cover: newer version available, already up-to-date, dev version, network error, malformed response
 
 ### TASK-002: Add binary self-replacement logic
 **Description:** As a developer, I want a function that downloads a release asset and replaces the running binary so that updates can be applied.
