@@ -39,10 +39,10 @@ Integrate the public API at `https://isclaude2x.com/json` into Maggus to visuall
 **Description:** As a user, I want to see how much time is left in the 2x window directly in the main menu so I can plan my usage.
 
 **Acceptance Criteria:**
-- [ ] When `Is2x` is `true`, the `2xWindowExpiresIn` value (e.g. "17h 54m 44s") is displayed in the menu below the logo area
-- [ ] The display format is clear, e.g. `2x expires in: 17h 54m 44s` styled in yellow
-- [ ] When `Is2x` is `false`, no 2x-related text is shown in the menu
-- [ ] Typecheck/lint passes
+- [x] When `Is2x` is `true`, the `2xWindowExpiresIn` value (e.g. "17h 54m 44s") is displayed in the menu below the logo area
+- [x] The display format is clear, e.g. `2x expires in: 17h 54m 44s` styled in yellow
+- [x] When `Is2x` is `false`, no 2x-related text is shown in the menu
+- [x] Typecheck/lint passes
 
 ### TASK-004: Display 2x remaining time in the work view
 **Description:** As a user, I want to see the 2x remaining time in the work view header so I'm aware of the 2x window while tasks are running.

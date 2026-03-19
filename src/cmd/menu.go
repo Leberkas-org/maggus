@@ -161,7 +161,8 @@ type menuModel struct {
 	summary  planSummary
 	width    int
 	height   int
-	is2x     bool // true when Claude is in 2x mode (logo/border turn yellow)
+	is2x          bool   // true when Claude is in 2x mode (logo/border turn yellow)
+	twoXExpiresIn string // e.g. "17h 54m 44s" — only set when is2x is true
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -192,6 +193,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case claude2xResultMsg:
 		m.is2x = msg.status.Is2x
+		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
 		return m, nil
 	case tea.KeyMsg:
 		if m.inSubMenu {
@@ -361,6 +363,13 @@ func (m menuModel) View() string {
 	header := centerBlock(styledLogo, contentW) + "\n" +
 		centerLine(versionLine, contentW) + "\n" +
 		centerLine(summaryLine, contentW)
+
+	// Show 2x remaining time below the summary when active
+	if m.is2x && m.twoXExpiresIn != "" {
+		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+		twoXLine := twoXStyle.Render(fmt.Sprintf("2x expires in: %s", m.twoXExpiresIn))
+		header += "\n" + centerLine(twoXLine, contentW)
+	}
 
 	content := header + "\n\n" + body
 
