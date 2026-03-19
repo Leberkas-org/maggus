@@ -147,8 +147,8 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `cmd/plan.go` non-interactive logic.
 
 **Acceptance Criteria:**
-- [ ] Test argument parsing and prompt assembly if extractable
-- [ ] Unit tests are written and successful
+- [x] Test argument parsing and prompt assembly if extractable
+- [x] Unit tests are written and successful
 
 BLOCKED: Need to read plan.go to determine testable surface — likely limited since it launches Claude Code
 
