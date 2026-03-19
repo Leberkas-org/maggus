@@ -22,7 +22,8 @@
       "Bash(wc -l /c/Users/11001103/GIT/maggus/src/internal/*/*.go /c/Users/11001103/GIT/maggus/src/cmd/*.go)",
       "Bash(__NEW_LINE_e8c73d84caf5a8ed__ echo:*)",
       "Bash(while read:*)",
-      "Bash(do wc:*)"
+      "Bash(do wc:*)",
+      "Bash(xargs head:*)"
     ]
   }
 }
