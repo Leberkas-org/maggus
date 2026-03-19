@@ -60,12 +60,12 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `internal/capabilities` so that tool detection and caching logic is verified.
 
 **Acceptance Criteria:**
-- [ ] Test `Load` returns zero-value when cache file does not exist
-- [ ] Test `Load` returns zero-value when cache file contains invalid JSON
-- [ ] Test `Load` correctly deserializes a valid capabilities JSON file
-- [ ] Test `write` creates directory structure and writes valid JSON
-- [ ] Test `configFile` returns a non-empty path
-- [ ] Unit tests are written and successful
+- [x] Test `Load` returns zero-value when cache file does not exist
+- [x] Test `Load` returns zero-value when cache file contains invalid JSON
+- [x] Test `Load` correctly deserializes a valid capabilities JSON file
+- [x] Test `write` creates directory structure and writes valid JSON
+- [x] Test `configFile` returns a non-empty path
+- [x] Unit tests are written and successful
 
 ### TASK-005: Add tests for agent registry and message types
 **Description:** As a developer, I want tests for `internal/agent/messages.go` and additional coverage for `agent.go` interface contracts.
