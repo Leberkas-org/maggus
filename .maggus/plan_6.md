@@ -43,19 +43,19 @@ Add a repository switching feature to Maggus so users can manage multiple projec
 **Description:** As a user, I want a TUI file browser so I can navigate the filesystem and select a repository directory to add.
 
 **Acceptance Criteria:**
-- [ ] New bubbletea model in `internal/tui/filebrowser/` implements a directory browser
-- [ ] Browser starts in the current working directory
-- [ ] Shows only directories (no files) in the listing, sorted alphabetically
-- [ ] `..` entry at the top navigates to the parent directory
-- [ ] Supports keyboard navigation: up/down to move, enter to descend into a directory, backspace to go up
-- [ ] A "Select" action (e.g., pressing `s` or a dedicated button) confirms the current directory as the chosen repo
-- [ ] Pressing `esc` cancels and returns without selection
-- [ ] The current path is displayed at the top of the browser
-- [ ] Directories starting with `.` are shown but visually muted
-- [ ] The browser handles permission errors gracefully (shows error inline, doesn't crash)
-- [ ] Long directory lists are scrollable with the viewport staying centered on the cursor
-- [ ] Uses the existing styles package for consistent theming
-- [ ] Unit tests cover navigation logic (enter, backspace, parent traversal, boundary cases)
+- [x] New bubbletea model in `internal/tui/filebrowser/` implements a directory browser
+- [x] Browser starts in the current working directory
+- [x] Shows only directories (no files) in the listing, sorted alphabetically
+- [x] `..` entry at the top navigates to the parent directory
+- [x] Supports keyboard navigation: up/down to move, enter to descend into a directory, backspace to go up
+- [x] A "Select" action (e.g., pressing `s` or a dedicated button) confirms the current directory as the chosen repo
+- [x] Pressing `esc` cancels and returns without selection
+- [x] The current path is displayed at the top of the browser
+- [x] Directories starting with `.` are shown but visually muted
+- [x] The browser handles permission errors gracefully (shows error inline, doesn't crash)
+- [x] Long directory lists are scrollable with the viewport staying centered on the cursor
+- [x] Uses the existing styles package for consistent theming
+- [x] Unit tests cover navigation logic (enter, backspace, parent traversal, boundary cases)
 
 ### TASK-004: Repository menu item with sub-menu
 **Description:** As a user, I want a "Repositories" entry in the main menu so I can switch between repos, add new ones, or remove existing ones.
