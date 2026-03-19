@@ -90,7 +90,7 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a new user, I want a clear getting-started guide so that I can install maggus and run my first task within minutes.
 
 **Acceptance Criteria:**
-- [ ] `docs/guide/getting-started.md` is rewritten with these sections:
+- [x] `docs/guide/getting-started.md` is rewritten with these sections:
   - **Prerequisites** — what you need (an AI agent CLI, git, a terminal)
   - **Installation** — three methods: pre-built binary download, `go install`, build from source. Platform-agnostic with OS-specific callouts where needed.
   - **First Project Setup** — `cd` into a git repo, run `maggus init`, explain what it creates
@@ -98,8 +98,8 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
   - **Running Maggus** — `maggus work`, what to expect (branch creation, agent invocation, commit), show sample output
   - **Understanding the Output** — explain the spinner, status messages, what "completed" means
   - **Next Steps** — links to concepts, writing-plans, configuration
-- [ ] All code examples work on Windows, macOS, and Linux (use platform-agnostic commands, add callouts for differences like path separators)
-- [ ] No broken internal links
+- [x] All code examples work on Windows, macOS, and Linux (use platform-agnostic commands, add callouts for differences like path separators)
+- [x] No broken internal links
 
 ### TASK-008: Add first-project tutorial page
 **Description:** As a new user, I want a step-by-step tutorial that walks me through a real example project so that I can see maggus in action end-to-end.
