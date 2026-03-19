@@ -80,13 +80,13 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for the helper functions in `cmd/work.go` so that task selection logic is verified.
 
 **Acceptance Criteria:**
-- [ ] Test `findTaskByID` returns the correct task when it exists and is incomplete
-- [ ] Test `findTaskByID` returns nil when task is complete
-- [ ] Test `findTaskByID` returns nil when task ID does not exist
-- [ ] Test `findNextUnlocked` returns first workable unlocked task
-- [ ] Test `findNextUnlocked` skips locked tasks (requires setting up a lock file)
-- [ ] Test `findNextUnlocked` returns nil when all workable tasks are locked
-- [ ] Unit tests are written and successful
+- [x] Test `findTaskByID` returns the correct task when it exists and is incomplete
+- [x] Test `findTaskByID` returns nil when task is complete
+- [x] Test `findTaskByID` returns nil when task ID does not exist
+- [x] Test `findNextUnlocked` returns first workable unlocked task
+- [x] Test `findNextUnlocked` skips locked tasks (requires setting up a lock file)
+- [x] Test `findNextUnlocked` returns nil when all workable tasks are locked
+- [x] Unit tests are written and successful
 
 ### TASK-007: Add tests for dispatch command
 **Description:** As a developer, I want tests for `cmd/dispatch.go` so that the `dispatchWork` function is verified.
