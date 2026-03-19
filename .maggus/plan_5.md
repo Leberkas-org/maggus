@@ -28,12 +28,12 @@ Integrate the public API at `https://isclaude2x.com/json` into Maggus to visuall
 **Description:** As a user, I want the menu logo and box border to turn yellow when Claude is in 2x mode so that I can see at a glance whether 2x is active.
 
 **Acceptance Criteria:**
-- [ ] `styles` package exposes a way to switch between normal (cyan/Primary) and 2x (yellow) color for the logo and box border
-- [ ] The menu model (`cmd/menu.go`) calls `claude2x.FetchStatus()` once during initialization (in `Init()` or as a Bubble Tea `Cmd`)
-- [ ] When `Is2x` is `true`, the logo renders in yellow and the menu box border renders in yellow
-- [ ] When `Is2x` is `false`, the logo and box border render in the default cyan color
-- [ ] If the API call fails or times out, the default cyan colors are used (no visible error)
-- [ ] Typecheck/lint passes
+- [x] `styles` package exposes a way to switch between normal (cyan/Primary) and 2x (yellow) color for the logo and box border
+- [x] The menu model (`cmd/menu.go`) calls `claude2x.FetchStatus()` once during initialization (in `Init()` or as a Bubble Tea `Cmd`)
+- [x] When `Is2x` is `true`, the logo renders in yellow and the menu box border renders in yellow
+- [x] When `Is2x` is `false`, the logo and box border render in the default cyan color
+- [x] If the API call fails or times out, the default cyan colors are used (no visible error)
+- [x] Typecheck/lint passes
 
 ### TASK-003: Display 2x remaining time in the main menu
 **Description:** As a user, I want to see how much time is left in the 2x window directly in the main menu so I can plan my usage.
