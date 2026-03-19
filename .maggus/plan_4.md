@@ -118,10 +118,8 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for any testable non-TUI logic in `cmd/config.go`.
 
 **Acceptance Criteria:**
-- [ ] Test config loading and display logic if extractable
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read config.go to determine testable surface
+- [x] Test config loading and display logic if extractable
+- [x] Unit tests are written and successful
 
 ### TASK-011: Add tests for detail command helpers
 **Description:** As a developer, I want tests for any helper functions in `cmd/detail.go` that don't require a TUI.
