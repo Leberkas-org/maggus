@@ -48,11 +48,11 @@ Integrate the public API at `https://isclaude2x.com/json` into Maggus to visuall
 **Description:** As a user, I want to see the 2x remaining time in the work view header so I'm aware of the 2x window while tasks are running.
 
 **Acceptance Criteria:**
-- [ ] The work view TUI (`internal/runner/tui.go`) receives the 2x status information
-- [ ] When `Is2x` is `true`, the header area displays the remaining time (e.g. "2x: 17h 54m 44s") styled in yellow
-- [ ] When `Is2x` is `false`, no 2x indicator is shown in the work view
-- [ ] The 2x info does not break the existing header layout (version, fingerprint, progress bar)
-- [ ] Typecheck/lint passes
+- [x] The work view TUI (`internal/runner/tui.go`) receives the 2x status information
+- [x] When `Is2x` is `true`, the header area displays the remaining time (e.g. "2x: 17h 54m 44s") styled in yellow
+- [x] When `Is2x` is `false`, no 2x indicator is shown in the work view
+- [x] The 2x info does not break the existing header layout (version, fingerprint, progress bar)
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 

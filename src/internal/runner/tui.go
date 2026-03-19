@@ -156,12 +156,13 @@ type tickMsg time.Time
 
 // BannerInfo holds startup information displayed in the TUI's initial view.
 type BannerInfo struct {
-	Iterations int
-	Branch     string
-	RunID      string
-	RunDir     string
-	Worktree   string // empty if not using worktree
-	Agent      string // agent name (e.g. "claude", "opencode")
+	Iterations      int
+	Branch          string
+	RunID           string
+	RunDir          string
+	Worktree        string // empty if not using worktree
+	Agent           string // agent name (e.g. "claude", "opencode")
+	TwoXExpiresIn   string // e.g. "17h 54m 44s"; empty when not in 2x mode
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.
@@ -1207,7 +1208,13 @@ func (m TUIModel) renderHeaderInner(w int) string {
 	}
 	b.WriteString(fmt.Sprintf("%s%s%s\n", left, strings.Repeat(" ", padding), right))
 
-	// Line 2: progress bar
+	// Line 2: 2x remaining time (only when active)
+	if m.banner.TwoXExpiresIn != "" {
+		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		b.WriteString(twoXStyle.Render(fmt.Sprintf("2x: %s", m.banner.TwoXExpiresIn)) + "\n")
+	}
+
+	// Line 3: progress bar
 	if m.totalIters > 0 {
 		barWidth := 20
 		bar := styles.ProgressBar(m.currentIter, m.totalIters, barWidth)

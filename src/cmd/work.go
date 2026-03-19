@@ -12,6 +12,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
@@ -314,6 +315,9 @@ Examples:
 			workCancel()
 		}
 
+		// Fetch 2x status (non-blocking with 3s timeout inside FetchStatus).
+		twoXStatus := claude2x.FetchStatus()
+
 		// Create the persistent TUI with banner info — starts immediately, no countdown.
 		banner := runner.BannerInfo{
 			Iterations: count,
@@ -324,6 +328,9 @@ Examples:
 		}
 		if useWorktree {
 			banner.Worktree = workDir
+		}
+		if twoXStatus.Is2x {
+			banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
 		}
 		// Wire gitsync functions into the runner TUI for between-task sync checks.
 		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
