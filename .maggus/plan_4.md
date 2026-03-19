@@ -110,11 +110,9 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for the non-TUI logic in `cmd/gitsync.go` so that sync result handling is verified.
 
 **Acceptance Criteria:**
-- [ ] Test sync result types and constants are consistent
-- [ ] Test any helper functions that don't require a running TUI
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read gitsync.go to determine which parts are testable without bubbletea
+- [x] Test sync result types and constants are consistent
+- [x] Test any helper functions that don't require a running TUI
+- [x] Unit tests are written and successful
 
 ### TASK-010: Add tests for config command (TUI-free parts)
 **Description:** As a developer, I want tests for any testable non-TUI logic in `cmd/config.go`.
