@@ -34,15 +34,15 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `cmd/unignore.go` so that plan and task unignore operations are verified.
 
 **Acceptance Criteria:**
-- [ ] Test `runUnignorePlan` on an ignored plan renames back to `.md`
-- [ ] Test `runUnignorePlan` on an active plan returns error ("not currently ignored")
-- [ ] Test `runUnignorePlan` on a completed plan returns error
-- [ ] Test `runUnignorePlan` on a missing plan returns error
-- [ ] Test `runUnignoreTask` rewrites heading from `### IGNORED TASK-NNN:` to `### TASK-NNN:`
-- [ ] Test `runUnignoreTask` on a non-ignored task returns error
-- [ ] Test `runUnignoreTask` with bare ID normalizes to "TASK-007"
-- [ ] Test `runUnignoreTask` on a missing task returns error
-- [ ] Unit tests are written and successful
+- [x] Test `runUnignorePlan` on an ignored plan renames back to `.md`
+- [x] Test `runUnignorePlan` on an active plan returns error ("not currently ignored")
+- [x] Test `runUnignorePlan` on a completed plan returns error
+- [x] Test `runUnignorePlan` on a missing plan returns error
+- [x] Test `runUnignoreTask` rewrites heading from `### IGNORED TASK-NNN:` to `### TASK-NNN:`
+- [x] Test `runUnignoreTask` on a non-ignored task returns error
+- [x] Test `runUnignoreTask` with bare ID normalizes to "TASK-007"
+- [x] Test `runUnignoreTask` on a missing task returns error
+- [x] Unit tests are written and successful
 
 ### TASK-003: Add tests for usage package
 **Description:** As a developer, I want tests for `internal/usage` so that CSV recording of token usage is verified.
