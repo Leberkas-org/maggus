@@ -89,13 +89,26 @@ func TestCheckLatestVersion_OlderRelease(t *testing.T) {
 }
 
 func TestCheckLatestVersion_DevVersion(t *testing.T) {
-	// Should return immediately without making any HTTP call.
+	// Dev version with a mocked release should return IsNewer=true.
+	body := `{
+		"tag_name": "v1.5.0",
+		"assets": [
+			{"name": "maggus_1.5.0_linux_amd64.tar.gz", "browser_download_url": "https://example.com/linux"},
+			{"name": "maggus_1.5.0_windows_amd64.zip", "browser_download_url": "https://example.com/windows"}
+		]
+	}`
+	_, cleanup := setupTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(body))
+	})
+	defer cleanup()
+
 	info := CheckLatestVersion("dev")
-	if info.IsNewer {
-		t.Error("expected IsNewer=false for dev version")
+	if !info.IsNewer {
+		t.Error("expected IsNewer=true for dev version with valid release")
 	}
-	if info.TagName != "" {
-		t.Errorf("expected empty TagName for dev version, got %s", info.TagName)
+	if info.TagName != "v1.5.0" {
+		t.Errorf("expected TagName=v1.5.0, got %s", info.TagName)
 	}
 }
 

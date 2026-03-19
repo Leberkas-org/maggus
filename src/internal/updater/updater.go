@@ -39,13 +39,9 @@ var httpClient = &http.Client{Timeout: 5 * time.Second}
 
 // CheckLatestVersion checks GitHub Releases for the latest maggus version.
 // It compares the release tag against currentVersion using semver.
-// Returns IsNewer=false immediately when currentVersion is "dev".
+// When currentVersion is "dev", any valid release is considered newer.
 // Network and parse errors are handled gracefully (returns no-update, nil error).
 func CheckLatestVersion(currentVersion string) UpdateInfo {
-	if currentVersion == "dev" {
-		return UpdateInfo{}
-	}
-
 	req, err := http.NewRequest("GET", releaseURL, nil)
 	if err != nil {
 		return UpdateInfo{}
@@ -71,7 +67,13 @@ func CheckLatestVersion(currentVersion string) UpdateInfo {
 		return UpdateInfo{}
 	}
 
-	isNewer := semverNewer(release.TagName, currentVersion)
+	var isNewer bool
+	if currentVersion == "dev" {
+		// Any valid release is newer than a dev build.
+		isNewer = true
+	} else {
+		isNewer = semverNewer(release.TagName, currentVersion)
+	}
 	downloadURL := findAssetURL(release.Assets, runtime.GOOS, runtime.GOARCH)
 
 	return UpdateInfo{
