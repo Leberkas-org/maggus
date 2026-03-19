@@ -71,10 +71,10 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `internal/agent/messages.go` and additional coverage for `agent.go` interface contracts.
 
 **Acceptance Criteria:**
-- [ ] Test that `ErrInterrupted` error message is stable
-- [ ] Test that message types (StatusMsg, OutputMsg, ToolMsg, SkillMsg, MCPMsg, UsageMsg) can be instantiated with expected fields
-- [ ] Test `ToolMsg.Timestamp` preserves time precision
-- [ ] Unit tests are written and successful
+- [x] Test that `ErrInterrupted` error message is stable
+- [x] Test that message types (StatusMsg, OutputMsg, ToolMsg, SkillMsg, MCPMsg, UsageMsg) can be instantiated with expected fields
+- [x] Test `ToolMsg.Timestamp` preserves time precision
+- [x] Unit tests are written and successful
 
 ### TASK-006: Add tests for work command helpers
 **Description:** As a developer, I want tests for the helper functions in `cmd/work.go` so that task selection logic is verified.
