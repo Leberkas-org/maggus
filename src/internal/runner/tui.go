@@ -156,13 +156,13 @@ type tickMsg time.Time
 
 // BannerInfo holds startup information displayed in the TUI's initial view.
 type BannerInfo struct {
-	Iterations      int
-	Branch          string
-	RunID           string
-	RunDir          string
-	Worktree        string // empty if not using worktree
-	Agent           string // agent name (e.g. "claude", "opencode")
-	TwoXExpiresIn   string // e.g. "17h 54m 44s"; empty when not in 2x mode
+	Iterations    int
+	Branch        string
+	RunID         string
+	RunDir        string
+	Worktree      string // empty if not using worktree
+	Agent         string // agent name (e.g. "claude", "opencode")
+	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.
@@ -197,64 +197,64 @@ type TUIModel struct {
 	summaryElapsed time.Duration // frozen elapsed time at summary display
 	pushStatus     string
 	pushDone       bool
-	menuChoice   int    // 0 = Exit, 1 = Run again
-	editingCount bool   // true when typing task count
-	countInput   string // buffer for task count input
-	runAgain     RunAgainResult
+	menuChoice     int    // 0 = Exit, 1 = Run again
+	editingCount   bool   // true when typing task count
+	countInput     string // buffer for task count input
+	runAgain       RunAgainResult
 
 	// Task info
 	taskDescription string
 	taskCriteria    []TaskCriterion
 	taskID          string
-	taskTitle    string
-	taskPlanFile string
+	taskTitle       string
+	taskPlanFile    string
 
 	// Recent commits
 	commits []string
 
 	// Token usage tracking
-	iterInputTokens   int         // current iteration input tokens
-	iterOutputTokens  int         // current iteration output tokens
-	totalInputTokens  int         // cumulative input tokens
-	totalOutputTokens int         // cumulative output tokens
-	hasUsageData      bool        // true if any usage data was received
-	taskUsages        []TaskUsage // per-task usage history
+	iterInputTokens   int             // current iteration input tokens
+	iterOutputTokens  int             // current iteration output tokens
+	totalInputTokens  int             // cumulative input tokens
+	totalOutputTokens int             // cumulative output tokens
+	hasUsageData      bool            // true if any usage data was received
+	taskUsages        []TaskUsage     // per-task usage history
 	onTaskUsage       func(TaskUsage) // called immediately when a task's usage is finalized
 
-	status      string
-	toolEntries []agent.ToolMsg // full tool messages for left-side list and detail panel
-	output      string
-	extras      string
-	model       string
-	toolCount   int
-	skills      []string
-	mcps        []string
-	startTime   time.Time
-	frame       int
-	width       int
-	height      int
-	activeTab          int    // 0 = Progress, 1 = Detail, 2 = Task, 3 = Commits
-	detailScrollOffset int    // scroll offset for the detail tab (in lines)
-	detailAutoScroll   bool   // true when detail tab auto-scrolls to bottom
-	detailTotalLines   int    // total rendered lines in last detail render (for scroll indicator)
-	stopAfterTask      bool          // when true, work stops after current task completes
-	confirmingStop     bool          // when true, showing "stop after task?" confirmation prompt
-	stopFlag           *atomic.Bool  // shared flag readable from the work loop goroutine
-	cancelFunc         func()        // called on Ctrl+C to cancel the context
+	status             string
+	toolEntries        []agent.ToolMsg // full tool messages for left-side list and detail panel
+	output             string
+	extras             string
+	model              string
+	toolCount          int
+	skills             []string
+	mcps               []string
+	startTime          time.Time
+	frame              int
+	width              int
+	height             int
+	activeTab          int          // 0 = Progress, 1 = Detail, 2 = Task, 3 = Commits
+	detailScrollOffset int          // scroll offset for the detail tab (in lines)
+	detailAutoScroll   bool         // true when detail tab auto-scrolls to bottom
+	detailTotalLines   int          // total rendered lines in last detail render (for scroll indicator)
+	stopAfterTask      bool         // when true, work stops after current task completes
+	confirmingStop     bool         // when true, showing "stop after task?" confirmation prompt
+	stopFlag           *atomic.Bool // shared flag readable from the work loop goroutine
+	cancelFunc         func()       // called on Ctrl+C to cancel the context
 	quitting           bool
 
 	// Sync check state (between-task remote sync)
-	syncActive       bool                // true when showing sync resolution screen
-	syncBehind       int                 // commits behind remote
-	syncAhead        int                 // commits ahead of remote
-	syncRemoteBranch string              // remote branch name
+	syncActive       bool                   // true when showing sync resolution screen
+	syncBehind       int                    // commits behind remote
+	syncAhead        int                    // commits ahead of remote
+	syncRemoteBranch string                 // remote branch name
 	syncResultCh     chan<- SyncCheckResult // channel to send result back to work goroutine
-	syncOptions      []syncMenuOption    // resolution menu options
-	syncCursor       int                 // selected menu item
-	syncConfirmForce bool                // showing force-pull confirmation
-	syncRunning      bool                // executing a pull action
-	syncErrorMsg     string              // error from failed action (returns to menu)
-	syncDir          string              // directory for git operations
+	syncOptions      []syncMenuOption       // resolution menu options
+	syncCursor       int                    // selected menu item
+	syncConfirmForce bool                   // showing force-pull confirmation
+	syncRunning      bool                   // executing a pull action
+	syncErrorMsg     string                 // error from failed action (returns to menu)
+	syncDir          string                 // directory for git operations
 }
 
 // syncMenuOption represents one item in the sync resolution menu.

@@ -1,10 +1,10 @@
 # CLI Commands
 
-Maggus provides four commands for working with implementation plans. All commands that load configuration will show the configured agent (defaults to `claude`).
+Maggus provides commands for working with implementation plans, managing projects, and maintaining your installation. When run without arguments in an interactive terminal, Maggus shows an interactive menu. All commands that load configuration will show the configured agent (defaults to `claude`).
 
 ## maggus work
 
-The main command. Parses plan files, finds the next workable task, builds a prompt with project context, invokes Claude Code, and commits the result. Repeats until the count is reached or all tasks are done.
+The main command. Parses plan files, finds the next workable task, builds a prompt with project context, invokes the configured agent, and commits the result. Repeats until the count is reached or all tasks are done.
 
 ### Usage
 
@@ -100,7 +100,7 @@ From the summary screen you can choose **Exit** or **Run again** (with a custom 
 
 ## maggus list
 
-Preview upcoming workable tasks without running them. Only shows incomplete, non-blocked tasks.
+Preview upcoming tasks without running them. In TUI mode, shows all incomplete tasks (workable and blocked) with keyboard navigation and a scrollable view.
 
 ### Usage
 
@@ -148,13 +148,13 @@ Next 5 task(s):
 
 The first task is highlighted in cyan (unless `--plain` is used).
 
-In TUI mode (without `--plain`), the list is displayed in a full-screen bordered view with keyboard navigation. If no pending tasks exist, a friendly "All done!" screen is shown instead of exiting immediately.
+In TUI mode (without `--plain`), the list is displayed in a full-screen bordered view with keyboard navigation. Blocked tasks are shown with a `⊘` icon. If no pending tasks exist, a friendly "All done!" screen is shown instead of exiting immediately.
 
 ---
 
 ## maggus status
 
-Show a compact summary of plan progress including task counts, progress bars, per-plan breakdowns, and the configured agent.
+Show a compact summary of plan progress with tabbed plan sections, task counts, progress bars, and the configured agent.
 
 ### Usage
 
@@ -198,18 +198,13 @@ Maggus Status — 3 plans (2 active), 24 tasks total
    ✓  TASK-004: Create "Writing Plans" documentation page
  → o  TASK-005: Create "CLI Commands" reference page
    o  TASK-006: Create "Configuration" reference page
-
- Plans
- ──────────────────────────────────────────
-   plan_7_completed.md              [██████████]  7/7   done
-   plan_8.md                        [████░░░░░░]  4/10  in progress
 ```
 
-- `✓` = completed task, `⚠` = blocked task, `o` = pending task
+- `✓` = completed task, `⚠` = blocked task, `o` = pending task, `~` = ignored task
 - `→` marks the next task that `maggus work` will pick up
-- With `--plain`, symbols are replaced: `[x]` for done, `[!]` for blocked, `->` for next
+- With `--plain`, symbols are replaced: `[x]` for done, `[!]` for blocked, `[~]` for ignored, `->` for next
 
-In TUI mode (without `--plain`), the status is displayed in a full-screen bordered view with tabbed plan sections, keyboard navigation, and a detail view for individual tasks. If no plans exist, a helpful empty state screen is shown with a hint to run `maggus plan`.
+In TUI mode (without `--plain`), the status is displayed in a full-screen bordered view with tabbed plan sections, keyboard navigation, and a detail view for individual tasks. Press `Alt+A` to toggle showing completed plans. If no plans exist, a helpful empty state screen is shown with a hint to run `maggus plan`.
 
 ### Managing Blocked Tasks
 
@@ -231,4 +226,280 @@ The action picker offers four options:
 
 Changes are applied immediately to the plan file. Press **Esc** at any point to go back.
 
+### Ignoring Tasks and Plans
+
+From the status or list TUI, you can toggle the ignored state of tasks and plans:
+
+| Key | Action |
+|-----|--------|
+| `Alt+I` | Ignore/unignore the selected task |
+| `Alt+P` | Ignore/unignore the selected plan |
+
+Ignored tasks and plans are skipped by `maggus work` but remain visible in the status view.
+
 ---
+
+## maggus update
+
+Check for and install updates from GitHub Releases.
+
+### Usage
+
+```bash
+maggus update
+```
+
+### Behavior
+
+- Compares the current version against the latest GitHub Release
+- If no update is available, prints "Already up to date"
+- If an update is available, shows the changelog and asks for confirmation
+- On confirmation, downloads the release asset and replaces the running binary
+- When running a dev build (version = `"dev"`), prints a message and skips the check
+
+### Example
+
+```bash
+$ maggus update
+Checking for updates...
+Update available: v1.2.0 → v1.3.0
+
+Changelog:
+- Added repository switcher
+- Improved TUI performance
+
+Install update? [y/N] y
+Downloading and installing...
+Successfully updated to v1.3.0! Please restart maggus.
+```
+
+---
+
+## maggus init
+
+Initialize a `.maggus` project in the current directory.
+
+### Usage
+
+```bash
+maggus init
+```
+
+### Behavior
+
+- Creates the `.maggus/` directory
+- Creates `.maggus/config.yml` with commented default settings (skips if it already exists)
+- Updates `.gitignore` with required entries (run directories, memory, worktree directories)
+- Installs the maggus plugin in Claude Code if the CLI is available
+
+This is the recommended first step when setting up Maggus in a new project.
+
+---
+
+## maggus plan
+
+Open an interactive AI session to create an implementation plan.
+
+### Usage
+
+```bash
+maggus plan <description...>
+```
+
+### Examples
+
+```bash
+maggus plan Add OAuth2 authentication with Google provider
+maggus plan "Refactor the parser to support nested tasks"
+```
+
+Launches the configured agent (Claude Code by default) interactively with the `/maggus-plan` skill. The AI walks you through clarifying questions before generating a plan file in `.maggus/`.
+
+---
+
+## maggus vision
+
+Open an interactive AI session to create or improve `VISION.md`.
+
+### Usage
+
+```bash
+maggus vision <description...>
+```
+
+### Examples
+
+```bash
+maggus vision A CLI tool for orchestrating AI agents
+maggus vision "Improve the vision for our e-commerce platform"
+```
+
+---
+
+## maggus architecture
+
+Open an interactive AI session to create or improve `ARCHITECTURE.md`.
+
+### Usage
+
+```bash
+maggus architecture <description...>
+```
+
+**Alias:** `maggus arch`
+
+### Examples
+
+```bash
+maggus architecture A Go CLI with plugin system and streaming output
+maggus arch "Review and improve our current architecture"
+```
+
+---
+
+## maggus config
+
+Edit project settings (`.maggus/config.yml`) interactively.
+
+### Usage
+
+```bash
+maggus config
+```
+
+Opens a TUI editor where you can change agent, model, worktree, and notification settings. Navigate with arrow keys, cycle values with Enter or Left/Right, then select **Save**, **Edit file in editor**, or **Cancel**.
+
+---
+
+## maggus clean
+
+Remove completed plan files and finished run directories.
+
+### Usage
+
+```bash
+maggus clean [flags]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | `false` | Show what would be removed without actually deleting anything |
+
+### Examples
+
+```bash
+# Preview what would be removed
+maggus clean --dry-run
+
+# Remove completed plans and finished runs
+maggus clean
+```
+
+Removes `_completed.md` plan files from `.maggus/` and run directories in `.maggus/runs/` that contain a `## End` section (indicating the run finished).
+
+---
+
+## maggus release
+
+Generate a `RELEASE.md` with a conventional changelog and an AI-generated summary.
+
+### Usage
+
+```bash
+maggus release [flags]
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--model` | *(from config)* | Model to use for AI summary generation |
+
+### Examples
+
+```bash
+# Generate release notes using default model
+maggus release
+
+# Use a specific model
+maggus release --model opus
+```
+
+Finds all commits since the last version tag, groups them by conventional commit type, and uses the configured agent to produce a human-readable summary. If `.maggus/RELEASE_NOTES.md` exists (accumulated during work iterations), it is included as context and then deleted after generation.
+
+---
+
+## maggus ignore
+
+Exclude plans or tasks from the work loop.
+
+### Usage
+
+```bash
+maggus ignore plan <plan-id>
+maggus ignore task <TASK-NNN>
+```
+
+### Examples
+
+```bash
+# Ignore plan 3 (renames plan_3.md → plan_3_ignored.md)
+maggus ignore plan 3
+
+# Ignore a specific task (rewrites heading to ### IGNORED TASK-007: ...)
+maggus ignore task TASK-007
+```
+
+Ignored plans and tasks are skipped by `maggus work` but remain visible in status/list views with a `~` marker.
+
+---
+
+## maggus unignore
+
+Re-include ignored plans or tasks in the work loop.
+
+### Usage
+
+```bash
+maggus unignore plan <plan-id>
+maggus unignore task <TASK-NNN>
+```
+
+### Examples
+
+```bash
+# Unignore plan 3 (renames plan_3_ignored.md → plan_3.md)
+maggus unignore plan 3
+
+# Unignore a specific task
+maggus unignore task TASK-007
+```
+
+---
+
+## maggus worktree
+
+Manage git worktrees created by `maggus work --worktree`.
+
+### Subcommands
+
+### `maggus worktree list`
+
+Show active worktrees with their run IDs and branches.
+
+```bash
+$ maggus worktree list
+Active worktrees:
+  20260315-143022  branch: feature/maggustask-001
+  20260315-150112  branch: feature/maggustask-002
+```
+
+### `maggus worktree clean`
+
+Remove all worktrees in `.maggus-work/` and their associated branches. Also cleans up stale task lock files and prunes git worktree references.
+
+```bash
+maggus worktree clean
+```

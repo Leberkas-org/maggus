@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	maggusPluginID      = "maggus@maggus"
-	maggusMarketplace   = "maggus"
+	maggusPluginID       = "maggus@maggus"
+	maggusMarketplace    = "maggus"
 	maggusMarketplaceURL = "https://github.com/Leberkas-org/maggus-skills.git"
 )
 

@@ -23,7 +23,8 @@
       "Bash(__NEW_LINE_e8c73d84caf5a8ed__ echo:*)",
       "Bash(while read:*)",
       "Bash(do wc:*)",
-      "Bash(xargs head:*)"
+      "Bash(xargs head:*)",
+      "Bash(sort -t_ -k2 -n)"
     ]
   }
 }

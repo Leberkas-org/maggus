@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"bufio"
+	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
+	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
 )
 
@@ -58,9 +62,47 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	}
 }
 
+// resolveWorkingDirectory runs the startup directory resolution logic.
+// It determines which repository to work in based on global config,
+// current directory, and user input.
+var resolveWorkingDirectory = func() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	deps := resolver.DefaultDeps()
+	// Only prompt when running in an interactive terminal.
+	if term.IsTerminal(os.Stdin.Fd()) {
+		deps.Prompt = promptYesNo
+	}
+
+	result, err := resolver.Resolve(cwd, deps)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: directory resolution failed: %v\n", err)
+		return
+	}
+
+	if result.Changed {
+		fmt.Fprintf(os.Stderr, "Switched to repository: %s\n", result.Dir)
+	}
+}
+
+// promptYesNo asks a yes/no question on stdin and returns true for yes.
+func promptYesNo(question string) bool {
+	fmt.Fprintf(os.Stderr, "%s [y/N] ", question)
+	reader := bufio.NewReader(os.Stdin)
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
+}
+
 func Execute() {
 	// Detect and cache available CLI tools on startup.
 	caps = capabilities.Detect()
+
+	// Resolve working directory based on global repository config.
+	resolveWorkingDirectory()
 
 	// Register skill commands only when claude is available.
 	if caps.HasClaude {

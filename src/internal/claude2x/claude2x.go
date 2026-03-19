@@ -11,9 +11,9 @@ const apiURL = "https://isclaude2x.com/json"
 
 // Status represents the response from the isclaude2x API.
 type Status struct {
-	Is2x                      bool   `json:"is2x"`
-	TwoXWindowExpiresIn       string `json:"2xWindowExpiresIn"`
-	TwoXWindowExpiresInSeconds int   `json:"2xWindowExpiresInSeconds"`
+	Is2x                       bool   `json:"is2x"`
+	TwoXWindowExpiresIn        string `json:"2xWindowExpiresIn"`
+	TwoXWindowExpiresInSeconds int    `json:"2xWindowExpiresInSeconds"`
 }
 
 // FetchStatus performs a GET request to the isclaude2x API and returns the parsed status.

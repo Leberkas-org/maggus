@@ -21,6 +21,7 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Tutorial', link: '/guide/tutorial' },
             { text: 'Writing Plans', link: '/guide/writing-plans' },
             { text: 'Maggus Plan Skill', link: '/guide/maggus-plan-skill' },
             { text: 'Concepts', link: '/guide/concepts' }

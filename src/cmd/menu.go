@@ -5,16 +5,90 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // claude2xResultMsg carries the result of the async 2x status fetch.
 type claude2xResultMsg struct {
 	status claude2x.Status
+}
+
+// updateCheckResultMsg carries the result of the async startup update check.
+type updateCheckResultMsg struct {
+	banner string // styled one-line banner text to show in the menu (empty = nothing to show)
+}
+
+// loadSettings is injectable for testing.
+var loadSettings = func() (globalconfig.Settings, error) {
+	return globalconfig.LoadSettings()
+}
+
+// loadUpdateState is injectable for testing.
+var loadUpdateState = func() (globalconfig.UpdateState, error) {
+	return globalconfig.LoadUpdateState()
+}
+
+// saveUpdateState is injectable for testing.
+var saveUpdateState = func(state globalconfig.UpdateState) error {
+	return globalconfig.SaveUpdateState(state)
+}
+
+// timeNow is injectable for testing.
+var timeNow = time.Now
+
+// startupUpdateCheck runs the update check logic based on global config.
+// Returns a banner string for notify mode, an applied-update message for auto mode,
+// or empty string for off mode / no update / dev build / cooldown not passed.
+func startupUpdateCheck() string {
+	if Version == "dev" {
+		return ""
+	}
+
+	settings, err := loadSettings()
+	if err != nil || settings.AutoUpdate == globalconfig.AutoUpdateOff {
+		return ""
+	}
+
+	state, err := loadUpdateState()
+	if err != nil {
+		return ""
+	}
+
+	now := timeNow()
+	if !globalconfig.ShouldCheckUpdate(state, now) {
+		return ""
+	}
+
+	info := checkLatestVersion(Version)
+
+	// Update the last check timestamp regardless of result.
+	_ = saveUpdateState(globalconfig.UpdateState{LastUpdateCheck: now})
+
+	if !info.IsNewer {
+		return ""
+	}
+
+	switch settings.AutoUpdate {
+	case globalconfig.AutoUpdateNotify:
+		return fmt.Sprintf("Update available: v%s → %s — run `maggus update` to install",
+			strings.TrimPrefix(Version, "v"), info.TagName)
+	case globalconfig.AutoUpdateAuto:
+		if info.DownloadURL == "" {
+			return ""
+		}
+		if err := applyUpdate(info.DownloadURL); err != nil {
+			return ""
+		}
+		return fmt.Sprintf("Updated to %s — restart maggus to use the new version", info.TagName)
+	}
+
+	return ""
 }
 
 // menuItem represents a single entry in the main menu.
@@ -41,7 +115,10 @@ var allMenuItems = []menuItem{
 	{name: "worktree", desc: "Manage Maggus worktrees"},
 	{name: "release", desc: "Generate RELEASE.md with changelog"},
 	{name: "clean", desc: "Remove completed plans and finished runs"},
-{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+	{name: "update", desc: "Check for and install updates"},
+	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
+	// Group 4: Repository management
+	{name: "repos", desc: "Manage configured repositories", separator: true},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
 }
@@ -153,16 +230,18 @@ func loadPlanSummary() planSummary {
 
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
-	items    []menuItem
-	cursor   int
-	selected string   // command name chosen by the user, empty if quit
-	args     []string // args to pass to the selected command
-	quitting bool
-	summary  planSummary
-	width    int
-	height   int
+	items         []menuItem
+	cursor        int
+	selected      string   // command name chosen by the user, empty if quit
+	args          []string // args to pass to the selected command
+	quitting      bool
+	summary       planSummary
+	width         int
+	height        int
+	cwd           string // current working directory, shown in header
 	is2x          bool   // true when Claude is in 2x mode (logo/border turn yellow)
 	twoXExpiresIn string // e.g. "17h 54m 44s" — only set when is2x is true
+	updateBanner  string // one-line update notification shown below summary
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -172,17 +251,24 @@ type menuModel struct {
 }
 
 func newMenuModel(summary planSummary) menuModel {
+	cwd, _ := os.Getwd()
 	return menuModel{
 		items:       activeMenuItems(),
 		summary:     summary,
+		cwd:         cwd,
 		subMenuDefs: buildSubMenus(),
 	}
 }
 
 func (m menuModel) Init() tea.Cmd {
-	return func() tea.Msg {
-		return claude2xResultMsg{status: claude2x.FetchStatus()}
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			return claude2xResultMsg{status: claude2x.FetchStatus()}
+		},
+		func() tea.Msg {
+			return updateCheckResultMsg{banner: startupUpdateCheck()}
+		},
+	)
 }
 
 func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -194,6 +280,9 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case claude2xResultMsg:
 		m.is2x = msg.status.Is2x
 		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
+		return m, nil
+	case updateCheckResultMsg:
+		m.updateBanner = msg.banner
 		return m, nil
 	case tea.KeyMsg:
 		if m.inSubMenu {
@@ -364,11 +453,28 @@ func (m menuModel) View() string {
 		centerLine(versionLine, contentW) + "\n" +
 		centerLine(summaryLine, contentW)
 
+	// Show current working directory below the summary
+	if m.cwd != "" {
+		cwdStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		cwdDisplay := m.cwd
+		// Only truncate if this is a git repo and not the home directory.
+		if home, err := os.UserHomeDir(); err != nil || (m.cwd != home && isGitRepoCheck(m.cwd)) {
+			cwdDisplay = truncateLeft(m.cwd, contentW-4)
+		}
+		header += "\n" + centerLine(cwdStyle.Render(cwdDisplay), contentW)
+	}
+
 	// Show 2x remaining time below the summary when active
 	if m.is2x && m.twoXExpiresIn != "" {
 		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
 		twoXLine := twoXStyle.Render(fmt.Sprintf("2x expires in: %s", m.twoXExpiresIn))
 		header += "\n" + centerLine(twoXLine, contentW)
+	}
+
+	// Show update banner when available
+	if m.updateBanner != "" {
+		updateStyle := lipgloss.NewStyle().Foreground(styles.Success).Bold(true)
+		header += "\n" + centerLine(updateStyle.Render(m.updateBanner), contentW)
 	}
 
 	content := header + "\n\n" + body
@@ -396,6 +502,17 @@ func centerBlock(block string, width int) string {
 		lines[i] = centerLine(line, width)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// truncateLeft truncates a path from the left, adding "..." prefix.
+func truncateLeft(path string, maxWidth int) string {
+	if maxWidth <= 0 || len(path) <= maxWidth {
+		return path
+	}
+	if maxWidth <= 3 {
+		return path[len(path)-maxWidth:]
+	}
+	return "..." + path[len(path)-(maxWidth-3):]
 }
 
 func (m menuModel) viewMainMenu() (string, string) {

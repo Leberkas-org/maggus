@@ -79,10 +79,10 @@ func TestConstants(t *testing.T) {
 
 func TestPluginInfo_JSONUnmarshal(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantID  string
-		wantOn  bool
+		name   string
+		input  string
+		wantID string
+		wantOn bool
 	}{
 		{
 			name:   "enabled plugin",

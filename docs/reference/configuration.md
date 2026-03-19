@@ -1,18 +1,21 @@
 # Configuration
 
-Maggus is configured through a YAML file and CLI flags. This page documents all available options.
+Maggus is configured through project-level and global config files, plus CLI flags. This page documents all available options.
 
-## Config File
+## Project Config (`.maggus/config.yml`)
 
-Maggus reads its configuration from `.maggus/config.yml` in your project root. If the file does not exist, Maggus uses default settings with no errors.
+Maggus reads its project configuration from `.maggus/config.yml` in your project root. If the file does not exist, Maggus uses default settings with no errors. Run `maggus init` to create this file with commented defaults, or `maggus config` to edit it interactively.
 
 ```yaml
 # .maggus/config.yml
 agent: claude
 model: anthropic/claude-sonnet-4-6
+worktree: false
 include:
   - ARCHITECTURE.md
   - docs/PATTERNS.md
+notifications:
+  sound: false
 ```
 
 ### `agent`
@@ -63,6 +66,16 @@ Bare model IDs without a provider prefix (e.g. `claude-sonnet-4-6`) still work f
 
 If omitted, Maggus does not pass a model flag to the agent, which uses the agent's default model.
 
+### `worktree`
+
+When set to `true`, `maggus work` runs each task in an isolated git worktree under `.maggus-work/`. This allows multiple Maggus instances to work on different tasks in parallel without interfering with each other.
+
+```yaml
+worktree: true
+```
+
+Defaults to `false`. Can be overridden with `--worktree` or `--no-worktree` CLI flags.
+
 ### `include`
 
 A list of additional files to include in the prompt context. Paths are relative to the project root.
@@ -77,6 +90,69 @@ include:
 These files are read at the start of each task and appended to the bootstrap context section of the prompt. This is useful for feeding project-specific documentation, architecture decisions, or coding guidelines into every task.
 
 If an included file does not exist, Maggus prints a warning to stderr and skips it — the task still runs with the remaining valid includes.
+
+### `notifications`
+
+Controls sound notifications during work runs. All sounds use the terminal bell character (`\a`).
+
+```yaml
+notifications:
+  sound: true
+  on_task_complete: true
+  on_run_complete: true
+  on_error: true
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `sound` | `false` | Master toggle — must be `true` for any sound to play |
+| `on_task_complete` | `true` | Play a sound when a task finishes successfully |
+| `on_run_complete` | `true` | Play a sound when the entire work run finishes |
+| `on_error` | `true` | Play a sound when a task or commit fails |
+
+The per-event toggles default to `true` when `sound` is enabled. Set any to `false` to selectively disable specific notifications.
+
+## Global Config (`~/.maggus/config.yml`)
+
+Global settings that apply across all projects are stored at `~/.maggus/config.yml`.
+
+```yaml
+# ~/.maggus/config.yml
+auto_update: notify
+```
+
+### `auto_update`
+
+Controls how Maggus handles update checks on startup.
+
+| Value | Description |
+|-------|-------------|
+| `off` | Never check for updates automatically |
+| `notify` | Check for updates and show a banner if one is available (default) |
+| `auto` | Automatically download and apply updates silently |
+
+When set to `notify` or `auto`, Maggus checks the GitHub Releases API at most once every 24 hours. The last check timestamp is stored in `~/.maggus/update_state.json`.
+
+Update checks are always skipped when running a local dev build (version = `"dev"`).
+
+## Repository Registry (`~/.maggus/repositories.yml`)
+
+Maggus keeps a list of known repositories at `~/.maggus/repositories.yml`. This is used by the interactive main menu's repository switcher to quickly jump between projects.
+
+```yaml
+# ~/.maggus/repositories.yml
+repositories:
+  - path: /home/user/projects/myapp
+  - path: /home/user/projects/other-repo
+last_opened: /home/user/projects/myapp
+```
+
+| Field | Description |
+|-------|-------------|
+| `repositories` | List of known repository paths |
+| `last_opened` | Path of the most recently opened repository (used for auto-resolution on startup) |
+
+You don't need to edit this file manually — use the **Repos** option in the interactive menu to add, remove, and switch between repositories.
 
 ## CLI Flags
 
@@ -151,9 +227,13 @@ A typical configuration using Claude Code (the default agent):
 # .maggus/config.yml — Claude Code
 agent: claude
 model: sonnet
+worktree: false
 include:
   - ARCHITECTURE.md
   - docs/coding-guidelines.md
+notifications:
+  sound: true
+  on_error: true
 ```
 
 ```bash

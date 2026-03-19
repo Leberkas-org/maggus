@@ -65,11 +65,11 @@ func buildProgressBarPlain(done, total int) string {
 
 // statusModel is the bubbletea model for the interactive status TUI.
 type statusModel struct {
-	plans       []planInfo
-	showAll     bool
-	nextTaskID  string
+	plans        []planInfo
+	showAll      bool
+	nextTaskID   string
 	nextTaskFile string
-	agentName   string
+	agentName    string
 
 	// Plan tab selection
 	selectedPlan int // index into visiblePlans()
@@ -888,7 +888,6 @@ func (m statusModel) viewStatus() string {
 	}
 	return styles.Box.Render(sb.String()+"\n\n"+footer) + "\n"
 }
-
 
 func (m statusModel) viewDetail() string {
 	if !m.detailReady {
