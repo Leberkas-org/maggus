@@ -117,13 +117,13 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a user, I want up-to-date configuration reference docs so that I can understand all available settings.
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/configuration.md` updated to include:
+- [x] `docs/reference/configuration.md` updated to include:
   - All `.maggus/config.yml` fields with descriptions and defaults
   - Global config (`~/.maggus/config.yml`) fields including the new `auto_update` setting
   - `~/.maggus/repositories.yml` format explanation
   - Model alias table (sonnet, opus, haiku → full model IDs)
-- [ ] `docs/reference/commands.md` updated to include the new `maggus update` command
-- [ ] All existing command docs are verified to be current
+- [x] `docs/reference/commands.md` updated to include the new `maggus update` command
+- [x] All existing command docs are verified to be current
 
 ### TASK-010: Update VitePress sidebar and navigation
 **Description:** As a user, I want consistent navigation in the docs site so that I can find all pages.
