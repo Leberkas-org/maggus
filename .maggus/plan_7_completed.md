@@ -129,11 +129,11 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a user, I want consistent navigation in the docs site so that I can find all pages.
 
 **Acceptance Criteria:**
-- [ ] VitePress config (`.vitepress/config.js` or similar) updated with sidebar entries for:
+- [x] VitePress config (`.vitepress/config.js` or similar) updated with sidebar entries for:
   - Guide: Getting Started, Tutorial, Concepts, Writing Plans, Maggus Plan Skill
   - Reference: Commands, Configuration
-- [ ] All sidebar links resolve correctly
-- [ ] Home page hero "Get Started" button links to the updated getting-started page
+- [x] All sidebar links resolve correctly
+- [x] Home page hero "Get Started" button links to the updated getting-started page
 
 ## Functional Requirements
 
