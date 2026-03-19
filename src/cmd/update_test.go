@@ -21,8 +21,25 @@ func newTestUpdateCmd() *cobra.Command {
 
 func TestUpdate_DevVersion(t *testing.T) {
 	origVersion := Version
-	defer func() { Version = origVersion }()
+	origCheck := checkLatestVersion
+	origPrompt := promptConfirm
+	origApply := applyUpdate
+	defer func() {
+		Version = origVersion
+		checkLatestVersion = origCheck
+		promptConfirm = origPrompt
+		applyUpdate = origApply
+	}()
 	Version = "dev"
+	checkLatestVersion = func(v string) updater.UpdateInfo {
+		return updater.UpdateInfo{
+			TagName:     "v1.5.0",
+			DownloadURL: "https://example.com/maggus.zip",
+			IsNewer:     true,
+			Body:        "New release",
+		}
+	}
+	promptConfirm = func(q string) bool { return false }
 
 	cmd := newTestUpdateCmd()
 	var buf bytes.Buffer
@@ -33,8 +50,67 @@ func TestUpdate_DevVersion(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "Skipping update check — running a local dev build") {
-		t.Errorf("expected dev build message, got: %s", output)
+	// Should proceed with update check, not skip
+	if strings.Contains(output, "Skipping") {
+		t.Errorf("dev build should not skip update check, got: %s", output)
+	}
+	// Should show "dev → vX.Y.Z" without "v" prefix on "dev"
+	if !strings.Contains(output, "Update available: dev → v1.5.0") {
+		t.Errorf("expected 'Update available: dev → v1.5.0', got: %s", output)
+	}
+}
+
+func TestUpdate_DevVersion_ApplySuccessful(t *testing.T) {
+	origVersion := Version
+	origCheck := checkLatestVersion
+	origApply := applyUpdate
+	origPrompt := promptConfirm
+	defer func() {
+		Version = origVersion
+		checkLatestVersion = origCheck
+		applyUpdate = origApply
+		promptConfirm = origPrompt
+	}()
+
+	Version = "dev"
+	var appliedURL string
+	checkLatestVersion = func(v string) updater.UpdateInfo {
+		if v != "dev" {
+			t.Errorf("expected currentVersion 'dev', got: %s", v)
+		}
+		return updater.UpdateInfo{
+			TagName:     "v2.1.0",
+			DownloadURL: "https://example.com/maggus_v2.1.0.zip",
+			IsNewer:     true,
+			Body:        "Bug fixes",
+		}
+	}
+	applyUpdate = func(url string) error {
+		appliedURL = url
+		return nil
+	}
+	promptConfirm = func(q string) bool { return true }
+
+	cmd := newTestUpdateCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Update available: dev → v2.1.0") {
+		t.Errorf("expected version comparison with 'dev', got: %s", output)
+	}
+	if !strings.Contains(output, "Bug fixes") {
+		t.Errorf("expected changelog, got: %s", output)
+	}
+	if !strings.Contains(output, "Successfully updated to v2.1.0") {
+		t.Errorf("expected success message, got: %s", output)
+	}
+	if appliedURL != "https://example.com/maggus_v2.1.0.zip" {
+		t.Errorf("expected apply to be called with download URL, got: %s", appliedURL)
 	}
 }
 

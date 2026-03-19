@@ -46,12 +46,6 @@ func runUpdate(cmd *cobra.Command) error {
 
 	currentVersion := Version
 
-	// Dev build guard
-	if currentVersion == "dev" {
-		fmt.Fprintln(out, "Skipping update check — running a local dev build")
-		return nil
-	}
-
 	fmt.Fprintln(out, "Checking for updates...")
 
 	info := checkLatestVersion(currentVersion)
@@ -61,9 +55,13 @@ func runUpdate(cmd *cobra.Command) error {
 		return nil
 	}
 
-	// Show current vs latest
-	fmt.Fprintf(out, "Update available: v%s → %s\n",
-		strings.TrimPrefix(currentVersion, "v"),
+	// Show current vs latest — "dev" is displayed as-is, tagged versions get "v" prefix normalization
+	currentDisplay := currentVersion
+	if currentVersion != "dev" {
+		currentDisplay = "v" + strings.TrimPrefix(currentVersion, "v")
+	}
+	fmt.Fprintf(out, "Update available: %s → %s\n",
+		currentDisplay,
 		info.TagName)
 
 	// Show changelog summary if available

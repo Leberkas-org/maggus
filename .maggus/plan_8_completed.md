@@ -26,15 +26,15 @@ Currently, both the manual `maggus update` command and the automatic startup upd
 **Description:** As a developer running a local build, I want `maggus update` to check for and install updates instead of printing "Skipping update check".
 
 **Acceptance Criteria:**
-- [ ] The dev build guard (`if currentVersion == "dev"`) is removed from `runUpdate` in `src/cmd/update.go`
-- [ ] When `Version == "dev"`, running `maggus update` fetches the latest release and shows "Update available: dev → vX.Y.Z"
-- [ ] The version display in the "Update available" line handles "dev" gracefully (no `v` prefix stripping needed for "dev")
-- [ ] Confirmation prompt and apply flow work identically to non-dev builds
-- [ ] The automatic startup check in `src/cmd/menu.go` still returns early for dev builds (no change)
-- [ ] Update `TestUpdate_DevVersion` to verify that the update flow proceeds instead of skipping
-- [ ] Add a new test: dev build with mocked newer release shows update available and applies successfully
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] The dev build guard (`if currentVersion == "dev"`) is removed from `runUpdate` in `src/cmd/update.go`
+- [x] When `Version == "dev"`, running `maggus update` fetches the latest release and shows "Update available: dev → vX.Y.Z"
+- [x] The version display in the "Update available" line handles "dev" gracefully (no `v` prefix stripping needed for "dev")
+- [x] Confirmation prompt and apply flow work identically to non-dev builds
+- [x] The automatic startup check in `src/cmd/menu.go` still returns early for dev builds (no change)
+- [x] Update `TestUpdate_DevVersion` to verify that the update flow proceeds instead of skipping
+- [x] Add a new test: dev build with mocked newer release shows update available and applies successfully
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ## Functional Requirements
 
