@@ -24,6 +24,11 @@ type updateCheckResultMsg struct {
 	banner string // styled one-line banner text to show in the menu (empty = nothing to show)
 }
 
+// hideShortcutsMsg is sent after a delay to hide the shortcut underlines.
+type hideShortcutsMsg struct {
+	timerID int // only hide if this matches the current timer ID
+}
+
 // loadSettings is injectable for testing.
 var loadSettings = func() (globalconfig.Settings, error) {
 	return globalconfig.LoadSettings()
@@ -95,6 +100,8 @@ func startupUpdateCheck() string {
 type menuItem struct {
 	name              string
 	desc              string
+	shortcut          rune   // keyboard shortcut (0 = none)
+	shortcutLabel     string // display label for the shortcut (e.g. "w", "s")
 	requiresClaude    bool
 	hideIfInitialized bool
 	separator         bool // render a blank line before this item
@@ -103,22 +110,22 @@ type menuItem struct {
 
 var allMenuItems = []menuItem{
 	// Group 1: Core workflow
-	{name: "work", desc: "Work on the next N tasks from the implementation plan"},
-	{name: "status", desc: "Show a compact summary of plan progress"},
-	{name: "list", desc: "Preview upcoming workable tasks"},
-	// Group 2: AI-assisted creation
-	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true},
-	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true},
-	{name: "plan", desc: "Create an implementation plan", requiresClaude: true},
-	// Group 3: Project management
-	{name: "config", desc: "Edit project settings", separator: true},
-	{name: "worktree", desc: "Manage Maggus worktrees"},
-	{name: "release", desc: "Generate RELEASE.md with changelog"},
-	{name: "clean", desc: "Remove completed plans and finished runs"},
-	{name: "update", desc: "Check for and install updates"},
-	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true},
-	// Group 4: Repository management
-	{name: "repos", desc: "Manage configured repositories", separator: true},
+	{name: "work", desc: "Work on the next N tasks from the implementation plan", shortcut: 'w', shortcutLabel: "w"},
+	{name: "status", desc: "Show a compact summary of plan progress", shortcut: 's', shortcutLabel: "s"},
+	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
+	// Group 2: Repository management
+	{name: "repos", desc: "Manage configured repositories", separator: true, shortcut: 'r', shortcutLabel: "r"},
+	// Group 3: AI-assisted creation
+	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true, shortcut: 'v', shortcutLabel: "v"},
+	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true, shortcut: 'a', shortcutLabel: "a"},
+	{name: "plan", desc: "Create an implementation plan", requiresClaude: true, shortcut: 'p', shortcutLabel: "p"},
+	// Group 4: Project management
+	{name: "config", desc: "Edit project settings", separator: true, shortcut: 'c', shortcutLabel: "c"},
+	{name: "worktree", desc: "Manage Maggus worktrees", shortcut: 't', shortcutLabel: "t"},
+	{name: "release", desc: "Generate RELEASE.md with changelog", shortcut: 'z', shortcutLabel: "z"},
+	{name: "clean", desc: "Remove completed plans and finished runs", shortcut: 'n', shortcutLabel: "n"},
+	{name: "update", desc: "Check for and install updates", shortcut: 'u', shortcutLabel: "u"},
+	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true, shortcut: 'i', shortcutLabel: "i"},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
 }
@@ -230,18 +237,20 @@ func loadPlanSummary() planSummary {
 
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
-	items         []menuItem
-	cursor        int
-	selected      string   // command name chosen by the user, empty if quit
-	args          []string // args to pass to the selected command
-	quitting      bool
-	summary       planSummary
-	width         int
-	height        int
-	cwd           string // current working directory, shown in header
-	is2x          bool   // true when Claude is in 2x mode (logo/border turn yellow)
-	twoXExpiresIn string // e.g. "17h 54m 44s" — only set when is2x is true
-	updateBanner  string // one-line update notification shown below summary
+	items           []menuItem
+	cursor          int
+	selected        string   // command name chosen by the user, empty if quit
+	args            []string // args to pass to the selected command
+	quitting        bool
+	summary         planSummary
+	width           int
+	height          int
+	cwd             string // current working directory, shown in header
+	is2x            bool   // true when Claude is in 2x mode (logo/border turn yellow)
+	twoXExpiresIn   string // e.g. "17h 54m 44s" — only set when is2x is true
+	updateBanner    string // one-line update notification shown below summary
+	showShortcuts   bool   // true while alt is held — underlines shortcut chars
+	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -284,7 +293,39 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
 		return m, nil
+	case hideShortcutsMsg:
+		// Only hide if this timer is still the latest one
+		if msg.timerID == m.shortcutTimerID {
+			m.showShortcuts = false
+		}
+		return m, nil
+
 	case tea.KeyMsg:
+		if msg.Alt {
+			// Show shortcuts and schedule auto-hide
+			m.showShortcuts = true
+			m.shortcutTimerID++
+			timerID := m.shortcutTimerID
+			hideCmd := tea.Tick(1500*time.Millisecond, func(_ time.Time) tea.Msg {
+				return hideShortcutsMsg{timerID: timerID}
+			})
+
+			// Alt+key shortcuts (main menu only, not sub-menu)
+			if !m.inSubMenu && len(msg.Runes) == 1 {
+				r := msg.Runes[0]
+				for i, item := range m.items {
+					if item.shortcut != 0 && item.shortcut == r {
+						m.cursor = i
+						return m.activateItem(item)
+					}
+				}
+			}
+			return m, hideCmd
+		}
+
+		// Non-alt key: hide shortcuts immediately
+		m.showShortcuts = false
+
 		if m.inSubMenu {
 			return m.updateSubMenu(msg)
 		}
@@ -298,13 +339,13 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc", "ctrl+c":
 		m.quitting = true
 		return m, tea.Quit
-	case "up", "k":
+	case "up":
 		if m.cursor > 0 {
 			m.cursor--
 		} else {
 			m.cursor = len(m.items) - 1
 		}
-	case "down", "j":
+	case "down":
 		if m.cursor < len(m.items)-1 {
 			m.cursor++
 		} else {
@@ -315,31 +356,35 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "end":
 		m.cursor = len(m.items) - 1
 	case "enter":
-		item := m.items[m.cursor]
-		if item.isExit {
-			m.quitting = true
-			return m, tea.Quit
-		}
-		if def, ok := m.subMenuDefs[item.name]; ok {
-			// Deep copy the sub-menu def so each entry resets
-			copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
-			for i, opt := range def.options {
-				copied.options[i] = subMenuOption{
-					label:   opt.label,
-					values:  opt.values,
-					current: opt.current,
-				}
-			}
-			m.activeSubDef = &copied
-			m.inSubMenu = true
-			m.subCursor = 0
-			return m, nil
-		}
-		// No sub-menu — launch directly
-		m.selected = item.name
-		return m, tea.Quit
+		return m.activateItem(m.items[m.cursor])
 	}
 	return m, nil
+}
+
+// activateItem handles selecting a menu item (enter or shortcut).
+func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
+	if item.isExit {
+		m.quitting = true
+		return m, tea.Quit
+	}
+	if def, ok := m.subMenuDefs[item.name]; ok {
+		// Deep copy the sub-menu def so each entry resets
+		copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
+		for i, opt := range def.options {
+			copied.options[i] = subMenuOption{
+				label:   opt.label,
+				values:  opt.values,
+				current: opt.current,
+			}
+		}
+		m.activeSubDef = &copied
+		m.inSubMenu = true
+		m.subCursor = 0
+		return m, nil
+	}
+	// No sub-menu — launch directly
+	m.selected = item.name
+	return m, tea.Quit
 }
 
 func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -504,6 +549,23 @@ func centerBlock(block string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// highlightShortcut renders the name with the shortcut character underlined
+// when active is true. Otherwise renders the full name with the base style.
+func highlightShortcut(name string, shortcut rune, base lipgloss.Style, active bool) string {
+	if !active || shortcut == 0 {
+		return base.Render(name)
+	}
+	underline := base.Underline(true)
+	for i, ch := range name {
+		if ch == shortcut {
+			before := name[:i]
+			after := name[i+len(string(ch)):]
+			return base.Render(before) + underline.Render(string(ch)) + base.Render(after)
+		}
+	}
+	return base.Render(name)
+}
+
 // truncateLeft truncates a path from the left, adding "..." prefix.
 func truncateLeft(path string, maxWidth int) string {
 	if maxWidth <= 0 || len(path) <= maxWidth {
@@ -564,19 +626,19 @@ func (m menuModel) viewMainMenu() (string, string) {
 			fmt.Fprintf(&sb, "%s%s %s  %s\n",
 				indent,
 				cursor.Render("→"),
-				nameStyle.Render(padded),
+				highlightShortcut(padded, item.shortcut, nameStyle, m.showShortcuts),
 				descStyle.Render(item.desc),
 			)
 		} else {
 			fmt.Fprintf(&sb, "%s  %s  %s\n",
 				indent,
-				normalStyle.Render(padded),
+				highlightShortcut(padded, item.shortcut, normalStyle, m.showShortcuts),
 				descStyle.Render(item.desc),
 			)
 		}
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: navigate · enter: select · q/esc: exit")
+	footer := styles.StatusBar.Render("↑/↓ navigate · enter select · hold alt for shortcuts · esc exit")
 	return sb.String(), footer
 }
 

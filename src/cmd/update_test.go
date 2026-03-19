@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/updater"
 )
 
@@ -12,10 +13,19 @@ func setupUpdateTest(_ *testing.T) func() {
 	origVersion := Version
 	origCheck := checkLatestVersion
 	origApply := applyUpdate
+	origLoad := loadGlobalSettings
+	origSave := saveGlobalSettings
+	// Default test stubs: return notify mode, discard saves.
+	loadGlobalSettings = func() (globalconfig.Settings, error) {
+		return globalconfig.Settings{AutoUpdate: globalconfig.AutoUpdateNotify}, nil
+	}
+	saveGlobalSettings = func(_ globalconfig.Settings) error { return nil }
 	return func() {
 		Version = origVersion
 		checkLatestVersion = origCheck
 		applyUpdate = origApply
+		loadGlobalSettings = origLoad
+		saveGlobalSettings = origSave
 	}
 }
 
@@ -206,8 +216,8 @@ func TestUpdate_UpdateAvailable_Declined(t *testing.T) {
 	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
 	um := model.(updateModel)
 
-	// Select Cancel (move down to index 1, then enter)
-	model, _ = um.Update(tea.KeyMsg{Type: tea.KeyDown})
+	// Select Cancel (→ moves to index 1, then enter)
+	model, _ = um.Update(tea.KeyMsg{Type: tea.KeyRight})
 	um = model.(updateModel)
 	if um.menuChoice != 1 {
 		t.Errorf("expected menuChoice 1, got %d", um.menuChoice)
@@ -315,6 +325,70 @@ func TestUpdate_NoChangelog(t *testing.T) {
 
 	if um.phase != phaseSuccess {
 		t.Errorf("expected phaseSuccess, got %d", um.phase)
+	}
+}
+
+func TestUpdate_AutoUpdateToggle(t *testing.T) {
+	defer setupUpdateTest(t)()
+	Version = "1.0.0"
+	checkLatestVersion = func(v string) updater.UpdateInfo {
+		return updater.UpdateInfo{TagName: "v1.0.0", IsNewer: false}
+	}
+
+	// Track what gets saved
+	var savedMode globalconfig.AutoUpdateMode
+	saveGlobalSettings = func(s globalconfig.Settings) error {
+		savedMode = s.AutoUpdate
+		return nil
+	}
+
+	m := newUpdateModel(Version)
+
+	// Starts at "notify" (index 1)
+	if autoUpdateModes[m.autoUpdateIdx] != globalconfig.AutoUpdateNotify {
+		t.Fatalf("expected initial mode notify, got %s", autoUpdateModes[m.autoUpdateIdx])
+	}
+
+	// Move to phaseUpToDate
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
+
+	// Press 'a' to cycle: notify → auto
+	model, _ = um.Update(tea.KeyMsg{Runes: []rune{'a'}})
+	um = model.(updateModel)
+	if autoUpdateModes[um.autoUpdateIdx] != globalconfig.AutoUpdateAuto {
+		t.Errorf("expected auto after first toggle, got %s", autoUpdateModes[um.autoUpdateIdx])
+	}
+	if !um.autoUpdateDirty {
+		t.Error("expected dirty flag after change")
+	}
+
+	// Press 'a' again: auto → off
+	model, _ = um.Update(tea.KeyMsg{Runes: []rune{'a'}})
+	um = model.(updateModel)
+	if autoUpdateModes[um.autoUpdateIdx] != globalconfig.AutoUpdateOff {
+		t.Errorf("expected off after second toggle, got %s", autoUpdateModes[um.autoUpdateIdx])
+	}
+
+	// Press 'a' again: off → notify (back to original)
+	model, _ = um.Update(tea.KeyMsg{Runes: []rune{'a'}})
+	um = model.(updateModel)
+	if autoUpdateModes[um.autoUpdateIdx] != globalconfig.AutoUpdateNotify {
+		t.Errorf("expected notify after third toggle, got %s", autoUpdateModes[um.autoUpdateIdx])
+	}
+	if um.autoUpdateDirty {
+		t.Error("expected dirty flag cleared when back to original")
+	}
+
+	// Change to auto and exit — should save
+	model, _ = um.Update(tea.KeyMsg{Runes: []rune{'a'}})
+	um = model.(updateModel)
+	// Exit (any key other than 'a')
+	model, _ = um.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = model.(updateModel)
+
+	if savedMode != globalconfig.AutoUpdateAuto {
+		t.Errorf("expected saved mode auto, got %s", savedMode)
 	}
 }
 

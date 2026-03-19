@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -47,33 +48,57 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	final := result.(configModel)
-	if final.saved {
+	switch final.action {
+	case configActionSaveProject:
 		newCfg := final.buildConfig()
-		// Preserve fields not editable in the TUI.
 		newCfg.Include = cfg.Include
 		return saveConfig(dir, newCfg)
-	}
-	if final.openEditor {
+	case configActionSaveGlobal:
+		return final.saveGlobalConfig()
+	case configActionEditProject:
 		return openInEditor(filepath.Join(dir, ".maggus", "config.yml"))
+	case configActionEditGlobal:
+		path, err := globalconfig.SettingsFilePath()
+		if err != nil {
+			return err
+		}
+		return openInEditor(path)
 	}
 	return nil
 }
 
-// configOption represents a single editable setting.
-type configOption struct {
+// configAction represents the user's chosen action on exit.
+type configAction int
+
+const (
+	configActionNone        configAction = iota
+	configActionSaveProject              // save .maggus/config.yml
+	configActionSaveGlobal               // save ~/.maggus/config.yml
+	configActionEditProject              // open .maggus/config.yml in editor
+	configActionEditGlobal               // open ~/.maggus/config.yml in editor
+)
+
+// configRow is a single navigable row in the config TUI.
+// It is either a setting (values != nil) or an action button.
+type configRow struct {
 	label   string
-	key     string // config key for display
-	values  []string
-	current int
+	values  []string     // nil for action buttons
+	current int          // selected value index (settings only)
+	action  configAction // non-zero for action buttons
+	section string       // non-empty triggers a section header before this row
+	isSave  bool         // render with save style
 }
 
+func (r configRow) isOption() bool { return r.values != nil }
+
 type configModel struct {
-	options    []configOption
-	cursor     int
-	saved      bool
-	openEditor bool
-	width      int
-	height     int
+	rows   []configRow
+	cursor int
+	action configAction
+	width  int
+	height int
+	// indices for buildConfig / saveGlobalConfig
+	globalAutoUpdateIdx int
 }
 
 func newConfigModel(cfg config.Config) configModel {
@@ -113,47 +138,97 @@ func newConfigModel(cfg config.Config) configModel {
 		errorIdx = 1
 	}
 
-	return configModel{
-		options: []configOption{
-			{label: "Agent", key: "agent", values: agentValues, current: agentIdx},
-			{label: "Model", key: "model", values: modelValues, current: modelIdx},
-			{label: "Worktree", key: "worktree", values: worktreeValues, current: worktreeIdx},
-			{label: "Sound", key: "notifications.sound", values: soundValues, current: soundIdx},
-			{label: "  On task complete", key: "notifications.on_task_complete", values: taskCompleteValues, current: taskCompleteIdx},
-			{label: "  On run complete", key: "notifications.on_run_complete", values: runCompleteValues, current: runCompleteIdx},
-			{label: "  On error", key: "notifications.on_error", values: errorValues, current: errorIdx},
-		},
+	// Load global auto-update setting
+	autoUpdateValues := []string{"off", "notify", "auto"}
+	autoUpdateIdx := 1 // default: notify
+	globalSettings, err := loadGlobalSettings()
+	if err == nil {
+		autoUpdateIdx = indexOf(autoUpdateValues, string(globalSettings.AutoUpdate))
 	}
+
+	rows := []configRow{
+		// Project section
+		{label: "Agent", values: agentValues, current: agentIdx, section: "Project"},
+		{label: "Model", values: modelValues, current: modelIdx},
+		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
+		{label: "Sound", values: soundValues, current: soundIdx},
+		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
+		{label: "  On run complete", values: runCompleteValues, current: runCompleteIdx},
+		{label: "  On error", values: errorValues, current: errorIdx},
+		// Project actions
+		{label: "Save project config", action: configActionSaveProject, isSave: true},
+		{label: "Edit project file in editor", action: configActionEditProject},
+		// Global section
+		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx, section: "Global"},
+		// Global actions
+		{label: "Save global config", action: configActionSaveGlobal, isSave: true},
+		{label: "Edit global file in editor", action: configActionEditGlobal},
+	}
+
+	// Find the auto-update row index for saveGlobalConfig
+	globalAutoUpdateIdx := 0
+	for i, r := range rows {
+		if r.label == "Auto-update" && r.isOption() {
+			globalAutoUpdateIdx = i
+			break
+		}
+	}
+
+	return configModel{
+		rows:                rows,
+		globalAutoUpdateIdx: globalAutoUpdateIdx,
+	}
+}
+
+// optionByLabel finds the first option row with the given label.
+func (m configModel) optionByLabel(label string) configRow {
+	for _, r := range m.rows {
+		if r.label == label && r.isOption() {
+			return r
+		}
+	}
+	return configRow{}
 }
 
 func (m configModel) buildConfig() config.Config {
 	cfg := config.Config{
-		Agent:    m.options[0].values[m.options[0].current],
-		Worktree: m.options[2].values[m.options[2].current] == "on",
+		Agent:    m.optionByLabel("Agent").values[m.optionByLabel("Agent").current],
+		Worktree: m.optionByLabel("Worktree").values[m.optionByLabel("Worktree").current] == "on",
 	}
 
-	model := m.options[1].values[m.options[1].current]
+	modelRow := m.optionByLabel("Model")
+	model := modelRow.values[modelRow.current]
 	if model != "(default)" {
 		cfg.Model = model
 	}
 
-	sound := m.options[3].values[m.options[3].current] == "on"
-	cfg.Notifications.Sound = sound
+	cfg.Notifications.Sound = m.optionByLabel("Sound").values[m.optionByLabel("Sound").current] == "on"
 
-	if m.options[4].values[m.options[4].current] == "off" {
+	if m.optionByLabel("  On task complete").values[m.optionByLabel("  On task complete").current] == "off" {
 		f := false
 		cfg.Notifications.OnTaskComplete = &f
 	}
-	if m.options[5].values[m.options[5].current] == "off" {
+	if m.optionByLabel("  On run complete").values[m.optionByLabel("  On run complete").current] == "off" {
 		f := false
 		cfg.Notifications.OnRunComplete = &f
 	}
-	if m.options[6].values[m.options[6].current] == "off" {
+	if m.optionByLabel("  On error").values[m.optionByLabel("  On error").current] == "off" {
 		f := false
 		cfg.Notifications.OnError = &f
 	}
 
 	return cfg
+}
+
+func (m configModel) saveGlobalConfig() error {
+	row := m.rows[m.globalAutoUpdateIdx]
+	mode := globalconfig.AutoUpdateMode(row.values[row.current])
+	settings, err := loadGlobalSettings()
+	if err != nil {
+		settings = globalconfig.DefaultSettings()
+	}
+	settings.AutoUpdate = mode
+	return saveGlobalSettings(settings)
 }
 
 func (m configModel) Init() tea.Cmd { return nil }
@@ -165,13 +240,10 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
-		// Total items = options + Save + Edit file + Cancel
-		itemCount := len(m.options) + 3
+		itemCount := len(m.rows)
 
 		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
-		case "esc":
+		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
 		case "up", "k":
 			if m.cursor > 0 {
@@ -186,42 +258,32 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 		case "left", "h":
-			if m.cursor < len(m.options) {
-				opt := &m.options[m.cursor]
-				if opt.current > 0 {
-					opt.current--
+			if row := &m.rows[m.cursor]; row.isOption() {
+				if row.current > 0 {
+					row.current--
 				} else {
-					opt.current = len(opt.values) - 1
+					row.current = len(row.values) - 1
 				}
 			}
 		case "right", "l":
-			if m.cursor < len(m.options) {
-				opt := &m.options[m.cursor]
-				if opt.current < len(opt.values)-1 {
-					opt.current++
+			if row := &m.rows[m.cursor]; row.isOption() {
+				if row.current < len(row.values)-1 {
+					row.current++
 				} else {
-					opt.current = 0
+					row.current = 0
 				}
 			}
 		case "enter":
-			if m.cursor < len(m.options) {
+			row := &m.rows[m.cursor]
+			if row.isOption() {
 				// Cycle value on enter
-				opt := &m.options[m.cursor]
-				if opt.current < len(opt.values)-1 {
-					opt.current++
+				if row.current < len(row.values)-1 {
+					row.current++
 				} else {
-					opt.current = 0
+					row.current = 0
 				}
-			} else if m.cursor == len(m.options) {
-				// Save
-				m.saved = true
-				return m, tea.Quit
-			} else if m.cursor == len(m.options)+1 {
-				// Edit file
-				m.openEditor = true
-				return m, tea.Quit
 			} else {
-				// Cancel
+				m.action = row.action
 				return m, tea.Quit
 			}
 		}
@@ -238,71 +300,69 @@ func (m configModel) View() string {
 	normalStyle := lipgloss.NewStyle()
 	saveStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
 
-	header := titleStyle.Render("Configuration") + "  " + mutedStyle.Render(".maggus/config.yml")
+	sectionPaths := map[string]string{
+		"Project": ".maggus/config.yml",
+		"Global":  "~/.maggus/config.yml",
+	}
 
 	var sb strings.Builder
-	sb.WriteString(header + "\n")
-	sb.WriteString(styles.Separator(50) + "\n")
 
-	for i, opt := range m.options {
-		label := fmt.Sprintf("%-22s", opt.label)
+	for i, row := range m.rows {
+		// Section header
+		if row.section != "" {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			path := sectionPaths[row.section]
+			sb.WriteString(titleStyle.Render(row.section) + "  " + mutedStyle.Render(path) + "\n")
+			sb.WriteString(styles.Separator(50) + "\n")
+		}
 
-		var valueParts []string
-		for vi, v := range opt.values {
-			if vi == opt.current {
-				if v == "off" {
-					valueParts = append(valueParts, activeOffStyle.Render(v))
+		if row.isOption() {
+			label := fmt.Sprintf("%-22s", row.label)
+
+			var valueParts []string
+			for vi, v := range row.values {
+				if vi == row.current {
+					if v == "off" {
+						valueParts = append(valueParts, activeOffStyle.Render(v))
+					} else {
+						valueParts = append(valueParts, activeValueStyle.Render(v))
+					}
 				} else {
-					valueParts = append(valueParts, activeValueStyle.Render(v))
+					valueParts = append(valueParts, mutedStyle.Render(v))
 				}
+			}
+			valueStr := strings.Join(valueParts, mutedStyle.Render(" / "))
+
+			if i == m.cursor {
+				fmt.Fprintf(&sb, "  %s %s  %s\n",
+					cursorStyle.Render("->"),
+					normalStyle.Render(label),
+					valueStr,
+				)
 			} else {
-				valueParts = append(valueParts, mutedStyle.Render(v))
+				fmt.Fprintf(&sb, "     %s  %s\n",
+					normalStyle.Render(label),
+					valueStr,
+				)
+			}
+		} else {
+			// Action button
+			btnStyle := normalStyle
+			if row.isSave {
+				btnStyle = saveStyle
+			}
+			if i == m.cursor {
+				fmt.Fprintf(&sb, "  %s %s\n", cursorStyle.Render("->"), btnStyle.Render(row.label))
+			} else {
+				fmt.Fprintf(&sb, "     %s\n", mutedStyle.Render(row.label))
 			}
 		}
-		valueStr := strings.Join(valueParts, mutedStyle.Render(" / "))
-
-		if i == m.cursor {
-			fmt.Fprintf(&sb, "  %s %s  %s\n",
-				cursorStyle.Render("->"),
-				normalStyle.Render(label),
-				valueStr,
-			)
-		} else {
-			fmt.Fprintf(&sb, "     %s  %s\n",
-				normalStyle.Render(label),
-				valueStr,
-			)
-		}
-	}
-
-	sb.WriteString("\n")
-
-	// Save button
-	saveIdx := len(m.options)
-	if m.cursor == saveIdx {
-		fmt.Fprintf(&sb, "  %s %s\n", cursorStyle.Render("->"), saveStyle.Render("Save"))
-	} else {
-		fmt.Fprintf(&sb, "     %s\n", normalStyle.Render("Save"))
-	}
-
-	// Edit file button
-	editIdx := saveIdx + 1
-	if m.cursor == editIdx {
-		fmt.Fprintf(&sb, "  %s %s\n", cursorStyle.Render("->"), normalStyle.Render("Edit file in editor"))
-	} else {
-		fmt.Fprintf(&sb, "     %s\n", mutedStyle.Render("Edit file in editor"))
-	}
-
-	// Cancel button
-	cancelIdx := editIdx + 1
-	if m.cursor == cancelIdx {
-		fmt.Fprintf(&sb, "  %s %s\n", cursorStyle.Render("->"), normalStyle.Render("Cancel"))
-	} else {
-		fmt.Fprintf(&sb, "     %s\n", normalStyle.Render("Cancel"))
 	}
 
 	content := sb.String()
-	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | esc: cancel")
+	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: cancel")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(content, footer, m.width, m.height)

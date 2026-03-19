@@ -9,6 +9,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// optionRows returns only the setting rows (not action buttons) from the model.
+func optionRows(m configModel) []configRow {
+	var opts []configRow
+	for _, r := range m.rows {
+		if r.isOption() {
+			opts = append(opts, r)
+		}
+	}
+	return opts
+}
+
 func TestIndexOf(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -36,48 +47,46 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	cfg := config.Config{Agent: "claude"}
 	m := newConfigModel(cfg)
 
-	if len(m.options) != 7 {
-		t.Fatalf("expected 7 options, got %d", len(m.options))
+	opts := optionRows(m)
+	if len(opts) != 8 {
+		t.Fatalf("expected 8 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
-	if m.options[0].label != "Agent" {
-		t.Errorf("options[0].label = %q, want Agent", m.options[0].label)
+	if opts[0].label != "Agent" {
+		t.Errorf("opts[0].label = %q, want Agent", opts[0].label)
 	}
-	if m.options[0].current != 0 {
-		t.Errorf("agent current = %d, want 0 (claude)", m.options[0].current)
+	if opts[0].current != 0 {
+		t.Errorf("agent current = %d, want 0 (claude)", opts[0].current)
 	}
 
 	// Model defaults to (default) (index 0)
-	if m.options[1].current != 0 {
-		t.Errorf("model current = %d, want 0 ((default))", m.options[1].current)
+	if opts[1].current != 0 {
+		t.Errorf("model current = %d, want 0 ((default))", opts[1].current)
 	}
 
 	// Worktree defaults to off (index 1)
-	if m.options[2].current != 1 {
-		t.Errorf("worktree current = %d, want 1 (off)", m.options[2].current)
+	if opts[2].current != 1 {
+		t.Errorf("worktree current = %d, want 1 (off)", opts[2].current)
 	}
 
 	// Sound defaults to off (index 1)
-	if m.options[3].current != 1 {
-		t.Errorf("sound current = %d, want 1 (off)", m.options[3].current)
+	if opts[3].current != 1 {
+		t.Errorf("sound current = %d, want 1 (off)", opts[3].current)
 	}
 
 	// Notification sub-options default to on (index 0) when nil
 	for i := 4; i <= 6; i++ {
-		if m.options[i].current != 0 {
-			t.Errorf("options[%d].current = %d, want 0 (on)", i, m.options[i].current)
+		if opts[i].current != 0 {
+			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
 	}
 
 	if m.cursor != 0 {
 		t.Errorf("cursor = %d, want 0", m.cursor)
 	}
-	if m.saved {
-		t.Error("saved should be false")
-	}
-	if m.openEditor {
-		t.Error("openEditor should be false")
+	if m.action != configActionNone {
+		t.Errorf("action = %d, want configActionNone", m.action)
 	}
 }
 
@@ -95,23 +104,24 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 		},
 	}
 	m := newConfigModel(cfg)
+	opts := optionRows(m)
 
-	if m.options[0].current != 1 {
-		t.Errorf("agent current = %d, want 1 (opencode)", m.options[0].current)
+	if opts[0].current != 1 {
+		t.Errorf("agent current = %d, want 1 (opencode)", opts[0].current)
 	}
-	if m.options[1].current != 2 {
-		t.Errorf("model current = %d, want 2 (opus)", m.options[1].current)
+	if opts[1].current != 2 {
+		t.Errorf("model current = %d, want 2 (opus)", opts[1].current)
 	}
-	if m.options[2].current != 0 {
-		t.Errorf("worktree current = %d, want 0 (on)", m.options[2].current)
+	if opts[2].current != 0 {
+		t.Errorf("worktree current = %d, want 0 (on)", opts[2].current)
 	}
-	if m.options[3].current != 0 {
-		t.Errorf("sound current = %d, want 0 (on)", m.options[3].current)
+	if opts[3].current != 0 {
+		t.Errorf("sound current = %d, want 0 (on)", opts[3].current)
 	}
 	// All notification sub-options set to false → off (index 1)
 	for i := 4; i <= 6; i++ {
-		if m.options[i].current != 1 {
-			t.Errorf("options[%d].current = %d, want 1 (off)", i, m.options[i].current)
+		if opts[i].current != 1 {
+			t.Errorf("opts[%d].current = %d, want 1 (off)", i, opts[i].current)
 		}
 	}
 }
@@ -184,7 +194,6 @@ func TestBuildConfig_CustomValues(t *testing.T) {
 }
 
 func TestBuildConfig_RoundTrip(t *testing.T) {
-	// A config round-tripped through newConfigModel→buildConfig should preserve values.
 	original := config.Config{
 		Agent:    "claude",
 		Model:    "sonnet",
@@ -211,7 +220,6 @@ func TestBuildConfig_RoundTrip(t *testing.T) {
 }
 
 func TestBuildConfig_IncludeNotSet(t *testing.T) {
-	// buildConfig should not set Include — that's preserved separately in runConfig.
 	m := newConfigModel(config.Config{Agent: "claude", Include: []string{"foo.md"}})
 	result := m.buildConfig()
 
@@ -265,7 +273,6 @@ func TestSaveConfig(t *testing.T) {
 func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	dir := t.TempDir()
 
-	// .maggus/ doesn't exist yet
 	maggusDir := filepath.Join(dir, ".maggus")
 	if _, err := os.Stat(maggusDir); !os.IsNotExist(err) {
 		t.Fatal(".maggus/ should not exist before saveConfig")
@@ -283,12 +290,10 @@ func TestSaveConfig_CreatesDirectory(t *testing.T) {
 func TestSaveConfig_Overwrite(t *testing.T) {
 	dir := t.TempDir()
 
-	// Save once
 	if err := saveConfig(dir, config.Config{Agent: "claude", Model: "sonnet"}); err != nil {
 		t.Fatalf("first saveConfig() error: %v", err)
 	}
 
-	// Overwrite with different values
 	if err := saveConfig(dir, config.Config{Agent: "opencode", Model: "opus"}); err != nil {
 		t.Fatalf("second saveConfig() error: %v", err)
 	}
@@ -312,44 +317,53 @@ func TestSaveConfig_Overwrite(t *testing.T) {
 	}
 }
 
-func TestConfigOption_Fields(t *testing.T) {
-	opt := configOption{
+func TestConfigRow_Fields(t *testing.T) {
+	row := configRow{
 		label:   "Agent",
-		key:     "agent",
 		values:  []string{"claude", "opencode"},
 		current: 0,
 	}
 
-	if opt.label != "Agent" {
-		t.Errorf("label = %q, want Agent", opt.label)
+	if row.label != "Agent" {
+		t.Errorf("label = %q, want Agent", row.label)
 	}
-	if opt.key != "agent" {
-		t.Errorf("key = %q, want agent", opt.key)
+	if len(row.values) != 2 {
+		t.Errorf("values len = %d, want 2", len(row.values))
 	}
-	if len(opt.values) != 2 {
-		t.Errorf("values len = %d, want 2", len(opt.values))
+	if row.current != 0 {
+		t.Errorf("current = %d, want 0", row.current)
 	}
-	if opt.current != 0 {
-		t.Errorf("current = %d, want 0", opt.current)
+	if !row.isOption() {
+		t.Error("row with values should be an option")
+	}
+
+	action := configRow{label: "Save", action: configActionSaveProject}
+	if action.isOption() {
+		t.Error("action row should not be an option")
 	}
 }
 
-func TestNewConfigModel_OptionKeys(t *testing.T) {
+func TestNewConfigModel_OptionLabels(t *testing.T) {
 	m := newConfigModel(config.Config{Agent: "claude"})
+	opts := optionRows(m)
 
-	expectedKeys := []string{
-		"agent",
-		"model",
-		"worktree",
-		"notifications.sound",
-		"notifications.on_task_complete",
-		"notifications.on_run_complete",
-		"notifications.on_error",
+	expectedLabels := []string{
+		"Agent",
+		"Model",
+		"Worktree",
+		"Sound",
+		"  On task complete",
+		"  On run complete",
+		"  On error",
+		"Auto-update",
 	}
 
-	for i, want := range expectedKeys {
-		if m.options[i].key != want {
-			t.Errorf("options[%d].key = %q, want %q", i, m.options[i].key, want)
+	for i, want := range expectedLabels {
+		if i >= len(opts) {
+			t.Fatalf("missing option at index %d, want label %q", i, want)
+		}
+		if opts[i].label != want {
+			t.Errorf("opts[%d].label = %q, want %q", i, opts[i].label, want)
 		}
 	}
 }
@@ -357,18 +371,19 @@ func TestNewConfigModel_OptionKeys(t *testing.T) {
 func TestNewConfigModel_ModelHaiku(t *testing.T) {
 	cfg := config.Config{Agent: "claude", Model: "haiku"}
 	m := newConfigModel(cfg)
+	opts := optionRows(m)
 
-	if m.options[1].current != 3 {
-		t.Errorf("model current = %d, want 3 (haiku)", m.options[1].current)
+	if opts[1].current != 3 {
+		t.Errorf("model current = %d, want 3 (haiku)", opts[1].current)
 	}
 }
 
 func TestNewConfigModel_UnknownModel(t *testing.T) {
-	// Unknown model value falls back to index 0 via indexOf
 	cfg := config.Config{Agent: "claude", Model: "unknown-model"}
 	m := newConfigModel(cfg)
+	opts := optionRows(m)
 
-	if m.options[1].current != 0 {
-		t.Errorf("model current = %d, want 0 (fallback for unknown)", m.options[1].current)
+	if opts[1].current != 0 {
+		t.Errorf("model current = %d, want 0 (fallback for unknown)", opts[1].current)
 	}
 }
