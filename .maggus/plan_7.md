@@ -64,15 +64,15 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a user, I want maggus to check for updates on startup so that I'm notified or auto-updated based on my config.
 
 **Acceptance Criteria:**
-- [ ] On startup (in `root.go` Execute or menu init), if version != "dev" and cooldown has passed (24h):
+- [x] On startup (in `root.go` Execute or menu init), if version != "dev" and cooldown has passed (24h):
   - `notify` mode: show a one-line banner "Update available: vX.Y.Z → vA.B.C — run `maggus update` to install"
   - `auto` mode: silently download and apply update, then print "Updated to vA.B.C — restart maggus to use the new version"
   - `off` mode: skip entirely
-- [ ] The update check runs in a goroutine so it doesn't block startup
-- [ ] The banner is shown in the TUI menu as a styled info line (not blocking the UI)
-- [ ] Updates `lastUpdateCheck` timestamp after a successful check
-- [ ] Startup time is not noticeably affected (< 100ms added)
-- [ ] Unit tests for each mode with mocked updater
+- [x] The update check runs in a goroutine so it doesn't block startup
+- [x] The banner is shown in the TUI menu as a styled info line (not blocking the UI)
+- [x] Updates `lastUpdateCheck` timestamp after a successful check
+- [x] Startup time is not noticeably affected (< 100ms added)
+- [x] Unit tests for each mode with mocked updater
 
 ### TASK-006: Add drive letter navigation to file browser (Windows)
 **Description:** As a Windows user, I want to see available drives when I navigate to the root of my current drive so that I can switch between drives.
