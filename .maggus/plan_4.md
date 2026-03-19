@@ -132,11 +132,9 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for any non-TUI helper functions in `cmd/status.go`.
 
 **Acceptance Criteria:**
-- [ ] Test plan/task aggregation logic if extractable
-- [ ] Test plain-text output rendering if it has a separate function
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read status.go to determine testable surface
+- [x] Test plan/task aggregation logic if extractable
+- [x] Test plain-text output rendering if it has a separate function
+- [x] Unit tests are written and successful
 
 ### TASK-013: Add tests for menu command helpers
 **Description:** As a developer, I want tests for any non-TUI helpers in `cmd/menu.go`.
