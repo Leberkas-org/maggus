@@ -76,11 +76,11 @@ Add a repository switching feature to Maggus so users can manage multiple projec
 **Description:** As a user, I want to see which repository I'm currently working in displayed in the main menu so I always have context.
 
 **Acceptance Criteria:**
-- [ ] The main menu header (below the plan summary line) shows the current repository path
-- [ ] The path is displayed in a muted style to not distract from the main content
-- [ ] Long paths are truncated from the left with `...` prefix to fit within the content width (e.g., `...org/maggus` instead of `/home/user/projects/leberkas-org/maggus`)
-- [ ] If the current directory is the user's home directory or not a repo, show the full path without truncation
-- [ ] The path updates after switching repositories (the menu reloads with the new working directory)
+- [x] The main menu header (below the plan summary line) shows the current repository path
+- [x] The path is displayed in a muted style to not distract from the main content
+- [x] Long paths are truncated from the left with `...` prefix to fit within the content width (e.g., `...org/maggus` instead of `/home/user/projects/leberkas-org/maggus`)
+- [x] If the current directory is the user's home directory or not a repo, show the full path without truncation
+- [x] The path updates after switching repositories (the menu reloads with the new working directory)
 
 ## Functional Requirements
 

@@ -372,7 +372,11 @@ func (m menuModel) View() string {
 	// Show current working directory below the summary
 	if m.cwd != "" {
 		cwdStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-		cwdDisplay := truncateLeft(m.cwd, contentW-4)
+		cwdDisplay := m.cwd
+		// Only truncate if this is a git repo and not the home directory.
+		if home, err := os.UserHomeDir(); err != nil || (m.cwd != home && isGitRepoCheck(m.cwd)) {
+			cwdDisplay = truncateLeft(m.cwd, contentW-4)
+		}
 		header += "\n" + centerLine(cwdStyle.Render(cwdDisplay), contentW)
 	}
 
