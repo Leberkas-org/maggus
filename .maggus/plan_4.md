@@ -48,13 +48,13 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for `internal/usage` so that CSV recording of token usage is verified.
 
 **Acceptance Criteria:**
-- [ ] Test `Append` creates file with header row when file does not exist
-- [ ] Test `Append` appends rows without duplicating header on subsequent calls
-- [ ] Test `Append` with empty records slice is a no-op (returns nil, no file created)
-- [ ] Test `Append` writes correct CSV columns matching `header()` order
-- [ ] Test elapsed time calculation is correct (EndTime - StartTime truncated to seconds)
-- [ ] Test `Append` returns error when directory does not exist
-- [ ] Unit tests are written and successful
+- [x] Test `Append` creates file with header row when file does not exist
+- [x] Test `Append` appends rows without duplicating header on subsequent calls
+- [x] Test `Append` with empty records slice is a no-op (returns nil, no file created)
+- [x] Test `Append` writes correct CSV columns matching `header()` order
+- [x] Test elapsed time calculation is correct (EndTime - StartTime truncated to seconds)
+- [x] Test `Append` returns error when directory does not exist
+- [x] Unit tests are written and successful
 
 ### TASK-004: Add tests for capabilities package
 **Description:** As a developer, I want tests for `internal/capabilities` so that tool detection and caching logic is verified.
