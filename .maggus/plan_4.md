@@ -125,10 +125,8 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for any helper functions in `cmd/detail.go` that don't require a TUI.
 
 **Acceptance Criteria:**
-- [ ] Test any data transformation or formatting helpers
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read detail.go to determine testable surface
+- [x] Test any data transformation or formatting helpers
+- [x] Unit tests are written and successful
 
 ### TASK-012: Add tests for status command helpers
 **Description:** As a developer, I want tests for any non-TUI helper functions in `cmd/status.go`.
