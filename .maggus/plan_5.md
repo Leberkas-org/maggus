@@ -17,12 +17,12 @@ Integrate the public API at `https://isclaude2x.com/json` into Maggus to visuall
 **Description:** As a developer, I want a reusable package that fetches and parses the isclaude2x API response so that other parts of the application can query the 2x status.
 
 **Acceptance Criteria:**
-- [ ] New package `src/internal/claude2x/` created
-- [ ] Struct defined matching the API JSON response (at minimum: `Is2x bool`, `TwoXWindowExpiresIn string`, `TwoXWindowExpiresInSeconds int`)
-- [ ] Function `FetchStatus()` performs a GET request to `https://isclaude2x.com/json` and returns the parsed struct
-- [ ] HTTP request has a reasonable timeout (e.g. 3 seconds) so the UI is not blocked for long
-- [ ] On any error (network, parse, non-200 status), returns a zero-value struct with `Is2x: false` — no error is surfaced to the caller
-- [ ] Unit tests are written and successful (test JSON parsing with a mock/httptest server, test error/timeout handling)
+- [x] New package `src/internal/claude2x/` created
+- [x] Struct defined matching the API JSON response (at minimum: `Is2x bool`, `TwoXWindowExpiresIn string`, `TwoXWindowExpiresInSeconds int`)
+- [x] Function `FetchStatus()` performs a GET request to `https://isclaude2x.com/json` and returns the parsed struct
+- [x] HTTP request has a reasonable timeout (e.g. 3 seconds) so the UI is not blocked for long
+- [x] On any error (network, parse, non-200 status), returns a zero-value struct with `Is2x: false` — no error is surfaced to the caller
+- [x] Unit tests are written and successful (test JSON parsing with a mock/httptest server, test error/timeout handling)
 
 ### TASK-002: Make logo and box border colors dynamic based on 2x status
 **Description:** As a user, I want the menu logo and box border to turn yellow when Claude is in 2x mode so that I can see at a glance whether 2x is active.
