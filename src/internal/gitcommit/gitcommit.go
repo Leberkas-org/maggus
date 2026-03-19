@@ -61,7 +61,17 @@ func CommitIteration(workDir string) (Result, error) {
 	cmd.Dir = workDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return Result{}, fmt.Errorf("git commit failed: %s", strings.TrimSpace(string(out)))
+		outStr := strings.TrimSpace(string(out))
+		// If there are no staged changes, treat it as a no-op rather than
+		// a fatal error so the work loop can continue to the next task.
+		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "nothing added to commit") {
+			_ = os.Remove(commitPath)
+			return Result{
+				Committed: false,
+				Message:   "No changes to commit — continuing to next task",
+			}, nil
+		}
+		return Result{}, fmt.Errorf("git commit failed: %s", outStr)
 	}
 
 	// Delete COMMIT.md after successful commit
