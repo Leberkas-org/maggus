@@ -140,10 +140,8 @@ Maggus has 207 tests across 21 test files, but significant gaps remain — 11 of
 **Description:** As a developer, I want tests for any non-TUI helpers in `cmd/menu.go`.
 
 **Acceptance Criteria:**
-- [ ] Test command availability filtering logic if extractable
-- [ ] Unit tests are written and successful
-
-BLOCKED: Need to read menu.go to determine testable surface
+- [x] Test command availability filtering logic if extractable
+- [x] Unit tests are written and successful
 
 ### TASK-014: Add tests for plan command
 **Description:** As a developer, I want tests for `cmd/plan.go` non-interactive logic.
