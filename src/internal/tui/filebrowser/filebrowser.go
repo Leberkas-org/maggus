@@ -14,6 +14,8 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
+const switchDriveLabel = "⮤ Drives"
+
 // dirEntry represents a single directory in the listing.
 type dirEntry struct {
 	name   string
@@ -31,9 +33,14 @@ type Model struct {
 	errMsg       string // inline error message
 	width        int
 	height       int
+	showDrives   bool // true when displaying the drive list
 
 	// readDir is injectable for testing.
 	readDir func(string) ([]os.DirEntry, error)
+	// listDrives returns available drive letters (Windows only). Injectable for testing.
+	listDrives func() []string
+	// canSwitchDrive returns true if the given dir is a drive root (Windows only). Injectable for testing.
+	canSwitchDrive func(string) bool
 }
 
 // New creates a new file browser model starting at the given directory.
@@ -43,8 +50,10 @@ func New(startDir string) Model {
 		abs = startDir
 	}
 	m := Model{
-		currentDir: abs,
-		readDir:    os.ReadDir,
+		currentDir:     abs,
+		readDir:        os.ReadDir,
+		listDrives:     availableDrives,
+		canSwitchDrive: isDriveRoot,
 	}
 	m.loadEntries()
 	return m
@@ -64,10 +73,14 @@ func (m Model) Cancelled() bool {
 func (m *Model) loadEntries() {
 	m.errMsg = ""
 	m.entries = nil
+	m.showDrives = false
 
 	// Add parent directory entry if not at root.
+	// On Windows drive roots, show "Switch Drive" instead of "..".
 	if parent := filepath.Dir(m.currentDir); parent != m.currentDir {
 		m.entries = append(m.entries, dirEntry{name: ".."})
+	} else if m.canSwitchDrive != nil && m.canSwitchDrive(m.currentDir) {
+		m.entries = append(m.entries, dirEntry{name: switchDriveLabel})
 	}
 
 	items, err := m.readDir(m.currentDir)
@@ -96,8 +109,33 @@ func (m *Model) loadEntries() {
 	m.scrollOffset = 0
 }
 
+// loadDriveList populates the entry list with available drives.
+func (m *Model) loadDriveList() {
+	m.showDrives = true
+	m.entries = nil
+	m.errMsg = ""
+	if m.listDrives != nil {
+		for _, d := range m.listDrives() {
+			m.entries = append(m.entries, dirEntry{name: d})
+		}
+	}
+	m.cursor = 0
+	m.scrollOffset = 0
+}
+
 // navigate changes into the selected directory.
 func (m *Model) navigate(name string) {
+	if name == switchDriveLabel {
+		m.loadDriveList()
+		return
+	}
+	if m.showDrives {
+		// Selected a drive from the drive list.
+		m.showDrives = false
+		m.currentDir = name
+		m.loadEntries()
+		return
+	}
 	if name == ".." {
 		m.currentDir = filepath.Dir(m.currentDir)
 	} else {
@@ -168,8 +206,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyBackspace:
-			if parent := filepath.Dir(m.currentDir); parent != m.currentDir {
+			if m.showDrives {
+				// Cancel drive listing, return to current directory.
+				m.loadEntries()
+			} else if parent := filepath.Dir(m.currentDir); parent != m.currentDir {
 				m.navigate("..")
+			} else if m.canSwitchDrive != nil && m.canSwitchDrive(m.currentDir) {
+				m.loadDriveList()
 			}
 
 		case tea.KeyRunes:
@@ -197,7 +240,11 @@ func (m Model) View() string {
 
 	// Path header.
 	pathStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	b.WriteString(pathStyle.Render(styles.Truncate(m.currentDir, innerW)))
+	if m.showDrives {
+		b.WriteString(pathStyle.Render("Available Drives"))
+	} else {
+		b.WriteString(pathStyle.Render(styles.Truncate(m.currentDir, innerW)))
+	}
 	b.WriteString("\n")
 	b.WriteString(styles.Separator(innerW))
 	b.WriteString("\n")
@@ -220,6 +267,7 @@ func (m Model) View() string {
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	normalStyle := lipgloss.NewStyle()
 	folderIcon := "📁 "
+	driveIcon := "💿 "
 
 	for i := m.scrollOffset; i < end; i++ {
 		entry := m.entries[i]
@@ -228,25 +276,29 @@ func (m Model) View() string {
 			prefix = "→ "
 		}
 
-		name := entry.name
-		if entry.name == ".." {
-			name = ".."
+		isNavEntry := entry.name == ".." || entry.name == switchDriveLabel
+		icon := folderIcon
+		if m.showDrives {
+			icon = driveIcon
+		}
+
+		if isNavEntry {
 			if i == m.cursor {
-				b.WriteString(selectedStyle.Render(prefix + name))
+				b.WriteString(selectedStyle.Render(prefix + entry.name))
 			} else {
-				b.WriteString(mutedStyle.Render(prefix + name))
+				b.WriteString(mutedStyle.Render(prefix + entry.name))
 			}
 		} else if entry.hidden {
 			if i == m.cursor {
-				b.WriteString(selectedStyle.Render(prefix) + mutedStyle.Render(folderIcon+name))
+				b.WriteString(selectedStyle.Render(prefix) + mutedStyle.Render(icon+entry.name))
 			} else {
-				b.WriteString(mutedStyle.Render(prefix + folderIcon + name))
+				b.WriteString(mutedStyle.Render(prefix + icon + entry.name))
 			}
 		} else {
 			if i == m.cursor {
-				b.WriteString(selectedStyle.Render(prefix + folderIcon + name))
+				b.WriteString(selectedStyle.Render(prefix + icon + entry.name))
 			} else {
-				b.WriteString(normalStyle.Render(prefix + folderIcon + name))
+				b.WriteString(normalStyle.Render(prefix + icon + entry.name))
 			}
 		}
 		b.WriteString("\n")
@@ -263,7 +315,13 @@ func (m Model) View() string {
 
 	// Footer.
 	footerStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	footer := footerStyle.Render("↑/↓ navigate · enter open · backspace up · s select · esc cancel")
+	var footerText string
+	if m.showDrives {
+		footerText = "↑/↓ navigate · enter select drive · backspace back · esc cancel"
+	} else {
+		footerText = "↑/↓ navigate · enter open · backspace up · s select · esc cancel"
+	}
+	footer := footerStyle.Render(footerText)
 
 	return styles.FullScreenLeft(content, footer, m.width, m.height)
 }

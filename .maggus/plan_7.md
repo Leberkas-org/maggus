@@ -78,13 +78,13 @@ This plan covers three areas: (1) an auto-update mechanism that checks GitHub Re
 **Description:** As a Windows user, I want to see available drives when I navigate to the root of my current drive so that I can switch between drives.
 
 **Acceptance Criteria:**
-- [ ] When on Windows and the user navigates up from the root of a drive (e.g., `C:\`), the file browser shows all available drive letters as entries instead of ".."
-- [ ] Available drives are detected by checking which drive letters (A:-Z:) exist (using `os.Stat` on `X:\`)
-- [ ] Each drive is shown as an entry like `C:\`, `D:\`, `E:\` with a drive icon
-- [ ] Selecting a drive navigates into that drive's root directory
-- [ ] On non-Windows platforms, this code is not compiled (build tags: `//go:build windows`)
-- [ ] The ".." entry at a drive root is replaced with a "Drives" or "Switch Drive" entry that triggers the drive listing
-- [ ] Unit tests cover: drive listing on Windows (mocked), navigation from drive list into a drive, no-op on non-Windows
+- [x] When on Windows and the user navigates up from the root of a drive (e.g., `C:\`), the file browser shows all available drive letters as entries instead of ".."
+- [x] Available drives are detected by checking which drive letters (A:-Z:) exist (using `os.Stat` on `X:\`)
+- [x] Each drive is shown as an entry like `C:\`, `D:\`, `E:\` with a drive icon
+- [x] Selecting a drive navigates into that drive's root directory
+- [x] On non-Windows platforms, this code is not compiled (build tags: `//go:build windows`)
+- [x] The ".." entry at a drive root is replaced with a "Drives" or "Switch Drive" entry that triggers the drive listing
+- [x] Unit tests cover: drive listing on Windows (mocked), navigation from drive list into a drive, no-op on non-Windows
 
 ### TASK-007: Rewrite getting-started guide
 **Description:** As a new user, I want a clear getting-started guide so that I can install maggus and run my first task within minutes.

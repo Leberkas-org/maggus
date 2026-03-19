@@ -365,6 +365,189 @@ func TestWindowSizeUpdatesViewport(t *testing.T) {
 	}
 }
 
+// --- drive navigation tests ---
+
+// newDriveTestModel creates a model at a drive root with mocked drive support.
+func newDriveTestModel(startDir string, d map[string][]os.DirEntry, drives []string) Model {
+	m := Model{
+		currentDir:     p(startDir),
+		readDir:        mockReadDir(d),
+		listDrives:     func() []string { return drives },
+		canSwitchDrive: func(dir string) bool { return dir == p(startDir) },
+		width:          80,
+		height:         24,
+	}
+	m.loadEntries()
+	return m
+}
+
+func TestDriveRoot_ShowsSwitchDriveEntry(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users", "Windows"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	names := entryNames(m.entries)
+	if names[0] != switchDriveLabel {
+		t.Errorf("expected first entry to be %q, got %q", switchDriveLabel, names[0])
+	}
+	if len(m.entries) != 3 { // switchDrive + Users + Windows
+		t.Errorf("expected 3 entries, got %d: %v", len(m.entries), names)
+	}
+}
+
+func TestDriveRoot_SelectSwitchDriveShowsDriveList(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`, `E:\`})
+
+	// First entry is "⮤ Drives", select it.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if !m.showDrives {
+		t.Error("expected showDrives=true after selecting switch drive")
+	}
+	names := entryNames(m.entries)
+	expected := []string{`C:\`, `D:\`, `E:\`}
+	if len(names) != len(expected) {
+		t.Fatalf("expected %d drives, got %d: %v", len(expected), len(names), names)
+	}
+	for i, exp := range expected {
+		if names[i] != exp {
+			t.Errorf("drive %d: expected %q, got %q", i, exp, names[i])
+		}
+	}
+}
+
+func TestDriveList_SelectDriveNavigatesInto(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+		"D:/": dirEntries("Data", "Games"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	// Open drive list.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.showDrives {
+		t.Fatal("expected showDrives=true")
+	}
+
+	// Select D:\ (second entry, index 1).
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.showDrives {
+		t.Error("expected showDrives=false after selecting a drive")
+	}
+	if m.currentDir != p("D:/") {
+		t.Errorf("expected currentDir=%q, got %q", p("D:/"), m.currentDir)
+	}
+	// Should list D:\ contents.
+	names := entryNames(m.entries)
+	if len(names) < 2 {
+		t.Fatalf("expected entries for D:\\, got %v", names)
+	}
+}
+
+func TestDriveList_BackspaceCancels(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	// Open drive list.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.showDrives {
+		t.Fatal("expected showDrives=true")
+	}
+
+	// Backspace cancels drive listing.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.showDrives {
+		t.Error("expected showDrives=false after backspace")
+	}
+	if m.currentDir != p("C:/") {
+		t.Errorf("expected currentDir=%q, got %q", p("C:/"), m.currentDir)
+	}
+}
+
+func TestBackspaceAtDriveRoot_ShowsDrives(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	// Backspace at drive root should show drive list.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	if !m.showDrives {
+		t.Error("expected showDrives=true after backspace at drive root")
+	}
+}
+
+func TestDriveViewShowsAvailableDrivesHeader(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	// Open drive list.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	view := m.View()
+	if !strings.Contains(view, "Available Drives") {
+		t.Error("drive list view should show 'Available Drives' header")
+	}
+}
+
+func TestDriveViewShowsDriveIcon(t *testing.T) {
+	d := dirs(map[string][]os.DirEntry{
+		"C:/": dirEntries("Users"),
+	})
+	m := newDriveTestModel("C:/", d, []string{`C:\`, `D:\`})
+
+	// Open drive list.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	view := m.View()
+	if !strings.Contains(view, "💿") {
+		t.Error("drive list view should show drive icon 💿")
+	}
+}
+
+func TestNoDriveSupport_NormalBehavior(t *testing.T) {
+	// When canSwitchDrive is nil (non-Windows), behavior is unchanged.
+	d := dirs(map[string][]os.DirEntry{
+		"/": dirEntries("usr", "etc"),
+	})
+	m := Model{
+		currentDir: p("/"),
+		readDir:    mockReadDir(d),
+		width:      80,
+		height:     24,
+		// listDrives and canSwitchDrive are nil (non-Windows default in tests).
+	}
+	m.loadEntries()
+
+	names := entryNames(m.entries)
+	// No ".." and no switchDriveLabel at root.
+	for _, n := range names {
+		if n == ".." || n == switchDriveLabel {
+			t.Errorf("unexpected nav entry %q at root without drive support", n)
+		}
+	}
+
+	// Backspace at root should be a no-op.
+	before := m.currentDir
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.currentDir != before {
+		t.Errorf("backspace at root should be no-op, dir changed to %q", m.currentDir)
+	}
+	if m.showDrives {
+		t.Error("showDrives should remain false without drive support")
+	}
+}
+
 // --- helpers ---
 
 func update(m Model, msg tea.Msg) (Model, tea.Cmd) {
