@@ -18,13 +18,13 @@ Add a repository switching feature to Maggus so users can manage multiple projec
 **Description:** As a user, I want my list of known repositories stored in a global config file so that it persists across sessions and projects.
 
 **Acceptance Criteria:**
-- [ ] New file `~/.maggus/repositories.yml` stores an array of repository entries
-- [ ] Each entry contains at minimum: `path` (absolute directory path)
-- [ ] A `last_opened` field tracks which repository was last used
-- [ ] New package `internal/globalconfig` handles loading, saving, and modifying this file
-- [ ] The `~/.maggus/` directory is created automatically if it doesn't exist
-- [ ] Loading a non-existent file returns an empty config (no error)
-- [ ] Unit tests cover load, save, add, remove, and last-opened operations
+- [x] New file `~/.maggus/repositories.yml` stores an array of repository entries
+- [x] Each entry contains at minimum: `path` (absolute directory path)
+- [x] A `last_opened` field tracks which repository was last used
+- [x] New package `internal/globalconfig` handles loading, saving, and modifying this file
+- [x] The `~/.maggus/` directory is created automatically if it doesn't exist
+- [x] Loading a non-existent file returns an empty config (no error)
+- [x] Unit tests cover load, save, add, remove, and last-opened operations
 
 ### TASK-002: Startup working directory resolution
 **Description:** As a user, I want Maggus to intelligently determine which repository to work in on startup so that I land in the right project automatically.
