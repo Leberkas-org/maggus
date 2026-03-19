@@ -1,35 +1,26 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/updater"
-	"github.com/spf13/cobra"
 )
 
-func newTestUpdateCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:  "update",
-		RunE: func(cmd *cobra.Command, args []string) error { return runUpdate(cmd) },
+func setupUpdateTest(_ *testing.T) func() {
+	origVersion := Version
+	origCheck := checkLatestVersion
+	origApply := applyUpdate
+	return func() {
+		Version = origVersion
+		checkLatestVersion = origCheck
+		applyUpdate = origApply
 	}
-	cmd.SetOut(&bytes.Buffer{})
-	return cmd
 }
 
 func TestUpdate_DevVersion(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origPrompt := promptConfirm
-	origApply := applyUpdate
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		promptConfirm = origPrompt
-		applyUpdate = origApply
-	}()
+	defer setupUpdateTest(t)()
 	Version = "dev"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -39,39 +30,27 @@ func TestUpdate_DevVersion(t *testing.T) {
 			Body:        "New release",
 		}
 	}
-	promptConfirm = func(q string) bool { return false }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	// Simulate version check result
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("dev")})
+	um := model.(updateModel)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if um.phase != phaseConfirm {
+		t.Errorf("expected phaseConfirm, got %d", um.phase)
 	}
 
-	output := buf.String()
-	// Should proceed with update check, not skip
-	if strings.Contains(output, "Skipping") {
-		t.Errorf("dev build should not skip update check, got: %s", output)
-	}
-	// Should show "dev → vX.Y.Z" without "v" prefix on "dev"
-	if !strings.Contains(output, "Update available: dev → v1.5.0") {
-		t.Errorf("expected 'Update available: dev → v1.5.0', got: %s", output)
+	// Check view shows "dev → v1.5.0"
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if got := view; !contains(got, "dev") || !contains(got, "v1.5.0") {
+		t.Errorf("expected dev and v1.5.0 in view, got: %s", got)
 	}
 }
 
 func TestUpdate_DevVersion_ApplySuccessful(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origApply := applyUpdate
-	origPrompt := promptConfirm
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		applyUpdate = origApply
-		promptConfirm = origPrompt
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "dev"
 	var appliedURL string
 	checkLatestVersion = func(v string) updater.UpdateInfo {
@@ -89,69 +68,72 @@ func TestUpdate_DevVersion_ApplySuccessful(t *testing.T) {
 		appliedURL = url
 		return nil
 	}
-	promptConfirm = func(q string) bool { return true }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	info := checkLatestVersion("dev")
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Check phase
+	model, _ := m.Update(updateCheckMsg{info: info})
+	um := model.(updateModel)
+	if um.phase != phaseConfirm {
+		t.Fatalf("expected phaseConfirm, got %d", um.phase)
 	}
 
-	output := buf.String()
-	if !strings.Contains(output, "Update available: dev → v2.1.0") {
-		t.Errorf("expected version comparison with 'dev', got: %s", output)
+	// Confirm with 'y' key
+	model, cmd := um.Update(tea.KeyMsg{Runes: []rune{'y'}})
+	um = model.(updateModel)
+	if um.phase != phaseDownloading {
+		t.Fatalf("expected phaseDownloading, got %d", um.phase)
 	}
-	if !strings.Contains(output, "Bug fixes") {
-		t.Errorf("expected changelog, got: %s", output)
+
+	// Execute the command (simulates apply)
+	if cmd != nil {
+		msg := cmd()
+		model, _ = um.Update(msg)
+		um = model.(updateModel)
 	}
-	if !strings.Contains(output, "Successfully updated to v2.1.0") {
-		t.Errorf("expected success message, got: %s", output)
+
+	if um.phase != phaseSuccess {
+		t.Errorf("expected phaseSuccess, got %d", um.phase)
 	}
 	if appliedURL != "https://example.com/maggus_v2.1.0.zip" {
-		t.Errorf("expected apply to be called with download URL, got: %s", appliedURL)
+		t.Errorf("expected apply with download URL, got: %s", appliedURL)
+	}
+
+	// Check view shows success
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if !contains(view, "Successfully updated") {
+		t.Errorf("expected success message in view")
 	}
 }
 
 func TestUpdate_AlreadyUpToDate(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-	}()
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{TagName: "v1.0.0", IsNewer: false}
 	}
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if um.phase != phaseUpToDate {
+		t.Errorf("expected phaseUpToDate, got %d", um.phase)
 	}
 
-	output := buf.String()
-	if !strings.Contains(output, "Already up to date (v1.0.0)") {
-		t.Errorf("expected up-to-date message, got: %s", output)
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if !contains(view, "Already up to date") {
+		t.Errorf("expected up-to-date message in view, got: %s", view)
 	}
 }
 
 func TestUpdate_UpdateAvailable_Confirmed(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origApply := applyUpdate
-	origPrompt := promptConfirm
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		applyUpdate = origApply
-		promptConfirm = origPrompt
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -162,41 +144,55 @@ func TestUpdate_UpdateAvailable_Confirmed(t *testing.T) {
 		}
 	}
 	applyUpdate = func(url string) error { return nil }
-	promptConfirm = func(q string) bool { return true }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	info := checkLatestVersion("1.0.0")
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Version check
+	model, _ := m.Update(updateCheckMsg{info: info})
+	um := model.(updateModel)
+	if um.phase != phaseConfirm {
+		t.Fatalf("expected phaseConfirm, got %d", um.phase)
 	}
 
-	output := buf.String()
-	if !strings.Contains(output, "Update available: v1.0.0 → v2.0.0") {
-		t.Errorf("expected version comparison, got: %s", output)
+	// View should show version comparison and changelog
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if !contains(view, "v1.0.0") || !contains(view, "v2.0.0") {
+		t.Errorf("expected version comparison in view")
 	}
-	if !strings.Contains(output, "Bug fixes and improvements") {
-		t.Errorf("expected changelog, got: %s", output)
+	if !contains(view, "Bug fixes and improvements") {
+		t.Errorf("expected changelog in view")
 	}
-	if !strings.Contains(output, "Successfully updated to v2.0.0") {
-		t.Errorf("expected success message, got: %s", output)
+
+	// Confirm with enter (menuChoice 0 = Install)
+	model, cmd := um.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	um = model.(updateModel)
+	if um.phase != phaseDownloading {
+		t.Fatalf("expected phaseDownloading, got %d", um.phase)
 	}
-	if !strings.Contains(output, "restart maggus") {
-		t.Errorf("expected restart suggestion, got: %s", output)
+
+	// Execute command
+	if cmd != nil {
+		msg := cmd()
+		model, _ = um.Update(msg)
+		um = model.(updateModel)
+	}
+
+	if um.phase != phaseSuccess {
+		t.Errorf("expected phaseSuccess, got %d", um.phase)
+	}
+	um.width = 120
+	um.height = 40
+	view = um.View()
+	if !contains(view, "Successfully updated") || !contains(view, "restart") {
+		t.Errorf("expected success + restart message in view")
 	}
 }
 
 func TestUpdate_UpdateAvailable_Declined(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origPrompt := promptConfirm
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		promptConfirm = origPrompt
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -205,34 +201,29 @@ func TestUpdate_UpdateAvailable_Declined(t *testing.T) {
 			IsNewer:     true,
 		}
 	}
-	promptConfirm = func(q string) bool { return false }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Select Cancel (move down to index 1, then enter)
+	model, _ = um.Update(tea.KeyMsg{Type: tea.KeyDown})
+	um = model.(updateModel)
+	if um.menuChoice != 1 {
+		t.Errorf("expected menuChoice 1, got %d", um.menuChoice)
 	}
 
-	output := buf.String()
-	if !strings.Contains(output, "Update cancelled") {
-		t.Errorf("expected cancellation message, got: %s", output)
+	model, cmd := um.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = model.(updateModel)
+
+	// Should quit
+	if cmd == nil {
+		t.Fatal("expected quit command")
 	}
 }
 
 func TestUpdate_ApplyError(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origApply := applyUpdate
-	origPrompt := promptConfirm
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		applyUpdate = origApply
-		promptConfirm = origPrompt
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -242,31 +233,32 @@ func TestUpdate_ApplyError(t *testing.T) {
 		}
 	}
 	applyUpdate = func(url string) error { return fmt.Errorf("permission denied") }
-	promptConfirm = func(q string) bool { return true }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error from apply failure")
+	// Confirm install
+	model, cmd := um.Update(tea.KeyMsg{Runes: []rune{'y'}})
+	um = model.(updateModel)
+
+	// Execute
+	if cmd != nil {
+		msg := cmd()
+		model, _ = um.Update(msg)
+		um = model.(updateModel)
 	}
-	if !strings.Contains(err.Error(), "update failed") {
-		t.Errorf("expected 'update failed' error, got: %v", err)
+
+	if um.phase != phaseError {
+		t.Errorf("expected phaseError, got %d", um.phase)
+	}
+	if !contains(um.errorMsg, "permission denied") {
+		t.Errorf("expected 'permission denied' in error, got: %s", um.errorMsg)
 	}
 }
 
 func TestUpdate_NoDownloadURL(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origPrompt := promptConfirm
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		promptConfirm = origPrompt
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -275,33 +267,21 @@ func TestUpdate_NoDownloadURL(t *testing.T) {
 			IsNewer:     true,
 		}
 	}
-	promptConfirm = func(q string) bool { return true }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for missing download URL")
+	if um.phase != phaseError {
+		t.Errorf("expected phaseError, got %d", um.phase)
 	}
-	if !strings.Contains(err.Error(), "no download available") {
-		t.Errorf("expected 'no download available' error, got: %v", err)
+	if !contains(um.errorMsg, "No download available") {
+		t.Errorf("expected 'No download available' in error, got: %s", um.errorMsg)
 	}
 }
 
 func TestUpdate_NoChangelog(t *testing.T) {
-	origVersion := Version
-	origCheck := checkLatestVersion
-	origPrompt := promptConfirm
-	origApply := applyUpdate
-	defer func() {
-		Version = origVersion
-		checkLatestVersion = origCheck
-		promptConfirm = origPrompt
-		applyUpdate = origApply
-	}()
-
+	defer setupUpdateTest(t)()
 	Version = "1.0.0"
 	checkLatestVersion = func(v string) updater.UpdateInfo {
 		return updater.UpdateInfo{
@@ -311,22 +291,46 @@ func TestUpdate_NoChangelog(t *testing.T) {
 			Body:        "", // no changelog
 		}
 	}
-	promptConfirm = func(q string) bool { return true }
 	applyUpdate = func(url string) error { return nil }
 
-	cmd := newTestUpdateCmd()
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("1.0.0")})
+	um := model.(updateModel)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if contains(view, "Changelog") {
+		t.Errorf("should not show changelog section when body is empty")
 	}
 
-	output := buf.String()
-	if strings.Contains(output, "Changelog:") {
-		t.Errorf("should not show changelog section when body is empty, got: %s", output)
+	// Confirm and apply
+	model, cmd := um.Update(tea.KeyMsg{Runes: []rune{'y'}})
+	um = model.(updateModel)
+	if cmd != nil {
+		msg := cmd()
+		model, _ = um.Update(msg)
+		um = model.(updateModel)
 	}
-	if !strings.Contains(output, "Successfully updated to v1.1.0") {
-		t.Errorf("expected success message, got: %s", output)
+
+	if um.phase != phaseSuccess {
+		t.Errorf("expected phaseSuccess, got %d", um.phase)
 	}
+}
+
+// contains is a helper for checking substrings in rendered views
+// which may contain ANSI escape codes.
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && stringContains(s, substr)
+}
+
+func stringContains(s, substr string) bool {
+	// Simple substring check — works even with ANSI codes in the string
+	// since we're checking for text fragments that appear between escape sequences.
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
