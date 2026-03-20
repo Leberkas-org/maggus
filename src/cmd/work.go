@@ -498,9 +498,6 @@ Examples:
 						}
 						reason := fmt.Sprintf("re-parse plans: %v", parseErr)
 						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
-						if resetErr := resetStagedChanges(workDir); resetErr != nil {
-							p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ could not reset staged changes: %v", resetErr)})
-						}
 						continue
 					} else {
 						tasks = parsedTasks
@@ -525,9 +522,6 @@ Examples:
 						reason := commitErr.Error()
 						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
 						p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", next.ID, reason)})
-						if resetErr := resetStagedChanges(workDir); resetErr != nil {
-							p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ could not reset staged changes: %v", resetErr)})
-						}
 						continue
 					}
 					if commitResult.Committed {
