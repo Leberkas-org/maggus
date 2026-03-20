@@ -1,55 +1,64 @@
-# The maggus-plan Skill
+# Maggus Skills
 
-The **maggus-plan** skill is a Claude Code skill that generates Maggus plan files interactively. Instead of writing `.maggus/plan_*.md` files by hand, you describe the feature you want and the skill asks clarifying questions before producing a well-structured plan file — ready to run with `maggus work`.
+Maggus ships with three Claude Code skills that use AI to generate project documents interactively. Instead of writing files by hand, you describe what you want and the skill guides you through clarifying questions before producing the output.
 
-## What It Does
+| Skill | Command | Produces |
+|---|---|---|
+| `/maggus-plan` | `maggus plan <description>` | `.maggus/plan_*.md` — implementation plan |
+| `/maggus-vision` | `maggus vision <description>` | `VISION.md` — project vision document |
+| `/maggus-architecture` | `maggus architecture <description>` | `ARCHITECTURE.md` — architecture document |
 
-When you invoke the skill, it:
+::: info Claude Code Only
+Maggus skills are Claude Code plugins. They require Claude Code as your agent. If you're using OpenCode, you'll need to write these files manually.
+:::
 
-1. Reads your feature description
-2. Asks clarifying questions to understand scope, constraints, and preferences
-3. Generates a complete plan file in the `.maggus/plan_*.md` format with tasks, descriptions, and acceptance criteria
+## Installation
 
-The generated plan follows the same conventions described in [Writing Plans](./writing-plans) — `TASK-NNN` headings, checkbox acceptance criteria, and proper markdown structure.
+Skills are installed automatically when you run `maggus init` in a project with Claude Code available. Under the hood, Maggus registers the [maggus-skills marketplace](https://github.com/Leberkas-org/maggus-skills) and installs the `maggus@maggus` plugin.
 
-## How to Invoke It
+If you need to install manually:
 
-In a Claude Code session, use the slash command:
-
+```bash
+claude plugin marketplace add https://github.com/Leberkas-org/maggus-skills.git
+claude plugin install maggus@maggus
 ```
-/maggus-plan <feature description>
-```
 
-For example:
+## How Skills Work
 
-```
+All three skills follow the same flow:
+
+1. **You** provide a description (via `maggus <command>` or the `/maggus-<skill>` slash command in Claude Code)
+2. **The skill** asks 3–5 clarifying questions tailored to your description
+3. **You** answer the questions
+4. **The skill** generates the file and writes it to your project
+
+You can invoke skills either through the Maggus CLI (`maggus plan`, `maggus vision`, `maggus architecture`) or directly in a Claude Code session using the slash command (`/maggus-plan`, `/maggus-vision`, `/maggus-architecture`).
+
+---
+
+## /maggus-plan
+
+Generates Maggus plan files in the `.maggus/plan_*.md` format with tasks, descriptions, and acceptance criteria — ready to run with `maggus work`.
+
+### Invocation
+
+```bash
+# Via Maggus CLI
+maggus plan Add OAuth2 login with Google and GitHub providers
+
+# Via Claude Code slash command
 /maggus-plan Add OAuth2 login with Google and GitHub providers
 ```
 
-You can also trigger it with natural language phrases like "create a plan for..." or "write a plan for..." — the skill activates when it detects planning intent.
+### Example Interaction
 
-## The Question-and-Answer Flow
-
-The skill doesn't generate a plan immediately. It first asks targeted questions to fill in gaps and avoid assumptions. A typical flow looks like:
-
-1. **You** provide a feature description
-2. **The skill** asks 3–5 clarifying questions (scope, tech choices, constraints, etc.)
-3. **You** answer the questions
-4. **The skill** generates the plan file and writes it to `.maggus/`
-
-Questions are tailored to your description. For a backend feature the skill might ask about database schema and error handling; for a frontend feature it might ask about component structure and accessibility.
-
-## Example Interaction
-
-Here's a full example showing a feature request through to running the generated plan.
-
-### Step 1: Invoke the skill
+#### Step 1: Invoke the skill
 
 ```
 You: /maggus-plan Add a REST API for managing blog posts
 ```
 
-### Step 2: Answer clarifying questions
+#### Step 2: Answer clarifying questions
 
 ```
 Skill: I have a few questions before generating the plan:
@@ -67,7 +76,7 @@ You: 1. PostgreSQL
      5. Yes, posts start as draft and can be published
 ```
 
-### Step 3: Skill generates the plan
+#### Step 3: Skill generates the plan
 
 The skill writes a file like `.maggus/plan_3.md`:
 
@@ -101,33 +110,10 @@ so that posts can be stored and queried.
 - [ ] Unit tests for model validation
 
 ### TASK-002: Add create and read endpoints
-
-**Description:** As an API consumer, I want to create and retrieve
-blog posts.
-
-**Acceptance Criteria:**
-- [ ] POST /api/posts creates a new draft post (requires auth)
-- [ ] GET /api/posts/:id returns a single post
-- [ ] GET /api/posts returns paginated list with cursor-based pagination
-- [ ] Published posts are visible to all; drafts only to the author
-- [ ] Integration tests cover auth and pagination
-
-### TASK-003: Add update, publish, and delete endpoints
-
-**Description:** As an author, I want to edit, publish, and delete
-my blog posts.
-
-**Acceptance Criteria:**
-- [ ] PUT /api/posts/:id updates post fields (requires auth, author only)
-- [ ] POST /api/posts/:id/publish sets status to published and
-      published_at to now
-- [ ] DELETE /api/posts/:id soft-deletes the post (requires auth,
-      author only)
-- [ ] Returns 403 if the authenticated user is not the author
-- [ ] Integration tests cover authorization checks
+...
 ```
 
-### Step 4: Run Maggus
+#### Step 4: Run Maggus
 
 The generated plan is immediately usable:
 
@@ -135,9 +121,7 @@ The generated plan is immediately usable:
 maggus work
 ```
 
-Maggus picks up `TASK-001` from the new plan and starts working through the tasks in order. No manual editing of the plan file is needed — though you're free to review and tweak it before running.
-
-## Output Format
+### Output Format
 
 The skill produces standard Maggus plan files. Key formatting conventions:
 
@@ -151,24 +135,57 @@ The skill produces standard Maggus plan files. Key formatting conventions:
 
 For full details on plan structure, see [Writing Plans](./writing-plans).
 
-## Integration with maggus work
+---
 
-The generated plan file is a standard `.maggus/plan_*.md` file — Maggus treats it identically to a hand-written plan. There's nothing special about skill-generated plans:
+## /maggus-vision
 
-- `maggus work` picks up the plan automatically
+Creates or improves a `VISION.md` file for your project. The vision document captures the project's purpose, target audience, core values, and long-term direction.
+
+### Invocation
+
+```bash
+# Via Maggus CLI
+maggus vision A CLI tool for orchestrating AI agents
+
+# Via Claude Code slash command
+/maggus-vision A CLI tool for orchestrating AI agents
+```
+
+The skill reads your existing codebase for context. If a `VISION.md` already exists, the skill improves it rather than starting from scratch.
+
+---
+
+## /maggus-architecture
+
+Creates or improves an `ARCHITECTURE.md` file for your project. The architecture document describes the system's structure, key components, data flow, and design decisions.
+
+### Invocation
+
+```bash
+# Via Maggus CLI (full or alias)
+maggus architecture A Go CLI with plugin system and streaming output
+maggus arch "Review and improve our current architecture"
+
+# Via Claude Code slash command
+/maggus-architecture A Go CLI with plugin system and streaming output
+```
+
+The skill reads your existing codebase for context. If an `ARCHITECTURE.md` already exists, the skill improves it rather than starting from scratch.
+
+---
+
+## Integration with Maggus
+
+Generated plan files are standard `.maggus/plan_*.md` files — Maggus treats them identically to hand-written plans:
+
+- `maggus work` picks up generated plans automatically
 - `maggus status` shows progress across all plans including generated ones
 - `maggus list` previews upcoming tasks from the plan
-- Tasks complete, block, and rename the same way as any other plan
 
-This means you can mix hand-written and generated plans freely. You can also edit a generated plan before running it — add tasks, remove tasks, reorder, or refine acceptance criteria.
+You can mix hand-written and generated plans freely, and edit generated plans before running them.
 
 ## Tips
 
-- **Be specific in your description.** The more context you give, the fewer questions the skill needs to ask and the better the generated plan will be.
-- **Review before running.** The skill generates good starting plans, but you know your project best. A quick review can catch assumptions that don't match your codebase.
-- **Iterate if needed.** If the generated plan isn't quite right, invoke the skill again with a more refined description or edit the plan file directly.
-- **Combine with existing plans.** Generated plans coexist with hand-written ones. Maggus processes all active plans in file order.
-
-::: info Claude Code Only
-The `maggus-plan` skill is a Claude Code skill. It requires Claude Code as your coding agent. If you're using OpenCode, you'll need to write plan files manually following the format described in [Writing Plans](./writing-plans).
-:::
+- **Be specific in your description.** The more context you give, the fewer questions the skill needs to ask and the better the output.
+- **Review before running.** Skills generate good starting points, but you know your project best. A quick review can catch assumptions that don't match your codebase.
+- **Iterate if needed.** If the output isn't quite right, invoke the skill again with a more refined description or edit the file directly.

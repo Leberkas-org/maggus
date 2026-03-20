@@ -24,7 +24,9 @@
       "Bash(while read:*)",
       "Bash(do wc:*)",
       "Bash(xargs head:*)",
-      "Bash(sort -t_ -k2 -n)"
+      "Bash(sort -t_ -k2 -n)",
+      "Bash(npx vitepress:*)",
+      "Bash(find /c/c/maggus -type f \\\\\\(-name *skill* -o -name *vision* -o -name *architecture* \\\\\\))"
     ]
   }
 }

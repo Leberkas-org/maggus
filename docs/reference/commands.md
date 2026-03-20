@@ -54,47 +54,7 @@ maggus work --worktree
 maggus work --no-bootstrap
 ```
 
-### TUI
-
-The work view displays inside a bordered full-screen box. A **tab bar** lets you switch between four views:
-
-| Tab | Key | Content |
-|-----|-----|---------|
-| **Progress** | `1` | Live status, recent tool list, model, elapsed time, token usage |
-| **Detail** | `2` | Scrollable structured log of every tool invocation with timestamps and parameters |
-| **Task** | `3` | Current task description and acceptance criteria with completion status |
-| **Commits** | `4` | List of commits made during the run |
-
-Switch tabs with `←/→` arrow keys or number keys `1`–`4`. The Detail tab supports `↑/↓/Home/End` scrolling.
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `←/→` or `1-4` | Switch tabs |
-| `↑/↓` | Scroll detail log (on Detail tab) |
-| `Home/End` | Jump to top/bottom of detail log |
-| `Alt+S` | Stop after current task (with confirmation) |
-| `Alt+S` (when stopping) | Cancel the stop and resume |
-| `Ctrl+C` | Interrupt immediately |
-
-### Stop After Task
-
-Press **Alt+S** during execution to request a graceful stop after the current task completes. A confirmation prompt appears: `Stop after current task? (y/n)`. When active, the box border turns yellow as a visual indicator. Press **Alt+S** again to revert and continue.
-
-### Summary Screen
-
-After all tasks complete (or the run is stopped/interrupted), a summary screen shows run details, token usage per task, commits, and remaining tasks. The title reflects the stop reason:
-
-| Title | When |
-|-------|------|
-| **✓ Work Complete** | All requested tasks finished successfully |
-| **⊘ Stopped by User** | User pressed Alt+S to stop after a task |
-| **⊘ Work Interrupted** | User pressed Ctrl+C during execution |
-| **✗ Work Failed** | A task or commit failed (shows error detail) |
-| **⊘ No Tasks Available** | No workable tasks found |
-
-From the summary screen you can choose **Exit** or **Run again** (with a custom task count).
+See the [Work View](/reference/tui#work-view) in the TUI reference for details on the interactive interface, tabs, keyboard shortcuts, and the summary screen.
 
 ---
 
@@ -148,7 +108,7 @@ Next 5 task(s):
 
 The first task is highlighted in cyan (unless `--plain` is used).
 
-In TUI mode (without `--plain`), the list is displayed in a full-screen bordered view with keyboard navigation. Blocked tasks are shown with a `⊘` icon. If no pending tasks exist, a friendly "All done!" screen is shown instead of exiting immediately.
+In TUI mode (without `--plain`), the list is displayed in a full-screen bordered view. See the [List View](/reference/tui#list-view) in the TUI reference for keyboard shortcuts and navigation.
 
 ---
 
@@ -204,38 +164,7 @@ Maggus Status — 3 plans (2 active), 24 tasks total
 - `→` marks the next task that `maggus work` will pick up
 - With `--plain`, symbols are replaced: `[x]` for done, `[!]` for blocked, `[~]` for ignored, `->` for next
 
-In TUI mode (without `--plain`), the status is displayed in a full-screen bordered view with tabbed plan sections, keyboard navigation, and a detail view for individual tasks. Press `Alt+A` to toggle showing completed plans. If no plans exist, a helpful empty state screen is shown with a hint to run `maggus plan`.
-
-### Managing Blocked Tasks
-
-Blocked tasks can be managed directly from the task detail view in both `maggus status` and `maggus list`. When viewing a task with blocked criteria:
-
-1. Press **Enter** on a task to open its detail view
-2. Press **Enter** again to enter **criteria mode** — blocked criteria are highlighted
-3. Navigate between blocked criteria with **↑/↓**
-4. Press **Enter** on a blocked criterion to open the **action picker**
-
-The action picker offers four options:
-
-| Action | Description |
-|--------|-------------|
-| **Unblock** | Removes the `BLOCKED:` prefix, turning it back into a normal unchecked criterion |
-| **Resolve** | Marks the criterion as done (removes the block and checks it) |
-| **Delete** | Removes the criterion entirely from the plan file |
-| **Skip** | Leaves the criterion unchanged |
-
-Changes are applied immediately to the plan file. Press **Esc** at any point to go back.
-
-### Ignoring Tasks and Plans
-
-From the status or list TUI, you can toggle the ignored state of tasks and plans:
-
-| Key | Action |
-|-----|--------|
-| `Alt+I` | Ignore/unignore the selected task |
-| `Alt+P` | Ignore/unignore the selected plan |
-
-Ignored tasks and plans are skipped by `maggus work` but remain visible in the status view.
+In TUI mode (without `--plain`), the status is displayed in a full-screen bordered view with tabbed plan sections and keyboard navigation. See the [Status View](/reference/tui#status-view) in the TUI reference for the interactive features, task detail view, blocked task management, and ignoring tasks/plans.
 
 ---
 
@@ -255,7 +184,7 @@ maggus update
 - If no update is available, prints "Already up to date"
 - If an update is available, shows the changelog and asks for confirmation
 - On confirmation, downloads the release asset and replaces the running binary
-- When running a dev build (version = `"dev"`), prints a message and skips the check
+- When running a dev build (version = `"dev"`), any available release is treated as newer, allowing manual updates to the latest stable version
 
 ### Example
 
@@ -503,3 +432,23 @@ Remove all worktrees in `.maggus-work/` and their associated branches. Also clea
 ```bash
 maggus worktree clean
 ```
+
+---
+
+## maggus repos
+
+Manage the list of known repositories. Opens an interactive TUI for adding, removing, and switching between projects.
+
+### Usage
+
+```bash
+maggus repos
+```
+
+### Behavior
+
+- Shows a list of repositories registered in `~/.maggus/repositories.yml`
+- Add new repositories or remove existing ones
+- Switch the active repository — Maggus changes its working directory accordingly
+
+This command powers the **Repos** option in the interactive main menu. See the [Repository Registry](/reference/configuration#repository-registry-maggus-repositories-yml) section in the configuration reference for details on the underlying file format.
