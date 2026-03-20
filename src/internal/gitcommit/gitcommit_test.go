@@ -91,7 +91,7 @@ func run(t *testing.T, dir string, args ...string) {
 func TestCommitIteration_NoCOMMITFile(t *testing.T) {
 	dir := initGitRepo(t)
 
-	result, err := CommitIteration(dir)
+	result, err := CommitIteration(dir, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestCommitIteration_Success(t *testing.T) {
 	commitMsg := "Add test file\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n"
 	os.WriteFile(filepath.Join(dir, commitFile), []byte(commitMsg), 0644)
 
-	result, err := CommitIteration(dir)
+	result, err := CommitIteration(dir, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestCommitIteration_UnstagesMaggusRuns(t *testing.T) {
 	// Create COMMIT.md
 	os.WriteFile(filepath.Join(dir, commitFile), []byte("feat: add feature\n"), 0644)
 
-	result, err := CommitIteration(dir)
+	result, err := CommitIteration(dir, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestCommitIteration_NothingStaged(t *testing.T) {
 	// Unstage it so nothing is staged
 	run(t, dir, "git", "reset", "HEAD", commitFile)
 
-	result, err := CommitIteration(dir)
+	result, err := CommitIteration(dir, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -214,5 +214,95 @@ func TestCommitIteration_NothingStaged(t *testing.T) {
 	// Verify COMMIT.md was cleaned up
 	if _, err := os.Stat(filepath.Join(dir, commitFile)); !os.IsNotExist(err) {
 		t.Error("expected COMMIT.md to be deleted after no-op commit")
+	}
+}
+
+func TestCommitIteration_FallbackMsg_WithStagedChanges(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// Stage a file without creating COMMIT.md
+	os.WriteFile(filepath.Join(dir, "feature.go"), []byte("package main\n"), 0644)
+	run(t, dir, "git", "add", "feature.go")
+
+	result, err := CommitIteration(dir, "TASK-001: add fallback")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Committed {
+		t.Errorf("expected Committed=true, got message: %s", result.Message)
+	}
+
+	// Verify the file was committed
+	cmd := exec.Command("git", "show", "--name-only", "--format=", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git show failed: %v", err)
+	}
+	if !strings.Contains(string(out), "feature.go") {
+		t.Error("feature.go should be in the fallback commit")
+	}
+
+	// Verify commit message matches fallback
+	cmd = exec.Command("git", "log", "-1", "--format=%s")
+	cmd.Dir = dir
+	out, err = cmd.Output()
+	if err != nil {
+		t.Fatalf("git log failed: %v", err)
+	}
+	if !strings.Contains(string(out), "TASK-001: add fallback") {
+		t.Errorf("commit subject should contain fallback message, got: %s", string(out))
+	}
+}
+
+func TestCommitIteration_FallbackMsg_NothingStaged(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// No staged changes, no COMMIT.md, but fallbackMsg is non-empty
+	result, err := CommitIteration(dir, "TASK-001: fallback nothing to commit")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Committed {
+		t.Error("expected Committed=false when nothing is staged")
+	}
+	if !strings.Contains(result.Message, "No changes to commit") {
+		t.Errorf("expected 'No changes to commit' message, got: %s", result.Message)
+	}
+}
+
+func TestCommitIteration_FallbackMsg_UnstagesSafetyGate(t *testing.T) {
+	dir := initGitRepo(t)
+
+	// Stage .maggus/runs/ and a real file, no COMMIT.md
+	runsDir := filepath.Join(dir, ".maggus", "runs", "test-run")
+	os.MkdirAll(runsDir, 0755)
+	os.WriteFile(filepath.Join(runsDir, "iteration-01.md"), []byte("log\n"), 0644)
+	run(t, dir, "git", "add", ".maggus/runs/")
+
+	os.WriteFile(filepath.Join(dir, "output.go"), []byte("package main\n"), 0644)
+	run(t, dir, "git", "add", "output.go")
+
+	result, err := CommitIteration(dir, "TASK-001: safety gate test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Committed {
+		t.Errorf("expected Committed=true, got message: %s", result.Message)
+	}
+
+	// Verify .maggus/runs/ was NOT committed
+	cmd := exec.Command("git", "show", "--name-only", "--format=", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git show failed: %v", err)
+	}
+	committed := string(out)
+	if strings.Contains(committed, ".maggus/runs/") {
+		t.Error(".maggus/runs/ files should not be in the fallback commit")
+	}
+	if !strings.Contains(committed, "output.go") {
+		t.Error("output.go should be in the fallback commit")
 	}
 }
