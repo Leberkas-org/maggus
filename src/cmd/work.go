@@ -492,16 +492,18 @@ Examples:
 					}
 
 					// Re-parse to pick up any changes the agent made
-					var parseErr error
-					tasks, parseErr = parser.ParsePlans(workDir)
-					if parseErr != nil {
+					if parsedTasks, parseErr := parser.ParsePlans(workDir); parseErr != nil {
 						if useWorktree {
 							lock.Release()
 						}
-						stopReason = runner.StopReasonError
-						errorDetail = fmt.Sprintf("re-parse plans: %v", parseErr)
-						workErr = fmt.Errorf("%s", errorDetail)
-						return
+						reason := fmt.Sprintf("re-parse plans: %v", parseErr)
+						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
+						if resetErr := resetStagedChanges(workDir); resetErr != nil {
+							p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ could not reset staged changes: %v", resetErr)})
+						}
+						continue
+					} else {
+						tasks = parsedTasks
 					}
 
 					// Rename fully completed plan files before committing
@@ -520,10 +522,13 @@ Examples:
 						if useWorktree {
 							lock.Release()
 						}
-						stopReason = runner.StopReasonError
-						errorDetail = fmt.Sprintf("commit after %s: %v", next.ID, commitErr)
-						workErr = fmt.Errorf("%s", errorDetail)
-						return
+						reason := commitErr.Error()
+						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
+						p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", next.ID, reason)})
+						if resetErr := resetStagedChanges(workDir); resetErr != nil {
+							p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ could not reset staged changes: %v", resetErr)})
+						}
+						continue
 					}
 					if commitResult.Committed {
 						p.Send(runner.CommitMsg{Message: commitResult.Message})

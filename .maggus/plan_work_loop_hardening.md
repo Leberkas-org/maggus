@@ -61,12 +61,12 @@ Two related weaknesses in the Maggus work loop: (1) when an agent omits `COMMIT.
 **Description:** As a Maggus user, I want a failed `git commit` to be recorded and skipped, so that a commit failure on task 2 doesn't prevent tasks 3–5 from running.
 
 **Acceptance Criteria:**
-- [ ] When `gitcommit.CommitIteration` returns a non-nil `commitErr`, the loop records the failure and calls `continue` instead of `return`
-- [ ] The failed task is added to the `failedTasks` slice with the commit error as the reason
-- [ ] A `runner.InfoMsg` is sent: `"✗ TASK-NNN commit failed: <error> — skipping to next task"`
-- [ ] `resetStagedChanges` (from TASK-004) is called after a commit error to ensure a clean state for the next task
-- [ ] Re-parse errors (`parser.ParsePlans`) are treated the same way: add to `failedTasks`, call `resetStagedChanges`, `continue` with the last good `tasks` slice
-- [ ] `go test ./...` passes in `src/`
+- [x] When `gitcommit.CommitIteration` returns a non-nil `commitErr`, the loop records the failure and calls `continue` instead of `return`
+- [x] The failed task is added to the `failedTasks` slice with the commit error as the reason
+- [x] A `runner.InfoMsg` is sent: `"✗ TASK-NNN commit failed: <error> — skipping to next task"`
+- [x] `resetStagedChanges` (from TASK-004) is called after a commit error to ensure a clean state for the next task
+- [x] Re-parse errors (`parser.ParsePlans`) are treated the same way: add to `failedTasks`, call `resetStagedChanges`, `continue` with the last good `tasks` slice
+- [x] `go test ./...` passes in `src/`
 
 ### TASK-006: Track and display failed tasks in the summary
 **Description:** As a Maggus user, I want the summary screen to show which tasks failed and why, so I know exactly what to fix after a run completes.
