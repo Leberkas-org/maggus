@@ -519,6 +519,8 @@ Examples:
 					if commitResult.Committed {
 						p.Send(runner.CommitMsg{Message: commitResult.Message})
 						notifier.PlayTaskComplete()
+					} else if commitResult.Message != "" {
+						p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ %s: %s", next.ID, commitResult.Message)})
 					}
 
 					// Release task lock after successful commit.
