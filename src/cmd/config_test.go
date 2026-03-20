@@ -45,7 +45,7 @@ func TestIndexOf(t *testing.T) {
 
 func TestNewConfigModel_Defaults(t *testing.T) {
 	cfg := config.Config{Agent: "claude"}
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
 	if len(opts) != 8 {
@@ -103,7 +103,7 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 			OnError:        &f,
 		},
 	}
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, "")
 	opts := optionRows(m)
 
 	if opts[0].current != 1 {
@@ -127,7 +127,7 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 }
 
 func TestBuildConfig_Defaults(t *testing.T) {
-	m := newConfigModel(config.Config{Agent: "claude"})
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
 	cfg := m.buildConfig()
 
 	if cfg.Agent != "claude" {
@@ -167,7 +167,7 @@ func TestBuildConfig_CustomValues(t *testing.T) {
 			OnError:        &f,
 		},
 	}
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, "")
 	result := m.buildConfig()
 
 	if result.Agent != "opencode" {
@@ -202,7 +202,7 @@ func TestBuildConfig_RoundTrip(t *testing.T) {
 			Sound: true,
 		},
 	}
-	m := newConfigModel(original)
+	m := newConfigModel(original, "")
 	result := m.buildConfig()
 
 	if result.Agent != original.Agent {
@@ -220,7 +220,7 @@ func TestBuildConfig_RoundTrip(t *testing.T) {
 }
 
 func TestBuildConfig_IncludeNotSet(t *testing.T) {
-	m := newConfigModel(config.Config{Agent: "claude", Include: []string{"foo.md"}})
+	m := newConfigModel(config.Config{Agent: "claude", Include: []string{"foo.md"}}, "")
 	result := m.buildConfig()
 
 	if len(result.Include) != 0 {
@@ -344,7 +344,7 @@ func TestConfigRow_Fields(t *testing.T) {
 }
 
 func TestNewConfigModel_OptionLabels(t *testing.T) {
-	m := newConfigModel(config.Config{Agent: "claude"})
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
 	opts := optionRows(m)
 
 	expectedLabels := []string{
@@ -370,7 +370,7 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 
 func TestNewConfigModel_ModelHaiku(t *testing.T) {
 	cfg := config.Config{Agent: "claude", Model: "haiku"}
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, "")
 	opts := optionRows(m)
 
 	if opts[1].current != 3 {
@@ -380,7 +380,7 @@ func TestNewConfigModel_ModelHaiku(t *testing.T) {
 
 func TestNewConfigModel_UnknownModel(t *testing.T) {
 	cfg := config.Config{Agent: "claude", Model: "unknown-model"}
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, "")
 	opts := optionRows(m)
 
 	if opts[1].current != 0 {

@@ -40,31 +40,10 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	m := newConfigModel(cfg)
+	m := newConfigModel(cfg, dir)
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	result, err := p.Run()
-	if err != nil {
-		return err
-	}
-
-	final := result.(configModel)
-	switch final.action {
-	case configActionSaveProject:
-		newCfg := final.buildConfig()
-		newCfg.Include = cfg.Include
-		return saveConfig(dir, newCfg)
-	case configActionSaveGlobal:
-		return final.saveGlobalConfig()
-	case configActionEditProject:
-		return openInEditor(filepath.Join(dir, ".maggus", "config.yml"))
-	case configActionEditGlobal:
-		path, err := globalconfig.SettingsFilePath()
-		if err != nil {
-			return err
-		}
-		return openInEditor(path)
-	}
-	return nil
+	_, err = p.Run()
+	return err
 }
 
 // configAction represents the user's chosen action on exit.
@@ -91,17 +70,28 @@ type configRow struct {
 
 func (r configRow) isOption() bool { return r.values != nil }
 
+// configResultMsg is sent after an async save/edit action completes.
+type configResultMsg struct {
+	text string
+	err  error
+}
+
 type configModel struct {
 	rows   []configRow
 	cursor int
 	action configAction
 	width  int
 	height int
+	dir    string // working directory for project config
 	// indices for buildConfig / saveGlobalConfig
 	globalAutoUpdateIdx int
+	// original project config (to preserve Include on save)
+	origInclude []string
+	// status feedback shown below the rows
+	statusText string
 }
 
-func newConfigModel(cfg config.Config) configModel {
+func newConfigModel(cfg config.Config, dir string) configModel {
 	agentValues := []string{"claude", "opencode"}
 	agentIdx := indexOf(agentValues, cfg.Agent)
 
@@ -177,6 +167,8 @@ func newConfigModel(cfg config.Config) configModel {
 	return configModel{
 		rows:                rows,
 		globalAutoUpdateIdx: globalAutoUpdateIdx,
+		dir:                 dir,
+		origInclude:         cfg.Include,
 	}
 }
 
@@ -239,7 +231,19 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	case configResultMsg:
+		if msg.err != nil {
+			m.statusText = "Error: " + msg.err.Error()
+		} else {
+			m.statusText = msg.text
+		}
+		return m, nil
+
 	case tea.KeyMsg:
+		// Clear status on any keypress
+		m.statusText = ""
+
 		itemCount := len(m.rows)
 
 		switch msg.String() {
@@ -276,19 +280,59 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			row := &m.rows[m.cursor]
 			if row.isOption() {
-				// Cycle value on enter
 				if row.current < len(row.values)-1 {
 					row.current++
 				} else {
 					row.current = 0
 				}
 			} else {
-				m.action = row.action
-				return m, tea.Quit
+				return m, m.executeAction(row.action)
 			}
 		}
 	}
 	return m, nil
+}
+
+// executeAction returns a tea.Cmd that performs the given config action.
+func (m configModel) executeAction(action configAction) tea.Cmd {
+	switch action {
+	case configActionSaveProject:
+		return func() tea.Msg {
+			newCfg := m.buildConfig()
+			newCfg.Include = m.origInclude
+			if err := saveConfig(m.dir, newCfg); err != nil {
+				return configResultMsg{err: err}
+			}
+			return configResultMsg{text: "Saved project config"}
+		}
+	case configActionSaveGlobal:
+		return func() tea.Msg {
+			if err := m.saveGlobalConfig(); err != nil {
+				return configResultMsg{err: err}
+			}
+			return configResultMsg{text: "Saved global config"}
+		}
+	case configActionEditProject:
+		return func() tea.Msg {
+			path := filepath.Join(m.dir, ".maggus", "config.yml")
+			if err := openInEditor(path); err != nil {
+				return configResultMsg{err: err}
+			}
+			return configResultMsg{text: "Opened project config in editor"}
+		}
+	case configActionEditGlobal:
+		return func() tea.Msg {
+			path, err := globalconfig.SettingsFilePath()
+			if err != nil {
+				return configResultMsg{err: err}
+			}
+			if err := openInEditor(path); err != nil {
+				return configResultMsg{err: err}
+			}
+			return configResultMsg{text: "Opened global config in editor"}
+		}
+	}
+	return nil
 }
 
 func (m configModel) View() string {
@@ -361,8 +405,18 @@ func (m configModel) View() string {
 		}
 	}
 
+	// Status feedback
+	if m.statusText != "" {
+		sb.WriteString("\n")
+		statusStyle := lipgloss.NewStyle().Foreground(styles.Success)
+		if strings.HasPrefix(m.statusText, "Error:") {
+			statusStyle = lipgloss.NewStyle().Foreground(styles.Error)
+		}
+		sb.WriteString("  " + statusStyle.Render(m.statusText) + "\n")
+	}
+
 	content := sb.String()
-	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: cancel")
+	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: exit")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreen(content, footer, m.width, m.height)
@@ -390,8 +444,8 @@ func saveConfig(dir string, cfg config.Config) error {
 	return nil
 }
 
-// openInEditor opens the given file in the user's preferred editor.
-// It checks $VISUAL, $EDITOR, and falls back to platform defaults.
+// openInEditor opens the given file in the user's preferred editor as a
+// detached process so it doesn't block maggus or take over the terminal.
 func openInEditor(path string) error {
 	// Ensure the file exists before opening.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -412,15 +466,16 @@ func openInEditor(path string) error {
 		if runtime.GOOS == "windows" {
 			editor = "notepad"
 		} else {
-			editor = "vi"
+			editor = "xdg-open"
 		}
 	}
 
 	cmd := exec.Command(editor, path)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	// Detach from terminal so the editor runs in the background.
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Start()
 }
 
 func indexOf(values []string, target string) int {
