@@ -40,12 +40,12 @@ Two related weaknesses in the Maggus work loop: (1) when an agent omits `COMMIT.
 **Description:** As a Maggus user, I want a failed agent run to be recorded and skipped rather than aborting the entire batch, so that the remaining tasks are still attempted.
 
 **Acceptance Criteria:**
-- [ ] When `activeAgent.Run` returns a non-nil error and the context is not cancelled, the loop does NOT `return` — instead it records the failure and calls `continue`
-- [ ] The failed task is added to a local `failedTasks` slice (struct with `ID string`, `Title string`, `Reason string`)
-- [ ] A `runner.InfoMsg` is sent to the TUI: `"✗ TASK-NNN failed: <error> — skipping to next task"`
-- [ ] `workErr` is NOT set (the outer Cobra error path is not triggered)
-- [ ] If the context IS cancelled (Ctrl+C), the existing interrupt path is preserved unchanged
-- [ ] `go test ./...` passes in `src/`
+- [x] When `activeAgent.Run` returns a non-nil error and the context is not cancelled, the loop does NOT `return` — instead it records the failure and calls `continue`
+- [x] The failed task is added to a local `failedTasks` slice (struct with `ID string`, `Title string`, `Reason string`)
+- [x] A `runner.InfoMsg` is sent to the TUI: `"✗ TASK-NNN failed: <error> — skipping to next task"`
+- [x] `workErr` is NOT set (the outer Cobra error path is not triggered)
+- [x] If the context IS cancelled (Ctrl+C), the existing interrupt path is preserved unchanged
+- [x] `go test ./...` passes in `src/`
 
 ### TASK-004: Clean git state between tasks
 **Description:** As a Maggus user, I want any uncommitted staged changes cleaned up before the next task starts, so that a failed task's partial work does not contaminate the next task's commit.

@@ -32,6 +32,13 @@ import (
 
 const defaultTaskCount = 5
 
+// failedTask records a task that the agent failed to complete.
+type failedTask struct {
+	ID     string
+	Title  string
+	Reason string
+}
+
 var (
 	countFlag       int
 	noBootstrapFlag bool
@@ -367,6 +374,7 @@ Examples:
 			// Run the work loop in a goroutine, sending events to the TUI.
 			var workErr error
 			completed := 0
+			var failedTasks []failedTask
 			go func() {
 				defer func() {
 					// Finalize run log before signaling done.
@@ -477,10 +485,10 @@ Examples:
 							break
 						}
 						notifier.PlayError()
-						stopReason = runner.StopReasonError
-						errorDetail = fmt.Sprintf("task %s failed: %v", next.ID, err)
-						workErr = fmt.Errorf("%s", errorDetail)
-						return
+						reason := err.Error()
+						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
+						p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
+						continue
 					}
 
 					// Re-parse to pick up any changes the agent made
