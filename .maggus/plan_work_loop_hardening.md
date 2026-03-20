@@ -31,10 +31,10 @@ Two related weaknesses in the Maggus work loop: (1) when an agent omits `COMMIT.
 **Description:** As a Maggus user, I want the work loop to pass the current task's title as the fallback commit message so that missing `COMMIT.md` files don't silently drop staged changes.
 
 **Acceptance Criteria:**
-- [ ] In `cmd/work.go`, the call `gitcommit.CommitIteration(workDir)` is updated to `gitcommit.CommitIteration(workDir, next.ID+": "+next.Title)`
-- [ ] When a fallback commit succeeds, a `runner.CommitMsg` is sent to the TUI (same path as a normal COMMIT.md commit)
-- [ ] When a fallback commit results in "nothing to commit", a `runner.InfoMsg` warning is sent
-- [ ] `go build ./...` and `go test ./...` pass in `src/`
+- [x] In `cmd/work.go`, the call `gitcommit.CommitIteration(workDir)` is updated to `gitcommit.CommitIteration(workDir, next.ID+": "+next.Title)`
+- [x] When a fallback commit succeeds, a `runner.CommitMsg` is sent to the TUI (same path as a normal COMMIT.md commit)
+- [x] When a fallback commit results in "nothing to commit", a `runner.InfoMsg` warning is sent
+- [x] `go build ./...` and `go test ./...` pass in `src/`
 
 ### TASK-003: Make agent errors non-fatal in the work loop
 **Description:** As a Maggus user, I want a failed agent run to be recorded and skipped rather than aborting the entire batch, so that the remaining tasks are still attempted.

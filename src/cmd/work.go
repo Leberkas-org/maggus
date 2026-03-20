@@ -507,7 +507,7 @@ Examples:
 					stagePlans.CombinedOutput() // ignore errors
 
 					// Commit using COMMIT.md
-					commitResult, commitErr := gitcommit.CommitIteration(workDir, next.ID)
+					commitResult, commitErr := gitcommit.CommitIteration(workDir, next.ID+": "+next.Title)
 					if commitErr != nil {
 						if useWorktree {
 							lock.Release()
