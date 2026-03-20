@@ -75,6 +75,7 @@ type SummaryData struct {
 	RemainingTasks []RemainingTask
 	Reason         StopReason // why the run ended
 	ErrorDetail    string     // error message when Reason == StopReasonError
+	Warnings       []string   // non-fatal warnings (e.g. skipped commits)
 }
 
 // RemainingTask is a task that was not completed during the run.
@@ -1049,7 +1050,11 @@ func (m TUIModel) renderSummaryView() string {
 	case StopReasonNoTasks:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ No Tasks Available")
 		content.WriteString(title + "\n")
-		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete, blocked, or ignored.") + "\n\n")
+		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete, blocked, or ignored.") + "\n")
+		if m.summary.ErrorDetail != "" {
+			content.WriteString(grayStyle.Render("  "+m.summary.ErrorDetail) + "\n")
+		}
+		content.WriteString("\n")
 		goto afterTitle
 	default:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
@@ -1103,6 +1108,17 @@ afterTitle:
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
 				styles.Truncate(c, innerW-4)))
+		}
+	}
+
+	// Warnings
+	if len(m.summary.Warnings) > 0 {
+		content.WriteString("\n")
+		content.WriteString(lipgloss.NewStyle().Foreground(styles.Warning).Render("Warnings") + "\n")
+		for _, w := range m.summary.Warnings {
+			content.WriteString(fmt.Sprintf("  %s %s\n",
+				lipgloss.NewStyle().Foreground(styles.Warning).Render("⚠"),
+				w))
 		}
 	}
 

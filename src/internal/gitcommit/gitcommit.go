@@ -25,17 +25,47 @@ type Result struct {
 	Message   string
 }
 
+// hasStagedChanges checks whether git has any staged changes ready to commit.
+func hasStagedChanges(workDir string) bool {
+	cmd := exec.Command("git", "diff", "--cached", "--quiet")
+	cmd.Dir = workDir
+	err := cmd.Run()
+	// Exit code 1 means there ARE staged changes; 0 means clean.
+	return err != nil
+}
+
 // CommitIteration checks for COMMIT.md in workDir, strips Co-Authored-By lines,
 // runs git commit -F COMMIT.md, and deletes COMMIT.md on success.
+// If COMMIT.md is missing but there are staged changes, it commits with an
+// auto-generated message using the provided taskID.
 // Returns a Result indicating what happened.
-func CommitIteration(workDir string) (Result, error) {
+func CommitIteration(workDir string, taskID ...string) (Result, error) {
 	commitPath := filepath.Join(workDir, commitFile)
 
 	data, err := os.ReadFile(commitPath)
 	if os.IsNotExist(err) {
+		// COMMIT.md missing — check if there are staged changes to salvage.
+		if !hasStagedChanges(workDir) {
+			return Result{
+				Committed: false,
+				Message:   "Warning: COMMIT.md not found and no staged changes",
+			}, nil
+		}
+		// There are staged changes: commit with a fallback message.
+		id := "unknown"
+		if len(taskID) > 0 && taskID[0] != "" {
+			id = taskID[0]
+		}
+		fallbackMsg := fmt.Sprintf("chore(%s): apply agent changes (COMMIT.md missing)\n", id)
+		cmd := exec.Command("git", "commit", "-m", fallbackMsg)
+		cmd.Dir = workDir
+		out, commitErr := cmd.CombinedOutput()
+		if commitErr != nil {
+			return Result{}, fmt.Errorf("fallback commit failed: %s", strings.TrimSpace(string(out)))
+		}
 		return Result{
-			Committed: false,
-			Message:   "Warning: COMMIT.md not found, agent may not have made changes",
+			Committed: true,
+			Message:   strings.TrimSpace(string(out)),
 		}, nil
 	}
 	if err != nil {

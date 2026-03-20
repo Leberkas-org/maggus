@@ -390,6 +390,7 @@ Examples:
 
 				stopReason := runner.StopReasonComplete
 				var errorDetail string
+				var warnings []string
 
 				// Log ignored tasks at the start so the user knows what's being skipped.
 				for i := range tasks {
@@ -506,7 +507,7 @@ Examples:
 					stagePlans.CombinedOutput() // ignore errors
 
 					// Commit using COMMIT.md
-					commitResult, commitErr := gitcommit.CommitIteration(workDir)
+					commitResult, commitErr := gitcommit.CommitIteration(workDir, next.ID)
 					if commitErr != nil {
 						if useWorktree {
 							lock.Release()
@@ -519,16 +520,21 @@ Examples:
 					if commitResult.Committed {
 						p.Send(runner.CommitMsg{Message: commitResult.Message})
 						notifier.PlayTaskComplete()
-					} else if commitResult.Message != "" {
-						p.Send(runner.InfoMsg{Text: fmt.Sprintf("⚠ %s: %s", next.ID, commitResult.Message)})
+						completed++
+					} else {
+						msg := commitResult.Message
+						if msg == "" {
+							msg = "commit skipped (unknown reason)"
+						}
+						w := fmt.Sprintf("%s: %s", next.ID, msg)
+						warnings = append(warnings, w)
+						p.Send(runner.InfoMsg{Text: "⚠ " + w})
 					}
 
 					// Release task lock after successful commit.
 					if useWorktree {
 						lock.Release()
 					}
-
-					completed++
 
 					// Update progress to reflect completed iteration.
 					p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
@@ -576,6 +582,32 @@ Examples:
 					}
 				}
 
+				// If nothing was accomplished, surface a meaningful reason.
+				if completed == 0 && stopReason == runner.StopReasonComplete {
+					if len(warnings) > 0 {
+						stopReason = runner.StopReasonError
+						errorDetail = "agent ran but produced no commits"
+					} else {
+						stopReason = runner.StopReasonNoTasks
+						// Add diagnostic detail about task states.
+						total, done, blocked, ignored := 0, 0, 0, 0
+						for i := range tasks {
+							total++
+							switch {
+							case tasks[i].IsComplete():
+								done++
+							case tasks[i].IsBlocked():
+								blocked++
+							case tasks[i].Ignored:
+								ignored++
+							}
+						}
+						errorDetail = fmt.Sprintf(
+							"tasks: %d total, %d complete, %d blocked, %d ignored, count=%d",
+							total, done, blocked, ignored, count)
+					}
+				}
+
 				// Build summary data.
 				endHashCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 				endHashCmd.Dir = workDir
@@ -609,6 +641,7 @@ Examples:
 					RemainingTasks: remaining,
 					Reason:         stopReason,
 					ErrorDetail:    errorDetail,
+					Warnings:       warnings,
 				}
 
 				// Notify run complete.
