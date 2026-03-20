@@ -391,7 +391,7 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	itemCount := len(m.activeSubDef.options) + 1 // options + Run
 
 	switch msg.String() {
-	case "esc":
+	case "esc", "q":
 		m.inSubMenu = false
 		m.activeSubDef = nil
 		m.subCursor = 0
@@ -652,9 +652,43 @@ func (m menuModel) viewSubMenu() (string, string) {
 	cmdName := m.items[m.cursor].name
 	titleLine := selectedStyle.Render(cmdName) + "  " + mutedStyle.Render(m.items[m.cursor].desc)
 
+	// Measure the widest row to center the sub-menu table.
+	// Row structure: cursor(4) + label(10) + gap(2) + values
+	const cursorCol = 4
+	const labelCol = 10
+	const gap = 2
+	maxValuesW := 0
+	for _, opt := range m.activeSubDef.options {
+		// Measure raw (unstyled) values width: "v1 / v2 / v3"
+		valW := 0
+		for vi, v := range opt.values {
+			if vi > 0 {
+				valW += 3 // " / "
+			}
+			valW += len(v)
+		}
+		if valW > maxValuesW {
+			maxValuesW = valW
+		}
+	}
+	tableW := cursorCol + labelCol + gap + maxValuesW
+
+	// Also account for the title line width
+	titleW := len(cmdName) + 2 + len(m.items[m.cursor].desc)
+	if titleW > tableW {
+		tableW = titleW
+	}
+
+	const contentW = 90
+	leftPad := (contentW - tableW) / 2
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	indent := strings.Repeat(" ", leftPad)
+
 	var sb strings.Builder
-	sb.WriteString(titleLine + "\n")
-	sb.WriteString(styles.Separator(40) + "\n")
+	sb.WriteString(indent + titleLine + "\n")
+	sb.WriteString(indent + styles.Separator(tableW) + "\n")
 
 	for i, opt := range m.activeSubDef.options {
 		label := fmt.Sprintf("%-10s", opt.label)
@@ -671,13 +705,15 @@ func (m menuModel) viewSubMenu() (string, string) {
 		valueStr := strings.Join(valueParts, mutedStyle.Render(" / "))
 
 		if i == m.subCursor {
-			fmt.Fprintf(&sb, "  %s %s  %s\n",
+			fmt.Fprintf(&sb, "%s  %s %s  %s\n",
+				indent,
 				cursorStyle.Render("→"),
 				normalStyle.Render(label),
 				valueStr,
 			)
 		} else {
-			fmt.Fprintf(&sb, "    %s  %s\n",
+			fmt.Fprintf(&sb, "%s    %s  %s\n",
+				indent,
 				normalStyle.Render(label),
 				valueStr,
 			)
@@ -688,12 +724,14 @@ func (m menuModel) viewSubMenu() (string, string) {
 	runIdx := len(m.activeSubDef.options)
 	sb.WriteString("\n")
 	if m.subCursor == runIdx {
-		fmt.Fprintf(&sb, "  %s %s\n",
+		fmt.Fprintf(&sb, "%s  %s %s\n",
+			indent,
 			cursorStyle.Render("→"),
 			selectedStyle.Render("Run"),
 		)
 	} else {
-		fmt.Fprintf(&sb, "    %s\n",
+		fmt.Fprintf(&sb, "%s    %s\n",
+			indent,
 			normalStyle.Render("Run"),
 		)
 	}
