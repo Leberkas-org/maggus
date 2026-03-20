@@ -657,6 +657,7 @@ Examples:
 				result := tm.Result()
 				if result.RunAgain {
 					count = result.TaskCount
+					taskFlag = ""            // clear so next batch finds the next workable task
 					workDir = dir // reset workDir for next iteration
 					continue
 				}

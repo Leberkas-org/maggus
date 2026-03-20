@@ -6,23 +6,13 @@ Get Maggus installed and run your first automated task in minutes.
 
 You need:
 
-- **Git** — any recent version ([download](https://git-scm.com/downloads))
-- **A terminal** — your OS default works (Terminal on macOS, PowerShell or Git Bash on Windows, any shell on Linux)
+- **Git**
+- **A terminal**
 - **An AI coding agent** on your `PATH`:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic's coding agent **(default)**
   - [OpenCode](https://opencode.ai) — open-source agent supporting multiple providers
 
-Verify your setup:
-
-```bash
-git --version         # any recent version
-claude --version      # if using Claude Code
-opencode --version    # if using OpenCode
-```
-
 ## Installation
-
-### Pre-built binary (recommended)
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/leberkas-org/maggus/releases).
 
@@ -50,29 +40,6 @@ Move-Item maggus.exe C:\tools\
 
 :::
 
-### `go install`
-
-If you have Go 1.22+ installed:
-
-```bash
-go install github.com/leberkas-org/maggus@latest
-```
-
-The binary is placed in your `$GOPATH/bin` (or `$HOME/go/bin` by default).
-
-### Build from source
-
-```bash
-git clone https://github.com/leberkas-org/maggus.git
-cd maggus/src
-go build -o maggus .
-```
-
-::: tip Windows
-On Windows, build with `go build -o maggus.exe .` instead. For embedded icon and version info, install [go-winres](https://github.com/tc-hib/go-winres) and run `go-winres make` before building.
-:::
-
-Move the resulting binary to a directory on your `PATH`, or run it directly with `./maggus` (or `.\maggus.exe` on Windows).
 
 ## First Project Setup
 
@@ -191,10 +158,10 @@ While Maggus runs, the TUI (terminal UI) shows:
 | **Task info** | Current task ID and title |
 | **Spinner & status** | What the agent is doing right now (reading files, writing code, running commands) |
 | **Tool history** | Recent tools the agent has used |
-| **Tokens** | Input/output token usage for the current task |
+| **Tokens** | Input/output token usage for the current task (Only updated after task completion) |
 | **Elapsed** | Time spent on the current task |
 
-**Tabs:** Press `1` for the Progress view or `2` for Recent Commits. Press `Alt+I` to toggle a detail panel showing full tool parameters.
+**Tabs:** Press `1`–`4` to switch between Progress, Detail, Task, and Commits views. Use `←/→` arrow keys to navigate tabs.
 
 **When a task completes**, Maggus commits the changes and immediately moves to the next task. When all tasks are done (or remaining tasks are blocked), you'll see a summary screen with:
 
@@ -203,20 +170,23 @@ While Maggus runs, the TUI (terminal UI) shows:
 - Remaining/blocked tasks (if any)
 - Token usage breakdown
 
-Press any key to exit the summary.
+From the summary screen you can choose **Exit** or **Run again** (with a custom task count).
 
 **Keyboard shortcuts during work:**
 
 | Key | Action |
 |---|---|
-| `Ctrl+C` | Stop gracefully after the current task |
-| `Ctrl+C` (twice) | Force-quit immediately |
-| `1` / `2` | Switch between Progress and Commits tabs |
-| `Alt+I` | Toggle detail panel |
+| `←/→` or `1-4` | Switch tabs |
+| `↑/↓` | Scroll (on Detail tab) |
+| `Home/End` | Jump to top/bottom |
+| `Alt+S` | Stop after current task (with confirmation) |
+| `Ctrl+C` | Interrupt immediately |
 
 ## Next Steps
 
 - [Writing Plans](./writing-plans) — learn the full plan format, blocked tasks, and multi-plan workflows
+- [Maggus Skills](./maggus-plan-skill) — generate plans, vision, and architecture docs with AI
+- [Terminal UI](/reference/tui) — explore the main menu, work view, status view, and more
 - [Concepts](./concepts) — understand the work loop, git behavior, run logs, and project memory
-- [CLI Commands](/reference/commands) — explore all available commands (`status`, `list`, `blocked`, `clean`, and more)
+- [CLI Commands](/reference/commands) — explore all available commands (`status`, `list`, `clean`, and more)
 - [Configuration](/reference/configuration) — customize agent, model, includes, and notifications

@@ -133,7 +133,7 @@ Controls how Maggus handles update checks on startup.
 
 When set to `notify` or `auto`, Maggus checks the GitHub Releases API at most once every 24 hours. The last check timestamp is stored in `~/.maggus/update_state.json`.
 
-Update checks are always skipped when running a local dev build (version = `"dev"`).
+When running a dev build (version = `"dev"`), any published release is treated as newer, allowing you to update from a dev build to the latest stable version.
 
 ## Repository Registry (`~/.maggus/repositories.yml`)
 

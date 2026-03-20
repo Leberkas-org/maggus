@@ -21,9 +21,8 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
-            { text: 'Tutorial', link: '/guide/tutorial' },
             { text: 'Writing Plans', link: '/guide/writing-plans' },
-            { text: 'Maggus Plan Skill', link: '/guide/maggus-plan-skill' },
+            { text: 'Maggus Skills', link: '/guide/maggus-plan-skill' },
             { text: 'Concepts', link: '/guide/concepts' }
           ]
         }
@@ -33,6 +32,7 @@ export default defineConfig({
           text: 'Reference',
           items: [
             { text: 'CLI Commands', link: '/reference/commands' },
+            { text: 'Terminal UI', link: '/reference/tui' },
             { text: 'Configuration', link: '/reference/configuration' }
           ]
         }

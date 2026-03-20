@@ -75,7 +75,7 @@ Sometimes a task can't be completed due to external dependencies or missing requ
 
 When any unchecked criterion contains `BLOCKED:`, Maggus treats the entire task as blocked and skips it. This lets you keep tasks in the plan without Maggus attempting work it can't finish.
 
-Blocked tasks show up in `maggus status` with a distinct indicator, and you can manage them interactively with `maggus blocked`.
+Blocked tasks show up in `maggus status` with a distinct indicator, and you can manage them interactively from the status or list TUI (see [CLI Commands](/reference/commands#managing-blocked-tasks)).
 
 ::: tip
 You can also use the `⚠️ BLOCKED:` prefix variant — Maggus recognizes both forms.
