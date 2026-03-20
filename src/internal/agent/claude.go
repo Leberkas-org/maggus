@@ -42,15 +42,16 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 	}
 
 	args := []string{
-		"-p", prompt,
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
 	}
+
 	if model != "" {
 		args = append(args, "--model", model)
 	}
 
+	args = append(args, "-p", prompt)
 	cmd := exec.CommandContext(ctx, path, args...)
 	setProcAttr(cmd)
 

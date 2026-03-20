@@ -60,9 +60,9 @@ include:
 
 func TestResolveModel_KnownAliases(t *testing.T) {
 	cases := map[string]string{
-		"sonnet": "anthropic/claude-sonnet-4-6",
-		"opus":   "anthropic/claude-opus-4-6",
-		"haiku":  "anthropic/claude-haiku-4-5-20251001",
+		"sonnet": "claude-sonnet-4-6",
+		"opus":   "claude-opus-4-6",
+		"haiku":  "claude-haiku-4-5-20251001",
 	}
 	for alias, want := range cases {
 		if got := ResolveModel(alias); got != want {
@@ -339,11 +339,11 @@ func TestResolveModel_ProviderModelFormat(t *testing.T) {
 	}
 }
 
-func TestResolveModel_LegacyAliasesResolveToProviderFormat(t *testing.T) {
+func TestResolveModel_LegacyAliasesResolveToModelID(t *testing.T) {
 	cases := map[string]string{
-		"sonnet": "anthropic/claude-sonnet-4-6",
-		"opus":   "anthropic/claude-opus-4-6",
-		"haiku":  "anthropic/claude-haiku-4-5-20251001",
+		"sonnet": "claude-sonnet-4-6",
+		"opus":   "claude-opus-4-6",
+		"haiku":  "claude-haiku-4-5-20251001",
 	}
 	for alias, want := range cases {
 		if got := ResolveModel(alias); got != want {

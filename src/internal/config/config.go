@@ -92,16 +92,16 @@ func DefaultAgent() string {
 	return "claude"
 }
 
-// modelAliases maps short alias names to full provider/model IDs.
+// modelAliases maps short alias names to full model IDs.
 var modelAliases = map[string]string{
-	"sonnet": "anthropic/claude-sonnet-4-6",
-	"opus":   "anthropic/claude-opus-4-6",
-	"haiku":  "anthropic/claude-haiku-4-5-20251001",
+	"sonnet": "claude-sonnet-4-6",
+	"opus":   "claude-opus-4-6",
+	"haiku":  "claude-haiku-4-5-20251001",
 }
 
 // ResolveModel resolves a model specification to its canonical provider/model format.
 // It handles:
-//   - Short aliases: "sonnet" → "anthropic/claude-sonnet-4-6"
+//   - Short aliases: "sonnet" → "claude-sonnet-4-6"
 //   - Already in provider/model format: returned unchanged
 //   - Bare model IDs (no provider prefix): returned unchanged for backwards compatibility
 //   - Empty string: returns empty string
