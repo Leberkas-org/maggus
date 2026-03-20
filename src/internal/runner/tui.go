@@ -56,11 +56,12 @@ type InfoMsg struct {
 type StopReason int
 
 const (
-	StopReasonComplete    StopReason = iota // all requested tasks finished
-	StopReasonUserStop                      // user pressed 's' (stop after task)
-	StopReasonInterrupted                   // user pressed Ctrl+C
-	StopReasonError                         // a task or commit failed
-	StopReasonNoTasks                       // no workable tasks found
+	StopReasonComplete        StopReason = iota // all requested tasks finished
+	StopReasonUserStop                          // user pressed 's' (stop after task)
+	StopReasonInterrupted                       // user pressed Ctrl+C
+	StopReasonError                             // a task or commit failed
+	StopReasonNoTasks                           // no workable tasks found
+	StopReasonPartialComplete                   // loop finished but some tasks failed
 )
 
 type SummaryData struct {
@@ -76,12 +77,21 @@ type SummaryData struct {
 	Reason         StopReason // why the run ended
 	ErrorDetail    string     // error message when Reason == StopReasonError
 	Warnings       []string   // non-fatal warnings (e.g. skipped commits)
+	FailedTasks    []FailedTask
+	TasksFailed    int
 }
 
 // RemainingTask is a task that was not completed during the run.
 type RemainingTask struct {
 	ID    string
 	Title string
+}
+
+// FailedTask records a task that could not be completed during the run.
+type FailedTask struct {
+	ID     string
+	Title  string
+	Reason string
 }
 
 // SummaryMsg tells the TUI to transition to the summary view.
@@ -1056,6 +1066,8 @@ func (m TUIModel) renderSummaryView() string {
 		}
 		content.WriteString("\n")
 		goto afterTitle
+	case StopReasonPartialComplete:
+		title = styles.Title.Foreground(styles.Warning).Render("⚠ Work Complete (with failures)")
 	default:
 		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
 	}
@@ -1119,6 +1131,20 @@ afterTitle:
 			content.WriteString(fmt.Sprintf("  %s %s\n",
 				lipgloss.NewStyle().Foreground(styles.Warning).Render("⚠"),
 				w))
+		}
+	}
+
+	// Failed tasks
+	if len(m.summary.FailedTasks) > 0 {
+		content.WriteString("\n")
+		content.WriteString(lipgloss.NewStyle().Foreground(styles.Error).Render("Failed Tasks:") + "\n")
+		for _, ft := range m.summary.FailedTasks {
+			content.WriteString(fmt.Sprintf("  %s %s: %s\n",
+				lipgloss.NewStyle().Foreground(styles.Error).Render("✗"),
+				ft.ID,
+				styles.Truncate(ft.Title, innerW-len(ft.ID)-6)))
+			content.WriteString(fmt.Sprintf("    %s\n",
+				lipgloss.NewStyle().Foreground(styles.Muted).Render(styles.Truncate(ft.Reason, innerW-4))))
 		}
 	}
 

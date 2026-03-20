@@ -595,6 +595,11 @@ Examples:
 					}
 				}
 
+				// Mark partial completion when some tasks failed but the loop ran to completion.
+				if len(failedTasks) > 0 && stopReason == runner.StopReasonComplete {
+					stopReason = runner.StopReasonPartialComplete
+				}
+
 				// If nothing was accomplished, surface a meaningful reason.
 				if completed == 0 && stopReason == runner.StopReasonComplete {
 					if len(warnings) > 0 {
@@ -642,6 +647,11 @@ Examples:
 					}
 				}
 
+				var runnerFailedTasks []runner.FailedTask
+				for _, ft := range failedTasks {
+					runnerFailedTasks = append(runnerFailedTasks, runner.FailedTask{ID: ft.ID, Title: ft.Title, Reason: ft.Reason})
+				}
+
 				summaryData := runner.SummaryData{
 					RunID:          run.ID,
 					Branch:         currentBranch,
@@ -655,6 +665,8 @@ Examples:
 					Reason:         stopReason,
 					ErrorDetail:    errorDetail,
 					Warnings:       warnings,
+					FailedTasks:    runnerFailedTasks,
+					TasksFailed:    len(failedTasks),
 				}
 
 				// Notify run complete.

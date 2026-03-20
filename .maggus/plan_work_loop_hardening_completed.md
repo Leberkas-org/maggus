@@ -72,13 +72,13 @@ Two related weaknesses in the Maggus work loop: (1) when an agent omits `COMMIT.
 **Description:** As a Maggus user, I want the summary screen to show which tasks failed and why, so I know exactly what to fix after a run completes.
 
 **Acceptance Criteria:**
-- [ ] `SummaryData` gains two new fields: `FailedTasks []FailedTask` (where `FailedTask` has `ID`, `Title`, `Reason string`) and `TasksFailed int`
-- [ ] A new `StopReason` value `StopReasonPartialComplete` is added for runs where the loop finished all N iterations but some tasks failed
-- [ ] In `cmd/work.go`, `summaryData` is populated with `failedTasks` and `TasksFailed = len(failedTasks)` before `SummaryMsg` is sent; `stopReason` is set to `StopReasonPartialComplete` when `len(failedTasks) > 0` and the loop ran to completion
-- [ ] When `Reason == StopReasonComplete` and `TasksFailed == 0`: title renders as `"✓ Work Complete"` (unchanged)
-- [ ] When `Reason == StopReasonPartialComplete`: title renders as `"⚠ Work Complete (with failures)"` in warning color
-- [ ] The summary screen renders a `"Failed Tasks:"` section listing each failed task's ID, title, and reason when `len(FailedTasks) > 0`
-- [ ] `go test ./...` passes in `src/`
+- [x] `SummaryData` gains two new fields: `FailedTasks []FailedTask` (where `FailedTask` has `ID`, `Title`, `Reason string`) and `TasksFailed int`
+- [x] A new `StopReason` value `StopReasonPartialComplete` is added for runs where the loop finished all N iterations but some tasks failed
+- [x] In `cmd/work.go`, `summaryData` is populated with `failedTasks` and `TasksFailed = len(failedTasks)` before `SummaryMsg` is sent; `stopReason` is set to `StopReasonPartialComplete` when `len(failedTasks) > 0` and the loop ran to completion
+- [x] When `Reason == StopReasonComplete` and `TasksFailed == 0`: title renders as `"✓ Work Complete"` (unchanged)
+- [x] When `Reason == StopReasonPartialComplete`: title renders as `"⚠ Work Complete (with failures)"` in warning color
+- [x] The summary screen renders a `"Failed Tasks:"` section listing each failed task's ID, title, and reason when `len(FailedTasks) > 0`
+- [x] `go test ./...` passes in `src/`
 
 ## Functional Requirements
 

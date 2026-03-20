@@ -170,6 +170,67 @@ func TestUsageNAWhenNoData(t *testing.T) {
 	}
 }
 
+func TestSummaryRenderComplete(t *testing.T) {
+	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+	m.showSummary = true
+	m.summary = SummaryData{
+		Reason:      StopReasonComplete,
+		TasksFailed: 0,
+	}
+	view := m.renderSummaryView()
+	if !contains(view, "Work Complete") {
+		t.Error("expected 'Work Complete' in complete summary view")
+	}
+	if contains(view, "with failures") {
+		t.Error("unexpected 'with failures' in complete summary view with no failed tasks")
+	}
+	if contains(view, "Failed Tasks") {
+		t.Error("unexpected 'Failed Tasks' section when no tasks failed")
+	}
+}
+
+func TestSummaryRenderPartialComplete(t *testing.T) {
+	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+	m.showSummary = true
+	m.summary = SummaryData{
+		Reason:      StopReasonPartialComplete,
+		TasksFailed: 1,
+		FailedTasks: []FailedTask{
+			{ID: "TASK-001", Title: "My Task", Reason: "agent error: something went wrong"},
+		},
+	}
+	view := m.renderSummaryView()
+	if !contains(view, "Work Complete (with failures)") {
+		t.Error("expected 'Work Complete (with failures)' in partial complete view")
+	}
+	if !contains(view, "Failed Tasks:") {
+		t.Error("expected 'Failed Tasks:' section in partial complete view")
+	}
+	if !contains(view, "TASK-001") {
+		t.Error("expected TASK-001 in failed tasks list")
+	}
+	if !contains(view, "My Task") {
+		t.Error("expected task title in failed tasks list")
+	}
+	if !contains(view, "agent error") {
+		t.Error("expected failure reason in failed tasks list")
+	}
+}
+
+func TestSummaryFailedTasksSectionHiddenWhenNone(t *testing.T) {
+	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+	m.showSummary = true
+	m.summary = SummaryData{
+		Reason:      StopReasonComplete,
+		TasksFailed: 0,
+		FailedTasks: nil,
+	}
+	view := m.renderSummaryView()
+	if contains(view, "Failed Tasks:") {
+		t.Error("unexpected 'Failed Tasks:' section when no tasks failed")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
