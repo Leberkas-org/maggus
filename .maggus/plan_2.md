@@ -69,14 +69,14 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a developer, I want to parse a Claude session JSONL file to sum up all token usage across the session and write a single usage record to `usage_prompt.jsonl`.
 
 **Acceptance Criteria:**
-- [ ] New `internal/session/extract.go` with a function that reads a session JSONL, finds all `"type":"assistant"` entries, and sums their `usage` fields
-- [ ] Extracts: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` per model
-- [ ] Groups usage by model (from the `model` field on each assistant message) to produce per-model breakdown
-- [ ] Cost is NOT calculated (no pricing table needed) — the `CostUSD` field is set to 0 or omitted; the future REST API will handle pricing
-- [ ] Returns a `usage.Record` (or similar struct) that can be appended to `usage_prompt.jsonl`
-- [ ] Handles malformed lines gracefully (skip and continue)
-- [ ] Unit tests with sample JSONL input verify correct summation
-- [ ] `go test ./...` passes
+- [x] New `internal/session/extract.go` with a function that reads a session JSONL, finds all `"type":"assistant"` entries, and sums their `usage` fields
+- [x] Extracts: `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` per model
+- [x] Groups usage by model (from the `model` field on each assistant message) to produce per-model breakdown
+- [x] Cost is NOT calculated (no pricing table needed) — the `CostUSD` field is set to 0 or omitted; the future REST API will handle pricing
+- [x] Returns a `usage.Record` (or similar struct) that can be appended to `usage_prompt.jsonl`
+- [x] Handles malformed lines gracefully (skip and continue)
+- [x] Unit tests with sample JSONL input verify correct summation
+- [x] `go test ./...` passes
 
 ### TASK-006: Wire Usage Extraction into the Prompt Command
 

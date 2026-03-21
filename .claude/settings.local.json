@@ -24,8 +24,6 @@
       "Bash(sort -t_ -k2 -n)",
       "Bash(npx vitepress:*)",
       "Bash(git rm:*)",
-      "Read(//c/Users/Dirnei/.claude/**)",
-      "Read(//c/Users/Dirnei/.claude//**)",
       "Bash(find:*)",
       "Bash(head:*)",
       "Bash(python3:*)"
