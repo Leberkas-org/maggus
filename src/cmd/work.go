@@ -60,12 +60,17 @@ Examples:
 		workDir := dir
 
 		// Git sync check: detect remote changes and uncommitted work before starting.
-		syncInfoMsg, shouldAbort, syncErr := checkSync(dir)
-		if syncErr != nil {
-			return syncErr
-		}
-		if shouldAbort {
-			return nil
+		var syncInfoMsg string
+		if wc.cfg.Git.IsCheckSyncEnabled() {
+			var shouldAbort bool
+			var syncErr error
+			syncInfoMsg, shouldAbort, syncErr = checkSync(dir)
+			if syncErr != nil {
+				return syncErr
+			}
+			if shouldAbort {
+				return nil
+			}
 		}
 
 		count := wc.count
@@ -80,7 +85,7 @@ Examples:
 		count = setup.count
 		run := setup.run
 
-		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, run)
+		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, run, wc.cfg.Git)
 		if err != nil {
 			return err
 		}

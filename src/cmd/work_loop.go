@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
@@ -380,7 +381,7 @@ func captureStartHash(workDir string) string {
 
 // setupBranch handles worktree creation or feature branch creation.
 // Returns the branch message (non-worktree mode) or empty string.
-func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *runtracker.Run) (string, error) {
+func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *runtracker.Run, gitCfg config.GitConfig) (string, error) {
 	if useWorktree {
 		cleanStaleWorktrees(repoDir)
 		branchName := gitbranch.FeatureBranchName(nextTask.ID)
@@ -390,7 +391,12 @@ func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *r
 		}
 		return "", nil
 	}
-	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID)
+
+	if !gitCfg.IsAutoBranchEnabled() {
+		return "Auto-branch disabled, staying on current branch", nil
+	}
+
+	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID, gitCfg.ProtectedBranchList())
 	if err != nil {
 		return "", fmt.Errorf("ensure feature branch: %w", err)
 	}
