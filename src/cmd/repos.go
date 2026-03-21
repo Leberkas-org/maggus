@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/filebrowser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -36,6 +37,8 @@ type reposModel struct {
 	quitting   bool
 	switched   bool // true if user switched repos (triggers menu reload)
 	statusMsg  string
+
+	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
 	// File browser sub-model (only active in browsing state)
 	browser    filebrowser.Model
@@ -65,7 +68,9 @@ func newReposModel() reposModel {
 }
 
 func (m reposModel) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		return claude2xResultMsg{status: claude2x.FetchStatus()}
+	}
 }
 
 func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -78,6 +83,9 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.browser = updated.(filebrowser.Model)
 			return m, cmd
 		}
+		return m, nil
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
 		return m, nil
 	case tea.KeyMsg:
 		switch m.state {
@@ -347,10 +355,11 @@ func (m reposModel) viewList() string {
 	content := b.String()
 	footer := styles.StatusBar.Render("↑/↓ navigate · enter switch · a add · d remove · esc back")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(content, footer, m.width, m.height)
+		return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
 	}
-	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(content+"\n\n"+footer) + "\n"
 }
 
 func (m reposModel) viewConfirmInit() string {
@@ -369,10 +378,11 @@ func (m reposModel) viewConfirmInit() string {
 	content := b.String()
 	footer := styles.StatusBar.Render("y: initialize · n: add without initializing · esc: cancel")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(content, footer, m.width, m.height)
+		return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
 	}
-	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(content+"\n\n"+footer) + "\n"
 }
 
 // isGitRepoCheck checks if a directory is inside a git work tree.

@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -727,5 +728,416 @@ func TestBlockedIncompleteTask_Skipped(t *testing.T) {
 	}
 	if next.ID != "TASK-002" {
 		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+// --- Bug file helpers ---
+
+func writeTempBug(t *testing.T, dir, filename, content string) {
+	t.Helper()
+	bugsDir := filepath.Join(dir, ".maggus", "bugs")
+	if err := os.MkdirAll(bugsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bugsDir, filename), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGlobBugFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", "# Bug 1")
+	writeTempBug(t, dir, "bug_002_completed.md", "# Bug 2")
+	writeTempBug(t, dir, "bug_003.md", "# Bug 3")
+
+	// Without completed
+	files, err := GlobBugFiles(dir, false)
+	if err != nil {
+		t.Fatalf("GlobBugFiles error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+
+	// With completed
+	files, err = GlobBugFiles(dir, true)
+	if err != nil {
+		t.Fatalf("GlobBugFiles error: %v", err)
+	}
+	if len(files) != 3 {
+		t.Fatalf("expected 3 files, got %d", len(files))
+	}
+}
+
+func TestGlobBugFiles_Empty(t *testing.T) {
+	dir := t.TempDir()
+	files, err := GlobBugFiles(dir, false)
+	if err != nil {
+		t.Fatalf("GlobBugFiles error: %v", err)
+	}
+	if len(files) != 0 {
+		t.Fatalf("expected 0 files, got %d", len(files))
+	}
+}
+
+func TestSortBugFiles(t *testing.T) {
+	files := []string{
+		"/tmp/bug_010.md",
+		"/tmp/bug_002.md",
+		"/tmp/bug_001.md",
+		"/tmp/bug_020.md",
+	}
+	SortBugFiles(files)
+	expected := []string{
+		"/tmp/bug_001.md",
+		"/tmp/bug_002.md",
+		"/tmp/bug_010.md",
+		"/tmp/bug_020.md",
+	}
+	for i, f := range files {
+		if f != expected[i] {
+			t.Errorf("index %d: got %s, want %s", i, f, expected[i])
+		}
+	}
+}
+
+func TestParseBugs(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+
+### BUG-001-001: Fix login crash
+**Description:** Login crashes on empty password.
+
+**Acceptance Criteria:**
+- [ ] Fix the crash
+- [ ] Add validation
+`)
+	writeTempBug(t, dir, "bug_002.md", `# Bug 002
+
+### BUG-002-001: Fix display issue
+**Description:** Display is broken.
+
+**Acceptance Criteria:**
+- [x] Fixed display
+`)
+
+	tasks, err := ParseBugs(dir)
+	if err != nil {
+		t.Fatalf("ParseBugs error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+	if tasks[0].ID != "BUG-001-001" {
+		t.Errorf("first task ID = %q, want BUG-001-001", tasks[0].ID)
+	}
+	if tasks[1].ID != "BUG-002-001" {
+		t.Errorf("second task ID = %q, want BUG-002-001", tasks[1].ID)
+	}
+}
+
+func TestParseBugsGrouped(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+
+### BUG-001-001: Fix crash
+**Acceptance Criteria:**
+- [ ] Fix it
+
+### BUG-001-002: Add test
+**Acceptance Criteria:**
+- [ ] Test it
+`)
+	writeTempBug(t, dir, "bug_002.md", `# Bug 002
+
+### BUG-002-001: Another fix
+**Acceptance Criteria:**
+- [ ] Fix another
+`)
+
+	bugs, err := ParseBugsGrouped(dir)
+	if err != nil {
+		t.Fatalf("ParseBugsGrouped error: %v", err)
+	}
+
+	if len(bugs) != 2 {
+		t.Fatalf("expected 2 bug groups, got %d", len(bugs))
+	}
+	if len(bugs[0].Tasks) != 2 {
+		t.Errorf("bug_001 should have 2 tasks, got %d", len(bugs[0].Tasks))
+	}
+	if len(bugs[1].Tasks) != 1 {
+		t.Errorf("bug_002 should have 1 task, got %d", len(bugs[1].Tasks))
+	}
+}
+
+func TestMarkCompletedBugs(t *testing.T) {
+	dir := t.TempDir()
+
+	// bug_001: all complete
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+### BUG-001-001: Done
+**Acceptance Criteria:**
+- [x] Fixed
+- [x] Tested
+`)
+
+	// bug_002: incomplete
+	writeTempBug(t, dir, "bug_002.md", `# Bug 002
+### BUG-002-001: Not done
+**Acceptance Criteria:**
+- [ ] Not fixed
+`)
+
+	if err := MarkCompletedBugs(dir); err != nil {
+		t.Fatalf("MarkCompletedBugs error: %v", err)
+	}
+
+	// bug_001 should be renamed
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_001.md")); !os.IsNotExist(err) {
+		t.Error("bug_001.md should have been renamed")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_001_completed.md")); err != nil {
+		t.Error("bug_001_completed.md should exist")
+	}
+
+	// bug_002 should still be there
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_002.md")); err != nil {
+		t.Error("bug_002.md should still exist")
+	}
+}
+
+func TestIsIgnoredFile_BugFiles(t *testing.T) {
+	if !IsIgnoredFile("bug_003_ignored.md") {
+		t.Error("bug_003_ignored.md should be detected as ignored")
+	}
+	if !IsIgnoredFile("/some/path/.maggus/bugs/bug_010_ignored.md") {
+		t.Error("full path to ignored bug file should be detected")
+	}
+	if IsIgnoredFile("bug_003.md") {
+		t.Error("bug_003.md should not be detected as ignored")
+	}
+	if IsIgnoredFile("bug_003_completed.md") {
+		t.Error("bug_003_completed.md should not be detected as ignored")
+	}
+}
+
+func TestMigrateLegacyBugIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_002.md", `# Bug 002
+
+### TASK-001: Fix the crash
+**Description:** Crash on login.
+
+**Acceptance Criteria:**
+- [ ] Fix it
+
+### TASK-002: Add test
+**Description:** Add a test for the fix.
+
+**Acceptance Criteria:**
+- [ ] Test it
+`)
+
+	path := filepath.Join(dir, ".maggus", "bugs", "bug_002.md")
+	modified, err := MigrateLegacyBugIDs(path)
+	if err != nil {
+		t.Fatalf("MigrateLegacyBugIDs error: %v", err)
+	}
+	if !modified {
+		t.Error("expected file to be modified")
+	}
+
+	// Read back and verify
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, "### BUG-002-001: Fix the crash") {
+		t.Errorf("expected BUG-002-001 heading, got:\n%s", content)
+	}
+	if !strings.Contains(content, "### BUG-002-002: Add test") {
+		t.Errorf("expected BUG-002-002 heading, got:\n%s", content)
+	}
+	if strings.Contains(content, "### TASK-") {
+		t.Error("legacy TASK- headings should have been replaced")
+	}
+}
+
+func TestMigrateLegacyBugIDs_NoLegacy(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+
+### BUG-001-001: Already migrated
+**Acceptance Criteria:**
+- [ ] Done
+`)
+
+	path := filepath.Join(dir, ".maggus", "bugs", "bug_001.md")
+	modified, err := MigrateLegacyBugIDs(path)
+	if err != nil {
+		t.Fatalf("MigrateLegacyBugIDs error: %v", err)
+	}
+	if modified {
+		t.Error("file should not be modified when no legacy IDs exist")
+	}
+}
+
+func TestMigrateLegacyBugIDs_WithIgnoredPrefix(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_003.md", `# Bug 003
+
+### IGNORED TASK-001: Skipped task
+**Acceptance Criteria:**
+- [ ] Something
+`)
+
+	path := filepath.Join(dir, ".maggus", "bugs", "bug_003.md")
+	modified, err := MigrateLegacyBugIDs(path)
+	if err != nil {
+		t.Fatalf("MigrateLegacyBugIDs error: %v", err)
+	}
+	if !modified {
+		t.Error("expected file to be modified")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "### IGNORED BUG-003-001: Skipped task") {
+		t.Errorf("expected IGNORED BUG-003-001 heading, got:\n%s", content)
+	}
+}
+
+func TestParseBugs_AutoMigration(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+
+### TASK-001: Legacy task
+**Description:** This has a legacy ID.
+
+**Acceptance Criteria:**
+- [ ] Fix it
+`)
+
+	tasks, err := ParseBugs(dir)
+	if err != nil {
+		t.Fatalf("ParseBugs error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].ID != "BUG-001-001" {
+		t.Errorf("task ID = %q, want BUG-001-001 (auto-migrated)", tasks[0].ID)
+	}
+}
+
+func TestParseBugs_SkipsCompletedFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001_completed.md", `# Bug 001
+### BUG-001-001: Done
+**Acceptance Criteria:**
+- [x] Done
+`)
+	writeTempBug(t, dir, "bug_002.md", `# Bug 002
+### BUG-002-001: Open
+**Acceptance Criteria:**
+- [ ] Not done
+`)
+
+	tasks, err := ParseBugs(dir)
+	if err != nil {
+		t.Fatalf("ParseBugs error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task (completed file skipped), got %d", len(tasks))
+	}
+	if tasks[0].ID != "BUG-002-001" {
+		t.Errorf("expected BUG-002-001, got %s", tasks[0].ID)
+	}
+}
+
+func TestParseBugs_IgnoredBugFile(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001_ignored.md", `# Bug 001
+### BUG-001-001: Ignored task
+**Acceptance Criteria:**
+- [ ] Something
+`)
+
+	tasks, err := ParseBugs(dir)
+	if err != nil {
+		t.Fatalf("ParseBugs error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if !tasks[0].Ignored {
+		t.Error("task from ignored bug file should be ignored")
+	}
+}
+
+func TestExistingFeatureParsing_NotAffected(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", testFeature)
+
+	tasks, err := ParseFeatures(dir)
+	if err != nil {
+		t.Fatalf("ParseFeatures error: %v", err)
+	}
+
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+	if tasks[0].ID != "TASK-001" {
+		t.Errorf("first task should be TASK-001, got %s", tasks[0].ID)
+	}
+}
+
+func TestParseFile_BugTaskIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+
+### BUG-001-001: First bug task
+**Description:** First bug task description.
+
+**Acceptance Criteria:**
+- [ ] Fix crash
+- [x] Add logging
+
+### BUG-001-002: Second bug task
+**Description:** Second bug task description.
+
+**Acceptance Criteria:**
+- [ ] Write test
+`)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "bugs", "bug_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+	if tasks[0].ID != "BUG-001-001" {
+		t.Errorf("task 0 ID = %q, want BUG-001-001", tasks[0].ID)
+	}
+	if tasks[0].Title != "First bug task" {
+		t.Errorf("task 0 Title = %q, want 'First bug task'", tasks[0].Title)
+	}
+	if len(tasks[0].Criteria) != 2 {
+		t.Fatalf("task 0 criteria count = %d, want 2", len(tasks[0].Criteria))
+	}
+	if tasks[1].ID != "BUG-001-002" {
+		t.Errorf("task 1 ID = %q, want BUG-001-002", tasks[1].ID)
 	}
 }

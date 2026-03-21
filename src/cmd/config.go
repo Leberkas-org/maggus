@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -89,6 +90,7 @@ type configModel struct {
 	origInclude           []string
 	origProtectedBranches []string
 	statusText            string
+	is2x                  bool
 }
 
 func newConfigModel(cfg config.Config, dir string) configModel {
@@ -254,13 +256,21 @@ func (m configModel) saveGlobalConfig() error {
 	return saveGlobalSettings(settings)
 }
 
-func (m configModel) Init() tea.Cmd { return nil }
+func (m configModel) Init() tea.Cmd {
+	return func() tea.Msg {
+		return claude2xResultMsg{status: claude2x.FetchStatus()}
+	}
+}
 
 func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
 		return m, nil
 
 	case configResultMsg:
@@ -467,10 +477,11 @@ func (m configModel) View() string {
 	content := sb.String()
 	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: exit")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(content, footer, m.width, m.height)
+		return styles.FullScreenColor(content, footer, m.width, m.height, borderColor)
 	}
-	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(content+"\n\n"+footer) + "\n"
 }
 
 func saveConfig(dir string, cfg config.Config) error {

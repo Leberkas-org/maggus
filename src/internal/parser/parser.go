@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?(TASK-[\w-]+?):\s+(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?((?:TASK|BUG)-[\w-]+?):\s+(.+)$`)
 
 // TaskHeadingRe is the exported task heading regex for use by other packages (e.g. ignore/unignore commands).
 var TaskHeadingRe = taskHeadingRe
@@ -212,7 +212,7 @@ func GlobFeatureFiles(dir string, includeCompleted bool) ([]string, error) {
 	return filtered, nil
 }
 
-// IsIgnoredFile returns true if the given path is an ignored feature file (ends with _ignored.md).
+// IsIgnoredFile returns true if the given path is an ignored feature or bug file (ends with _ignored.md).
 func IsIgnoredFile(path string) bool {
 	return strings.HasSuffix(path, "_ignored.md")
 }
@@ -455,4 +455,196 @@ func DeleteCriterion(filePath string, c Criterion) error {
 	}
 
 	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0o644)
+}
+
+// bugNumberRe extracts the numeric part from bug filenames like "bug_001.md" or "bug_003_completed.md".
+var bugNumberRe = regexp.MustCompile(`bug_(\d+)`)
+
+// legacyBugTaskRe matches legacy TASK-NNN headings (### TASK-NNN: or ### IGNORED TASK-NNN:) in bug files.
+var legacyBugTaskRe = regexp.MustCompile(`^(###\s+(?:IGNORED\s+)?)TASK-(\d+):\s`)
+
+// GlobBugFiles returns all bug_*.md file paths in .maggus/bugs/, sorted numerically.
+// If includeCompleted is false, files ending in _completed.md are excluded.
+func GlobBugFiles(dir string, includeCompleted bool) ([]string, error) {
+	pattern := filepath.Join(dir, ".maggus", "bugs", "bug_*.md")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("glob %s: %w", pattern, err)
+	}
+
+	SortBugFiles(files)
+
+	if includeCompleted {
+		return files, nil
+	}
+
+	filtered := files[:0]
+	for _, f := range files {
+		if !strings.HasSuffix(f, "_completed.md") {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered, nil
+}
+
+// SortBugFiles sorts bug file paths by their numeric bug number (e.g. bug_001 before bug_010).
+func SortBugFiles(files []string) {
+	sort.Slice(files, func(i, j int) bool {
+		return extractBugNumber(files[i]) < extractBugNumber(files[j])
+	})
+}
+
+// extractBugNumber returns the numeric portion of a bug filename for sorting.
+func extractBugNumber(path string) int {
+	base := filepath.Base(path)
+	m := bugNumberRe.FindStringSubmatch(base)
+	if m == nil {
+		return 1<<31 - 1
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 1<<31 - 1
+	}
+	return n
+}
+
+// MigrateLegacyBugIDs rewrites legacy TASK-NNN headings in a bug file to BUG-NNN-XXX format.
+// NNN is derived from the bug file number (e.g., bug_1.md → 001).
+// Returns true if the file was modified.
+func MigrateLegacyBugIDs(path string) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	base := filepath.Base(path)
+	m := bugNumberRe.FindStringSubmatch(base)
+	if m == nil {
+		return false, nil
+	}
+	bugNum, err := strconv.Atoi(m[1])
+	if err != nil {
+		return false, nil
+	}
+	bugPrefix := fmt.Sprintf("BUG-%03d", bugNum)
+
+	lines := strings.Split(string(data), "\n")
+	modified := false
+	taskCounter := 0
+
+	for i, line := range lines {
+		if legacyBugTaskRe.MatchString(line) {
+			taskCounter++
+			newID := fmt.Sprintf("%s-%03d", bugPrefix, taskCounter)
+			lines[i] = legacyBugTaskRe.ReplaceAllString(line, "${1}"+newID+": ")
+			modified = true
+		}
+	}
+
+	if modified {
+		if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+			return false, fmt.Errorf("write %s: %w", path, err)
+		}
+	}
+
+	return modified, nil
+}
+
+// ParseBugs finds all .maggus/bugs/bug_*.md files, auto-migrates legacy IDs, and parses them.
+// Files ending in _completed.md are excluded.
+func ParseBugs(dir string) ([]Task, error) {
+	files, err := GlobBugFiles(dir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var allTasks []Task
+	for _, f := range files {
+		if _, err := MigrateLegacyBugIDs(f); err != nil {
+			return nil, err
+		}
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return nil, err
+		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		allTasks = append(allTasks, tasks...)
+	}
+
+	return allTasks, nil
+}
+
+// ParseBugsGrouped finds all .maggus/bugs/bug_*.md files and returns them as Feature structs.
+// Files ending in _completed.md are excluded. Auto-migrates legacy IDs before parsing.
+func ParseBugsGrouped(dir string) ([]Feature, error) {
+	files, err := GlobBugFiles(dir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var bugs []Feature
+	for _, f := range files {
+		if _, err := MigrateLegacyBugIDs(f); err != nil {
+			return nil, err
+		}
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return nil, err
+		}
+		ignored := IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		bugs = append(bugs, Feature{
+			File:    f,
+			Ignored: ignored,
+			Tasks:   tasks,
+		})
+	}
+
+	return bugs, nil
+}
+
+// MarkCompletedBugs renames bug files where all tasks are complete (and none are blocked)
+// by appending _completed before the .md extension (e.g. bug_001.md → bug_001_completed.md).
+func MarkCompletedBugs(dir string) error {
+	files, err := GlobBugFiles(dir, false)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		tasks, err := ParseFile(f)
+		if err != nil {
+			return err
+		}
+
+		if len(tasks) == 0 {
+			continue
+		}
+
+		allComplete := true
+		for _, t := range tasks {
+			if !t.IsComplete() || t.IsBlocked() {
+				allComplete = false
+				break
+			}
+		}
+
+		if allComplete {
+			newName := strings.TrimSuffix(f, ".md") + "_completed.md"
+			if err := os.Rename(f, newName); err != nil {
+				return fmt.Errorf("rename %s: %w", f, err)
+			}
+		}
+	}
+
+	return nil
 }
