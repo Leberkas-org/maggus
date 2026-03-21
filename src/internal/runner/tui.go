@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -51,62 +50,8 @@ type InfoMsg struct {
 	Text string
 }
 
-// SummaryData holds information displayed on the post-completion summary screen.
-// StopReason describes why the work loop ended.
-type StopReason int
-
-const (
-	StopReasonComplete        StopReason = iota // all requested tasks finished
-	StopReasonUserStop                          // user pressed 's' (stop after task)
-	StopReasonInterrupted                       // user pressed Ctrl+C
-	StopReasonError                             // a task or commit failed
-	StopReasonNoTasks                           // no workable tasks found
-	StopReasonPartialComplete                   // loop finished but some tasks failed
-)
-
-type SummaryData struct {
-	RunID          string
-	Branch         string
-	Model          string
-	StartTime      time.Time
-	TasksCompleted int
-	TasksTotal     int
-	CommitStart    string // short hash of first commit
-	CommitEnd      string // short hash of last commit
-	RemainingTasks []RemainingTask
-	Reason         StopReason // why the run ended
-	ErrorDetail    string     // error message when Reason == StopReasonError
-	Warnings       []string   // non-fatal warnings (e.g. skipped commits)
-	FailedTasks    []FailedTask
-	TasksFailed    int
-}
-
-// RemainingTask is a task that was not completed during the run.
-type RemainingTask struct {
-	ID    string
-	Title string
-}
-
-// FailedTask records a task that could not be completed during the run.
-type FailedTask struct {
-	ID     string
-	Title  string
-	Reason string
-}
-
-// SummaryMsg tells the TUI to transition to the summary view.
-type SummaryMsg struct {
-	Data SummaryData
-}
-
-// PushStatusMsg updates the push status on the summary screen.
-type PushStatusMsg struct {
-	Status string // e.g. "Pushed to origin/branch" or "Push failed: reason"
-	Done   bool
-}
-
-// QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
-type QuitMsg struct{}
+// SummaryData, SummaryMsg, PushStatusMsg, QuitMsg, RunAgainResult, StopReason,
+// RemainingTask, FailedTask types are defined in tui_summary.go.
 
 // TaskCriterion holds a single acceptance criterion for display in the task detail view.
 type TaskCriterion struct {
@@ -124,12 +69,6 @@ type IterationStartMsg struct {
 	PlanFile        string
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
-}
-
-// RunAgainResult holds the user's choice from the summary menu.
-type RunAgainResult struct {
-	RunAgain  bool
-	TaskCount int
 }
 
 // tickMsg is sent by the spinner ticker.
@@ -172,16 +111,8 @@ type TUIModel struct {
 	infoMessages []string
 	done         bool
 
-	// Summary state
-	showSummary    bool
-	summary        SummaryData
-	summaryElapsed time.Duration // frozen elapsed time at summary display
-	pushStatus     string
-	pushDone       bool
-	menuChoice     int    // 0 = Exit, 1 = Run again
-	editingCount   bool   // true when typing task count
-	countInput     string // buffer for task count input
-	runAgain       RunAgainResult
+	// Summary state (post-run screen)
+	summary summaryState
 
 	// Task info
 	taskDescription string
@@ -282,7 +213,7 @@ func saveIterationUsage(m *TUIModel) {
 
 // Result returns the user's choice from the summary menu.
 func (m TUIModel) Result() RunAgainResult {
-	return m.runAgain
+	return m.summary.runAgain
 }
 
 // TaskUsages returns the per-task token usage records.
@@ -318,9 +249,13 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if m.done {
-			return m.handleSummaryKeys(msg)
+			quitting, cmd := m.summary.handleSummaryKeys(msg)
+			if quitting {
+				m.quitting = true
+			}
+			return m, cmd
 		}
-		if m.showSummary && msg.Type == tea.KeyCtrlC {
+		if m.summary.show && msg.Type == tea.KeyCtrlC {
 			// Ctrl+C on summary exits immediately
 			m.quitting = true
 			return m, tea.Quit
@@ -355,7 +290,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Alt+S toggles stop-after-task (confirm to enable, instant to revert)
-		if m.taskID != "" && !m.showSummary && msg.Alt && len(msg.Runes) == 1 && (msg.Runes[0] == 's' || msg.Runes[0] == 'S') {
+		if m.taskID != "" && !m.summary.show && msg.Alt && len(msg.Runes) == 1 && (msg.Runes[0] == 's' || msg.Runes[0] == 'S') {
 			if m.stopAfterTask {
 				m.stopAfterTask = false
 				m.stopFlag.Store(false)
@@ -431,23 +366,10 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.frame = (m.frame + 1) % len(spinnerFrames)
 		return m, tickCmd()
 
-	case SummaryMsg:
-		// Save last iteration's usage before transitioning to summary.
-		saveIterationUsage(&m)
-		m.showSummary = true
-		m.summary = msg.Data
-		m.summaryElapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)
-		m.pushStatus = "Pushing to remote..."
-		return m, nil
-
-	case PushStatusMsg:
-		m.pushStatus = msg.Status
-		m.pushDone = msg.Done
-		return m, nil
-
-	case QuitMsg:
-		m.done = true
-		return m, nil
+	case SummaryMsg, PushStatusMsg, QuitMsg:
+		if m.summary.handleSummaryMsg(msg, &m) {
+			return m, nil
+		}
 
 	case InfoMsg:
 		m.infoMessages = append(m.infoMessages, msg.Text)
@@ -575,8 +497,8 @@ func (m TUIModel) View() string {
 	if m.sync.active {
 		return m.sync.renderSyncView(&m)
 	}
-	if m.showSummary || m.done {
-		return m.renderSummaryView()
+	if m.summary.show || m.done {
+		return m.summary.renderSummaryView(&m)
 	}
 	if m.taskID == "" {
 		return m.renderBannerView()
@@ -618,292 +540,7 @@ func (m TUIModel) renderBannerView() string {
 	return styles.Box.Render(b.String()) + "\n"
 }
 
-func (m TUIModel) handleSummaryKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.editingCount {
-		switch msg.Type {
-		case tea.KeyEscape:
-			m.editingCount = false
-			m.countInput = ""
-			return m, nil
-		case tea.KeyEnter:
-			n, err := strconv.Atoi(m.countInput)
-			if err != nil || n <= 0 {
-				// Invalid input, reset
-				m.countInput = ""
-				return m, nil
-			}
-			m.runAgain = RunAgainResult{RunAgain: true, TaskCount: n}
-			m.quitting = true
-			return m, tea.Quit
-		case tea.KeyBackspace:
-			if len(m.countInput) > 0 {
-				m.countInput = m.countInput[:len(m.countInput)-1]
-			}
-			return m, nil
-		case tea.KeyCtrlC:
-			m.quitting = true
-			return m, tea.Quit
-		default:
-			if len(msg.Runes) == 1 && msg.Runes[0] >= '0' && msg.Runes[0] <= '9' {
-				if len(m.countInput) < 4 { // max 9999 tasks
-					m.countInput += string(msg.Runes[0])
-				}
-			}
-			return m, nil
-		}
-	}
-
-	switch msg.Type {
-	case tea.KeyEscape:
-		m.quitting = true
-		return m, tea.Quit
-	case tea.KeyCtrlC:
-		m.quitting = true
-		return m, tea.Quit
-	case tea.KeyUp, tea.KeyShiftTab:
-		if m.menuChoice > 0 {
-			m.menuChoice--
-		}
-		return m, nil
-	case tea.KeyDown, tea.KeyTab:
-		if m.menuChoice < 1 {
-			m.menuChoice++
-		}
-		return m, nil
-	case tea.KeyEnter:
-		if m.menuChoice == 0 {
-			// Exit
-			m.quitting = true
-			return m, tea.Quit
-		}
-		// Run again — start editing count
-		m.editingCount = true
-		m.countInput = ""
-		return m, nil
-	default:
-		if len(msg.Runes) == 1 {
-			switch msg.Runes[0] {
-			case 'q', 'Q':
-				m.quitting = true
-				return m, tea.Quit
-			case 'j':
-				if m.menuChoice < 1 {
-					m.menuChoice++
-				}
-			case 'k':
-				if m.menuChoice > 0 {
-					m.menuChoice--
-				}
-			}
-		}
-		return m, nil
-	}
-}
-
-func (m TUIModel) renderSummaryView() string {
-	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
-	if innerW < 40 {
-		innerW = 40
-	}
-
-	var content strings.Builder
-
-	// Header inside box
-	content.WriteString(m.renderHeaderInner(innerW))
-
-	// Title and reason
-	elapsed := m.summaryElapsed
-	var title string
-	switch m.summary.Reason {
-	case StopReasonComplete:
-		title = styles.Title.Render("✓ Work Complete")
-	case StopReasonUserStop:
-		title = styles.Title.Foreground(styles.Warning).Render("⊘ Stopped by User")
-		content.WriteString(title + "\n")
-		content.WriteString(grayStyle.Render("  You requested to stop after the completed task.") + "\n\n")
-		goto afterTitle
-	case StopReasonInterrupted:
-		title = styles.Title.Foreground(styles.Error).Render("⊘ Work Interrupted")
-		content.WriteString(title + "\n")
-		content.WriteString(grayStyle.Render("  Cancelled via Ctrl+C — the in-progress task was aborted.") + "\n\n")
-		goto afterTitle
-	case StopReasonError:
-		title = styles.Title.Foreground(styles.Error).Render("✗ Work Failed")
-		content.WriteString(title + "\n")
-		if m.summary.ErrorDetail != "" {
-			content.WriteString(redStyle.Render("  "+m.summary.ErrorDetail) + "\n\n")
-		}
-		goto afterTitle
-	case StopReasonNoTasks:
-		title = styles.Title.Foreground(styles.Warning).Render("⊘ No Tasks Available")
-		content.WriteString(title + "\n")
-		content.WriteString(grayStyle.Render("  No workable tasks found — all tasks may be complete, blocked, or ignored.") + "\n")
-		if m.summary.ErrorDetail != "" {
-			content.WriteString(grayStyle.Render("  "+m.summary.ErrorDetail) + "\n")
-		}
-		content.WriteString("\n")
-		goto afterTitle
-	case StopReasonPartialComplete:
-		title = styles.Title.Foreground(styles.Warning).Render("⚠ Work Complete (with failures)")
-	default:
-		title = styles.Title.Foreground(styles.Warning).Render("⊘ Work Interrupted")
-	}
-	content.WriteString(title + "\n\n")
-afterTitle:
-
-	// Key-value pairs
-	labelStyle := styles.Label.Width(10).Align(lipgloss.Right)
-	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-
-	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Run ID:"), valStyle.Render(m.summary.RunID)))
-	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Branch:"), valStyle.Render(m.summary.Branch)))
-	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Model:"), valStyle.Render(m.summary.Model)))
-	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Elapsed:"), valStyle.Render(elapsed.String())))
-	content.WriteString(fmt.Sprintf("%s  %s\n",
-		labelStyle.Render("Tasks:"),
-		lipgloss.NewStyle().Foreground(styles.Success).Render(
-			fmt.Sprintf("%d/%d completed", m.summary.TasksCompleted, m.summary.TasksTotal))))
-
-	// Token usage totals
-	if m.hasUsageData {
-		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
-		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render(tokenStr)))
-	} else {
-		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render("N/A")))
-	}
-
-	// Per-task token breakdown
-	if len(m.taskUsages) > 0 {
-		content.WriteString("\n")
-		content.WriteString(styles.Subtitle.Render("Token Usage") + "\n")
-		for _, tu := range m.taskUsages {
-			content.WriteString(fmt.Sprintf("  %s %s  %s in / %s out\n",
-				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%-12s", tu.TaskID),
-				FormatTokens(tu.InputTokens),
-				FormatTokens(tu.OutputTokens)))
-		}
-	}
-
-	// Commit range and list
-	if len(m.commits) > 0 {
-		content.WriteString("\n")
-		commitHeader := fmt.Sprintf("Commits (%d)", len(m.commits))
-		if m.summary.CommitStart != "" && m.summary.CommitEnd != "" {
-			commitHeader += fmt.Sprintf("  %s..%s", m.summary.CommitStart, m.summary.CommitEnd)
-		}
-		content.WriteString(styles.Subtitle.Render(commitHeader) + "\n")
-		for _, c := range m.commits {
-			content.WriteString(fmt.Sprintf("  %s %s\n",
-				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				styles.Truncate(c, innerW-4)))
-		}
-	}
-
-	// Warnings
-	if len(m.summary.Warnings) > 0 {
-		content.WriteString("\n")
-		content.WriteString(lipgloss.NewStyle().Foreground(styles.Warning).Render("Warnings") + "\n")
-		for _, w := range m.summary.Warnings {
-			content.WriteString(fmt.Sprintf("  %s %s\n",
-				lipgloss.NewStyle().Foreground(styles.Warning).Render("⚠"),
-				w))
-		}
-	}
-
-	// Failed tasks
-	if len(m.summary.FailedTasks) > 0 {
-		content.WriteString("\n")
-		content.WriteString(lipgloss.NewStyle().Foreground(styles.Error).Render("Failed Tasks:") + "\n")
-		for _, ft := range m.summary.FailedTasks {
-			content.WriteString(fmt.Sprintf("  %s %s: %s\n",
-				lipgloss.NewStyle().Foreground(styles.Error).Render("✗"),
-				ft.ID,
-				styles.Truncate(ft.Title, innerW-len(ft.ID)-6)))
-			content.WriteString(fmt.Sprintf("    %s\n",
-				lipgloss.NewStyle().Foreground(styles.Muted).Render(styles.Truncate(ft.Reason, innerW-4))))
-		}
-	}
-
-	// Remaining incomplete tasks
-	if len(m.summary.RemainingTasks) > 0 {
-		content.WriteString("\n")
-		content.WriteString(lipgloss.NewStyle().Foreground(styles.Warning).Render(
-			fmt.Sprintf("Remaining (%d)", len(m.summary.RemainingTasks))) + "\n")
-		maxShow := 5
-		for i, t := range m.summary.RemainingTasks {
-			if i >= maxShow {
-				content.WriteString(fmt.Sprintf("  %s\n",
-					lipgloss.NewStyle().Foreground(styles.Muted).Render(
-						fmt.Sprintf("... and %d more", len(m.summary.RemainingTasks)-maxShow))))
-				break
-			}
-			content.WriteString(fmt.Sprintf("  %s %s\n",
-				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%s: %s", t.ID, styles.Truncate(t.Title, innerW-len(t.ID)-6))))
-		}
-	}
-
-	// Push status
-	content.WriteString("\n")
-	if m.pushDone {
-		content.WriteString(lipgloss.NewStyle().Foreground(styles.Success).Render(m.pushStatus) + "\n")
-	} else if m.pushStatus != "" {
-		spinner := cyanStyle.Render(spinnerFrames[m.frame])
-		content.WriteString(fmt.Sprintf("%s %s\n", spinner, m.pushStatus))
-	}
-
-	// Footer: summary menu or waiting message
-	var footer string
-	if m.done {
-		footer = m.renderSummaryMenu()
-	} else {
-		footer = lipgloss.NewStyle().Foreground(styles.Muted).Render("Waiting for push to complete...")
-	}
-
-	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(content.String(), footer, m.width, m.height)
-	}
-	return styles.Box.Render(content.String()) + "\n"
-}
-
-func (m TUIModel) renderSummaryMenu() string {
-	var menu strings.Builder
-
-	selectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
-	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	hintStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
-
-	// Exit option
-	if m.menuChoice == 0 {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", selectedStyle.Render("▸"), selectedStyle.Render("Exit")))
-	} else {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Exit")))
-	}
-
-	// Run again option
-	if m.menuChoice == 1 {
-		if m.editingCount {
-			cursor := "█"
-			countDisplay := m.countInput + cursor
-			menu.WriteString(fmt.Sprintf("  %s %s %s %s\n",
-				selectedStyle.Render("▸"),
-				selectedStyle.Render("Run again:"),
-				selectedStyle.Render(countDisplay),
-				hintStyle.Render("tasks (enter to confirm, esc to cancel)")))
-		} else {
-			menu.WriteString(fmt.Sprintf("  %s %s\n",
-				selectedStyle.Render("▸"),
-				selectedStyle.Render("Run again")))
-		}
-	} else {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Run again")))
-	}
-
-	menu.WriteString(fmt.Sprintf("\n  %s\n", hintStyle.Render("↑/↓ select · enter confirm · q/esc exit")))
-
-	return menu.String()
-}
+// handleSummaryKeys, renderSummaryView, renderSummaryMenu are defined in tui_summary.go.
 
 // renderHeaderInner renders the header content for use inside a bordered box.
 func (m TUIModel) renderHeaderInner(w int) string {

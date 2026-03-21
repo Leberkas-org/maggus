@@ -38,15 +38,15 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the summary/post-run screen state and rendering extracted into a separate file so that adding summary features doesn't require touching the main TUI model.
 
 **Acceptance Criteria:**
-- [ ] New file `src/internal/runner/tui_summary.go` contains all summary-related state and methods
-- [ ] Create a `summaryState` struct holding: `show`, `data`, `elapsed`, `pushStatus`, `pushDone`, `menuChoice`, `editingCount`, `countInput`, `runAgain` fields
-- [ ] `TUIModel` holds a `summaryState` field instead of 9 individual summary fields
-- [ ] `handleSummaryKeys()`, `renderSummaryView()`, `renderSummaryMenu()` move to `tui_summary.go`
-- [ ] `SummaryData`, `SummaryMsg`, `PushStatusMsg`, `QuitMsg`, `RunAgainResult`, `StopReason`, `RemainingTask`, `FailedTask` types move to `tui_summary.go`
-- [ ] Summary-related message handling in `Update()` delegates to methods on summaryState
-- [ ] `go test ./internal/runner` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New file `src/internal/runner/tui_summary.go` contains all summary-related state and methods
+- [x] Create a `summaryState` struct holding: `show`, `data`, `elapsed`, `pushStatus`, `pushDone`, `menuChoice`, `editingCount`, `countInput`, `runAgain` fields
+- [x] `TUIModel` holds a `summaryState` field instead of 9 individual summary fields
+- [x] `handleSummaryKeys()`, `renderSummaryView()`, `renderSummaryMenu()` move to `tui_summary.go`
+- [x] `SummaryData`, `SummaryMsg`, `PushStatusMsg`, `QuitMsg`, `RunAgainResult`, `StopReason`, `RemainingTask`, `FailedTask` types move to `tui_summary.go`
+- [x] Summary-related message handling in `Update()` delegates to methods on summaryState
+- [x] `go test ./internal/runner` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-003: Extract token tracking from TUIModel into tui_tokens.go
 **Description:** As a developer, I want token usage tracking isolated so that changes to usage reporting don't affect the main TUI model.

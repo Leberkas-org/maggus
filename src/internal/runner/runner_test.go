@@ -172,12 +172,12 @@ func TestUsageNAWhenNoData(t *testing.T) {
 
 func TestSummaryRenderComplete(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonComplete,
 		TasksFailed: 0,
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if !contains(view, "Work Complete") {
 		t.Error("expected 'Work Complete' in complete summary view")
 	}
@@ -191,15 +191,15 @@ func TestSummaryRenderComplete(t *testing.T) {
 
 func TestSummaryRenderPartialComplete(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonPartialComplete,
 		TasksFailed: 1,
 		FailedTasks: []FailedTask{
 			{ID: "TASK-001", Title: "My Task", Reason: "agent error: something went wrong"},
 		},
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if !contains(view, "Work Complete (with failures)") {
 		t.Error("expected 'Work Complete (with failures)' in partial complete view")
 	}
@@ -219,13 +219,13 @@ func TestSummaryRenderPartialComplete(t *testing.T) {
 
 func TestSummaryFailedTasksSectionHiddenWhenNone(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonComplete,
 		TasksFailed: 0,
 		FailedTasks: nil,
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if contains(view, "Failed Tasks:") {
 		t.Error("unexpected 'Failed Tasks:' section when no tasks failed")
 	}
