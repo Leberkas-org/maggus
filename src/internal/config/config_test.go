@@ -389,6 +389,140 @@ func TestModelProvider(t *testing.T) {
 	}
 }
 
+func TestGitConfig_IsAutoBranchEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *bool
+		want bool
+	}{
+		{"nil defaults to true", nil, true},
+		{"explicit true", boolPtr(true), true},
+		{"explicit false", boolPtr(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gc := GitConfig{AutoBranch: tt.val}
+			if got := gc.IsAutoBranchEnabled(); got != tt.want {
+				t.Errorf("IsAutoBranchEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGitConfig_IsCheckSyncEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *bool
+		want bool
+	}{
+		{"nil defaults to true", nil, true},
+		{"explicit true", boolPtr(true), true},
+		{"explicit false", boolPtr(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gc := GitConfig{CheckSync: tt.val}
+			if got := gc.IsCheckSyncEnabled(); got != tt.want {
+				t.Errorf("IsCheckSyncEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGitConfig_ProtectedBranchList(t *testing.T) {
+	tests := []struct {
+		name string
+		list []string
+		want []string
+	}{
+		{"nil returns defaults", nil, []string{"main", "master", "dev"}},
+		{"empty returns defaults", []string{}, []string{"main", "master", "dev"}},
+		{"custom list returned as-is", []string{"main", "release"}, []string{"main", "release"}},
+		{"filters empty strings", []string{"main", "", "dev"}, []string{"main", "dev"}},
+		{"all empty strings returns defaults", []string{"", ""}, []string{"main", "master", "dev"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gc := GitConfig{ProtectedBranches: tt.list}
+			got := gc.ProtectedBranchList()
+			if len(got) != len(tt.want) {
+				t.Fatalf("ProtectedBranchList() len = %d, want %d", len(got), len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("ProtectedBranchList()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func TestLoad_WithGitConfig(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `model: sonnet
+git:
+  auto_branch: false
+  protected_branches:
+    - main
+    - release
+  check_sync: false
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Git.IsAutoBranchEnabled() {
+		t.Error("expected auto_branch to be disabled")
+	}
+	if cfg.Git.IsCheckSyncEnabled() {
+		t.Error("expected check_sync to be disabled")
+	}
+	got := cfg.Git.ProtectedBranchList()
+	if len(got) != 2 || got[0] != "main" || got[1] != "release" {
+		t.Errorf("ProtectedBranchList() = %v, want [main release]", got)
+	}
+}
+
+func TestLoad_GitConfigDefaults(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.Git.IsAutoBranchEnabled() {
+		t.Error("expected auto_branch to default to enabled")
+	}
+	if !cfg.Git.IsCheckSyncEnabled() {
+		t.Error("expected check_sync to default to enabled")
+	}
+	got := cfg.Git.ProtectedBranchList()
+	if len(got) != 3 {
+		t.Errorf("expected 3 default protected branches, got %d", len(got))
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

@@ -11,11 +11,11 @@ var requiredEntries = []string{
 	".maggus/runs",
 	".maggus/MEMORY.md",
 	".maggus/RELEASE_NOTES.md",
-	".maggus/usage.csv",
-	".maggus/usage_work.jsonl",
-	".maggus/usage_prompt.jsonl",
+	".maggus/usage*.csv",
+	".maggus/usage_*.jsonl",
 	".maggus/locks/",
 	".maggus-work/",
+	".maggus/bugs",
 	"COMMIT.md",
 }
 
