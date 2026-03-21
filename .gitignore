@@ -12,3 +12,4 @@ docs/node_modules
 .maggus-work/
 .maggus/RELEASE_NOTES.md
 .maggus/usage.csv
+.maggus/usage_v2.csv

@@ -1,5 +1,5 @@
 agent: claude
-model: ""
+model: opus
 include: []
 worktree: false
 notifications:

@@ -60,12 +60,12 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a developer, I want the TUI to know about remaining upcoming tasks so that the stop picker can list them.
 
 **Acceptance Criteria:**
-- [ ] The TUI model receives a list of upcoming/remaining workable tasks (IDs + titles)
-- [ ] This list is updated each time a new task starts (via `IterationStartMsg` or a new message type)
-- [ ] The list excludes the currently running task and already-completed tasks
-- [ ] The stop picker reads from this list to build its menu options
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] The TUI model receives a list of upcoming/remaining workable tasks (IDs + titles)
+- [x] This list is updated each time a new task starts (via `IterationStartMsg` or a new message type)
+- [x] The list excludes the currently running task and already-completed tasks
+- [x] The stop picker reads from this list to build its menu options
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-005: Remove "Run Again" from Summary Screen
 **Description:** As a user, I want the summary screen to only show "Exit" so that the experience is clean — I'll start a new run when I'm ready.
