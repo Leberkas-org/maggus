@@ -72,13 +72,13 @@ Currently, the 2x theme only affects the main menu (logo color + border). The st
 **Parallel:** yes — can run alongside TASK-002-001, TASK-002-002, TASK-002-003
 
 **Acceptance Criteria:**
-- [ ] `BannerInfo` gains a `CWD string` field populated from `os.Getwd()` at work command startup
-- [ ] `renderHeaderInner()` displays the working directory on a new line between version/fingerprint and the 2x status line
-- [ ] Directory path is left-truncated with "..." if it exceeds the available width
-- [ ] Style matches the menu's improved CWD style (from TASK-002-003)
-- [ ] The CWD line also appears in `renderBannerView()`
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] `BannerInfo` gains a `CWD string` field populated from `os.Getwd()` at work command startup
+- [x] `renderHeaderInner()` displays the working directory on a new line between version/fingerprint and the 2x status line
+- [x] Directory path is left-truncated with "..." if it exceeds the available width
+- [x] Style matches the menu's improved CWD style (from TASK-002-003)
+- [x] The CWD line also appears in `renderBannerView()`
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ## Task Dependency Graph
 

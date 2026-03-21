@@ -116,12 +116,14 @@ Examples:
 
 		// Build and start the TUI.
 		twoXStatus := claude2x.FetchStatus()
+		cwd, _ := os.Getwd()
 		banner := runner.BannerInfo{
 			Iterations: count,
 			Branch:     run.Branch,
 			RunID:      run.ID,
 			RunDir:     run.RelativeDir(dir),
 			Agent:      wc.activeAgent.Name(),
+			CWD:        cwd,
 		}
 		if wc.useWorktree {
 			banner.Worktree = workDir

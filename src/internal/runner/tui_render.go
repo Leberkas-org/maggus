@@ -47,6 +47,17 @@ func (m TUIModel) renderBannerView() string {
 	return styles.Box.Render(b.String()) + "\n"
 }
 
+// truncateLeftPath truncates a path from the left, adding "..." prefix.
+func truncateLeftPath(path string, maxWidth int) string {
+	if maxWidth <= 0 || len(path) <= maxWidth {
+		return path
+	}
+	if maxWidth <= 3 {
+		return path[len(path)-maxWidth:]
+	}
+	return "..." + path[len(path)-(maxWidth-3):]
+}
+
 // renderHeaderInner renders the header content for use inside a bordered box.
 func (m TUIModel) renderHeaderInner(w int) string {
 	if w < 40 {
@@ -69,7 +80,14 @@ func (m TUIModel) renderHeaderInner(w int) string {
 	}
 	b.WriteString(fmt.Sprintf("%s%s%s\n", left, strings.Repeat(" ", padding), right))
 
-	// Line 2: 2x remaining time (only when active)
+	// Line 2: current working directory
+	if m.banner.CWD != "" {
+		cwdStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+		cwdDisplay := truncateLeftPath(m.banner.CWD, w)
+		b.WriteString(cwdStyle.Render(cwdDisplay) + "\n")
+	}
+
+	// Line 3: 2x remaining time (only when active)
 	if m.banner.TwoXExpiresIn != "" {
 		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 		b.WriteString(twoXStyle.Render(fmt.Sprintf("2x: %s", m.banner.TwoXExpiresIn)) + "\n")

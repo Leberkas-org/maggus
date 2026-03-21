@@ -12,7 +12,7 @@ import (
 type TaskUsage struct {
 	TaskID                   string
 	TaskTitle                string
-	FeatureFile                 string
+	FeatureFile              string
 	InputTokens              int
 	OutputTokens             int
 	CacheCreationInputTokens int
@@ -96,7 +96,7 @@ func (t *tokenState) saveAndReset(taskID, taskTitle, featureFile string, startTi
 	tu := TaskUsage{
 		TaskID:                   taskID,
 		TaskTitle:                taskTitle,
-		FeatureFile:                 featureFile,
+		FeatureFile:              featureFile,
 		InputTokens:              t.iterInput,
 		OutputTokens:             t.iterOutput,
 		CacheCreationInputTokens: t.iterCacheCreation,

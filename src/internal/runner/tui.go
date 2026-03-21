@@ -54,7 +54,7 @@ type IterationStartMsg struct {
 	Total           int
 	TaskID          string
 	TaskTitle       string
-	FeatureFile        string
+	FeatureFile     string
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
 	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
@@ -72,6 +72,7 @@ type BannerInfo struct {
 	Worktree      string // empty if not using worktree
 	Agent         string // agent name (e.g. "claude", "opencode")
 	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode
+	CWD           string // current working directory, shown in header
 }
 
 // TUIModel is the bubbletea model that replaces the old display struct.
@@ -95,7 +96,7 @@ type TUIModel struct {
 	taskCriteria    []TaskCriterion
 	taskID          string
 	taskTitle       string
-	taskFeatureFile    string
+	taskFeatureFile string
 
 	// Recent commits
 	commits []string

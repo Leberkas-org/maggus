@@ -340,6 +340,97 @@ func TestIs2xDerivation(t *testing.T) {
 	})
 }
 
+func TestTruncateLeftPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		maxWidth int
+		expected string
+	}{
+		{"short path unchanged", "/home/user", 20, "/home/user"},
+		{"exact width unchanged", "/home", 5, "/home"},
+		{"long path truncated", "/home/user/projects/myapp", 15, "...ojects/myapp"},
+		{"very small max", "/home/user", 3, "ser"},
+		{"zero max", "/home/user", 0, "/home/user"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateLeftPath(tt.path, tt.maxWidth)
+			if got != tt.expected {
+				t.Errorf("truncateLeftPath(%q, %d) = %q, want %q", tt.path, tt.maxWidth, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRenderHeaderInner_CWD(t *testing.T) {
+	t.Run("CWD appears in header", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: "/home/user/project"})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(100)
+		if !contains(header, "/home/user/project") {
+			t.Error("header should contain CWD path")
+		}
+	})
+
+	t.Run("CWD absent when empty", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(100)
+		// Should not have a CWD line (only version line, separator, etc.)
+		if contains(header, "...") {
+			t.Error("header should not contain truncation prefix when CWD is empty")
+		}
+	})
+
+	t.Run("long CWD is left-truncated", func(t *testing.T) {
+		longPath := "/very/long/path/that/exceeds/the/available/width/significantly/deep/nested/project"
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: longPath})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(40)
+		if !contains(header, "...") {
+			t.Error("header should truncate long CWD path with '...' prefix")
+		}
+		if contains(header, longPath) {
+			t.Error("header should not contain full long path")
+		}
+	})
+}
+
+func TestRenderBannerView_CWD(t *testing.T) {
+	t.Run("CWD appears in banner view", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations: 3,
+			RunID:      "run-001",
+			CWD:        "/home/user/myproject",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "/home/user/myproject") {
+			t.Error("banner view should contain CWD path")
+		}
+	})
+}
+
+func TestRenderView_CWD(t *testing.T) {
+	t.Run("CWD appears in work view", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: "/home/user/workproject"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-CWD", TaskTitle: "CWD Test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "/home/user/workproject") {
+			t.Error("work view should contain CWD path")
+		}
+	})
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
