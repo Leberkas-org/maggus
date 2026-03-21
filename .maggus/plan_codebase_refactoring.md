@@ -172,12 +172,12 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the commit handling and between-task sync check extracted from the work loop body.
 
 **Acceptance Criteria:**
-- [ ] New function that encapsulates: `gitcommit.CommitIteration()`, commit result handling, lock release, progress update, between-task sync check
-- [ ] The main loop calls `completeTask()` after successful agent execution
-- [ ] Error paths (commit failure, sync abort) return appropriate signals to the caller
-- [ ] `go test ./cmd -run TestWork` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New function that encapsulates: `gitcommit.CommitIteration()`, commit result handling, lock release, progress update, between-task sync check
+- [x] The main loop calls `completeTask()` after successful agent execution
+- [x] Error paths (commit failure, sync abort) return appropriate signals to the caller
+- [x] `go test ./cmd -run TestWork` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-014: Write unit tests for extracted work loop stages
 **Description:** As a developer, I want unit tests for `workSetup`, `checkSync`, and the task execution helpers so that orchestration changes are safe.

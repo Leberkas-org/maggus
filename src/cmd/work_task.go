@@ -127,16 +127,24 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	stagePlans.Dir = tc.workDir
 	_, _ = stagePlans.CombinedOutput()
 
+	// Commit, release lock, update progress, and check sync.
+	return completeTask(tc, next, lock, parsedTasks, i, count)
+}
+
+// completeTask encapsulates post-agent-execution logic: committing via COMMIT.md,
+// releasing the task lock, sending progress updates, and running between-task sync checks.
+// It returns a taskResult indicating whether the loop should continue, break, or skip.
+func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedTasks []parser.Task, i, count int) taskResult {
 	// Commit using COMMIT.md.
-	commitResult, commitErr := gitcommit.CommitIteration(tc.workDir, next.ID+": "+next.Title)
+	commitResult, commitErr := gitcommit.CommitIteration(tc.workDir, task.ID+": "+task.Title)
 	if commitErr != nil {
 		releaseLock(lock, tc.useWorktree)
 		reason := commitErr.Error()
-		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", next.ID, reason)})
+		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", task.ID, reason)})
 		return taskResult{
 			action: taskSkipToNext,
 			tasks:  parsedTasks,
-			failed: &failedTask{ID: next.ID, Title: next.Title, Reason: reason},
+			failed: &failedTask{ID: task.ID, Title: task.Title, Reason: reason},
 		}
 	}
 
@@ -156,7 +164,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		if msg == "" {
 			msg = "commit skipped (unknown reason)"
 		}
-		result.warning = fmt.Sprintf("%s: %s", next.ID, msg)
+		result.warning = fmt.Sprintf("%s: %s", task.ID, msg)
 		tc.p.Send(runner.InfoMsg{Text: "⚠ " + result.warning})
 	}
 
