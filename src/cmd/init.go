@@ -26,6 +26,15 @@ const defaultConfig = `# Maggus configuration
 #   - docs/ARCHITECTURE.md
 #   - docs/VISION.md
 
+# Git workflow settings
+# git:
+#   auto_branch: true
+#   check_sync: true
+#   protected_branches:
+#     - main
+#     - master
+#     - dev
+
 # Sound notifications
 # notifications:
 #   sound: false
