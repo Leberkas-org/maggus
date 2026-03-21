@@ -91,7 +91,7 @@ type summaryState struct {
 func (s *summaryState) handleSummaryMsg(msg tea.Msg, m *TUIModel) (handled bool) {
 	switch msg := msg.(type) {
 	case SummaryMsg:
-		saveIterationUsage(m)
+		m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskPlanFile, m.startTime)
 		s.show = true
 		s.data = msg.Data
 		s.elapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)
@@ -250,18 +250,18 @@ afterTitle:
 			fmt.Sprintf("%d/%d completed", s.data.TasksCompleted, s.data.TasksTotal))))
 
 	// Token usage totals
-	if m.hasUsageData {
-		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+	if m.tokens.hasData {
+		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.tokens.totalInput), FormatTokens(m.tokens.totalOutput))
 		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render(tokenStr)))
 	} else {
 		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render("N/A")))
 	}
 
 	// Per-task token breakdown
-	if len(m.taskUsages) > 0 {
+	if len(m.tokens.usages) > 0 {
 		content.WriteString("\n")
 		content.WriteString(styles.Subtitle.Render("Token Usage") + "\n")
-		for _, tu := range m.taskUsages {
+		for _, tu := range m.tokens.usages {
 			content.WriteString(fmt.Sprintf("  %s %s  %s in / %s out\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
 				fmt.Sprintf("%-12s", tu.TaskID),

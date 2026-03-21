@@ -101,10 +101,10 @@ func TestFormatTokens(t *testing.T) {
 func TestUsageAccumulation(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
 
-	if m.hasUsageData {
-		t.Error("expected hasUsageData to be false initially")
+	if m.tokens.hasData {
+		t.Error("expected hasData to be false initially")
 	}
-	if m.totalInputTokens != 0 || m.totalOutputTokens != 0 {
+	if m.tokens.totalInput != 0 || m.tokens.totalOutput != 0 {
 		t.Error("expected zero tokens initially")
 	}
 
@@ -114,47 +114,47 @@ func TestUsageAccumulation(t *testing.T) {
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 1000, OutputTokens: 500})
 	m = updated.(TUIModel)
 
-	if !m.hasUsageData {
-		t.Error("expected hasUsageData to be true after receiving usage")
+	if !m.tokens.hasData {
+		t.Error("expected hasData to be true after receiving usage")
 	}
-	if m.iterInputTokens != 1000 || m.iterOutputTokens != 500 {
-		t.Errorf("iter tokens: got %d/%d, want 1000/500", m.iterInputTokens, m.iterOutputTokens)
+	if m.tokens.iterInput != 1000 || m.tokens.iterOutput != 500 {
+		t.Errorf("iter tokens: got %d/%d, want 1000/500", m.tokens.iterInput, m.tokens.iterOutput)
 	}
-	if m.totalInputTokens != 1000 || m.totalOutputTokens != 500 {
-		t.Errorf("total tokens: got %d/%d, want 1000/500", m.totalInputTokens, m.totalOutputTokens)
+	if m.tokens.totalInput != 1000 || m.tokens.totalOutput != 500 {
+		t.Errorf("total tokens: got %d/%d, want 1000/500", m.tokens.totalInput, m.tokens.totalOutput)
 	}
 
 	updated, _ = m.Update(IterationStartMsg{Current: 2, Total: 2, TaskID: "TASK-002", TaskTitle: "Second task"})
 	m = updated.(TUIModel)
 
-	if len(m.taskUsages) != 1 {
-		t.Fatalf("expected 1 task usage entry, got %d", len(m.taskUsages))
+	if len(m.tokens.usages) != 1 {
+		t.Fatalf("expected 1 task usage entry, got %d", len(m.tokens.usages))
 	}
-	if m.taskUsages[0].TaskID != "TASK-001" {
-		t.Errorf("expected task ID TASK-001, got %s", m.taskUsages[0].TaskID)
+	if m.tokens.usages[0].TaskID != "TASK-001" {
+		t.Errorf("expected task ID TASK-001, got %s", m.tokens.usages[0].TaskID)
 	}
-	if m.taskUsages[0].InputTokens != 1000 || m.taskUsages[0].OutputTokens != 500 {
-		t.Errorf("task usage: got %d/%d, want 1000/500", m.taskUsages[0].InputTokens, m.taskUsages[0].OutputTokens)
+	if m.tokens.usages[0].InputTokens != 1000 || m.tokens.usages[0].OutputTokens != 500 {
+		t.Errorf("task usage: got %d/%d, want 1000/500", m.tokens.usages[0].InputTokens, m.tokens.usages[0].OutputTokens)
 	}
-	if m.iterInputTokens != 0 || m.iterOutputTokens != 0 {
+	if m.tokens.iterInput != 0 || m.tokens.iterOutput != 0 {
 		t.Error("expected iter tokens reset to 0 after new iteration")
 	}
 
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 2000, OutputTokens: 800})
 	m = updated.(TUIModel)
 
-	if m.totalInputTokens != 3000 || m.totalOutputTokens != 1300 {
-		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.totalInputTokens, m.totalOutputTokens)
+	if m.tokens.totalInput != 3000 || m.tokens.totalOutput != 1300 {
+		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.tokens.totalInput, m.tokens.totalOutput)
 	}
 
 	updated, _ = m.Update(SummaryMsg{Data: SummaryData{TasksCompleted: 2, TasksTotal: 2}})
 	m = updated.(TUIModel)
 
-	if len(m.taskUsages) != 2 {
-		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.taskUsages))
+	if len(m.tokens.usages) != 2 {
+		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.tokens.usages))
 	}
-	if m.taskUsages[1].TaskID != "TASK-002" {
-		t.Errorf("expected task ID TASK-002, got %s", m.taskUsages[1].TaskID)
+	if m.tokens.usages[1].TaskID != "TASK-002" {
+		t.Errorf("expected task ID TASK-002, got %s", m.tokens.usages[1].TaskID)
 	}
 }
 

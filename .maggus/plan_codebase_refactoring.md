@@ -52,15 +52,15 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want token usage tracking isolated so that changes to usage reporting don't affect the main TUI model.
 
 **Acceptance Criteria:**
-- [ ] New file `src/internal/runner/tui_tokens.go` contains token tracking state and methods
-- [ ] Create a `tokenState` struct holding: `iterInput`, `iterOutput`, `totalInput`, `totalOutput`, `hasData`, `usages []TaskUsage`, `onUsage func(TaskUsage)` fields
-- [ ] `TUIModel` holds a `tokenState` field instead of 7 individual token fields
-- [ ] `saveIterationUsage()`, `FormatTokens()`, `TaskUsage` type, `SetOnTaskUsage()`, `TaskUsages()` move to `tui_tokens.go`
-- [ ] `agent.UsageMsg` handling in `Update()` delegates to `tokenState.addUsage()` method
-- [ ] `IterationStartMsg` handler calls `tokenState.saveAndReset()` to finalize previous iteration
-- [ ] `go test ./internal/runner` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New file `src/internal/runner/tui_tokens.go` contains token tracking state and methods
+- [x] Create a `tokenState` struct holding: `iterInput`, `iterOutput`, `totalInput`, `totalOutput`, `hasData`, `usages []TaskUsage`, `onUsage func(TaskUsage)` fields
+- [x] `TUIModel` holds a `tokenState` field instead of 7 individual token fields
+- [x] `saveIterationUsage()`, `FormatTokens()`, `TaskUsage` type, `SetOnTaskUsage()`, `TaskUsages()` move to `tui_tokens.go`
+- [x] `agent.UsageMsg` handling in `Update()` delegates to `tokenState.addUsage()` method
+- [x] `IterationStartMsg` handler calls `tokenState.saveAndReset()` to finalize previous iteration
+- [x] `go test ./internal/runner` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-004: Write unit tests for extracted TUI sub-components
 **Description:** As a developer, I want unit tests for the sync, summary, and token sub-components so that they can be modified with confidence.

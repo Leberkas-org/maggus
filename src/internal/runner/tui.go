@@ -34,16 +34,7 @@ type CommitMsg struct {
 	Message string
 }
 
-// TaskUsage records token usage for a single task/iteration.
-type TaskUsage struct {
-	TaskID       string
-	TaskTitle    string
-	PlanFile     string
-	InputTokens  int
-	OutputTokens int
-	StartTime    time.Time
-	EndTime      time.Time
-}
+// TaskUsage, tokenState, FormatTokens, and token-related methods are defined in tui_tokens.go.
 
 // InfoMsg displays an informational message in the TUI.
 type InfoMsg struct {
@@ -85,19 +76,6 @@ type BannerInfo struct {
 	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode
 }
 
-// FormatTokens formats a token count with a `k` suffix for thousands.
-// e.g., 234 → "234", 1500 → "1.5k", 12345 → "12.3k"
-func FormatTokens(n int) string {
-	if n < 1000 {
-		return fmt.Sprintf("%d", n)
-	}
-	v := float64(n) / 1000.0
-	// Use one decimal place, but drop trailing zero (e.g., 2.0k → "2k")
-	s := fmt.Sprintf("%.1f", v)
-	s = strings.TrimSuffix(s, ".0")
-	return s + "k"
-}
-
 // TUIModel is the bubbletea model that replaces the old display struct.
 type TUIModel struct {
 	// Header fields
@@ -125,13 +103,7 @@ type TUIModel struct {
 	commits []string
 
 	// Token usage tracking
-	iterInputTokens   int             // current iteration input tokens
-	iterOutputTokens  int             // current iteration output tokens
-	totalInputTokens  int             // cumulative input tokens
-	totalOutputTokens int             // cumulative output tokens
-	hasUsageData      bool            // true if any usage data was received
-	taskUsages        []TaskUsage     // per-task usage history
-	onTaskUsage       func(TaskUsage) // called immediately when a task's usage is finalized
+	tokens tokenState
 
 	status             string
 	toolEntries        []agent.ToolMsg // full tool messages for left-side list and detail panel
@@ -187,28 +159,7 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 
 // SetOnTaskUsage sets a callback that is invoked each time a task's usage is finalized.
 func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
-	m.onTaskUsage = fn
-}
-
-// saveIterationUsage saves the current iteration's token usage and invokes the callback.
-// Called from Update (value receiver), so it must operate on the value directly.
-func saveIterationUsage(m *TUIModel) {
-	if m.taskID == "" || (m.iterInputTokens == 0 && m.iterOutputTokens == 0) {
-		return
-	}
-	tu := TaskUsage{
-		TaskID:       m.taskID,
-		TaskTitle:    m.taskTitle,
-		PlanFile:     m.taskPlanFile,
-		InputTokens:  m.iterInputTokens,
-		OutputTokens: m.iterOutputTokens,
-		StartTime:    m.startTime,
-		EndTime:      time.Now(),
-	}
-	m.taskUsages = append(m.taskUsages, tu)
-	if m.onTaskUsage != nil {
-		m.onTaskUsage(tu)
-	}
+	m.tokens.onUsage = fn
 }
 
 // Result returns the user's choice from the summary menu.
@@ -218,7 +169,7 @@ func (m TUIModel) Result() RunAgainResult {
 
 // TaskUsages returns the per-task token usage records.
 func (m TUIModel) TaskUsages() []TaskUsage {
-	return m.taskUsages
+	return m.tokens.usages
 }
 
 // StopFlag returns the shared atomic flag that the work loop can poll
@@ -375,17 +326,11 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.infoMessages = append(m.infoMessages, msg.Text)
 
 	case agent.UsageMsg:
-		m.iterInputTokens += msg.InputTokens
-		m.iterOutputTokens += msg.OutputTokens
-		m.totalInputTokens += msg.InputTokens
-		m.totalOutputTokens += msg.OutputTokens
-		if msg.InputTokens > 0 || msg.OutputTokens > 0 {
-			m.hasUsageData = true
-		}
+		m.tokens.addUsage(msg)
 
 	case IterationStartMsg:
 		// Save previous iteration's usage before resetting.
-		saveIterationUsage(&m)
+		m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskPlanFile, m.startTime)
 		m.currentIter = msg.Current
 		m.totalIters = msg.Total
 		m.taskID = msg.TaskID
@@ -401,8 +346,6 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.extras = ""
 		m.skills = nil
 		m.mcps = nil
-		m.iterInputTokens = 0
-		m.iterOutputTokens = 0
 		m.detailScrollOffset = 0
 		m.detailAutoScroll = true
 		m.detailTotalLines = 0
@@ -913,8 +856,8 @@ func (m TUIModel) renderView() string {
 		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
 		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
-		if m.hasUsageData {
-			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.totalInputTokens), FormatTokens(m.totalOutputTokens))
+		if m.tokens.hasData {
+			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.tokens.totalInput), FormatTokens(m.tokens.totalOutput))
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
 		} else {
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
