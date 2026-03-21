@@ -47,6 +47,18 @@ func (m TUIModel) renderBannerView() string {
 	return styles.Box.Render(b.String()) + "\n"
 }
 
+// formatHHMMSS converts a time.Duration to HH:MM:SS format (e.g., "00:02:15", "01:30:00").
+func formatHHMMSS(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	totalSeconds := int(d.Seconds())
+	h := totalSeconds / 3600
+	m := (totalSeconds % 3600) / 60
+	s := totalSeconds % 60
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
 // truncateLeftPath truncates a path from the left, adding "..." prefix.
 func truncateLeftPath(path string, maxWidth int) string {
 	if maxWidth <= 0 || len(path) <= maxWidth {
@@ -596,7 +608,7 @@ func (m TUIModel) renderView() string {
 
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
 			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-			b.WriteString(fmt.Sprintf("  %s Task: %s  ·  Run: %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(taskElapsed.String()), grayStyle.Render(runElapsed.String())))
+			b.WriteString(fmt.Sprintf("  %s Task: %s   ·   Run: %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(formatHHMMSS(taskElapsed)), grayStyle.Render(formatHHMMSS(runElapsed))))
 
 			if m.tokens.hasData {
 				totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead

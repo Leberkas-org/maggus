@@ -21,15 +21,15 @@ The elapsed timers on the work view Progress tab currently display in Go's defau
 **Parallel:** n/a — single task
 
 **Acceptance Criteria:**
-- [ ] A helper function `formatHHMMSS(d time.Duration) string` is added to the runner package (e.g., in `tui_render.go` or a small util file) that converts a `time.Duration` to `HH:MM:SS` format (e.g., `00:02:15`, `01:30:00`)
-- [ ] The Progress tab Elapsed line in `tui_render.go` (line 599) uses the new format for both task and run timers
-- [ ] The spacing between Task and Run is increased (e.g., use `    ` or a wider separator like `   ·   ` instead of `  ·  `)
-- [ ] The summary screen (`tui_summary.go`) is NOT modified — it keeps Go's default duration format
-- [ ] Example rendered output: `  Elapsed:  Task: 00:02:15   ·   Run: 00:12:30`
-- [ ] Hours roll over correctly (e.g., 90 minutes renders as `01:30:00`, not `90:00`)
-- [ ] Unit tests for `formatHHMMSS` cover: zero duration, seconds only, minutes+seconds, hours+minutes+seconds, large durations (24h+)
-- [ ] `go vet ./...` passes
-- [ ] `go test ./...` passes
+- [x] A helper function `formatHHMMSS(d time.Duration) string` is added to the runner package (e.g., in `tui_render.go` or a small util file) that converts a `time.Duration` to `HH:MM:SS` format (e.g., `00:02:15`, `01:30:00`)
+- [x] The Progress tab Elapsed line in `tui_render.go` (line 599) uses the new format for both task and run timers
+- [x] The spacing between Task and Run is increased (e.g., use `    ` or a wider separator like `   ·   ` instead of `  ·  `)
+- [x] The summary screen (`tui_summary.go`) is NOT modified — it keeps Go's default duration format
+- [x] Example rendered output: `  Elapsed:  Task: 00:02:15   ·   Run: 00:12:30`
+- [x] Hours roll over correctly (e.g., 90 minutes renders as `01:30:00`, not `90:00`)
+- [x] Unit tests for `formatHHMMSS` cover: zero duration, seconds only, minutes+seconds, hours+minutes+seconds, large durations (24h+)
+- [x] `go vet ./...` passes
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 
