@@ -73,8 +73,8 @@ case SummaryMsg, PushStatusMsg, QuitMsg:
 **Description:** As a developer, I want the summary message handler to return early after processing so that message handling follows the same pattern as the rest of the Update function.
 
 **Acceptance Criteria:**
-- [ ] In `tui.go`, the `case SummaryMsg, PushStatusMsg, QuitMsg:` block returns `m, nil` after calling `handleSummaryMsg` (restoring the early return that existed before the refactor)
-- [ ] `go test ./...` passes
+- [x] In `tui.go`, the `case SummaryMsg, PushStatusMsg, QuitMsg:` block returns `m, nil` after calling `handleSummaryMsg` (restoring the early return that existed before the refactor)
+- [x] `go test ./...` passes
 
 ### TASK-003: Audit All Value-Receiver Methods for Mutation Bugs
 

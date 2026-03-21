@@ -233,6 +233,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case SummaryMsg, PushStatusMsg, QuitMsg:
 		m.summary.handleSummaryMsg(msg, &m)
+		return m, nil
 
 	case InfoMsg:
 		m.infoMessages = append(m.infoMessages, msg.Text)
