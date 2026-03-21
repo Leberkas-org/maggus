@@ -110,7 +110,7 @@ type menuItem struct {
 
 var allMenuItems = []menuItem{
 	// Group 1: Core workflow
-	{name: "work", desc: "Work on the next N tasks from the implementation plan", shortcut: 'w', shortcutLabel: "w"},
+	{name: "work", desc: "Work through all tasks in the plan", shortcut: 'w', shortcutLabel: "w"},
 	{name: "status", desc: "Show a compact summary of plan progress", shortcut: 's', shortcutLabel: "s"},
 	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
 	// Group 2: Repository management
@@ -175,10 +175,6 @@ type subMenuDef struct {
 // buildSubMenus returns sub-menu definitions keyed by command name.
 func buildSubMenus() map[string]subMenuDef {
 	return map[string]subMenuDef{
-		"work": {options: []subMenuOption{
-			{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
-			{label: "Worktree", values: []string{"off", "on"}, current: 0},
-		}},
 		"worktree": {options: []subMenuOption{
 			{label: "Action", values: []string{"list", "clean"}, current: 0},
 		}},
@@ -188,19 +184,6 @@ func buildSubMenus() map[string]subMenuDef {
 // buildArgs converts the sub-menu selections into CLI args for the command.
 func buildArgs(cmdName string, opts []subMenuOption) []string {
 	switch cmdName {
-	case "work":
-		var args []string
-		// Tasks option
-		if opts[0].values[opts[0].current] == "all" {
-			args = append(args, "--count", "999")
-		} else {
-			args = append(args, "--count", opts[0].values[opts[0].current])
-		}
-		// Worktree option
-		if opts[1].values[opts[1].current] == "on" {
-			args = append(args, "--worktree")
-		}
-		return args
 	case "worktree":
 		return []string{opts[0].values[opts[0].current]}
 	}
@@ -384,6 +367,9 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	}
 	// No sub-menu — launch directly
 	m.selected = item.name
+	if item.name == "work" {
+		m.args = []string{"--count", "999"}
+	}
 	return m, tea.Quit
 }
 

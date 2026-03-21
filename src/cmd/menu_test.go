@@ -118,13 +118,9 @@ func TestActiveMenuItems_AlwaysIncludesExit(t *testing.T) {
 func TestBuildSubMenus(t *testing.T) {
 	subs := buildSubMenus()
 
-	// "work" should have 2 options.
-	workDef, ok := subs["work"]
-	if !ok {
-		t.Fatal("expected sub-menu definition for 'work'")
-	}
-	if len(workDef.options) != 2 {
-		t.Errorf("work sub-menu: got %d options, want 2", len(workDef.options))
+	// "work" should NOT have a sub-menu.
+	if _, ok := subs["work"]; ok {
+		t.Error("expected no sub-menu definition for 'work'")
 	}
 
 	// "worktree" should have 1 option.
@@ -134,61 +130,6 @@ func TestBuildSubMenus(t *testing.T) {
 	}
 	if len(wtDef.options) != 1 {
 		t.Errorf("worktree sub-menu: got %d options, want 1", len(wtDef.options))
-	}
-}
-
-func TestBuildArgs_Work(t *testing.T) {
-	tests := []struct {
-		name     string
-		opts     []subMenuOption
-		wantArgs []string
-	}{
-		{
-			name: "default (3 tasks, worktree off)",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "3"},
-		},
-		{
-			name: "all tasks",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 4},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "999"},
-		},
-		{
-			name: "1 task with worktree on",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 0},
-				{label: "Worktree", values: []string{"off", "on"}, current: 1},
-			},
-			wantArgs: []string{"--count", "1", "--worktree"},
-		},
-		{
-			name: "10 tasks",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 3},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "10"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := buildArgs("work", tt.opts)
-			if len(got) != len(tt.wantArgs) {
-				t.Fatalf("got %v, want %v", got, tt.wantArgs)
-			}
-			for i := range got {
-				if got[i] != tt.wantArgs[i] {
-					t.Errorf("arg[%d]: got %q, want %q", i, got[i], tt.wantArgs[i])
-				}
-			}
-		})
 	}
 }
 
