@@ -81,12 +81,12 @@ case SummaryMsg, PushStatusMsg, QuitMsg:
 **Description:** As a developer, I want to verify that no other value-receiver methods in the TUI package silently discard state mutations.
 
 **Acceptance Criteria:**
-- [ ] Review all `func (m TUIModel)` methods in `tui_keys.go`, `tui_messages.go`, `tui_render.go`, and `tui.go`
-- [ ] Render methods (`renderXxx`) are confirmed safe as value receivers (they only read, never write)
-- [ ] Read-only getters (`StopFlag`, `StopAtTaskIDFlag`, `TaskUsages`) are confirmed safe
-- [ ] Any method that mutates `m` fields uses a pointer receiver `*TUIModel`
-- [ ] `handleStopPicker` and `applyStopPickerSelection` are checked — they return `(tea.Model, tea.Cmd)` so the model propagates, but verify they correctly modify and return `m`
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Review all `func (m TUIModel)` methods in `tui_keys.go`, `tui_messages.go`, `tui_render.go`, and `tui.go`
+- [x] Render methods (`renderXxx`) are confirmed safe as value receivers (they only read, never write)
+- [x] Read-only getters (`StopFlag`, `StopAtTaskIDFlag`, `TaskUsages`) are confirmed safe
+- [x] Any method that mutates `m` fields uses a pointer receiver `*TUIModel`
+- [x] `handleStopPicker` and `applyStopPickerSelection` are checked — they return `(tea.Model, tea.Cmd)` so the model propagates, but verify they correctly modify and return `m`
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Functional Requirements
 

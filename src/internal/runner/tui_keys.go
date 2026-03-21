@@ -75,7 +75,7 @@ func (m TUIModel) stopPickerCurrentIndex() int {
 }
 
 // handleStopPicker processes keys while the stop picker is visible.
-func (m TUIModel) handleStopPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *TUIModel) handleStopPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	maxIdx := m.stopPickerItemCount() - 1
 
 	switch msg.Type {
@@ -106,7 +106,7 @@ func (m TUIModel) handleStopPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // applyStopPickerSelection applies the user's choice from the stop picker.
-func (m TUIModel) applyStopPickerSelection() (tea.Model, tea.Cmd) {
+func (m *TUIModel) applyStopPickerSelection() (tea.Model, tea.Cmd) {
 	m.showStopPicker = false
 	lastIdx := m.stopPickerItemCount() - 1
 
