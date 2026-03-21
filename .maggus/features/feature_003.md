@@ -80,14 +80,14 @@ Extend maggus to recognize and process bug report files (`.maggus/bugs/bug_N.md`
 **Parallel:** yes — can run alongside TASK-003-003, TASK-003-005
 
 **Acceptance Criteria:**
-- [ ] Status view parses both features and bugs via `ParseFeaturesGrouped` and `ParseBugsGrouped`
-- [ ] Bug tabs appear after feature tabs, visually separated (e.g., different label style or a separator)
-- [ ] Bug tabs show the bug filename (e.g., `bug_1.md`)
-- [ ] Task display, progress bars, completion status, and criteria all work identically for bug tasks
-- [ ] Interactive actions (delete task, resolve/unblock criteria) work on bug files
-- [ ] `findNextTask()` considers both bugs and features, with bugs taking priority
-- [ ] `go fmt ./...` and `go vet ./...` pass
-- [ ] Unit tests cover bug tab rendering and mixed feature/bug navigation
+- [x] Status view parses both features and bugs via `ParseFeaturesGrouped` and `ParseBugsGrouped`
+- [x] Bug tabs appear after feature tabs, visually separated (e.g., different label style or a separator)
+- [x] Bug tabs show the bug filename (e.g., `bug_1.md`)
+- [x] Task display, progress bars, completion status, and criteria all work identically for bug tasks
+- [x] Interactive actions (delete task, resolve/unblock criteria) work on bug files
+- [x] `findNextTask()` considers both bugs and features, with bugs taking priority
+- [x] `go fmt ./...` and `go vet ./...` pass
+- [x] Unit tests cover bug tab rendering and mixed feature/bug navigation
 
 ### TASK-003-005: Update list command to include bug tasks
 **Description:** As a user, I want `maggus list` to show upcoming bug tasks before feature tasks so I can preview the full queue.

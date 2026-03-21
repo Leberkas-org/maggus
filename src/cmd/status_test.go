@@ -618,3 +618,252 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		}
 	})
 }
+
+func TestFindNextTask_BugsPrioritized(t *testing.T) {
+	t.Run("bugs before features", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		id, file := findNextTask(items)
+		if id != "BUG-001-001" {
+			t.Errorf("id = %q, want BUG-001-001 (bugs should be prioritized)", id)
+		}
+		if file != "bug_001.md" {
+			t.Errorf("file = %q, want bug_001.md", file)
+		}
+	})
+
+	t.Run("falls back to features when all bugs complete", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename:  "bug_001.md",
+				isBug:     true,
+				completed: true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: true}}},
+				},
+			},
+		}
+		id, _ := findNextTask(items)
+		if id != "TASK-001-001" {
+			t.Errorf("id = %q, want TASK-001-001", id)
+		}
+	})
+
+	t.Run("only bugs", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		id, _ := findNextTask(items)
+		if id != "BUG-001-001" {
+			t.Errorf("id = %q, want BUG-001-001", id)
+		}
+	})
+}
+
+func TestVisibleFeatures_WithBugs(t *testing.T) {
+	items := []featureInfo{
+		{filename: "feature_001.md"},
+		{filename: "bug_001.md", isBug: true},
+		{filename: "bug_002_completed.md", isBug: true, completed: true},
+	}
+
+	t.Run("showAll false hides completed bugs", func(t *testing.T) {
+		m := statusModel{features: items, showAll: false}
+		got := m.visibleFeatures()
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2", len(got))
+		}
+		if got[1].filename != "bug_001.md" {
+			t.Errorf("got %s, want bug_001.md", got[1].filename)
+		}
+	})
+
+	t.Run("showAll true shows completed bugs", func(t *testing.T) {
+		m := statusModel{features: items, showAll: true}
+		got := m.visibleFeatures()
+		if len(got) != 3 {
+			t.Fatalf("len = %d, want 3", len(got))
+		}
+	})
+}
+
+func TestRenderStatusPlain_WithBugs(t *testing.T) {
+	t.Run("mixed features and bugs", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", Title: "Feature task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", Title: "Bug task", SourceFile: "b", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		var sb strings.Builder
+		renderStatusPlain(&sb, items, false, "BUG-001-001", "b", "claude")
+		out := sb.String()
+
+		if !strings.Contains(out, "1 features (1 active)") {
+			t.Error("missing feature count in header")
+		}
+		if !strings.Contains(out, "1 bugs (1 active)") {
+			t.Error("missing bug count in header")
+		}
+		if !strings.Contains(out, "bug_001.md") {
+			t.Error("missing bug filename in tasks")
+		}
+		if !strings.Contains(out, "BUG-001-001") {
+			t.Error("missing bug task ID")
+		}
+	})
+
+	t.Run("no bugs omits bug count", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", Title: "Task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		var sb strings.Builder
+		renderStatusPlain(&sb, items, false, "TASK-001-001", "f", "claude")
+		out := sb.String()
+
+		if strings.Contains(out, "bugs") {
+			t.Error("should not mention bugs when there are none")
+		}
+	})
+}
+
+func TestNewStatusModel_WithBugs(t *testing.T) {
+	items := []featureInfo{
+		{
+			filename: "feature_001.md",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+		{
+			filename: "bug_001.md",
+			isBug:    true,
+			tasks: []parser.Task{
+				{ID: "BUG-001-001", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+	}
+
+	t.Run("tabs include bugs", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		visible := m.visibleFeatures()
+		if len(visible) != 2 {
+			t.Fatalf("visible features = %d, want 2", len(visible))
+		}
+		if !visible[1].isBug {
+			t.Error("second visible item should be a bug")
+		}
+	})
+
+	t.Run("navigation to bug tab", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m.selectedFeature = 1
+		m.rebuildForSelectedFeature()
+		if len(m.Tasks) != 1 {
+			t.Fatalf("Tasks len = %d, want 1", len(m.Tasks))
+		}
+		if m.Tasks[0].ID != "BUG-001-001" {
+			t.Errorf("Tasks[0].ID = %q, want BUG-001-001", m.Tasks[0].ID)
+		}
+	})
+}
+
+func TestStatusModel_ViewWithBugs(t *testing.T) {
+	items := []featureInfo{
+		{
+			filename: "feature_001.md",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Title: "Feature task", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+		{
+			filename: "bug_001.md",
+			isBug:    true,
+			tasks: []parser.Task{
+				{ID: "BUG-001-001", Title: "Bug task", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+	}
+
+	t.Run("view renders bug tabs", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		view := m.View()
+		if !strings.Contains(view, "bug_001") {
+			t.Error("view should contain bug tab label")
+		}
+		if !strings.Contains(view, "feature_001") {
+			t.Error("view should contain feature tab label")
+		}
+	})
+
+	t.Run("view shows bug header counts", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		view := m.View()
+		if !strings.Contains(view, "1 bugs") {
+			t.Error("view header should show bug count")
+		}
+	})
+
+	t.Run("selected bug tab shows bug tasks", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m.selectedFeature = 1
+		m.rebuildForSelectedFeature()
+		view := m.View()
+		if !strings.Contains(view, "BUG-001-001") {
+			t.Error("view should show bug task ID when bug tab is selected")
+		}
+	})
+}
+
+func TestRenderTabBar_BugSeparator(t *testing.T) {
+	items := []featureInfo{
+		{filename: "feature_001.md", tasks: []parser.Task{{ID: "T1"}}},
+		{filename: "bug_001.md", isBug: true, tasks: []parser.Task{{ID: "B1"}}},
+	}
+	m := statusModel{features: items, showAll: false}
+	m.Width = 120
+	bar := m.renderTabBar()
+	// The separator ┃ should appear between features and bugs
+	if !strings.Contains(bar, "┃") {
+		t.Error("tab bar should contain ┃ separator between features and bugs")
+	}
+}

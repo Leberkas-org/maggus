@@ -96,13 +96,19 @@ func (m *statusModel) rebuildForSelectedFeature() {
 	m.ScrollOffset = 0
 }
 
-// reloadFeatures reloads all features from disk and rebuilds the current view.
+// reloadFeatures reloads all features and bugs from disk and rebuilds the current view.
 func (m *statusModel) reloadFeatures() {
 	features, err := parseFeatures(m.dir)
-	if err == nil {
-		m.features = features
-		m.nextTaskID, m.nextTaskFile = findNextTask(features)
+	if err != nil {
+		m.rebuildForSelectedFeature()
+		return
 	}
+	bugs, err := parseBugs(m.dir)
+	if err == nil {
+		features = append(features, bugs...)
+	}
+	m.features = features
+	m.nextTaskID, m.nextTaskFile = findNextTask(features)
 	m.rebuildForSelectedFeature()
 }
 
@@ -215,6 +221,10 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showAll = !m.showAll
 		features, err := parseFeatures(m.dir)
 		if err == nil {
+			bugs, bugErr := parseBugs(m.dir)
+			if bugErr == nil {
+				features = append(features, bugs...)
+			}
 			m.features = features
 		}
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
@@ -293,7 +303,11 @@ func (m statusModel) handleIgnoreFeature() (tea.Model, tea.Cmd) {
 	if f.completed {
 		return m, nil
 	}
-	fullPath := filepath.Join(m.dir, ".maggus", "features", f.filename)
+	subdir := "features"
+	if f.isBug {
+		subdir = "bugs"
+	}
+	fullPath := filepath.Join(m.dir, ".maggus", subdir, f.filename)
 	var newPath string
 	if f.ignored {
 		newPath = strings.TrimSuffix(fullPath, "_ignored.md") + ".md"
@@ -307,6 +321,10 @@ func (m statusModel) handleIgnoreFeature() (tea.Model, tea.Cmd) {
 	newBase := filepath.Base(newPath)
 	features, err := parseFeatures(m.dir)
 	if err == nil {
+		bugs, bugErr := parseBugs(m.dir)
+		if bugErr == nil {
+			features = append(features, bugs...)
+		}
 		m.features = features
 		m.nextTaskID, m.nextTaskFile = findNextTask(features)
 	}
@@ -359,11 +377,22 @@ func (m statusModel) renderTabBar() string {
 	}
 
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	selectedBugStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Error)
 	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	unselectedBugStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
 	ignoredTabStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 
 	var tabs []string
+	needsSep := false
 	for i, p := range visible {
+		// Insert separator between features and bugs
+		if p.isBug && !needsSep {
+			needsSep = true
+			if len(tabs) > 0 {
+				tabs = append(tabs, statusDimStyle.Render(" ┃ "))
+			}
+		}
+
 		done := p.doneCount()
 		total := len(p.tasks)
 		name := strings.TrimSuffix(p.filename, ".md")
@@ -375,12 +404,16 @@ func (m statusModel) renderTabBar() string {
 		if i == m.selectedFeature {
 			if p.ignored {
 				tabs = append(tabs, ignoredTabStyle.Bold(true).Render(label))
+			} else if p.isBug {
+				tabs = append(tabs, selectedBugStyle.Render(label))
 			} else {
 				tabs = append(tabs, selectedStyle.Render(label))
 			}
 		} else {
 			if p.ignored {
 				tabs = append(tabs, ignoredTabStyle.Render(label))
+			} else if p.isBug {
+				tabs = append(tabs, unselectedBugStyle.Render(label))
 			} else {
 				tabs = append(tabs, unselectedStyle.Render(label))
 			}
@@ -433,19 +466,33 @@ func (m statusModel) viewStatus() string {
 	totalDone := 0
 	totalBlocked := 0
 	activeFeatures := 0
+	totalBugs := 0
+	activeBugs := 0
 	for _, f := range m.features {
 		totalTasks += len(f.tasks)
 		totalDone += f.doneCount()
 		totalBlocked += f.blockedCount()
-		if !f.completed {
-			activeFeatures++
+		if f.isBug {
+			totalBugs++
+			if !f.completed {
+				activeBugs++
+			}
+		} else {
+			if !f.completed {
+				activeFeatures++
+			}
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
+	featureCount := len(m.features) - totalBugs
 
 	// Header
-	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %d features (%d active), %d tasks total",
-		len(m.features), activeFeatures, totalTasks))
+	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
+	if totalBugs > 0 {
+		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
+	}
+	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %s, %d tasks total",
+		headerParts, totalTasks))
 	sb.WriteString(header)
 	sb.WriteString("\n\n")
 
@@ -611,6 +658,11 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		bugs, bugErr := parseBugs(dir)
+		if bugErr != nil {
+			return bugErr
+		}
+		features = append(features, bugs...)
 
 		if len(features) == 0 {
 			if plain {

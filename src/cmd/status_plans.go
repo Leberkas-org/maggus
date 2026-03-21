@@ -16,6 +16,7 @@ type featureInfo struct {
 	tasks     []parser.Task
 	completed bool // filename contains _completed
 	ignored   bool // filename contains _ignored
+	isBug     bool // true for bug files (from .maggus/bugs/)
 }
 
 func (f *featureInfo) doneCount() int {
@@ -87,9 +88,48 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 	return features, nil
 }
 
+func parseBugs(dir string) ([]featureInfo, error) {
+	files, err := parser.GlobBugFiles(dir, true)
+	if err != nil {
+		return nil, fmt.Errorf("glob bugs: %w", err)
+	}
+
+	var bugs []featureInfo
+	for _, f := range files {
+		tasks, err := parser.ParseFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f, err)
+		}
+		ignored := parser.IsIgnoredFile(f)
+		if ignored {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		bugs = append(bugs, featureInfo{
+			filename:  filepath.Base(f),
+			tasks:     tasks,
+			completed: strings.HasSuffix(f, "_completed.md"),
+			ignored:   ignored,
+			isBug:     true,
+		})
+	}
+	return bugs, nil
+}
+
 func findNextTask(features []featureInfo) (string, string) {
+	// Bugs first, then features
 	for _, f := range features {
-		if f.completed {
+		if f.completed || !f.isBug {
+			continue
+		}
+		next := parser.FindNextIncomplete(f.tasks)
+		if next != nil {
+			return next.ID, next.SourceFile
+		}
+	}
+	for _, f := range features {
+		if f.completed || f.isBug {
 			continue
 		}
 		next := parser.FindNextIncomplete(f.tasks)
@@ -106,17 +146,31 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 	totalDone := 0
 	totalBlocked := 0
 	activeFeatures := 0
+	totalBugs := 0
+	activeBugs := 0
 	for _, f := range features {
 		totalTasks += len(f.tasks)
 		totalDone += f.doneCount()
 		totalBlocked += f.blockedCount()
-		if !f.completed {
-			activeFeatures++
+		if f.isBug {
+			totalBugs++
+			if !f.completed {
+				activeBugs++
+			}
+		} else {
+			if !f.completed {
+				activeFeatures++
+			}
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
+	featureCount := len(features) - totalBugs
 
-	fmt.Fprintf(w, "Maggus Status — %d features (%d active), %d tasks total\n\n", len(features), activeFeatures, totalTasks)
+	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
+	if totalBugs > 0 {
+		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
+	}
+	fmt.Fprintf(w, "Maggus Status — %s, %d tasks total\n\n", headerParts, totalTasks)
 	fmt.Fprintf(w, " Summary: %d/%d tasks complete · %d pending · %d blocked\n", totalDone, totalTasks, totalPending, totalBlocked)
 	fmt.Fprintf(w, " Agent: %s\n", agentName)
 
