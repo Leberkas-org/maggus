@@ -8,6 +8,7 @@ import (
 )
 
 var taskIDSuffixRe = regexp.MustCompile(`^TASK-(.+)$`)
+var bugIDSuffixRe = regexp.MustCompile(`^BUG-(\d+)`)
 
 // IsProtected returns true if the branch name is in the protected list.
 func IsProtected(branch string, protectedList []string) bool {
@@ -17,6 +18,16 @@ func IsProtected(branch string, protectedList []string) bool {
 		}
 	}
 	return false
+}
+
+// BranchName generates a branch name from a task ID.
+// BUG-NNN task IDs produce "bugfix/maggus-bug-NNN" branches.
+// TASK-NNN task IDs produce "feature/maggustask-NNN" branches.
+func BranchName(taskID string) string {
+	if m := bugIDSuffixRe.FindStringSubmatch(taskID); m != nil {
+		return fmt.Sprintf("bugfix/maggus-bug-%s", strings.ToLower(m[1]))
+	}
+	return FeatureBranchName(taskID)
 }
 
 // FeatureBranchName generates a feature branch name from a task ID.
@@ -43,7 +54,7 @@ func EnsureFeatureBranch(workDir string, taskID string, protectedList []string) 
 		return current, fmt.Sprintf("On branch %s (not protected, staying here)", current), nil
 	}
 
-	target := FeatureBranchName(taskID)
+	target := BranchName(taskID)
 	if err := createAndCheckout(workDir, target); err != nil {
 		return "", "", fmt.Errorf("create feature branch %s: %w", target, err)
 	}

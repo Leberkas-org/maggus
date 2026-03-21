@@ -384,7 +384,7 @@ func captureStartHash(workDir string) string {
 func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *runtracker.Run, gitCfg config.GitConfig) (string, error) {
 	if useWorktree {
 		cleanStaleWorktrees(repoDir)
-		branchName := gitbranch.FeatureBranchName(nextTask.ID)
+		branchName := gitbranch.BranchName(nextTask.ID)
 		wtPath := filepath.Join(repoDir, ".maggus-work", run.ID)
 		if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
 			return "", fmt.Errorf("create worktree: %w", err)

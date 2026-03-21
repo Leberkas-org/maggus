@@ -56,6 +56,53 @@ func TestFeatureBranchName(t *testing.T) {
 	}
 }
 
+func TestBranchName(t *testing.T) {
+	tests := []struct {
+		taskID string
+		want   string
+	}{
+		// Bug task IDs
+		{"BUG-001-001", "bugfix/maggus-bug-001"},
+		{"BUG-002-003", "bugfix/maggus-bug-002"},
+		{"BUG-123-456", "bugfix/maggus-bug-123"},
+		{"BUG-001", "bugfix/maggus-bug-001"},
+		// Feature task IDs (delegated to FeatureBranchName)
+		{"TASK-001", "feature/maggustask-001"},
+		{"TASK-003", "feature/maggustask-003"},
+		{"TASK-1-E05", "feature/maggustask-1-e05"},
+		// Invalid
+		{"INVALID", "feature/maggustask-000"},
+	}
+
+	for _, tt := range tests {
+		got := BranchName(tt.taskID)
+		if got != tt.want {
+			t.Errorf("BranchName(%q) = %q, want %q", tt.taskID, got, tt.want)
+		}
+	}
+}
+
+func TestEnsureFeatureBranch_BugTask(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "main")
+
+	branch, msg, err := EnsureFeatureBranch(tmp, "BUG-001-001", []string{"main", "master", "dev"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if branch != "bugfix/maggus-bug-001" {
+		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001")
+	}
+	if msg == "" {
+		t.Error("expected a message about switching branches")
+	}
+
+	got := getCurrentBranch(t, tmp)
+	if got != "bugfix/maggus-bug-001" {
+		t.Errorf("actual git branch = %q, want %q", got, "bugfix/maggus-bug-001")
+	}
+}
+
 func TestEnsureFeatureBranch_NonProtected(t *testing.T) {
 	tmp := t.TempDir()
 	initGitRepo(t, tmp)

@@ -46,12 +46,12 @@ Extend maggus to recognize and process bug report files (`.maggus/bugs/bug_N.md`
 **Parallel:** yes — can run alongside TASK-003-001
 
 **Acceptance Criteria:**
-- [ ] `FeatureBranchName()` (or a renamed/extended function) detects `BUG-NNN` prefix in the task ID
-- [ ] Bug task IDs produce `bugfix/maggus-bug-NNN` branches (e.g., `BUG-001-001` → `bugfix/maggus-bug-001`)
-- [ ] Feature task IDs still produce `feature/maggustask-NNN` branches (no regression)
-- [ ] Protected branch check still applies for bug branches
-- [ ] `go fmt ./...` and `go vet ./...` pass
-- [ ] Unit tests cover both feature and bug branch name generation
+- [x] `FeatureBranchName()` (or a renamed/extended function) detects `BUG-NNN` prefix in the task ID
+- [x] Bug task IDs produce `bugfix/maggus-bug-NNN` branches (e.g., `BUG-001-001` → `bugfix/maggus-bug-001`)
+- [x] Feature task IDs still produce `feature/maggustask-NNN` branches (no regression)
+- [x] Protected branch check still applies for bug branches
+- [x] `go fmt ./...` and `go vet ./...` pass
+- [x] Unit tests cover both feature and bug branch name generation
 
 ### TASK-003-003: Integrate bug tasks into the work loop
 **Description:** As a user, I want `maggus work` to pick up bug tasks before feature tasks so that bugs are fixed as part of the normal workflow.
