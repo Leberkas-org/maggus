@@ -87,7 +87,7 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 - [x] The extracted usage record is appended to `.maggus/usage_prompt.jsonl` via the JSONL writer from TASK-001
 - [x] The record includes: a generated run ID (timestamp-based, same format as `work`), model, agent name ("claude"), start time, end time, and token totals
 - [x] If extraction fails (no session found, parse error), a warning is printed but the command exits cleanly (no error exit code)
-- [ ] Manual test: run `maggus prompt`, have a short conversation, exit, verify `usage_prompt.jsonl` contains a valid JSON line with token counts
+- [x] ⚠️ BLOCKED: Manual test: run `maggus prompt`, have a short conversation, exit, verify `usage_prompt.jsonl` contains a valid JSON line with token counts — Requires interactive terminal session; cannot be performed by automated agent
 - [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-007: Add Prompt Command to TUI Menu
