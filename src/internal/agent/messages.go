@@ -40,6 +40,23 @@ type MCPMsg struct {
 
 // UsageMsg is sent when a result event contains token usage data.
 type UsageMsg struct {
-	InputTokens  int
-	OutputTokens int
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	CostUSD                  float64
+}
+
+// ModelTokens holds token usage data for a specific model.
+type ModelTokens struct {
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	CostUSD                  float64
+}
+
+// ModelUsageMsg is sent when a result event contains per-model usage data.
+type ModelUsageMsg struct {
+	Models map[string]ModelTokens
 }

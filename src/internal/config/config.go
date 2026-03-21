@@ -52,6 +52,44 @@ func (n NotificationsConfig) IsErrorEnabled() bool {
 	return true
 }
 
+// GitConfig holds git workflow settings.
+type GitConfig struct {
+	AutoBranch        *bool    `yaml:"auto_branch"`
+	ProtectedBranches []string `yaml:"protected_branches"`
+	CheckSync         *bool    `yaml:"check_sync"`
+}
+
+// defaultProtectedBranches are used when no custom list is configured.
+var defaultProtectedBranches = []string{"main", "master", "dev"}
+
+// IsAutoBranchEnabled returns true if auto-branching is enabled (default: true).
+func (g GitConfig) IsAutoBranchEnabled() bool {
+	return g.AutoBranch == nil || *g.AutoBranch
+}
+
+// IsCheckSyncEnabled returns true if pre-work sync check is enabled (default: true).
+func (g GitConfig) IsCheckSyncEnabled() bool {
+	return g.CheckSync == nil || *g.CheckSync
+}
+
+// ProtectedBranchList returns the configured protected branches, or defaults if empty.
+// Filters out empty strings.
+func (g GitConfig) ProtectedBranchList() []string {
+	if len(g.ProtectedBranches) == 0 {
+		return append([]string(nil), defaultProtectedBranches...)
+	}
+	var filtered []string
+	for _, b := range g.ProtectedBranches {
+		if b != "" {
+			filtered = append(filtered, b)
+		}
+	}
+	if len(filtered) == 0 {
+		return append([]string(nil), defaultProtectedBranches...)
+	}
+	return filtered
+}
+
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
 	Agent         string              `yaml:"agent"`
@@ -59,6 +97,7 @@ type Config struct {
 	Include       []string            `yaml:"include"`
 	Worktree      bool                `yaml:"worktree"`
 	Notifications NotificationsConfig `yaml:"notifications"`
+	Git           GitConfig           `yaml:"git"`
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,

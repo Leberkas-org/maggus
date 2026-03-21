@@ -26,6 +26,15 @@ const defaultConfig = `# Maggus configuration
 #   - docs/ARCHITECTURE.md
 #   - docs/VISION.md
 
+# Git workflow settings
+# git:
+#   auto_branch: true
+#   check_sync: true
+#   protected_branches:
+#     - main
+#     - master
+#     - dev
+
 # Sound notifications
 # notifications:
 #   sound: false
@@ -86,7 +95,7 @@ This is the recommended first step when setting up Maggus in a new project.`,
 		}
 
 		fmt.Println("\nDone! You can now:")
-		fmt.Println("  maggus plan <description>   Create an implementation plan")
+		fmt.Println("  maggus plan <description>   Create a feature plan")
 		fmt.Println("  maggus work                  Start working on tasks")
 
 		return nil

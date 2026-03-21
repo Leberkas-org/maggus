@@ -101,10 +101,10 @@ func TestFormatTokens(t *testing.T) {
 func TestUsageAccumulation(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
 
-	if m.hasUsageData {
-		t.Error("expected hasUsageData to be false initially")
+	if m.tokens.hasData {
+		t.Error("expected hasData to be false initially")
 	}
-	if m.totalInputTokens != 0 || m.totalOutputTokens != 0 {
+	if m.tokens.totalInput != 0 || m.tokens.totalOutput != 0 {
 		t.Error("expected zero tokens initially")
 	}
 
@@ -114,47 +114,47 @@ func TestUsageAccumulation(t *testing.T) {
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 1000, OutputTokens: 500})
 	m = updated.(TUIModel)
 
-	if !m.hasUsageData {
-		t.Error("expected hasUsageData to be true after receiving usage")
+	if !m.tokens.hasData {
+		t.Error("expected hasData to be true after receiving usage")
 	}
-	if m.iterInputTokens != 1000 || m.iterOutputTokens != 500 {
-		t.Errorf("iter tokens: got %d/%d, want 1000/500", m.iterInputTokens, m.iterOutputTokens)
+	if m.tokens.iterInput != 1000 || m.tokens.iterOutput != 500 {
+		t.Errorf("iter tokens: got %d/%d, want 1000/500", m.tokens.iterInput, m.tokens.iterOutput)
 	}
-	if m.totalInputTokens != 1000 || m.totalOutputTokens != 500 {
-		t.Errorf("total tokens: got %d/%d, want 1000/500", m.totalInputTokens, m.totalOutputTokens)
+	if m.tokens.totalInput != 1000 || m.tokens.totalOutput != 500 {
+		t.Errorf("total tokens: got %d/%d, want 1000/500", m.tokens.totalInput, m.tokens.totalOutput)
 	}
 
 	updated, _ = m.Update(IterationStartMsg{Current: 2, Total: 2, TaskID: "TASK-002", TaskTitle: "Second task"})
 	m = updated.(TUIModel)
 
-	if len(m.taskUsages) != 1 {
-		t.Fatalf("expected 1 task usage entry, got %d", len(m.taskUsages))
+	if len(m.tokens.usages) != 1 {
+		t.Fatalf("expected 1 task usage entry, got %d", len(m.tokens.usages))
 	}
-	if m.taskUsages[0].TaskID != "TASK-001" {
-		t.Errorf("expected task ID TASK-001, got %s", m.taskUsages[0].TaskID)
+	if m.tokens.usages[0].TaskID != "TASK-001" {
+		t.Errorf("expected task ID TASK-001, got %s", m.tokens.usages[0].TaskID)
 	}
-	if m.taskUsages[0].InputTokens != 1000 || m.taskUsages[0].OutputTokens != 500 {
-		t.Errorf("task usage: got %d/%d, want 1000/500", m.taskUsages[0].InputTokens, m.taskUsages[0].OutputTokens)
+	if m.tokens.usages[0].InputTokens != 1000 || m.tokens.usages[0].OutputTokens != 500 {
+		t.Errorf("task usage: got %d/%d, want 1000/500", m.tokens.usages[0].InputTokens, m.tokens.usages[0].OutputTokens)
 	}
-	if m.iterInputTokens != 0 || m.iterOutputTokens != 0 {
+	if m.tokens.iterInput != 0 || m.tokens.iterOutput != 0 {
 		t.Error("expected iter tokens reset to 0 after new iteration")
 	}
 
 	updated, _ = m.Update(agent.UsageMsg{InputTokens: 2000, OutputTokens: 800})
 	m = updated.(TUIModel)
 
-	if m.totalInputTokens != 3000 || m.totalOutputTokens != 1300 {
-		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.totalInputTokens, m.totalOutputTokens)
+	if m.tokens.totalInput != 3000 || m.tokens.totalOutput != 1300 {
+		t.Errorf("cumulative tokens: got %d/%d, want 3000/1300", m.tokens.totalInput, m.tokens.totalOutput)
 	}
 
 	updated, _ = m.Update(SummaryMsg{Data: SummaryData{TasksCompleted: 2, TasksTotal: 2}})
 	m = updated.(TUIModel)
 
-	if len(m.taskUsages) != 2 {
-		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.taskUsages))
+	if len(m.tokens.usages) != 2 {
+		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.tokens.usages))
 	}
-	if m.taskUsages[1].TaskID != "TASK-002" {
-		t.Errorf("expected task ID TASK-002, got %s", m.taskUsages[1].TaskID)
+	if m.tokens.usages[1].TaskID != "TASK-002" {
+		t.Errorf("expected task ID TASK-002, got %s", m.tokens.usages[1].TaskID)
 	}
 }
 
@@ -172,12 +172,12 @@ func TestUsageNAWhenNoData(t *testing.T) {
 
 func TestSummaryRenderComplete(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonComplete,
 		TasksFailed: 0,
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if !contains(view, "Work Complete") {
 		t.Error("expected 'Work Complete' in complete summary view")
 	}
@@ -191,15 +191,15 @@ func TestSummaryRenderComplete(t *testing.T) {
 
 func TestSummaryRenderPartialComplete(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonPartialComplete,
 		TasksFailed: 1,
 		FailedTasks: []FailedTask{
 			{ID: "TASK-001", Title: "My Task", Reason: "agent error: something went wrong"},
 		},
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if !contains(view, "Work Complete (with failures)") {
 		t.Error("expected 'Work Complete (with failures)' in partial complete view")
 	}
@@ -219,16 +219,216 @@ func TestSummaryRenderPartialComplete(t *testing.T) {
 
 func TestSummaryFailedTasksSectionHiddenWhenNone(t *testing.T) {
 	m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
-	m.showSummary = true
-	m.summary = SummaryData{
+	m.summary.show = true
+	m.summary.data = SummaryData{
 		Reason:      StopReasonComplete,
 		TasksFailed: 0,
 		FailedTasks: nil,
 	}
-	view := m.renderSummaryView()
+	view := m.summary.renderSummaryView(&m)
 	if contains(view, "Failed Tasks:") {
 		t.Error("unexpected 'Failed Tasks:' section when no tasks failed")
 	}
+}
+
+func TestRenderView_2xBorderColor(t *testing.T) {
+	t.Run("non-2x uses primary border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-001", TaskTitle: "Test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+		// Non-2x, non-stop → should render without error
+		if view == "" {
+			t.Error("expected non-empty view")
+		}
+	})
+
+	t.Run("2x active renders with warning border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h 30m"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-002", TaskTitle: "Test 2x"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "TASK-002") {
+			t.Error("view should contain task ID")
+		}
+		if !contains(view, "2x:") {
+			t.Error("view should contain 2x status line")
+		}
+	})
+
+	t.Run("stop-after-task overrides border to warning", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		m.stopAfterTask = true
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-003", TaskTitle: "Stop test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "Stopping after current task") {
+			t.Error("view should contain stop indicator")
+		}
+	})
+
+	t.Run("non-border elements remain cyan", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-004", TaskTitle: "Cyan check"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		// The spinner and task ID should still use cyan style, not warning
+		if !contains(view, "TASK-004") {
+			t.Error("view should contain task ID rendered with cyan style")
+		}
+	})
+}
+
+func TestRenderBannerView_2xBorderColor(t *testing.T) {
+	t.Run("non-2x banner uses primary border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations: 3,
+			RunID:      "run-001",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "run-001") {
+			t.Error("banner should contain run ID")
+		}
+	})
+
+	t.Run("2x banner uses warning border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations:    3,
+			RunID:         "run-002",
+			TwoXExpiresIn: "17h 54m",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "run-002") {
+			t.Error("banner should contain run ID")
+		}
+		if !contains(view, "2x:") {
+			t.Error("banner should contain 2x status in header")
+		}
+	})
+}
+
+func TestIs2xDerivation(t *testing.T) {
+	t.Run("empty TwoXExpiresIn means not 2x", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: ""})
+		is2x := m.banner.TwoXExpiresIn != ""
+		if is2x {
+			t.Error("empty TwoXExpiresIn should mean not 2x")
+		}
+	})
+
+	t.Run("non-empty TwoXExpiresIn means 2x", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h 30m"})
+		is2x := m.banner.TwoXExpiresIn != ""
+		if !is2x {
+			t.Error("non-empty TwoXExpiresIn should mean 2x")
+		}
+	})
+}
+
+func TestTruncateLeftPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		maxWidth int
+		expected string
+	}{
+		{"short path unchanged", "/home/user", 20, "/home/user"},
+		{"exact width unchanged", "/home", 5, "/home"},
+		{"long path truncated", "/home/user/projects/myapp", 15, "...ojects/myapp"},
+		{"very small max", "/home/user", 3, "ser"},
+		{"zero max", "/home/user", 0, "/home/user"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateLeftPath(tt.path, tt.maxWidth)
+			if got != tt.expected {
+				t.Errorf("truncateLeftPath(%q, %d) = %q, want %q", tt.path, tt.maxWidth, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRenderHeaderInner_CWD(t *testing.T) {
+	t.Run("CWD appears in header", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: "/home/user/project"})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(100)
+		if !contains(header, "/home/user/project") {
+			t.Error("header should contain CWD path")
+		}
+	})
+
+	t.Run("CWD absent when empty", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(100)
+		// Should not have a CWD line (only version line, separator, etc.)
+		if contains(header, "...") {
+			t.Error("header should not contain truncation prefix when CWD is empty")
+		}
+	})
+
+	t.Run("long CWD is left-truncated", func(t *testing.T) {
+		longPath := "/very/long/path/that/exceeds/the/available/width/significantly/deep/nested/project"
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: longPath})
+		m.width = 120
+		m.height = 40
+		header := m.renderHeaderInner(40)
+		if !contains(header, "...") {
+			t.Error("header should truncate long CWD path with '...' prefix")
+		}
+		if contains(header, longPath) {
+			t.Error("header should not contain full long path")
+		}
+	})
+}
+
+func TestRenderBannerView_CWD(t *testing.T) {
+	t.Run("CWD appears in banner view", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations: 3,
+			RunID:      "run-001",
+			CWD:        "/home/user/myproject",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "/home/user/myproject") {
+			t.Error("banner view should contain CWD path")
+		}
+	})
+}
+
+func TestRenderView_CWD(t *testing.T) {
+	t.Run("CWD appears in work view", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{CWD: "/home/user/workproject"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-CWD", TaskTitle: "CWD Test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "/home/user/workproject") {
+			t.Error("work view should contain CWD path")
+		}
+	})
 }
 
 func contains(s, substr string) bool {

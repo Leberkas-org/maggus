@@ -14,15 +14,19 @@ func setupCleanDir(t *testing.T) string {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")
 	runsDir := filepath.Join(maggusDir, "runs")
+	featuresDir := filepath.Join(maggusDir, "features")
 	if err := os.MkdirAll(runsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(featuresDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return dir
 }
 
-func writePlanFile(t *testing.T, dir, name, content string) {
+func writeFeatureFile(t *testing.T, dir, name, content string) {
 	t.Helper()
-	path := filepath.Join(dir, ".maggus", name)
+	path := filepath.Join(dir, ".maggus", "features", name)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -57,29 +61,29 @@ func runCleanCmd(t *testing.T, dir string, flags ...string) string {
 	return buf.String()
 }
 
-func TestCleanRemovesCompletedPlans(t *testing.T) {
+func TestCleanRemovesCompletedFeatures(t *testing.T) {
 	dir := setupCleanDir(t)
-	writePlanFile(t, dir, "plan_1_completed.md", "# completed plan")
-	writePlanFile(t, dir, "plan_2_completed.md", "# another completed plan")
-	writePlanFile(t, dir, "plan_3.md", "# active plan")
+	writeFeatureFile(t, dir, "feature_001_completed.md", "# completed feature")
+	writeFeatureFile(t, dir, "feature_002_completed.md", "# another completed feature")
+	writeFeatureFile(t, dir, "feature_003.md", "# active feature")
 
 	out := runCleanCmd(t, dir)
 
-	if !strings.Contains(out, "2 completed plan(s)") {
-		t.Errorf("expected '2 completed plan(s)' in output, got:\n%s", out)
+	if !strings.Contains(out, "2 completed feature(s)") {
+		t.Errorf("expected '2 completed feature(s)' in output, got:\n%s", out)
 	}
 
-	// Completed plans should be gone
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1_completed.md")); !os.IsNotExist(err) {
-		t.Error("plan_1_completed.md should have been removed")
+	// Completed features should be gone
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")); !os.IsNotExist(err) {
+		t.Error("feature_001_completed.md should have been removed")
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_2_completed.md")); !os.IsNotExist(err) {
-		t.Error("plan_2_completed.md should have been removed")
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_002_completed.md")); !os.IsNotExist(err) {
+		t.Error("feature_002_completed.md should have been removed")
 	}
 
-	// Active plan should still exist
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_3.md")); err != nil {
-		t.Error("plan_3.md should still exist")
+	// Active feature should still exist
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_003.md")); err != nil {
+		t.Error("feature_003.md should still exist")
 	}
 }
 
@@ -111,7 +115,7 @@ func TestCleanRemovesCompletedRuns(t *testing.T) {
 
 func TestCleanDryRun(t *testing.T) {
 	dir := setupCleanDir(t)
-	writePlanFile(t, dir, "plan_1_completed.md", "# completed")
+	writeFeatureFile(t, dir, "feature_001_completed.md", "# completed")
 
 	finishedRunMd := "# Run Log\n\n## End\n"
 	writeRunDir(t, dir, "20260101-120000", finishedRunMd)
@@ -126,8 +130,8 @@ func TestCleanDryRun(t *testing.T) {
 	}
 
 	// Files should still exist
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1_completed.md")); err != nil {
-		t.Error("plan_1_completed.md should still exist in dry-run mode")
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")); err != nil {
+		t.Error("feature_001_completed.md should still exist in dry-run mode")
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".maggus", "runs", "20260101-120000")); err != nil {
 		t.Error("run directory should still exist in dry-run mode")
@@ -136,7 +140,7 @@ func TestCleanDryRun(t *testing.T) {
 
 func TestCleanNothingToClean(t *testing.T) {
 	dir := setupCleanDir(t)
-	writePlanFile(t, dir, "plan_1.md", "# active plan")
+	writeFeatureFile(t, dir, "feature_001.md", "# active feature")
 
 	out := runCleanCmd(t, dir)
 
@@ -174,20 +178,20 @@ func TestCleanKeepsInProgressRuns(t *testing.T) {
 
 func TestCleanDryRunShowsPaths(t *testing.T) {
 	dir := setupCleanDir(t)
-	writePlanFile(t, dir, "plan_5_completed.md", "# done")
+	writeFeatureFile(t, dir, "feature_005_completed.md", "# done")
 
 	out := runCleanCmd(t, dir, "--dry-run")
 
-	if !strings.Contains(out, "plan_5_completed.md") {
-		t.Errorf("expected plan filename in dry-run output, got:\n%s", out)
+	if !strings.Contains(out, "feature_005_completed.md") {
+		t.Errorf("expected feature filename in dry-run output, got:\n%s", out)
 	}
 }
 
-func TestCleanCombinedPlansAndRuns(t *testing.T) {
+func TestCleanCombinedFeaturesAndRuns(t *testing.T) {
 	dir := setupCleanDir(t)
-	writePlanFile(t, dir, "plan_1_completed.md", "# done 1")
-	writePlanFile(t, dir, "plan_2_completed.md", "# done 2")
-	writePlanFile(t, dir, "plan_3_completed.md", "# done 3")
+	writeFeatureFile(t, dir, "feature_001_completed.md", "# done 1")
+	writeFeatureFile(t, dir, "feature_002_completed.md", "# done 2")
+	writeFeatureFile(t, dir, "feature_003_completed.md", "# done 3")
 
 	writeRunDir(t, dir, "run-a", "# Run\n\n## End\n")
 	writeRunDir(t, dir, "run-b", "# Run\n\n## End\n")
@@ -195,8 +199,8 @@ func TestCleanCombinedPlansAndRuns(t *testing.T) {
 
 	out := runCleanCmd(t, dir)
 
-	if !strings.Contains(out, "3 completed plan(s)") {
-		t.Errorf("expected '3 completed plan(s)' in output, got:\n%s", out)
+	if !strings.Contains(out, "3 completed feature(s)") {
+		t.Errorf("expected '3 completed feature(s)' in output, got:\n%s", out)
 	}
 	if !strings.Contains(out, "2 run directory(ies)") {
 		t.Errorf("expected '2 run directory(ies)' in output, got:\n%s", out)

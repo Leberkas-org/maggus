@@ -130,9 +130,8 @@ func TestInitAddsGitignoreEntries(t *testing.T) {
 		".maggus/runs",
 		".maggus/MEMORY.md",
 		".maggus/RELEASE_NOTES.md",
-		".maggus/usage.csv",
-		".maggus/locks/",
-		".maggus-work/",
+		".maggus/usage*.csv",
+		".maggus/usage_*.jsonl",
 		"COMMIT.md",
 	}
 

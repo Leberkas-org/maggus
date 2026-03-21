@@ -4,10 +4,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-func TestPlanInfo_DoneCount(t *testing.T) {
+func TestFeatureInfo_DoneCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -53,7 +55,7 @@ func TestPlanInfo_DoneCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &planInfo{tasks: tt.tasks}
+			p := &featureInfo{tasks: tt.tasks}
 			got := p.doneCount()
 			if got != tt.want {
 				t.Errorf("doneCount() = %d, want %d", got, tt.want)
@@ -62,7 +64,7 @@ func TestPlanInfo_DoneCount(t *testing.T) {
 	}
 }
 
-func TestPlanInfo_BlockedCount(t *testing.T) {
+func TestFeatureInfo_BlockedCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -100,7 +102,7 @@ func TestPlanInfo_BlockedCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &planInfo{tasks: tt.tasks}
+			p := &featureInfo{tasks: tt.tasks}
 			got := p.blockedCount()
 			if got != tt.want {
 				t.Errorf("blockedCount() = %d, want %d", got, tt.want)
@@ -109,8 +111,8 @@ func TestPlanInfo_BlockedCount(t *testing.T) {
 	}
 }
 
-func TestBuildSelectableTasksForPlan(t *testing.T) {
-	plan := planInfo{
+func TestBuildSelectableTasksForFeature(t *testing.T) {
+	feature := featureInfo{
 		tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
@@ -119,7 +121,7 @@ func TestBuildSelectableTasksForPlan(t *testing.T) {
 	}
 
 	t.Run("showAll false excludes complete", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(plan, false)
+		got := buildSelectableTasksForFeature(feature, false)
 		if len(got) != 1 {
 			t.Fatalf("len = %d, want 1", len(got))
 		}
@@ -129,30 +131,30 @@ func TestBuildSelectableTasksForPlan(t *testing.T) {
 	})
 
 	t.Run("showAll true includes all", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(plan, true)
+		got := buildSelectableTasksForFeature(feature, true)
 		if len(got) != 3 {
 			t.Fatalf("len = %d, want 3", len(got))
 		}
 	})
 
-	t.Run("empty plan", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(planInfo{}, false)
+	t.Run("empty feature", func(t *testing.T) {
+		got := buildSelectableTasksForFeature(featureInfo{}, false)
 		if len(got) != 0 {
 			t.Errorf("len = %d, want 0", len(got))
 		}
 	})
 }
 
-func TestVisiblePlans(t *testing.T) {
-	plans := []planInfo{
+func TestVisibleFeatures(t *testing.T) {
+	plans := []featureInfo{
 		{filename: "plan_1.md", completed: false},
 		{filename: "plan_2_completed.md", completed: true},
 		{filename: "plan_3.md", completed: false},
 	}
 
 	t.Run("showAll false hides completed", func(t *testing.T) {
-		m := statusModel{plans: plans, showAll: false}
-		got := m.visiblePlans()
+		m := statusModel{features: plans, showAll: false}
+		got := m.visibleFeatures()
 		if len(got) != 2 {
 			t.Fatalf("len = %d, want 2", len(got))
 		}
@@ -162,16 +164,16 @@ func TestVisiblePlans(t *testing.T) {
 	})
 
 	t.Run("showAll true shows all", func(t *testing.T) {
-		m := statusModel{plans: plans, showAll: true}
-		got := m.visiblePlans()
+		m := statusModel{features: plans, showAll: true}
+		got := m.visibleFeatures()
 		if len(got) != 3 {
 			t.Fatalf("len = %d, want 3", len(got))
 		}
 	})
 
 	t.Run("no plans", func(t *testing.T) {
-		m := statusModel{plans: nil, showAll: false}
-		got := m.visiblePlans()
+		m := statusModel{features: nil, showAll: false}
+		got := m.visibleFeatures()
 		if len(got) != 0 {
 			t.Errorf("len = %d, want 0", len(got))
 		}
@@ -180,7 +182,7 @@ func TestVisiblePlans(t *testing.T) {
 
 func TestFindNextTask(t *testing.T) {
 	t.Run("finds first incomplete task", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -200,7 +202,7 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("skips completed plans", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1_completed.md",
 				completed: true,
@@ -223,7 +225,7 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("all complete returns empty", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -248,7 +250,7 @@ func TestFindNextTask(t *testing.T) {
 
 func TestRenderStatusPlain(t *testing.T) {
 	t.Run("basic output", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -264,7 +266,7 @@ func TestRenderStatusPlain(t *testing.T) {
 		out := sb.String()
 
 		// Header
-		if !strings.Contains(out, "1 plans (1 active), 3 tasks total") {
+		if !strings.Contains(out, "1 features (1 active), 3 tasks total") {
 			t.Error("missing header summary")
 		}
 		// Summary line
@@ -294,9 +296,9 @@ func TestRenderStatusPlain(t *testing.T) {
 		if !strings.Contains(out, "BLOCKED: dep") {
 			t.Error("missing blocked reason")
 		}
-		// Plans table
-		if !strings.Contains(out, "Plans") {
-			t.Error("missing Plans section")
+		// Features table
+		if !strings.Contains(out, "Features") {
+			t.Error("missing Features section")
 		}
 		if !strings.Contains(out, "plan_1.md") {
 			t.Error("missing plan filename in table")
@@ -304,7 +306,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan hidden when showAll false", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
@@ -325,7 +327,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan shown when showAll true", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
@@ -343,7 +345,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("ignored plan shown with marker", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_ignored.md", ignored: true, tasks: []parser.Task{
 				{ID: "TASK-001", Title: "Ign task", Ignored: true, SourceFile: "plan_1_ignored.md", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
@@ -365,13 +367,13 @@ func TestRenderStatusPlain(t *testing.T) {
 		renderStatusPlain(&sb, nil, false, "", "", "claude")
 		out := sb.String()
 
-		if !strings.Contains(out, "0 plans (0 active), 0 tasks total") {
-			t.Error("empty plans should show zero counts")
+		if !strings.Contains(out, "0 features (0 active), 0 tasks total") {
+			t.Error("empty features should show zero counts")
 		}
 	})
 
 	t.Run("plans table status labels", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_new.md", tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
@@ -403,7 +405,7 @@ func TestRenderStatusPlain(t *testing.T) {
 }
 
 func TestNewStatusModel(t *testing.T) {
-	plans := []planInfo{
+	plans := []featureInfo{
 		{
 			filename: "plan_1.md",
 			tasks: []parser.Task{
@@ -425,31 +427,31 @@ func TestNewStatusModel(t *testing.T) {
 			t.Error("showAll should be false")
 		}
 		// showAll=false should exclude complete tasks from selectable
-		if len(m.selectableTasks) != 1 {
-			t.Fatalf("selectableTasks len = %d, want 1", len(m.selectableTasks))
+		if len(m.Tasks) != 1 {
+			t.Fatalf("Tasks len = %d, want 1", len(m.Tasks))
 		}
-		if m.selectableTasks[0].ID != "TASK-002" {
-			t.Errorf("selectable[0].ID = %q, want TASK-002", m.selectableTasks[0].ID)
+		if m.Tasks[0].ID != "TASK-002" {
+			t.Errorf("Tasks[0].ID = %q, want TASK-002", m.Tasks[0].ID)
 		}
 	})
 
 	t.Run("showAll includes complete tasks", func(t *testing.T) {
 		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp")
-		if len(m.selectableTasks) != 2 {
-			t.Errorf("selectableTasks len = %d, want 2", len(m.selectableTasks))
+		if len(m.Tasks) != 2 {
+			t.Errorf("Tasks len = %d, want 2", len(m.Tasks))
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
 		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
-		if len(m.selectableTasks) != 0 {
-			t.Errorf("selectableTasks len = %d, want 0", len(m.selectableTasks))
+		if len(m.Tasks) != 0 {
+			t.Errorf("Tasks len = %d, want 0", len(m.Tasks))
 		}
 	})
 }
 
 func TestRebuildForSelectedPlan(t *testing.T) {
-	plans := []planInfo{
+	plans := []featureInfo{
 		{filename: "plan_1.md", tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
@@ -460,40 +462,42 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 	}
 
 	t.Run("selects correct plan tasks", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 1, showAll: false}
-		m.rebuildForSelectedPlan()
-		if len(m.selectableTasks) != 2 {
-			t.Fatalf("len = %d, want 2", len(m.selectableTasks))
+		m := statusModel{features: plans, selectedFeature: 1, showAll: false}
+		m.rebuildForSelectedFeature()
+		if len(m.Tasks) != 2 {
+			t.Fatalf("len = %d, want 2", len(m.Tasks))
 		}
-		if m.selectableTasks[0].ID != "TASK-010" {
-			t.Errorf("first task = %s, want TASK-010", m.selectableTasks[0].ID)
+		if m.Tasks[0].ID != "TASK-010" {
+			t.Errorf("first task = %s, want TASK-010", m.Tasks[0].ID)
 		}
 	})
 
 	t.Run("resets cursor", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 0, cursor: 5, scrollOffset: 3}
-		m.rebuildForSelectedPlan()
-		if m.cursor != 0 {
-			t.Errorf("cursor = %d, want 0", m.cursor)
+		m := statusModel{features: plans, selectedFeature: 0}
+		m.Cursor = 5
+		m.ScrollOffset = 3
+		m.rebuildForSelectedFeature()
+		if m.Cursor != 0 {
+			t.Errorf("Cursor = %d, want 0", m.Cursor)
 		}
-		if m.scrollOffset != 0 {
-			t.Errorf("scrollOffset = %d, want 0", m.scrollOffset)
+		if m.ScrollOffset != 0 {
+			t.Errorf("ScrollOffset = %d, want 0", m.ScrollOffset)
 		}
 	})
 
-	t.Run("out of bounds selectedPlan resets to 0", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 99}
-		m.rebuildForSelectedPlan()
-		if m.selectedPlan != 0 {
-			t.Errorf("selectedPlan = %d, want 0", m.selectedPlan)
+	t.Run("out of bounds selectedFeature resets to 0", func(t *testing.T) {
+		m := statusModel{features: plans, selectedFeature: 99}
+		m.rebuildForSelectedFeature()
+		if m.selectedFeature != 0 {
+			t.Errorf("selectedFeature = %d, want 0", m.selectedFeature)
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
-		m := statusModel{plans: nil}
-		m.rebuildForSelectedPlan()
-		if m.selectableTasks != nil {
-			t.Errorf("selectableTasks should be nil, got %v", m.selectableTasks)
+		m := statusModel{features: nil}
+		m.rebuildForSelectedFeature()
+		if m.Tasks != nil {
+			t.Errorf("Tasks should be nil, got %v", m.Tasks)
 		}
 	})
 }
@@ -501,29 +505,365 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 func TestEnsureCursorVisible(t *testing.T) {
 	// Use a model with fixed dimensions so visibleTaskLines returns a known value
 	m := statusModel{
-		width:  80,
-		height: 30,
-		cursor: 0,
+		taskListComponent: taskListComponent{
+			Width:       80,
+			Height:      30,
+			Cursor:      0,
+			HeaderLines: statusHeaderLines,
+		},
 	}
-	// Just verify it doesn't panic and scrollOffset stays reasonable
+	// Just verify it doesn't panic and ScrollOffset stays reasonable
 	m.ensureCursorVisible()
-	if m.scrollOffset < 0 {
-		t.Errorf("scrollOffset = %d, should not be negative", m.scrollOffset)
+	if m.ScrollOffset < 0 {
+		t.Errorf("ScrollOffset = %d, should not be negative", m.ScrollOffset)
 	}
 
 	// Cursor beyond visible range
-	m.cursor = 100
-	m.scrollOffset = 0
+	m.Cursor = 100
+	m.ScrollOffset = 0
 	m.ensureCursorVisible()
-	if m.scrollOffset <= 0 {
-		t.Errorf("scrollOffset should advance when cursor is beyond visible range, got %d", m.scrollOffset)
+	if m.ScrollOffset <= 0 {
+		t.Errorf("ScrollOffset should advance when cursor is beyond visible range, got %d", m.ScrollOffset)
 	}
 
-	// Cursor before scrollOffset
-	m.scrollOffset = 50
-	m.cursor = 10
+	// Cursor before ScrollOffset
+	m.ScrollOffset = 50
+	m.Cursor = 10
 	m.ensureCursorVisible()
-	if m.scrollOffset > m.cursor {
-		t.Errorf("scrollOffset (%d) should not exceed cursor (%d)", m.scrollOffset, m.cursor)
+	if m.ScrollOffset > m.Cursor {
+		t.Errorf("ScrollOffset (%d) should not exceed Cursor (%d)", m.ScrollOffset, m.Cursor)
+	}
+}
+
+func TestStatusModel_InitReturnsCmd(t *testing.T) {
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+	cmd := m.Init()
+	if cmd == nil {
+		t.Error("Init() should return a non-nil Cmd for async 2x fetch")
+	}
+}
+
+func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
+	plans := []featureInfo{
+		{filename: "plan_1.md", tasks: []parser.Task{
+			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
+		}},
+	}
+
+	t.Run("2x active sets is2x and BorderColor to Warning", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		msg := claude2xResultMsg{status: claude2x.Status{Is2x: true, TwoXWindowExpiresIn: "5h"}}
+		result, _ := m.Update(msg)
+		updated := result.(statusModel)
+		if !updated.is2x {
+			t.Error("is2x should be true")
+		}
+		if updated.BorderColor != styles.Warning {
+			t.Errorf("BorderColor = %q, want %q (Warning/yellow)", updated.BorderColor, styles.Warning)
+		}
+	})
+
+	t.Run("2x inactive keeps is2x false and BorderColor Primary", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		msg := claude2xResultMsg{status: claude2x.Status{Is2x: false}}
+		result, _ := m.Update(msg)
+		updated := result.(statusModel)
+		if updated.is2x {
+			t.Error("is2x should be false")
+		}
+		if updated.BorderColor != styles.Primary {
+			t.Errorf("BorderColor = %q, want %q (Primary/cyan)", updated.BorderColor, styles.Primary)
+		}
+	})
+}
+
+func TestStatusModel_ViewBorderColor(t *testing.T) {
+	plans := []featureInfo{
+		{filename: "plan_1.md", tasks: []parser.Task{
+			{ID: "TASK-001", Title: "Test", Criteria: []parser.Criterion{{Checked: false}}},
+		}},
+	}
+
+	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m.is2x = false
+		view := m.View()
+		// Verify the view renders without error and contains expected content
+		if !strings.Contains(view, "Status") {
+			t.Error("view should contain 'Status' header")
+		}
+		if !strings.Contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+	})
+
+	t.Run("2x view renders without error", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m.is2x = true
+		view := m.View()
+		if !strings.Contains(view, "Status") {
+			t.Error("view should contain 'Status' header")
+		}
+		if !strings.Contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+	})
+
+	t.Run("empty features view renders with 2x", func(t *testing.T) {
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+		m.is2x = true
+		view := m.View()
+		if !strings.Contains(view, "No features found") {
+			t.Error("empty view should contain 'No features found'")
+		}
+	})
+}
+
+func TestFindNextTask_BugsPrioritized(t *testing.T) {
+	t.Run("bugs before features", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		id, file := findNextTask(items)
+		if id != "BUG-001-001" {
+			t.Errorf("id = %q, want BUG-001-001 (bugs should be prioritized)", id)
+		}
+		if file != "bug_001.md" {
+			t.Errorf("file = %q, want bug_001.md", file)
+		}
+	})
+
+	t.Run("falls back to features when all bugs complete", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename:  "bug_001.md",
+				isBug:     true,
+				completed: true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: true}}},
+				},
+			},
+		}
+		id, _ := findNextTask(items)
+		if id != "TASK-001-001" {
+			t.Errorf("id = %q, want TASK-001-001", id)
+		}
+	})
+
+	t.Run("only bugs", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		id, _ := findNextTask(items)
+		if id != "BUG-001-001" {
+			t.Errorf("id = %q, want BUG-001-001", id)
+		}
+	})
+}
+
+func TestVisibleFeatures_WithBugs(t *testing.T) {
+	items := []featureInfo{
+		{filename: "feature_001.md"},
+		{filename: "bug_001.md", isBug: true},
+		{filename: "bug_002_completed.md", isBug: true, completed: true},
+	}
+
+	t.Run("showAll false hides completed bugs", func(t *testing.T) {
+		m := statusModel{features: items, showAll: false}
+		got := m.visibleFeatures()
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2", len(got))
+		}
+		if got[1].filename != "bug_001.md" {
+			t.Errorf("got %s, want bug_001.md", got[1].filename)
+		}
+	})
+
+	t.Run("showAll true shows completed bugs", func(t *testing.T) {
+		m := statusModel{features: items, showAll: true}
+		got := m.visibleFeatures()
+		if len(got) != 3 {
+			t.Fatalf("len = %d, want 3", len(got))
+		}
+	})
+}
+
+func TestRenderStatusPlain_WithBugs(t *testing.T) {
+	t.Run("mixed features and bugs", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", Title: "Feature task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+			{
+				filename: "bug_001.md",
+				isBug:    true,
+				tasks: []parser.Task{
+					{ID: "BUG-001-001", Title: "Bug task", SourceFile: "b", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		var sb strings.Builder
+		renderStatusPlain(&sb, items, false, "BUG-001-001", "b", "claude")
+		out := sb.String()
+
+		if !strings.Contains(out, "1 features (1 active)") {
+			t.Error("missing feature count in header")
+		}
+		if !strings.Contains(out, "1 bugs (1 active)") {
+			t.Error("missing bug count in header")
+		}
+		if !strings.Contains(out, "bug_001.md") {
+			t.Error("missing bug filename in tasks")
+		}
+		if !strings.Contains(out, "BUG-001-001") {
+			t.Error("missing bug task ID")
+		}
+	})
+
+	t.Run("no bugs omits bug count", func(t *testing.T) {
+		items := []featureInfo{
+			{
+				filename: "feature_001.md",
+				tasks: []parser.Task{
+					{ID: "TASK-001-001", Title: "Task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		}
+		var sb strings.Builder
+		renderStatusPlain(&sb, items, false, "TASK-001-001", "f", "claude")
+		out := sb.String()
+
+		if strings.Contains(out, "bugs") {
+			t.Error("should not mention bugs when there are none")
+		}
+	})
+}
+
+func TestNewStatusModel_WithBugs(t *testing.T) {
+	items := []featureInfo{
+		{
+			filename: "feature_001.md",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+		{
+			filename: "bug_001.md",
+			isBug:    true,
+			tasks: []parser.Task{
+				{ID: "BUG-001-001", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+	}
+
+	t.Run("tabs include bugs", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		visible := m.visibleFeatures()
+		if len(visible) != 2 {
+			t.Fatalf("visible features = %d, want 2", len(visible))
+		}
+		if !visible[1].isBug {
+			t.Error("second visible item should be a bug")
+		}
+	})
+
+	t.Run("navigation to bug tab", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m.selectedFeature = 1
+		m.rebuildForSelectedFeature()
+		if len(m.Tasks) != 1 {
+			t.Fatalf("Tasks len = %d, want 1", len(m.Tasks))
+		}
+		if m.Tasks[0].ID != "BUG-001-001" {
+			t.Errorf("Tasks[0].ID = %q, want BUG-001-001", m.Tasks[0].ID)
+		}
+	})
+}
+
+func TestStatusModel_ViewWithBugs(t *testing.T) {
+	items := []featureInfo{
+		{
+			filename: "feature_001.md",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Title: "Feature task", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+		{
+			filename: "bug_001.md",
+			isBug:    true,
+			tasks: []parser.Task{
+				{ID: "BUG-001-001", Title: "Bug task", Criteria: []parser.Criterion{{Checked: false}}},
+			},
+		},
+	}
+
+	t.Run("view renders bug tabs", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		view := m.View()
+		if !strings.Contains(view, "bug_001") {
+			t.Error("view should contain bug tab label")
+		}
+		if !strings.Contains(view, "feature_001") {
+			t.Error("view should contain feature tab label")
+		}
+	})
+
+	t.Run("view shows bug header counts", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		view := m.View()
+		if !strings.Contains(view, "1 bugs") {
+			t.Error("view header should show bug count")
+		}
+	})
+
+	t.Run("selected bug tab shows bug tasks", func(t *testing.T) {
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m.selectedFeature = 1
+		m.rebuildForSelectedFeature()
+		view := m.View()
+		if !strings.Contains(view, "BUG-001-001") {
+			t.Error("view should show bug task ID when bug tab is selected")
+		}
+	})
+}
+
+func TestRenderTabBar_BugSeparator(t *testing.T) {
+	items := []featureInfo{
+		{filename: "feature_001.md", tasks: []parser.Task{{ID: "T1"}}},
+		{filename: "bug_001.md", isBug: true, tasks: []parser.Task{{ID: "B1"}}},
+	}
+	m := statusModel{features: items, showAll: false}
+	m.Width = 120
+	bar := m.renderTabBar()
+	// The separator ┃ should appear between features and bugs
+	if !strings.Contains(bar, "┃") {
+		t.Error("tab bar should contain ┃ separator between features and bugs")
 	}
 }

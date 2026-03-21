@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -66,9 +67,11 @@ type configRow struct {
 	action  configAction // non-zero for action buttons
 	section string       // non-empty triggers a section header before this row
 	isSave  bool         // render with save style
+	display string       // non-empty = read-only display row (no cycling)
 }
 
-func (r configRow) isOption() bool { return r.values != nil }
+func (r configRow) isOption() bool  { return r.values != nil }
+func (r configRow) isDisplay() bool { return r.display != "" }
 
 // configResultMsg is sent after an async save/edit action completes.
 type configResultMsg struct {
@@ -77,18 +80,17 @@ type configResultMsg struct {
 }
 
 type configModel struct {
-	rows   []configRow
-	cursor int
-	action configAction
-	width  int
-	height int
-	dir    string // working directory for project config
-	// indices for buildConfig / saveGlobalConfig
-	globalAutoUpdateIdx int
-	// original project config (to preserve Include on save)
-	origInclude []string
-	// status feedback shown below the rows
-	statusText string
+	rows                  []configRow
+	cursor                int
+	action                configAction
+	width                 int
+	height                int
+	dir                   string
+	globalAutoUpdateIdx   int
+	origInclude           []string
+	origProtectedBranches []string
+	statusText            string
+	is2x                  bool
 }
 
 func newConfigModel(cfg config.Config, dir string) configModel {
@@ -102,6 +104,23 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	worktreeIdx := 1
 	if cfg.Worktree {
 		worktreeIdx = 0
+	}
+
+	autoBranchValues := []string{"on", "off"}
+	autoBranchIdx := 0
+	if !cfg.Git.IsAutoBranchEnabled() {
+		autoBranchIdx = 1
+	}
+
+	checkSyncValues := []string{"on", "off"}
+	checkSyncIdx := 0
+	if !cfg.Git.IsCheckSyncEnabled() {
+		checkSyncIdx = 1
+	}
+
+	protectedDisplay := strings.Join(cfg.Git.ProtectedBranchList(), ", ")
+	if len(protectedDisplay) > 40 {
+		protectedDisplay = protectedDisplay[:37] + "..."
 	}
 
 	soundValues := []string{"on", "off"}
@@ -141,6 +160,9 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Agent", values: agentValues, current: agentIdx, section: "Project"},
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
+		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
+		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
+		{label: "Protected branches", display: protectedDisplay},
 		{label: "Sound", values: soundValues, current: soundIdx},
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
 		{label: "  On run complete", values: runCompleteValues, current: runCompleteIdx},
@@ -165,10 +187,11 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	return configModel{
-		rows:                rows,
-		globalAutoUpdateIdx: globalAutoUpdateIdx,
-		dir:                 dir,
-		origInclude:         cfg.Include,
+		rows:                  rows,
+		globalAutoUpdateIdx:   globalAutoUpdateIdx,
+		dir:                   dir,
+		origInclude:           cfg.Include,
+		origProtectedBranches: cfg.Git.ProtectedBranchList(),
 	}
 }
 
@@ -209,6 +232,16 @@ func (m configModel) buildConfig() config.Config {
 		cfg.Notifications.OnError = &f
 	}
 
+	if m.optionByLabel("Auto-branch").values[m.optionByLabel("Auto-branch").current] == "off" {
+		f := false
+		cfg.Git.AutoBranch = &f
+	}
+	if m.optionByLabel("Check sync").values[m.optionByLabel("Check sync").current] == "off" {
+		f := false
+		cfg.Git.CheckSync = &f
+	}
+	cfg.Git.ProtectedBranches = m.origProtectedBranches
+
 	return cfg
 }
 
@@ -223,7 +256,11 @@ func (m configModel) saveGlobalConfig() error {
 	return saveGlobalSettings(settings)
 }
 
-func (m configModel) Init() tea.Cmd { return nil }
+func (m configModel) Init() tea.Cmd {
+	return func() tea.Msg {
+		return claude2xResultMsg{status: claude2x.FetchStatus()}
+	}
+}
 
 func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -231,6 +268,17 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
+		if m.is2x {
+			return m, next2xTick()
+		}
+		return m, nil
+	case claude2xTickMsg:
+		is2x, _, tickCmd := fetch2xAndUpdate()
+		m.is2x = is2x
+		return m, tickCmd
 
 	case configResultMsg:
 		if msg.err != nil {
@@ -391,6 +439,24 @@ func (m configModel) View() string {
 					valueStr,
 				)
 			}
+		} else if row.isDisplay() {
+			label := fmt.Sprintf("%-22s", row.label)
+			hint := mutedStyle.Render("(edit in config.yml)")
+			displayVal := mutedStyle.Render(row.display)
+			if i == m.cursor {
+				fmt.Fprintf(&sb, "  %s %s  %s  %s\n",
+					cursorStyle.Render("->"),
+					normalStyle.Render(label),
+					displayVal,
+					hint,
+				)
+			} else {
+				fmt.Fprintf(&sb, "     %s  %s  %s\n",
+					normalStyle.Render(label),
+					displayVal,
+					hint,
+				)
+			}
 		} else {
 			// Action button
 			btnStyle := normalStyle
@@ -418,10 +484,11 @@ func (m configModel) View() string {
 	content := sb.String()
 	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: exit")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreen(content, footer, m.width, m.height)
+		return styles.FullScreenColor(content, footer, m.width, m.height, borderColor)
 	}
-	return styles.Box.Render(content+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(content+"\n\n"+footer) + "\n"
 }
 
 func saveConfig(dir string, cfg config.Config) error {

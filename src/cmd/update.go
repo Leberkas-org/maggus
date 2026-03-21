@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/leberkas-org/maggus/internal/updater"
@@ -71,6 +72,8 @@ type updateModel struct {
 	autoUpdateIdx     int  // index into autoUpdateModes
 	autoUpdateOrigIdx int  // original index (to detect changes)
 	autoUpdateDirty   bool // true if user changed the setting
+
+	is2x bool // true when Claude is in 2x mode (border turns yellow)
 }
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -110,6 +113,9 @@ func (m updateModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.checkVersion,
 		updateTickCmd(),
+		func() tea.Msg {
+			return claude2xResultMsg{status: claude2x.FetchStatus()}
+		},
 	)
 }
 
@@ -140,6 +146,17 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case updateTickMsg:
 		m.frame = (m.frame + 1) % len(spinnerFrames)
 		return m, updateTickCmd()
+
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
+		if m.is2x {
+			return m, next2xTick()
+		}
+		return m, nil
+	case claude2xTickMsg:
+		is2x, _, tickCmd := fetch2xAndUpdate()
+		m.is2x = is2x
+		return m, tickCmd
 
 	case updateCheckMsg:
 		m.info = msg.info
@@ -476,10 +493,11 @@ func (m updateModel) View() string {
 
 	visible := strings.Join(visibleLines, "\n")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(visible, footer, m.width, m.height)
+		return styles.FullScreenLeftColor(visible, footer, m.width, m.height, borderColor)
 	}
-	return styles.Box.Render(visible) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(visible) + "\n"
 }
 
 var updateCmd = &cobra.Command{

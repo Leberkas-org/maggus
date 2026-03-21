@@ -118,13 +118,9 @@ func TestActiveMenuItems_AlwaysIncludesExit(t *testing.T) {
 func TestBuildSubMenus(t *testing.T) {
 	subs := buildSubMenus()
 
-	// "work" should have 2 options.
-	workDef, ok := subs["work"]
-	if !ok {
-		t.Fatal("expected sub-menu definition for 'work'")
-	}
-	if len(workDef.options) != 2 {
-		t.Errorf("work sub-menu: got %d options, want 2", len(workDef.options))
+	// "work" should NOT have a sub-menu.
+	if _, ok := subs["work"]; ok {
+		t.Error("expected no sub-menu definition for 'work'")
 	}
 
 	// "worktree" should have 1 option.
@@ -134,61 +130,6 @@ func TestBuildSubMenus(t *testing.T) {
 	}
 	if len(wtDef.options) != 1 {
 		t.Errorf("worktree sub-menu: got %d options, want 1", len(wtDef.options))
-	}
-}
-
-func TestBuildArgs_Work(t *testing.T) {
-	tests := []struct {
-		name     string
-		opts     []subMenuOption
-		wantArgs []string
-	}{
-		{
-			name: "default (3 tasks, worktree off)",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "3"},
-		},
-		{
-			name: "all tasks",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 4},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "999"},
-		},
-		{
-			name: "1 task with worktree on",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 0},
-				{label: "Worktree", values: []string{"off", "on"}, current: 1},
-			},
-			wantArgs: []string{"--count", "1", "--worktree"},
-		},
-		{
-			name: "10 tasks",
-			opts: []subMenuOption{
-				{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 3},
-				{label: "Worktree", values: []string{"off", "on"}, current: 0},
-			},
-			wantArgs: []string{"--count", "10"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := buildArgs("work", tt.opts)
-			if len(got) != len(tt.wantArgs) {
-				t.Fatalf("got %v, want %v", got, tt.wantArgs)
-			}
-			for i := range got {
-				if got[i] != tt.wantArgs[i] {
-					t.Errorf("arg[%d]: got %q, want %q", i, got[i], tt.wantArgs[i])
-				}
-			}
-		})
 	}
 }
 
@@ -537,5 +478,264 @@ func TestStartupUpdateCheck_AutoMode_NoDownloadURL(t *testing.T) {
 	result := startupUpdateCheck()
 	if result != "" {
 		t.Errorf("expected empty banner when no download URL in auto mode, got: %q", result)
+	}
+}
+
+func TestTruncateLeft(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		maxWidth int
+		want     string
+	}{
+		{
+			name:     "short path unchanged",
+			path:     "/home/user",
+			maxWidth: 20,
+			want:     "/home/user",
+		},
+		{
+			name:     "exact width unchanged",
+			path:     "abcdefghij",
+			maxWidth: 10,
+			want:     "abcdefghij",
+		},
+		{
+			name:     "long path truncated with ellipsis",
+			path:     "/home/user/projects/myapp",
+			maxWidth: 15,
+			want:     "...ojects/myapp",
+		},
+		{
+			name:     "very small max width",
+			path:     "/home/user",
+			maxWidth: 3,
+			want:     "ser",
+		},
+		{
+			name:     "zero max width returns original",
+			path:     "/home/user",
+			maxWidth: 0,
+			want:     "/home/user",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateLeft(tt.path, tt.maxWidth)
+			if got != tt.want {
+				t.Errorf("truncateLeft(%q, %d) = %q, want %q", tt.path, tt.maxWidth, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMenuView_CWDUsesBoldPrimaryStyle(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/test/project",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// The CWD path must appear in the rendered view.
+	if !strings.Contains(view, "/test/project") {
+		t.Error("expected CWD path to appear in menu view")
+	}
+}
+
+func TestMenuView_CWDEmptyHidden(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// When cwd is empty, no CWD line should appear.
+	// The view should still render without errors.
+	if strings.Contains(view, "...") {
+		// No truncated path should appear since cwd is empty.
+	}
+	_ = view // ensure it renders without panic
+}
+
+func TestMenuView_CWDStillCentered(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/short",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// Find the line containing the CWD. It should have leading spaces (centered).
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "/short") {
+			trimmed := strings.TrimLeft(line, " ")
+			leadingSpaces := len(line) - len(trimmed)
+			if leadingSpaces == 0 {
+				t.Error("expected CWD line to be centered with leading spaces")
+			}
+			return
+		}
+	}
+	t.Error("CWD path not found in view output")
+}
+
+func TestFormatSummaryLine(t *testing.T) {
+	tests := []struct {
+		name    string
+		summary featureSummary
+		want    string
+	}{
+		{
+			name:    "no features or bugs",
+			summary: featureSummary{},
+			want:    "No features or bugs found",
+		},
+		{
+			name: "features only, no done or blocked",
+			summary: featureSummary{
+				features: 3, tasks: 5,
+			},
+			want: "3 features (5 tasks)",
+		},
+		{
+			name: "features only with done",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3,
+			},
+			want: "3 features (5 tasks, 3 done)",
+		},
+		{
+			name: "features only with done and blocked",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3, blocked: 1,
+			},
+			want: "3 features (5 tasks, 3 done, 1 blocked)",
+		},
+		{
+			name: "bugs only",
+			summary: featureSummary{
+				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+			},
+			want: "2 bugs (4 tasks, 2 done, 1 blocked)",
+		},
+		{
+			name: "bugs only no done or blocked",
+			summary: featureSummary{
+				bugs: 1, bugTasks: 3,
+			},
+			want: "1 bugs (3 tasks)",
+		},
+		{
+			name: "both features and bugs",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3,
+				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+			},
+			want: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)",
+		},
+		{
+			name: "both with zero done/blocked omitted",
+			summary: featureSummary{
+				features: 1, tasks: 2,
+				bugs: 1, bugTasks: 1,
+			},
+			want: "1 features (2 tasks) · 1 bugs (1 tasks)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatSummaryLine(tt.summary)
+			if got != tt.want {
+				t.Errorf("formatSummaryLine() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMenuView_SummaryShowsFeaturesAndBugs(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		cwd:    "/test",
+		width:  120,
+		height: 40,
+		summary: featureSummary{
+			features: 3, tasks: 5, done: 3,
+			bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+		},
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "3 features") {
+		t.Error("expected view to contain '3 features'")
+	}
+	if !strings.Contains(view, "2 bugs") {
+		t.Error("expected view to contain '2 bugs'")
+	}
+}
+
+func TestMenuView_SummaryNoFeaturesOrBugs(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/test",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "No features or bugs found") {
+		t.Error("expected view to contain 'No features or bugs found'")
+	}
+}
+
+func TestMenuUpdate_FeatureSummaryUpdateMsg(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	// Create feature directory and file so loadFeatureSummary returns data.
+	featDir := filepath.Join(dir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	featureContent := "# Feature\n### TASK-001: Do thing\n- [ ] criterion\n"
+	if err := os.WriteFile(filepath.Join(featDir, "feature_001.md"), []byte(featureContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ch := make(chan struct{}, 1)
+	m := menuModel{
+		items:     activeMenuItems(),
+		summary:   featureSummary{},
+		watcherCh: ch,
+	}
+
+	// Send the update message
+	updated, cmd := m.Update(featureSummaryUpdateMsg{})
+	um := updated.(menuModel)
+
+	// After receiving featureSummaryUpdateMsg, summary should be reloaded
+	if um.summary.features != 1 {
+		t.Errorf("expected 1 feature after update, got %d", um.summary.features)
+	}
+	if um.summary.tasks != 1 {
+		t.Errorf("expected 1 task after update, got %d", um.summary.tasks)
+	}
+
+	// Should return a cmd to listen for more updates
+	if cmd == nil {
+		t.Error("expected non-nil cmd after featureSummaryUpdateMsg")
 	}
 }

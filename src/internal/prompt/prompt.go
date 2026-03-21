@@ -104,7 +104,7 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 		b.WriteString("Do not modify or switch branches — stay on your current branch.\n\n")
 	}
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
-	b.WriteString("Do NOT scan plan files to find a different task. Do NOT work on any other task.\n\n")
+	b.WriteString("Do NOT scan feature files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")
 	b.WriteString("If a criterion cannot be completed (missing dependency, needs human input, external blocker), mark it as:\n")
 	b.WriteString("  `- [x] ⚠️ BLOCKED: <original criterion text> — <reason>`\n")
@@ -113,8 +113,8 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	// Stage files but do NOT commit
 	b.WriteString("When you are done:\n")
 
-	// Update plan checkboxes
-	fmt.Fprintf(b, "1. Update the plan file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
+	// Update feature checkboxes
+	fmt.Fprintf(b, "1. Update the feature file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
 
 	b.WriteString("2. Stage all changed files with `git add *` but do NOT commit.\n")
 	b.WriteString("3. Write a commit message to `COMMIT.md` in the repository root. Include the task ID in the message.\n")
@@ -126,11 +126,14 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("   - Any deviations or skips from the acceptance criteria\n")
 
 	// Update project memory
-	b.WriteString("5. Create or update `.maggus/MEMORY.md` with any project knowledge gained during this task. ")
-	b.WriteString("This file serves as a portable project memory for consistency across machines. ")
-	b.WriteString("Include: project structure changes, build/tooling changes, new conventions, ")
-	b.WriteString("architectural decisions, and important file paths. ")
-	b.WriteString("Keep it concise and organized by topic. Do NOT commit this file.\n")
+	b.WriteString("5. Create or update `.maggus/MEMORY.md` only if something non-obvious was learned during this task. ")
+	b.WriteString("This file is a reference for future sessions — keep it architectural, not historical. ")
+	b.WriteString("ONLY add entries for: non-obvious platform quirks, gotchas discovered during implementation, ")
+	b.WriteString("important constraints or invariants that are not evident from reading the code, ")
+	b.WriteString("and cross-cutting architectural decisions with a non-obvious rationale. ")
+	b.WriteString("Do NOT record: completed task summaries, what files were changed, what tests were added, ")
+	b.WriteString("implementation details that are visible in the code, or anything already in CLAUDE.md. ")
+	b.WriteString("If nothing non-obvious was learned, skip this step entirely. Do NOT commit this file.\n")
 
 	// Append release notes
 	b.WriteString("6. Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. ")

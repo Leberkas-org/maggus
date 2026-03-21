@@ -1,43 +1,45 @@
-// Package usage appends per-task token usage records to .maggus/usage.csv.
+// Package usage appends per-task token usage records to .maggus/usage_work.jsonl.
 package usage
 
 import (
-	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/leberkas-org/maggus/internal/agent"
 )
 
-const fileName = ".maggus/usage.csv"
+const fileName = ".maggus/usage_work.jsonl"
 
 // Record represents a single task usage entry.
 type Record struct {
-	RunID        string
-	TaskID       string
-	TaskTitle    string
-	PlanFile     string
-	Model        string
-	Agent        string
-	InputTokens  int
-	OutputTokens int
-	StartTime    time.Time
-	EndTime      time.Time
+	RunID                    string                       `json:"run_id"`
+	TaskID                   string                       `json:"task_id"`
+	TaskTitle                string                       `json:"task_title"`
+	FeatureFile              string                       `json:"feature_file"`
+	Model                    string                       `json:"model"`
+	Agent                    string                       `json:"agent"`
+	InputTokens              int                          `json:"input_tokens"`
+	OutputTokens             int                          `json:"output_tokens"`
+	CacheCreationInputTokens int                          `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int                          `json:"cache_read_input_tokens"`
+	CostUSD                  float64                      `json:"cost_usd"`
+	ModelUsage               map[string]agent.ModelTokens `json:"model_usage"`
+	StartTime                time.Time                    `json:"start_time"`
+	EndTime                  time.Time                    `json:"end_time"`
 }
 
-// Append writes one or more usage records to .maggus/usage.csv, creating
-// the file with a header row if it does not exist.
+// Append writes one or more usage records as JSON Lines to .maggus/usage_work.jsonl.
 func Append(dir string, records []Record) error {
+	return AppendTo(filepath.Join(dir, fileName), records)
+}
+
+// AppendTo writes one or more usage records as JSON Lines to the given file path.
+func AppendTo(path string, records []Record) error {
 	if len(records) == 0 {
 		return nil
-	}
-
-	path := filepath.Join(dir, fileName)
-
-	// Check if file exists to decide whether to write the header.
-	writeHeader := false
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		writeHeader = true
 	}
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -46,50 +48,12 @@ func Append(dir string, records []Record) error {
 	}
 	defer f.Close()
 
-	w := csv.NewWriter(f)
-	defer w.Flush()
-
-	if writeHeader {
-		if err := w.Write(header()); err != nil {
-			return fmt.Errorf("write usage header: %w", err)
-		}
-	}
-
-	for _, r := range records {
-		elapsed := r.EndTime.Sub(r.StartTime).Truncate(time.Second)
-		row := []string{
-			r.RunID,
-			r.TaskID,
-			r.TaskTitle,
-			r.PlanFile,
-			r.Model,
-			r.Agent,
-			fmt.Sprintf("%d", r.InputTokens),
-			fmt.Sprintf("%d", r.OutputTokens),
-			r.StartTime.Format(time.RFC3339),
-			r.EndTime.Format(time.RFC3339),
-			elapsed.String(),
-		}
-		if err := w.Write(row); err != nil {
-			return fmt.Errorf("write usage row: %w", err)
+	enc := json.NewEncoder(f)
+	for i := range records {
+		if err := enc.Encode(records[i]); err != nil {
+			return fmt.Errorf("write usage record: %w", err)
 		}
 	}
 
 	return nil
-}
-
-func header() []string {
-	return []string{
-		"run_id",
-		"task_id",
-		"task_title",
-		"plan_file",
-		"model",
-		"agent",
-		"input_tokens",
-		"output_tokens",
-		"start_time",
-		"end_time",
-		"elapsed",
-	}
 }

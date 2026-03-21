@@ -11,4 +11,6 @@ docs/node_modules
 .maggus/locks/
 .maggus-work/
 .maggus/RELEASE_NOTES.md
-.maggus/usage.csv
+.maggus/usage*.jsonl
+.maggus/usage*.csv
+.maggus/usage_*.jsonl

@@ -203,6 +203,14 @@ func setupPlanDir(t *testing.T, dir string) {
 	}
 }
 
+func writePlanFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, ".maggus", name)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDetailState_PerformAction_Unblock(t *testing.T) {
 	dir := t.TempDir()
 	setupPlanDir(t, dir)

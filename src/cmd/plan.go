@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/session"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +33,7 @@ Examples:
   maggus plan Add OAuth2 authentication with Google provider
   maggus plan "Refactor the parser to support nested tasks"`,
 	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-plan"),
+	RunE: runSkillCommand("/maggus-plan", "usage_plan.jsonl"),
 }
 
 var visionCmd = &cobra.Command{
@@ -42,7 +47,7 @@ Examples:
   maggus vision A CLI tool for orchestrating AI agents
   maggus vision "Improve the vision for our e-commerce platform"`,
 	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-vision"),
+	RunE: runSkillCommand("/maggus-vision", "usage_vision.jsonl"),
 }
 
 var architectureCmd = &cobra.Command{
@@ -57,12 +62,14 @@ Examples:
   maggus architecture "Review and improve our current architecture"`,
 	Aliases: []string{"arch"},
 	Args:    cobra.MinimumNArgs(1),
-	RunE:    runSkillCommand("/maggus-architecture"),
+	RunE:    runSkillCommand("/maggus-architecture", "usage_architecture.jsonl"),
 }
 
 // runSkillCommand returns a cobra RunE that launches the configured agent
 // interactively with the given skill and the user's description as prompt.
-func runSkillCommand(skill string) func(cmd *cobra.Command, args []string) error {
+// If usageFile is non-empty, token usage is extracted from the session and
+// appended to .maggus/<usageFile> after the session ends.
+func runSkillCommand(skill, usageFile string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		description := strings.Join(args, " ")
 
@@ -88,18 +95,95 @@ func runSkillCommand(skill string) func(cmd *cobra.Command, args []string) error
 			}
 		}
 
+		resolvedModel := config.ResolveModel(cfg.Model)
+
 		prompt := fmt.Sprintf("%s %s", skill, description)
-		return launchInteractive(agentName, prompt)
+		info, err := launchInteractive(agentName, prompt, dir)
+
+		// Extract usage if a usage file is configured and we have session info.
+		if usageFile != "" && info != nil {
+			extractSkillUsage(dir, resolvedModel, agentName, usageFile, info)
+		}
+
+		return err
 	}
+}
+
+// extractSkillUsage detects the session file created during an interactive skill session,
+// extracts token usage, and appends a record to the specified usage file.
+// Errors are printed as warnings but never cause a non-zero exit.
+func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInfo) {
+	sessionFile, err := session.DetectSessionFile(dir, info.BeforeSnapshot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not detect session file: %v\n", err)
+		return
+	}
+	if sessionFile == "" {
+		fmt.Fprintln(os.Stderr, "Warning: no new Claude session file found; skipping usage extraction")
+		return
+	}
+
+	summary, err := session.ExtractUsage(sessionFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not extract usage from session: %v\n", err)
+		return
+	}
+
+	runID := info.StartTime.Format("20060102-150405")
+	usagePath := filepath.Join(dir, ".maggus", usageFile)
+
+	rec := usage.Record{
+		RunID:                    runID,
+		Model:                    model,
+		Agent:                    agentName,
+		InputTokens:              summary.InputTokens,
+		OutputTokens:             summary.OutputTokens,
+		CacheCreationInputTokens: summary.CacheCreationInputTokens,
+		CacheReadInputTokens:     summary.CacheReadInputTokens,
+		CostUSD:                  0,
+		ModelUsage:               summary.ModelUsage,
+		StartTime:                info.StartTime,
+		EndTime:                  info.EndTime,
+	}
+
+	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not write usage record: %v\n", err)
+	}
+}
+
+// SessionInfo holds timing and snapshot data from an interactive session,
+// allowing callers to extract usage from the detected session file afterward.
+type SessionInfo struct {
+	BeforeSnapshot map[string]bool
+	StartTime      time.Time
+	EndTime        time.Time
 }
 
 // launchInteractive launches the given agent CLI interactively with a prefilled prompt.
 // It connects stdin/stdout/stderr directly so the user has full control.
-func launchInteractive(agentName string, prompt string) error {
+// The dir parameter is the working directory used to locate the Claude session directory
+// for snapshotting. Session timing info is returned so callers can extract usage afterward.
+// Snapshotting errors are logged as warnings and do not prevent the session from launching.
+func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
 	path, err := exec.LookPath(agentName)
 	if err != nil {
-		return fmt.Errorf("%s not found on PATH: %w", agentName, err)
+		return nil, fmt.Errorf("%s not found on PATH: %w", agentName, err)
 	}
+
+	// Snapshot session directory before launching to detect new session files afterward.
+	sessionDir, sdErr := session.SessionDir(dir)
+	var beforeSnapshot map[string]bool
+	if sdErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not resolve session directory: %v\n", sdErr)
+	} else {
+		var snapErr error
+		beforeSnapshot, snapErr = session.SnapshotDir(sessionDir)
+		if snapErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not snapshot session directory: %v\n", snapErr)
+		}
+	}
+
+	startTime := time.Now()
 
 	// Launch interactively: pass prompt as positional arg (not -p).
 	cmd := exec.Command(path, prompt)
@@ -107,7 +191,40 @@ func launchInteractive(agentName string, prompt string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	// Forward interrupt signals to the child process by ignoring them in
+	// the parent — the terminal delivers SIGINT to the entire process group,
+	// so the agent receives it directly.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, shutdownSignals...)
+	defer signal.Stop(sigCh)
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start %s: %w", agentName, err)
+	}
+
+	waitErr := cmd.Wait()
+	endTime := time.Now()
+
+	signal.Stop(sigCh)
+
+	info := &SessionInfo{
+		BeforeSnapshot: beforeSnapshot,
+		StartTime:      startTime,
+		EndTime:        endTime,
+	}
+
+	if waitErr != nil {
+		// User-initiated exits (Ctrl+C or exit code 2) are not errors.
+		if cmd.ProcessState != nil {
+			code := cmd.ProcessState.ExitCode()
+			if code == 130 || code == 2 {
+				return info, nil
+			}
+		}
+		return info, fmt.Errorf("%s exited with error: %w", agentName, waitErr)
+	}
+
+	return info, nil
 }
 
 // pluginInfo represents a single entry from `claude plugin list --json`.

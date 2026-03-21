@@ -13,7 +13,7 @@ func newTestTask() *parser.Task {
 		ID:          "TASK-042",
 		Title:       "Implement the thing",
 		Description: "As a dev, I want the thing so it works.",
-		SourceFile:  ".maggus/plan_2.md",
+		SourceFile:  ".maggus/features/feature_002.md",
 		Criteria: []parser.Criterion{
 			{Text: "First criterion", Checked: false},
 			{Text: "Second criterion", Checked: true},
@@ -59,13 +59,13 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 
 		// Instructions
 		"Work ONLY on TASK-042: Implement the thing",
-		"Do NOT scan plan files to find a different task",
+		"Do NOT scan feature files to find a different task",
 		"verify that every acceptance criterion",
 		"Stage all changed files",
 		"do NOT commit",
 		"COMMIT.md",
-		"Update the plan file",
-		".maggus/plan_2.md",
+		"Update the feature file",
+		".maggus/features/feature_002.md",
 		"Write an iteration log",
 		"iteration-03.md",
 		"Task selected",
@@ -89,10 +89,10 @@ func TestBuild_NoBootstrap_OmitsBootstrapSection(t *testing.T) {
 	// Should NOT contain bootstrap section
 	bootstrapMarkers := []string{
 		"# Bootstrap",
-		"CLAUDE.md",
-		"AGENTS.md",
-		"PROJECT_CONTEXT.md",
-		"TOOLING.md",
+		"- CLAUDE.md",
+		"- AGENTS.md",
+		"- PROJECT_CONTEXT.md",
+		"- TOOLING.md",
 	}
 
 	for _, marker := range bootstrapMarkers {
@@ -252,6 +252,28 @@ func TestBuild_ContainsReleaseNotesInstruction(t *testing.T) {
 	}
 	if releaseIdx <= memoryIdx {
 		t.Error("step 6 (release notes) should appear after step 5 (MEMORY.md)")
+	}
+}
+
+func TestBuild_BugSourceFile_ReferencedCorrectly(t *testing.T) {
+	task := &parser.Task{
+		ID:          "BUG-001-001",
+		Title:       "Fix the crash",
+		Description: "The app crashes on startup.",
+		SourceFile:  ".maggus/bugs/bug_1.md",
+		Criteria: []parser.Criterion{
+			{Text: "Fix the crash", Checked: false},
+		},
+	}
+	opts := newTestOpts()
+	result := Build(task, opts)
+
+	// The prompt should reference the bug source file, not a feature file.
+	if !strings.Contains(result, ".maggus/bugs/bug_1.md") {
+		t.Errorf("prompt should reference bug source file .maggus/bugs/bug_1.md\n\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, "Update the feature file (`.maggus/bugs/bug_1.md`)") {
+		t.Errorf("prompt should instruct updating the bug source file\n\nGot:\n%s", result)
 	}
 }
 

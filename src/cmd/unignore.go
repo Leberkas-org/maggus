@@ -12,8 +12,8 @@ import (
 
 var unignoreCmd = &cobra.Command{
 	Use:          "unignore",
-	Short:        "Re-include ignored plans or tasks in the work loop",
-	Long:         `Unignore a plan or task so that it is picked up again by maggus work.`,
+	Short:        "Re-include ignored features or tasks in the work loop",
+	Long:         `Unignore a feature or task so that it is picked up again by maggus work.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
@@ -21,42 +21,42 @@ var unignoreCmd = &cobra.Command{
 	},
 }
 
-var unignorePlanCmd = &cobra.Command{
-	Use:   "plan <plan-id>",
-	Short: "Unignore a plan file",
-	Long:  `Renames plan_<N>_ignored.md back to plan_<N>.md so that it is included in the work loop again.`,
+var unignoreFeatureCmd = &cobra.Command{
+	Use:   "feature <feature-id>",
+	Short: "Unignore a feature file",
+	Long:  `Renames feature_<N>_ignored.md back to feature_<N>.md so that it is included in the work loop again.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
-		return runUnignorePlan(cmd, dir, args[0])
+		return runUnignoreFeature(cmd, dir, args[0])
 	},
 }
 
-func runUnignorePlan(cmd *cobra.Command, dir string, planID string) error {
-	file, state, err := findPlanFile(dir, planID)
+func runUnignoreFeature(cmd *cobra.Command, dir string, featureID string) error {
+	file, state, err := findFeatureFile(dir, featureID)
 	if err != nil {
 		return err
 	}
 
 	switch state {
-	case planStateNotFound:
-		cmd.PrintErrln(fmt.Sprintf("Error: plan %s not found", planID))
-		return fmt.Errorf("plan %s not found", planID)
-	case planStateCompleted:
-		cmd.PrintErrln(fmt.Sprintf("Error: cannot unignore a completed plan (plan %s)", planID))
-		return fmt.Errorf("cannot unignore a completed plan")
-	case planStateActive:
-		cmd.PrintErrln(fmt.Sprintf("Error: plan %s is not currently ignored", planID))
-		return fmt.Errorf("plan %s is not currently ignored", planID)
-	case planStateIgnored:
+	case featureStateNotFound:
+		cmd.PrintErrln(fmt.Sprintf("Error: feature %s not found", featureID))
+		return fmt.Errorf("feature %s not found", featureID)
+	case featureStateCompleted:
+		cmd.PrintErrln(fmt.Sprintf("Error: cannot unignore a completed feature (feature %s)", featureID))
+		return fmt.Errorf("cannot unignore a completed feature")
+	case featureStateActive:
+		cmd.PrintErrln(fmt.Sprintf("Error: feature %s is not currently ignored", featureID))
+		return fmt.Errorf("feature %s is not currently ignored", featureID)
+	case featureStateIgnored:
 		newName := strings.TrimSuffix(file, "_ignored.md") + ".md"
 		if err := os.Rename(file, newName); err != nil {
 			return fmt.Errorf("rename %s: %w", file, err)
 		}
-		cmd.Println(fmt.Sprintf("Unignored plan %s (%s → %s)", planID, filepath.Base(file), filepath.Base(newName)))
+		cmd.Println(fmt.Sprintf("Unignored feature %s (%s → %s)", featureID, filepath.Base(file), filepath.Base(newName)))
 		return nil
 	}
 
@@ -83,8 +83,8 @@ func runUnignoreTask(cmd *cobra.Command, dir string, taskID string) error {
 		taskID = "TASK-" + taskID
 	}
 
-	// Search all plan files (including ignored, excluding completed) for this task
-	files, err := parser.GlobPlanFiles(dir, false)
+	// Search all feature files (including ignored, excluding completed) for this task
+	files, err := parser.GlobFeatureFiles(dir, false)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func runUnignoreTask(cmd *cobra.Command, dir string, taskID string) error {
 }
 
 func init() {
-	unignoreCmd.AddCommand(unignorePlanCmd)
+	unignoreCmd.AddCommand(unignoreFeatureCmd)
 	unignoreCmd.AddCommand(unignoreTaskCmd)
 	rootCmd.AddCommand(unignoreCmd)
 }

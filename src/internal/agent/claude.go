@@ -138,9 +138,25 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 			case "result":
 				if event.Usage != nil {
 					p.Send(UsageMsg{
-						InputTokens:  event.Usage.InputTokens,
-						OutputTokens: event.Usage.OutputTokens,
+						InputTokens:              event.Usage.InputTokens,
+						OutputTokens:             event.Usage.OutputTokens,
+						CacheCreationInputTokens: event.Usage.CacheCreationInputTokens,
+						CacheReadInputTokens:     event.Usage.CacheReadInputTokens,
+						CostUSD:                  event.CostUSD,
 					})
+				}
+				if len(event.ModelUsage) > 0 {
+					models := make(map[string]ModelTokens, len(event.ModelUsage))
+					for name, entry := range event.ModelUsage {
+						models[name] = ModelTokens{
+							InputTokens:              entry.InputTokens,
+							OutputTokens:             entry.OutputTokens,
+							CacheCreationInputTokens: entry.CacheCreationInputTokens,
+							CacheReadInputTokens:     entry.CacheReadInputTokens,
+							CostUSD:                  entry.CostUSD,
+						}
+					}
+					p.Send(ModelUsageMsg{Models: models})
 				}
 				if event.Subtype == "success" {
 					p.Send(StatusMsg{Status: "Done"})
@@ -233,16 +249,28 @@ func (a *ClaudeAgent) RunOnce(ctx context.Context, prompt string, model string) 
 // Internal types for Claude Code's streaming JSON format.
 
 type streamEvent struct {
-	Type    string          `json:"type"`
-	Subtype string          `json:"subtype"`
-	Message json.RawMessage `json:"message"`
-	Result  string          `json:"result"`
-	Usage   *streamUsage    `json:"usage,omitempty"`
+	Type       string                     `json:"type"`
+	Subtype    string                     `json:"subtype"`
+	Message    json.RawMessage            `json:"message"`
+	Result     string                     `json:"result"`
+	Usage      *streamUsage               `json:"usage,omitempty"`
+	CostUSD    float64                    `json:"total_cost_usd"`
+	ModelUsage map[string]modelUsageEntry `json:"modelUsage,omitempty"`
 }
 
 type streamUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+}
+
+type modelUsageEntry struct {
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	CostUSD                  float64 `json:"costUSD"`
 }
 
 type assistantMessage struct {

@@ -1,21 +1,24 @@
 package usage
 
 import (
-	"encoding/csv"
+	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/leberkas-org/maggus/internal/agent"
 )
 
-func TestAppendCreatesFileWithHeader(t *testing.T) {
+func TestAppendCreatesFileWithJSONL(t *testing.T) {
 	dir := setupDir(t)
 	records := []Record{
 		{
 			RunID:        "run-1",
 			TaskID:       "TASK-001",
 			TaskTitle:    "First task",
-			PlanFile:     "plan_1.md",
+			FeatureFile:  "plan_1.md",
 			Model:        "opus",
 			Agent:        "claude",
 			InputTokens:  100,
@@ -29,27 +32,30 @@ func TestAppendCreatesFileWithHeader(t *testing.T) {
 		t.Fatalf("Append returned error: %v", err)
 	}
 
-	rows := readCSV(t, filepath.Join(dir, fileName))
-	if len(rows) != 2 {
-		t.Fatalf("expected 2 rows (header + 1 data), got %d", len(rows))
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
 
-	// First row should be the header.
-	wantHeader := header()
-	for i, col := range wantHeader {
-		if rows[0][i] != col {
-			t.Errorf("header[%d] = %q, want %q", i, rows[0][i], col)
-		}
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("line is not valid JSON: %v", err)
+	}
+	if rec.RunID != "run-1" {
+		t.Errorf("RunID = %q, want %q", rec.RunID, "run-1")
+	}
+	if rec.TaskID != "TASK-001" {
+		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-001")
 	}
 }
 
-func TestAppendDoesNotDuplicateHeader(t *testing.T) {
+func TestAppendMultipleCallsAppendsLines(t *testing.T) {
 	dir := setupDir(t)
 	rec := Record{
 		RunID:        "run-1",
 		TaskID:       "TASK-001",
 		TaskTitle:    "Task",
-		PlanFile:     "plan.md",
+		FeatureFile:  "plan.md",
 		Model:        "sonnet",
 		Agent:        "claude",
 		InputTokens:  10,
@@ -65,15 +71,17 @@ func TestAppendDoesNotDuplicateHeader(t *testing.T) {
 		t.Fatalf("second Append: %v", err)
 	}
 
-	rows := readCSV(t, filepath.Join(dir, fileName))
-	// Expect header + 2 data rows = 3 rows total.
-	if len(rows) != 3 {
-		t.Fatalf("expected 3 rows (header + 2 data), got %d", len(rows))
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(lines))
 	}
 
-	// Only the first row should be the header.
-	if rows[1][0] == "run_id" {
-		t.Error("second row is a duplicate header")
+	// Each line must be valid JSON.
+	for i, line := range lines {
+		var r Record
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Errorf("line %d is not valid JSON: %v", i, err)
+		}
 	}
 }
 
@@ -103,7 +111,7 @@ func TestAppendNilRecordsIsNoOp(t *testing.T) {
 	}
 }
 
-func TestAppendWritesCorrectColumns(t *testing.T) {
+func TestAppendWritesCorrectFields(t *testing.T) {
 	dir := setupDir(t)
 	start := time.Date(2026, 3, 15, 14, 30, 0, 0, time.UTC)
 	end := time.Date(2026, 3, 15, 14, 35, 45, 0, time.UTC)
@@ -113,7 +121,7 @@ func TestAppendWritesCorrectColumns(t *testing.T) {
 			RunID:        "run-42",
 			TaskID:       "TASK-007",
 			TaskTitle:    "Secret task",
-			PlanFile:     "plan_3.md",
+			FeatureFile:  "plan_3.md",
 			Model:        "claude-opus-4-6",
 			Agent:        "claude",
 			InputTokens:  5000,
@@ -127,65 +135,34 @@ func TestAppendWritesCorrectColumns(t *testing.T) {
 		t.Fatalf("Append returned error: %v", err)
 	}
 
-	rows := readCSV(t, filepath.Join(dir, fileName))
-	if len(rows) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(rows))
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
 
-	data := rows[1]
-	wantColumns := []string{
-		"run-42",
-		"TASK-007",
-		"Secret task",
-		"plan_3.md",
-		"claude-opus-4-6",
-		"claude",
-		"5000",
-		"3000",
-		start.Format(time.RFC3339),
-		end.Format(time.RFC3339),
-		"5m45s",
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
 	}
 
-	if len(data) != len(wantColumns) {
-		t.Fatalf("got %d columns, want %d", len(data), len(wantColumns))
+	if rec.RunID != "run-42" {
+		t.Errorf("RunID = %q, want %q", rec.RunID, "run-42")
 	}
-	for i, want := range wantColumns {
-		if data[i] != want {
-			t.Errorf("column %d (%s) = %q, want %q", i, header()[i], data[i], want)
-		}
+	if rec.TaskID != "TASK-007" {
+		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-007")
 	}
-}
-
-func TestElapsedTimeTruncatedToSeconds(t *testing.T) {
-	dir := setupDir(t)
-	// StartTime and EndTime differ by 2m30.999s — should truncate to 2m30s.
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2026, 1, 1, 0, 2, 30, 999_000_000, time.UTC)
-
-	records := []Record{
-		{
-			RunID:     "run-1",
-			TaskID:    "TASK-001",
-			StartTime: start,
-			EndTime:   end,
-		},
+	if rec.TaskTitle != "Secret task" {
+		t.Errorf("TaskTitle = %q, want %q", rec.TaskTitle, "Secret task")
 	}
-
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if rec.InputTokens != 5000 {
+		t.Errorf("InputTokens = %d, want 5000", rec.InputTokens)
 	}
-
-	rows := readCSV(t, filepath.Join(dir, fileName))
-	elapsed := rows[1][10] // elapsed is the last column
-	want := "2m30s"
-	if elapsed != want {
-		t.Errorf("elapsed = %q, want %q", elapsed, want)
+	if rec.OutputTokens != 3000 {
+		t.Errorf("OutputTokens = %d, want 3000", rec.OutputTokens)
 	}
 }
 
 func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
-	// Use a directory path that does not exist.
 	dir := filepath.Join(t.TempDir(), "nonexistent", "deep")
 
 	records := []Record{
@@ -203,6 +180,136 @@ func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
 	}
 }
 
+func TestAppendWritesCacheAndModelUsage(t *testing.T) {
+	dir := setupDir(t)
+	start := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 3, 20, 10, 5, 0, 0, time.UTC)
+
+	modelUsage := map[string]agent.ModelTokens{
+		"claude-opus-4-6[1m]": {
+			InputTokens:              3,
+			OutputTokens:             24,
+			CacheCreationInputTokens: 13055,
+			CacheReadInputTokens:     6692,
+			CostUSD:                  0.0855,
+		},
+	}
+
+	records := []Record{
+		{
+			RunID:                    "run-99",
+			TaskID:                   "TASK-008",
+			TaskTitle:                "Cache test",
+			FeatureFile:              "plan_2.md",
+			Model:                    "claude-opus-4-6",
+			Agent:                    "claude",
+			InputTokens:              3,
+			OutputTokens:             24,
+			CacheCreationInputTokens: 13055,
+			CacheReadInputTokens:     6692,
+			CostUSD:                  0.0855,
+			ModelUsage:               modelUsage,
+			StartTime:                start,
+			EndTime:                  end,
+		},
+	}
+
+	if err := Append(dir, records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+
+	if rec.CacheCreationInputTokens != 13055 {
+		t.Errorf("CacheCreationInputTokens = %d, want 13055", rec.CacheCreationInputTokens)
+	}
+	if rec.CacheReadInputTokens != 6692 {
+		t.Errorf("CacheReadInputTokens = %d, want 6692", rec.CacheReadInputTokens)
+	}
+	if rec.CostUSD != 0.0855 {
+		t.Errorf("CostUSD = %f, want 0.0855", rec.CostUSD)
+	}
+
+	opus, ok := rec.ModelUsage["claude-opus-4-6[1m]"]
+	if !ok {
+		t.Fatal("ModelUsage missing claude-opus-4-6[1m] entry")
+	}
+	if opus.InputTokens != 3 {
+		t.Errorf("model InputTokens = %d, want 3", opus.InputTokens)
+	}
+	if opus.OutputTokens != 24 {
+		t.Errorf("model OutputTokens = %d, want 24", opus.OutputTokens)
+	}
+	if opus.CacheCreationInputTokens != 13055 {
+		t.Errorf("model CacheCreationInputTokens = %d, want 13055", opus.CacheCreationInputTokens)
+	}
+	if opus.CacheReadInputTokens != 6692 {
+		t.Errorf("model CacheReadInputTokens = %d, want 6692", opus.CacheReadInputTokens)
+	}
+	if opus.CostUSD != 0.0855 {
+		t.Errorf("model CostUSD = %f, want 0.0855", opus.CostUSD)
+	}
+}
+
+func TestAppendWritesEmptyModelUsage(t *testing.T) {
+	dir := setupDir(t)
+	records := []Record{
+		{
+			RunID:     "run-1",
+			TaskID:    "TASK-001",
+			StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndTime:   time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
+		},
+	}
+
+	if err := Append(dir, records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+
+	if rec.ModelUsage != nil && len(rec.ModelUsage) != 0 {
+		t.Errorf("ModelUsage = %v, want nil or empty", rec.ModelUsage)
+	}
+}
+
+func TestEachLineIsIndependentlyParseable(t *testing.T) {
+	dir := setupDir(t)
+	records := []Record{
+		{RunID: "run-1", TaskID: "TASK-001", StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)},
+		{RunID: "run-2", TaskID: "TASK-002", StartTime: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 1, 2, 0, 0, time.UTC)},
+		{RunID: "run-3", TaskID: "TASK-003", StartTime: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 2, 3, 0, 0, time.UTC)},
+	}
+
+	if err := Append(dir, records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	lines := readJSONL(t, filepath.Join(dir, fileName))
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+
+	for i, line := range lines {
+		var rec Record
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Errorf("line %d is not independently parseable: %v", i, err)
+		}
+	}
+}
+
 // setupDir creates a temp dir with the .maggus subdirectory that Append expects.
 func setupDir(t *testing.T) string {
 	t.Helper()
@@ -213,18 +320,25 @@ func setupDir(t *testing.T) string {
 	return dir
 }
 
-// readCSV is a test helper that reads all rows from a CSV file.
-func readCSV(t *testing.T, path string) [][]string {
+// readJSONL reads all non-empty lines from a file.
+func readJSONL(t *testing.T, path string) []string {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
-		t.Fatalf("open CSV: %v", err)
+		t.Fatalf("open JSONL: %v", err)
 	}
 	defer f.Close()
 
-	rows, err := csv.NewReader(f).ReadAll()
-	if err != nil {
-		t.Fatalf("read CSV: %v", err)
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "" {
+			lines = append(lines, line)
+		}
 	}
-	return rows
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("read JSONL: %v", err)
+	}
+	return lines
 }

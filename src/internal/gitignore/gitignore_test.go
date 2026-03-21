@@ -31,31 +31,11 @@ func TestEnsureEntries_CreatesGitignoreWithAllEntries(t *testing.T) {
 	}
 }
 
-func TestEnsureEntries_IncludesMaggusWork(t *testing.T) {
-	dir := t.TempDir()
-
-	added, err := EnsureEntries(dir)
-	if err != nil {
-		t.Fatalf("EnsureEntries failed: %v", err)
-	}
-
-	found := false
-	for _, entry := range added {
-		if entry == ".maggus-work/" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected .maggus-work/ to be in added entries")
-	}
-}
-
 func TestEnsureEntries_DoesNotDuplicateExisting(t *testing.T) {
 	dir := t.TempDir()
 
 	// Pre-populate with some entries
-	initial := ".maggus/runs\n.maggus-work/\n"
+	initial := ".maggus/runs\nCOMMIT.md\n"
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(initial), 0644); err != nil {
 		t.Fatalf("failed to write initial .gitignore: %v", err)
 	}
@@ -65,9 +45,9 @@ func TestEnsureEntries_DoesNotDuplicateExisting(t *testing.T) {
 		t.Fatalf("EnsureEntries failed: %v", err)
 	}
 
-	// Should not re-add .maggus/runs or .maggus-work/
+	// Should not re-add .maggus/runs or COMMIT.md
 	for _, entry := range added {
-		if entry == ".maggus/runs" || entry == ".maggus-work/" {
+		if entry == ".maggus/runs" || entry == "COMMIT.md" {
 			t.Errorf("should not have re-added %q", entry)
 		}
 	}

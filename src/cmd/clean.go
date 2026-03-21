@@ -12,8 +12,8 @@ import (
 
 var cleanCmd = &cobra.Command{
 	Use:   "clean",
-	Short: "Remove completed plan files and finished run directories",
-	Long:  `Removes all _completed.md plan files from .maggus/ and run directories that have finished (contain an ## End section in run.md).`,
+	Short: "Remove completed feature files and finished run directories",
+	Long:  `Removes all _completed.md feature files from .maggus/features/ and run directories that have finished (contain an ## End section in run.md).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dryRun, err := cmd.Flags().GetBool("dry-run")
 		if err != nil {
@@ -32,7 +32,7 @@ var cleanCmd = &cobra.Command{
 func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 	out := cmd.OutOrStdout()
 
-	completedPlans, err := findCompletedPlans(dir)
+	completedFeatures, err := findCompletedFeatures(dir)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		return err
 	}
 
-	if len(completedPlans) == 0 && len(completedRuns) == 0 {
+	if len(completedFeatures) == 0 && len(completedRuns) == 0 {
 		fmt.Fprintln(out, "Nothing to clean.")
 		return nil
 	}
@@ -52,16 +52,16 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		fmt.Fprintln(out)
 	}
 
-	for _, p := range completedPlans {
+	for _, p := range completedFeatures {
 		rel, _ := filepath.Rel(dir, p)
 		if rel == "" {
 			rel = p
 		}
 		if dryRun {
-			fmt.Fprintf(out, "  plan: %s\n", filepath.ToSlash(rel))
+			fmt.Fprintf(out, "  feature: %s\n", filepath.ToSlash(rel))
 		} else {
 			if err := os.Remove(p); err != nil {
-				return fmt.Errorf("remove plan %s: %w", rel, err)
+				return fmt.Errorf("remove feature %s: %w", rel, err)
 			}
 		}
 	}
@@ -82,20 +82,20 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 
 	if dryRun {
 		fmt.Fprintln(out)
-		fmt.Fprintf(out, "Would remove %d completed plan(s), %d run directory(ies).\n", len(completedPlans), len(completedRuns))
+		fmt.Fprintf(out, "Would remove %d completed feature(s), %d run directory(ies).\n", len(completedFeatures), len(completedRuns))
 	} else {
-		fmt.Fprintf(out, "Removed %d completed plan(s), %d run directory(ies).\n", len(completedPlans), len(completedRuns))
+		fmt.Fprintf(out, "Removed %d completed feature(s), %d run directory(ies).\n", len(completedFeatures), len(completedRuns))
 	}
 
 	return nil
 }
 
-// findCompletedPlans returns paths to all _completed.md plan files in .maggus/.
-func findCompletedPlans(dir string) ([]string, error) {
-	pattern := filepath.Join(dir, ".maggus", "plan_*_completed.md")
+// findCompletedFeatures returns paths to all _completed.md feature files in .maggus/features/.
+func findCompletedFeatures(dir string) ([]string, error) {
+	pattern := filepath.Join(dir, ".maggus", "features", "feature_*_completed.md")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("glob completed plans: %w", err)
+		return nil, fmt.Errorf("glob completed features: %w", err)
 	}
 	return files, nil
 }

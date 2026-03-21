@@ -202,7 +202,7 @@ func TestFindAssetURL(t *testing.T) {
 		{"linux", "amd64", "https://example.com/linux_amd64"},
 		{"darwin", "arm64", "https://example.com/darwin_arm64"},
 		{"windows", "amd64", "https://example.com/windows_amd64"},
-		{"linux", "arm64", ""},  // not in assets
+		{"linux", "arm64", ""},   // not in assets
 		{"freebsd", "amd64", ""}, // unsupported OS
 	}
 	for _, tt := range tests {
@@ -215,9 +215,9 @@ func TestFindAssetURL(t *testing.T) {
 
 func TestParseSemver(t *testing.T) {
 	tests := []struct {
-		input                    string
-		major, minor, patch      int
-		ok                       bool
+		input               string
+		major, minor, patch int
+		ok                  bool
 	}{
 		{"v1.2.3", 1, 2, 3, true},
 		{"1.2.3", 1, 2, 3, true},

@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -109,22 +110,22 @@ type menuItem struct {
 }
 
 var allMenuItems = []menuItem{
-	// Group 1: Core workflow
-	{name: "work", desc: "Work on the next N tasks from the implementation plan", shortcut: 'w', shortcutLabel: "w"},
-	{name: "status", desc: "Show a compact summary of plan progress", shortcut: 's', shortcutLabel: "s"},
-	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
-	// Group 2: Repository management
-	{name: "repos", desc: "Manage configured repositories", separator: true, shortcut: 'r', shortcutLabel: "r"},
-	// Group 3: AI-assisted creation
-	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true, shortcut: 'v', shortcutLabel: "v"},
+	// Core workflow
+	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
+{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
+	{name: "repos", desc: "Manage configured repositories", shortcut: 'r', shortcutLabel: "r"},
+	// AI-assisted creation
+	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, separator: true, shortcut: 'o', shortcutLabel: "o"},
+	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, shortcut: 'v', shortcutLabel: "v"},
 	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true, shortcut: 'a', shortcutLabel: "a"},
 	{name: "plan", desc: "Create an implementation plan", requiresClaude: true, shortcut: 'p', shortcutLabel: "p"},
-	// Group 4: Project management
+	// Project management
+	{name: "release", desc: "Generate RELEASE.md with changelog", separator: true, shortcut: 'z', shortcutLabel: "z"},
+	{name: "clean", desc: "Remove completed features and finished runs", shortcut: 'n', shortcutLabel: "n"},
+	{name: "update", desc: "Check for and install updates", shortcut: 'u', shortcutLabel: "u"},
+	// Group 5: Confguration
 	{name: "config", desc: "Edit project settings", separator: true, shortcut: 'c', shortcutLabel: "c"},
 	{name: "worktree", desc: "Manage Maggus worktrees", shortcut: 't', shortcutLabel: "t"},
-	{name: "release", desc: "Generate RELEASE.md with changelog", shortcut: 'z', shortcutLabel: "z"},
-	{name: "clean", desc: "Remove completed plans and finished runs", shortcut: 'n', shortcutLabel: "n"},
-	{name: "update", desc: "Check for and install updates", shortcut: 'u', shortcutLabel: "u"},
 	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true, shortcut: 'i', shortcutLabel: "i"},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
@@ -175,10 +176,6 @@ type subMenuDef struct {
 // buildSubMenus returns sub-menu definitions keyed by command name.
 func buildSubMenus() map[string]subMenuDef {
 	return map[string]subMenuDef{
-		"work": {options: []subMenuOption{
-			{label: "Tasks", values: []string{"1", "3", "5", "10", "all"}, current: 1},
-			{label: "Worktree", values: []string{"off", "on"}, current: 0},
-		}},
 		"worktree": {options: []subMenuOption{
 			{label: "Action", values: []string{"list", "clean"}, current: 0},
 		}},
@@ -188,51 +185,94 @@ func buildSubMenus() map[string]subMenuDef {
 // buildArgs converts the sub-menu selections into CLI args for the command.
 func buildArgs(cmdName string, opts []subMenuOption) []string {
 	switch cmdName {
-	case "work":
-		var args []string
-		// Tasks option
-		if opts[0].values[opts[0].current] == "all" {
-			args = append(args, "--count", "999")
-		} else {
-			args = append(args, "--count", opts[0].values[opts[0].current])
-		}
-		// Worktree option
-		if opts[1].values[opts[1].current] == "on" {
-			args = append(args, "--worktree")
-		}
-		return args
 	case "worktree":
 		return []string{opts[0].values[opts[0].current]}
 	}
 	return nil
 }
 
-// planSummary holds the aggregated plan statistics for the menu header.
-type planSummary struct {
-	plans   int
-	tasks   int
-	done    int
-	blocked int
+// featureSummaryUpdateMsg is sent when the file watcher detects changes
+// to feature or bug files, triggering a summary reload.
+type featureSummaryUpdateMsg struct{}
+
+// featureSummary holds the aggregated feature and bug statistics for the menu header.
+type featureSummary struct {
+	features int
+	tasks    int
+	done     int
+	blocked  int
+
+	bugs        int
+	bugTasks    int
+	bugDone     int
+	bugBlocked  int
 }
 
-// loadPlanSummary computes plan statistics from the current working directory.
-func loadPlanSummary() planSummary {
+// loadFeatureSummary computes feature and bug statistics from the current working directory.
+func loadFeatureSummary() featureSummary {
 	dir, err := os.Getwd()
 	if err != nil {
-		return planSummary{}
+		return featureSummary{}
 	}
-	plans, err := parsePlans(dir)
-	if err != nil || len(plans) == 0 {
-		return planSummary{}
+
+	var s featureSummary
+
+	features, err := parseFeatures(dir)
+	if err == nil {
+		s.features = len(features)
+		for _, f := range features {
+			s.tasks += len(f.tasks)
+			s.done += f.doneCount()
+			s.blocked += f.blockedCount()
+		}
 	}
-	var s planSummary
-	s.plans = len(plans)
-	for _, p := range plans {
-		s.tasks += len(p.tasks)
-		s.done += p.doneCount()
-		s.blocked += p.blockedCount()
+
+	bugs, err := parseBugs(dir)
+	if err == nil {
+		s.bugs = len(bugs)
+		for _, b := range bugs {
+			s.bugTasks += len(b.tasks)
+			s.bugDone += b.doneCount()
+			s.bugBlocked += b.blockedCount()
+		}
 	}
+
 	return s
+}
+
+// formatSummaryLine builds the human-readable summary string for the menu header.
+// Format: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)"
+// Zero-count parts (done, blocked) are omitted for brevity.
+func formatSummaryLine(s featureSummary) string {
+	if s.features == 0 && s.bugs == 0 {
+		return "No features or bugs found"
+	}
+
+	var parts []string
+
+	if s.features > 0 {
+		detail := fmt.Sprintf("%d tasks", s.tasks)
+		if s.done > 0 {
+			detail += fmt.Sprintf(", %d done", s.done)
+		}
+		if s.blocked > 0 {
+			detail += fmt.Sprintf(", %d blocked", s.blocked)
+		}
+		parts = append(parts, fmt.Sprintf("%d features (%s)", s.features, detail))
+	}
+
+	if s.bugs > 0 {
+		detail := fmt.Sprintf("%d tasks", s.bugTasks)
+		if s.bugDone > 0 {
+			detail += fmt.Sprintf(", %d done", s.bugDone)
+		}
+		if s.bugBlocked > 0 {
+			detail += fmt.Sprintf(", %d blocked", s.bugBlocked)
+		}
+		parts = append(parts, fmt.Sprintf("%d bugs (%s)", s.bugs, detail))
+	}
+
+	return strings.Join(parts, " · ")
 }
 
 // menuModel is the bubbletea model for the interactive main menu.
@@ -242,7 +282,7 @@ type menuModel struct {
 	selected        string   // command name chosen by the user, empty if quit
 	args            []string // args to pass to the selected command
 	quitting        bool
-	summary         planSummary
+	summary         featureSummary
 	width           int
 	height          int
 	cwd             string // current working directory, shown in header
@@ -252,6 +292,10 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
+	// File watcher for live summary updates
+	watcher   *filewatcher.Watcher
+	watcherCh chan struct{}
+
 	// Sub-menu state
 	inSubMenu    bool
 	subCursor    int // cursor within sub-menu (options + Run item)
@@ -259,13 +303,39 @@ type menuModel struct {
 	activeSubDef *subMenuDef // pointer to the active sub-menu definition (with live option state)
 }
 
-func newMenuModel(summary planSummary) menuModel {
+func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
+
+	ch := make(chan struct{}, 1)
+	w, _ := filewatcher.New(cwd, func(_ any) {
+		select {
+		case ch <- struct{}{}:
+		default: // don't block if channel already has a pending update
+		}
+	}, 300*time.Millisecond)
+
 	return menuModel{
 		items:       activeMenuItems(),
 		summary:     summary,
 		cwd:         cwd,
 		subMenuDefs: buildSubMenus(),
+		watcher:     w,
+		watcherCh:   ch,
+	}
+}
+
+// listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
+// signals a file change, then delivers a featureSummaryUpdateMsg.
+func listenForWatcherUpdate(ch <-chan struct{}) tea.Cmd {
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		_, ok := <-ch
+		if !ok {
+			return nil // channel closed, watcher stopped
+		}
+		return featureSummaryUpdateMsg{}
 	}
 }
 
@@ -277,6 +347,7 @@ func (m menuModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return updateCheckResultMsg{banner: startupUpdateCheck()}
 		},
+		listenForWatcherUpdate(m.watcherCh),
 	)
 }
 
@@ -289,10 +360,22 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case claude2xResultMsg:
 		m.is2x = msg.status.Is2x
 		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
+		if m.is2x {
+			return m, next2xTick()
+		}
 		return m, nil
+	case claude2xTickMsg:
+		is2x, expiresIn, tickCmd := fetch2xAndUpdate()
+		m.is2x = is2x
+		m.twoXExpiresIn = expiresIn
+		return m, tickCmd
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
 		return m, nil
+	case featureSummaryUpdateMsg:
+		m.summary = loadFeatureSummary()
+		return m, listenForWatcherUpdate(m.watcherCh)
+
 	case hideShortcutsMsg:
 		// Only hide if this timer is still the latest one
 		if msg.timerID == m.shortcutTimerID {
@@ -384,6 +467,9 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	}
 	// No sub-menu — launch directly
 	m.selected = item.name
+	if item.name == "work" {
+		m.args = []string{"--count", "999"}
+	}
 	return m, tea.Quit
 }
 
@@ -466,21 +552,9 @@ func (m menuModel) View() string {
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
-	// Plan summary line
+	// Feature & bug summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	var summaryLine string
-	if m.summary.tasks == 0 {
-		summaryLine = mutedStyle.Render("No plans found")
-	} else {
-		greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
-		redStyle := lipgloss.NewStyle().Foreground(styles.Error)
-		summaryLine = fmt.Sprintf("%s · %s · %s · %s",
-			mutedStyle.Render(fmt.Sprintf("%d plans", m.summary.plans)),
-			mutedStyle.Render(fmt.Sprintf("%d tasks", m.summary.tasks)),
-			greenStyle.Render(fmt.Sprintf("%d done", m.summary.done)),
-			redStyle.Render(fmt.Sprintf("%d blocked", m.summary.blocked)),
-		)
-	}
+	summaryLine := mutedStyle.Render(formatSummaryLine(m.summary))
 
 	var body, footer string
 	if m.inSubMenu {
@@ -500,7 +574,7 @@ func (m menuModel) View() string {
 
 	// Show current working directory below the summary
 	if m.cwd != "" {
-		cwdStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		cwdStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
 		cwdDisplay := m.cwd
 		// Only truncate if this is a git repo and not the home directory.
 		if home, err := os.UserHomeDir(); err != nil || (m.cwd != home && isGitRepoCheck(m.cwd)) {
