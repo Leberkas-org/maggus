@@ -40,13 +40,13 @@ Currently, the 2x theme only affects the main menu (logo color + border). The st
 **Parallel:** yes — can run alongside TASK-002-001, TASK-002-003, TASK-002-004
 
 **Acceptance Criteria:**
-- [ ] `BannerInfo` already carries `TwoXExpiresIn` — use it to derive `is2x` state (non-empty = true)
-- [ ] `renderView()` uses `styles.ThemeColor(is2x)` as the default border color (replacing the hardcoded `styles.Primary`)
-- [ ] The existing "stop-after-task → yellow border" behavior is preserved (stop override still takes priority or combines naturally since both use `Warning`)
-- [ ] `renderBannerView()` also uses the 2x-aware border color
-- [ ] Non-border elements (spinner, tabs, task ID) remain cyan
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] `BannerInfo` already carries `TwoXExpiresIn` — use it to derive `is2x` state (non-empty = true)
+- [x] `renderView()` uses `styles.ThemeColor(is2x)` as the default border color (replacing the hardcoded `styles.Primary`)
+- [x] The existing "stop-after-task → yellow border" behavior is preserved (stop override still takes priority or combines naturally since both use `Warning`)
+- [x] `renderBannerView()` also uses the 2x-aware border color
+- [x] Non-border elements (spinner, tabs, task ID) remain cyan
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-002-003: Improve working directory visibility in the main menu
 **Description:** As a user, I want the working directory in the main menu to be more prominent so I can quickly confirm which project I'm working in.

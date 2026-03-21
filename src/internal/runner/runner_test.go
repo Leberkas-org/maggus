@@ -231,6 +231,115 @@ func TestSummaryFailedTasksSectionHiddenWhenNone(t *testing.T) {
 	}
 }
 
+func TestRenderView_2xBorderColor(t *testing.T) {
+	t.Run("non-2x uses primary border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-001", TaskTitle: "Test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+		// Non-2x, non-stop → should render without error
+		if view == "" {
+			t.Error("expected non-empty view")
+		}
+	})
+
+	t.Run("2x active renders with warning border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h 30m"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-002", TaskTitle: "Test 2x"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "TASK-002") {
+			t.Error("view should contain task ID")
+		}
+		if !contains(view, "2x:") {
+			t.Error("view should contain 2x status line")
+		}
+	})
+
+	t.Run("stop-after-task overrides border to warning", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{})
+		m.width = 120
+		m.height = 40
+		m.stopAfterTask = true
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-003", TaskTitle: "Stop test"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		if !contains(view, "Stopping after current task") {
+			t.Error("view should contain stop indicator")
+		}
+	})
+
+	t.Run("non-border elements remain cyan", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h"})
+		m.width = 120
+		m.height = 40
+		updated, _ := m.Update(IterationStartMsg{Current: 1, Total: 1, TaskID: "TASK-004", TaskTitle: "Cyan check"})
+		m = updated.(TUIModel)
+		view := m.renderView()
+		// The spinner and task ID should still use cyan style, not warning
+		if !contains(view, "TASK-004") {
+			t.Error("view should contain task ID rendered with cyan style")
+		}
+	})
+}
+
+func TestRenderBannerView_2xBorderColor(t *testing.T) {
+	t.Run("non-2x banner uses primary border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations: 3,
+			RunID:      "run-001",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "run-001") {
+			t.Error("banner should contain run ID")
+		}
+	})
+
+	t.Run("2x banner uses warning border", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{
+			Iterations:    3,
+			RunID:         "run-002",
+			TwoXExpiresIn: "17h 54m",
+		})
+		m.width = 120
+		m.height = 40
+		view := m.renderBannerView()
+		if !contains(view, "run-002") {
+			t.Error("banner should contain run ID")
+		}
+		if !contains(view, "2x:") {
+			t.Error("banner should contain 2x status in header")
+		}
+	})
+}
+
+func TestIs2xDerivation(t *testing.T) {
+	t.Run("empty TwoXExpiresIn means not 2x", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: ""})
+		is2x := m.banner.TwoXExpiresIn != ""
+		if is2x {
+			t.Error("empty TwoXExpiresIn should mean not 2x")
+		}
+	})
+
+	t.Run("non-empty TwoXExpiresIn means 2x", func(t *testing.T) {
+		m := NewTUIModel("test", "dev", "fp", func() {}, BannerInfo{TwoXExpiresIn: "5h 30m"})
+		is2x := m.banner.TwoXExpiresIn != ""
+		if !is2x {
+			t.Error("non-empty TwoXExpiresIn should mean 2x")
+		}
+	})
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }

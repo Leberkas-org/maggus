@@ -40,7 +40,9 @@ func (m TUIModel) renderBannerView() string {
 	footer := styles.StatusBar.Render("ctrl+c stop")
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
+		is2x := m.banner.TwoXExpiresIn != ""
+		borderColor := styles.ThemeColor(is2x)
+		return styles.FullScreenLeftColor(b.String(), footer, m.width, m.height, borderColor)
 	}
 	return styles.Box.Render(b.String()) + "\n"
 }
@@ -559,9 +561,11 @@ func (m TUIModel) renderView() string {
 		footer = styles.StatusBar.Render(strings.Join(footerParts, " · "))
 	}
 
-	// Use warning border color when stop-after-task is active or picker is shown
+	// Border color: 2x mode → yellow, stop-after-task → yellow, otherwise → cyan.
+	// Both 2x and stop use Warning, so they combine naturally.
 	if m.width > 0 && m.height > 0 {
-		borderColor := styles.Primary
+		is2x := m.banner.TwoXExpiresIn != ""
+		borderColor := styles.ThemeColor(is2x)
 		if m.stopAfterTask || m.showStopPicker {
 			borderColor = styles.Warning
 		}
