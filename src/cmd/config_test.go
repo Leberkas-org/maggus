@@ -48,8 +48,8 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
-	if len(opts) != 8 {
-		t.Fatalf("expected 8 option rows, got %d", len(opts))
+	if len(opts) != 10 {
+		t.Fatalf("expected 10 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
@@ -70,13 +70,23 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 		t.Errorf("worktree current = %d, want 1 (off)", opts[2].current)
 	}
 
+	// Auto-branch defaults to on (index 0)
+	if opts[3].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+	}
+
+	// Check sync defaults to on (index 0)
+	if opts[4].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
+	}
+
 	// Sound defaults to off (index 1)
-	if opts[3].current != 1 {
-		t.Errorf("sound current = %d, want 1 (off)", opts[3].current)
+	if opts[5].current != 1 {
+		t.Errorf("sound current = %d, want 1 (off)", opts[5].current)
 	}
 
 	// Notification sub-options default to on (index 0) when nil
-	for i := 4; i <= 6; i++ {
+	for i := 6; i <= 8; i++ {
 		if opts[i].current != 0 {
 			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
@@ -115,11 +125,19 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 	if opts[2].current != 0 {
 		t.Errorf("worktree current = %d, want 0 (on)", opts[2].current)
 	}
+	// Auto-branch defaults to on (index 0) — not set in config
 	if opts[3].current != 0 {
-		t.Errorf("sound current = %d, want 0 (on)", opts[3].current)
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+	}
+	// Check sync defaults to on (index 0) — not set in config
+	if opts[4].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
+	}
+	if opts[5].current != 0 {
+		t.Errorf("sound current = %d, want 0 (on)", opts[5].current)
 	}
 	// All notification sub-options set to false → off (index 1)
-	for i := 4; i <= 6; i++ {
+	for i := 6; i <= 8; i++ {
 		if opts[i].current != 1 {
 			t.Errorf("opts[%d].current = %d, want 1 (off)", i, opts[i].current)
 		}
@@ -190,6 +208,47 @@ func TestBuildConfig_CustomValues(t *testing.T) {
 	}
 	if result.Notifications.OnError == nil || *result.Notifications.OnError {
 		t.Error("OnError should be false")
+	}
+}
+
+func TestBuildConfig_GitSettings(t *testing.T) {
+	f := false
+	cfg := config.Config{
+		Agent: "claude",
+		Git: config.GitConfig{
+			AutoBranch:        &f,
+			CheckSync:         &f,
+			ProtectedBranches: []string{"main", "release"},
+		},
+	}
+	m := newConfigModel(cfg, "")
+	result := m.buildConfig()
+
+	if result.Git.AutoBranch == nil || *result.Git.AutoBranch {
+		t.Error("AutoBranch should be false")
+	}
+	if result.Git.CheckSync == nil || *result.Git.CheckSync {
+		t.Error("CheckSync should be false")
+	}
+	if len(result.Git.ProtectedBranches) != 2 || result.Git.ProtectedBranches[0] != "main" {
+		t.Errorf("ProtectedBranches = %v, want [main release]", result.Git.ProtectedBranches)
+	}
+}
+
+func TestBuildConfig_GitDefaults(t *testing.T) {
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
+	result := m.buildConfig()
+
+	// When on (default), git pointers should be nil
+	if result.Git.AutoBranch != nil {
+		t.Errorf("AutoBranch = %v, want nil", result.Git.AutoBranch)
+	}
+	if result.Git.CheckSync != nil {
+		t.Errorf("CheckSync = %v, want nil", result.Git.CheckSync)
+	}
+	// Protected branches should be preserved (defaults)
+	if len(result.Git.ProtectedBranches) != 3 {
+		t.Errorf("ProtectedBranches len = %d, want 3", len(result.Git.ProtectedBranches))
 	}
 }
 
@@ -351,6 +410,8 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 		"Agent",
 		"Model",
 		"Worktree",
+		"Auto-branch",
+		"Check sync",
 		"Sound",
 		"  On task complete",
 		"  On run complete",

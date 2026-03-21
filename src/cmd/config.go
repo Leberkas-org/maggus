@@ -79,12 +79,12 @@ type configResultMsg struct {
 }
 
 type configModel struct {
-	rows   []configRow
-	cursor int
-	action configAction
-	width  int
-	height int
-	dir    string
+	rows                  []configRow
+	cursor                int
+	action                configAction
+	width                 int
+	height                int
+	dir                   string
 	globalAutoUpdateIdx   int
 	origInclude           []string
 	origProtectedBranches []string
