@@ -13,6 +13,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Function variables for dependency injection in tests.
+var (
+	loadConfigFn       = config.Load
+	newAgentFn         = agent.New
+	ensureGitignoreFn  = gitignore.EnsureEntries
+	fingerprintGetFn   = fingerprint.Get
+	getwdFn            = os.Getwd
+)
+
 // workConfig holds all resolved configuration needed by the work loop.
 type workConfig struct {
 	count           int
@@ -46,13 +55,13 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 		count = n
 	}
 
-	dir, err := os.Getwd()
+	dir, err := getwdFn()
 	if err != nil {
 		return nil, fmt.Errorf("get working directory: %w", err)
 	}
 
 	// Load config
-	cfg, err := config.Load(dir)
+	cfg, err := loadConfigFn(dir)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -78,7 +87,7 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 	if agentFlag != "" {
 		agentName = agentFlag
 	}
-	activeAgent, err := agent.New(agentName)
+	activeAgent, err := newAgentFn(agentName)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +117,12 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 	}
 
 	// Ensure .gitignore has required entries
-	if _, err := gitignore.EnsureEntries(dir); err != nil {
+	if _, err := ensureGitignoreFn(dir); err != nil {
 		return nil, fmt.Errorf("check gitignore: %w", err)
 	}
 
 	// Get host fingerprint
-	hostFingerprint, _ := fingerprint.Get()
+	hostFingerprint, _ := fingerprintGetFn()
 	if hostFingerprint == "" {
 		hostFingerprint = "unknown"
 	}

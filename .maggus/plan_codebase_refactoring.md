@@ -183,11 +183,11 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want unit tests for `workSetup`, `checkSync`, and the task execution helpers so that orchestration changes are safe.
 
 **Acceptance Criteria:**
-- [ ] Tests for `workSetup`: verifies config resolution (model flag overrides config, agent flag overrides config, worktree flag precedence)
-- [ ] Tests for `checkSync`: verifies correct syncInfoMsg for various scenarios (no remote, behind remote, fetch failure, up to date)
-- [ ] Tests use test helpers or interfaces to avoid real git/filesystem operations where possible
-- [ ] All new tests pass: `go test ./cmd -v`
-- [ ] Existing tests still pass: `go test ./...`
+- [x] Tests for `workSetup`: verifies config resolution (model flag overrides config, agent flag overrides config, worktree flag precedence)
+- [x] Tests for `checkSync`: verifies correct syncInfoMsg for various scenarios (no remote, behind remote, fetch failure, up to date)
+- [x] Tests use test helpers or interfaces to avoid real git/filesystem operations where possible
+- [x] All new tests pass: `go test ./cmd -v`
+- [x] Existing tests still pass: `go test ./...`
 
 ### TASK-015: Final cleanup — verify line counts and run full test suite
 **Description:** As a developer, I want to verify that the refactoring achieved its goals and that the entire test suite passes.

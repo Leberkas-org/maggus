@@ -6,6 +6,13 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitsync"
 )
 
+// Function variables for dependency injection in tests.
+var (
+	fetchRemoteFn      = gitsync.FetchRemote
+	remoteStatusFn     = func(dir string) (gitsync.Status, error) { return gitsync.RemoteStatus(dir) }
+	workingTreeStatusFn = func(dir string) (gitsync.WorkTree, error) { return gitsync.WorkingTreeStatus(dir) }
+)
+
 // checkSync performs the pre-work git sync check. It fetches from the remote,
 // checks for uncommitted changes and diverged branches, and optionally shows
 // an interactive sync TUI if action is needed.
@@ -15,9 +22,9 @@ import (
 //   - shouldAbort: true if the user chose to abort from the sync TUI
 //   - err: non-nil only on unexpected errors (TUI failure, etc.)
 func checkSync(dir string) (syncInfoMsg string, shouldAbort bool, err error) {
-	fetchErr := gitsync.FetchRemote(dir)
-	remoteStatus, _ := gitsync.RemoteStatus(dir)
-	workTreeStatus, _ := gitsync.WorkingTreeStatus(dir)
+	fetchErr := fetchRemoteFn(dir)
+	remoteStatus, _ := remoteStatusFn(dir)
+	workTreeStatus, _ := workingTreeStatusFn(dir)
 
 	hasDirty := workTreeStatus.HasUncommittedChanges || workTreeStatus.HasUntrackedFiles
 	isBehind := remoteStatus.HasRemote && remoteStatus.Behind > 0
