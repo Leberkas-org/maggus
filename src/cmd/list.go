@@ -152,6 +152,7 @@ func renderListPlain(workable, ignored []parser.Task, all bool, agentName string
 	}
 	return sb.String()
 }
+
 var listCmd = &cobra.Command{
 	Use:   "list [N]",
 	Short: "Preview the next N upcoming workable tasks",

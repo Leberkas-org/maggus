@@ -160,13 +160,13 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the per-task execution logic (find next task, acquire lock, build prompt, invoke agent, parse results) extracted so the work loop body is concise.
 
 **Acceptance Criteria:**
-- [ ] New function or method that encapsulates the per-iteration body of the work loop (lines 410-590 in current code)
-- [ ] Handles: finding next task, acquiring lock, sending IterationStartMsg, building prompt, running agent, re-parsing plans, marking completed plans, staging plan renames
-- [ ] Returns a result struct indicating: success/failure, whether to continue/break, any warnings
-- [ ] The main loop in RunE calls this function and handles the result
-- [ ] `go test ./cmd -run TestWork` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New function or method that encapsulates the per-iteration body of the work loop (lines 410-590 in current code)
+- [x] Handles: finding next task, acquiring lock, sending IterationStartMsg, building prompt, running agent, re-parsing plans, marking completed plans, staging plan renames
+- [x] Returns a result struct indicating: success/failure, whether to continue/break, any warnings
+- [x] The main loop in RunE calls this function and handles the result
+- [x] `go test ./cmd -run TestWork` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-013: Extract commit and post-task logic into a completeTask function
 **Description:** As a developer, I want the commit handling and between-task sync check extracted from the work loop body.

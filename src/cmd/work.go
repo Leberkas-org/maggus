@@ -12,10 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
-	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/runtracker"
 	"github.com/leberkas-org/maggus/internal/tasklock"
@@ -303,185 +301,63 @@ Examples:
 					}
 				}
 
+				tc := taskContext{
+					workCtx:       workCtx,
+					p:             p,
+					run:           run,
+					activeAgent:   activeAgent,
+					resolvedModel: resolvedModel,
+					notifier:      notifier,
+					validIncludes: validIncludes,
+					useWorktree:   useWorktree,
+					repoDir:       repoDir,
+					workDir:       workDir,
+					runID:         run.ID,
+				}
+
 				for i := 0; i < count; i++ {
-					if workCtx.Err() != nil {
-						stopReason = runner.StopReasonInterrupted
-						break
-					}
 					// Check if user requested stop after previous task
 					if i > 0 && stopFlag.Load() {
 						stopReason = runner.StopReasonUserStop
 						break
 					}
 
-					// Find next workable task. --task targets a specific ID; otherwise pick next incomplete.
-					var next *parser.Task
-					if taskFlag != "" {
-						next = findTaskByID(tasks, taskFlag)
-					} else if useWorktree {
-						next = findNextUnlocked(tasks, repoDir)
-					} else {
-						next = parser.FindNextIncomplete(tasks)
+					result := runTask(tc, tasks, i, count)
+
+					// Update task list if re-parsed.
+					if result.tasks != nil {
+						tasks = result.tasks
 					}
-					if next == nil {
-						if completed == 0 {
+
+					// Accumulate failures and warnings.
+					if result.failed != nil {
+						failedTasks = append(failedTasks, *result.failed)
+					}
+					if result.warning != "" {
+						warnings = append(warnings, result.warning)
+					}
+					if result.committed {
+						completed++
+					}
+
+					switch result.action {
+					case taskBreak:
+						if result.stopReason != 0 {
+							stopReason = result.stopReason
+						} else if completed == 0 {
 							stopReason = runner.StopReasonNoTasks
 						}
+					case taskRetry:
+						i--
+						continue
+					case taskSkipToNext:
+						continue
+					case taskContinue:
+						// proceed normally
+					}
+
+					if result.action == taskBreak {
 						break
-					}
-
-					// Acquire task lock in worktree mode.
-					var lock tasklock.Lock
-					if useWorktree {
-						var lockErr error
-						lock, lockErr = tasklock.Acquire(repoDir, next.ID, run.ID)
-						if lockErr != nil {
-							// Another session grabbed it between check and acquire; retry.
-							i--
-							continue
-						}
-					}
-
-					// Signal iteration start to the TUI (resets per-iteration state).
-					// Convert parser criteria to runner criteria for the TUI.
-					tuiCriteria := make([]runner.TaskCriterion, len(next.Criteria))
-					for ci, c := range next.Criteria {
-						tuiCriteria[ci] = runner.TaskCriterion{
-							Text:    c.Text,
-							Checked: c.Checked,
-							Blocked: c.Blocked,
-						}
-					}
-					p.Send(runner.IterationStartMsg{
-						Current:         i + 1,
-						Total:           count,
-						TaskID:          next.ID,
-						TaskTitle:       next.Title,
-						PlanFile:        next.SourceFile,
-						TaskDescription: next.Description,
-						TaskCriteria:    tuiCriteria,
-					})
-
-					opts := prompt.Options{
-						NoBootstrap: noBootstrapFlag,
-						Include:     validIncludes,
-						RunID:       run.ID,
-						RunDir:      run.RelativeDir(workDir),
-						Iteration:   i + 1,
-						IterLog:     run.RelativeIterationLogPath(workDir, i+1),
-					}
-
-					builtPrompt := prompt.Build(next, opts)
-					if err := activeAgent.Run(workCtx, builtPrompt, resolvedModel, p); err != nil {
-						if useWorktree {
-							lock.Release()
-						}
-						if workCtx.Err() != nil {
-							stopReason = runner.StopReasonInterrupted
-							break
-						}
-						notifier.PlayError()
-						reason := err.Error()
-						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
-						p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
-						continue
-					}
-
-					// Re-parse to pick up any changes the agent made
-					if parsedTasks, parseErr := parser.ParsePlans(workDir); parseErr != nil {
-						if useWorktree {
-							lock.Release()
-						}
-						reason := fmt.Sprintf("re-parse plans: %v", parseErr)
-						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
-						continue
-					} else {
-						tasks = parsedTasks
-					}
-
-					// Rename fully completed plan files before committing
-					if markErr := parser.MarkCompletedPlans(workDir); markErr != nil {
-						// non-fatal
-					}
-
-					// Stage any plan renames so they are included in the commit
-					stagePlans := exec.Command("git", "add", "--", ".maggus/")
-					stagePlans.Dir = workDir
-					stagePlans.CombinedOutput() // ignore errors
-
-					// Commit using COMMIT.md
-					commitResult, commitErr := gitcommit.CommitIteration(workDir, next.ID+": "+next.Title)
-					if commitErr != nil {
-						if useWorktree {
-							lock.Release()
-						}
-						reason := commitErr.Error()
-						failedTasks = append(failedTasks, failedTask{ID: next.ID, Title: next.Title, Reason: reason})
-						p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", next.ID, reason)})
-						continue
-					}
-					if commitResult.Committed {
-						p.Send(runner.CommitMsg{Message: commitResult.Message})
-						notifier.PlayTaskComplete()
-						completed++
-					} else {
-						msg := commitResult.Message
-						if msg == "" {
-							msg = "commit skipped (unknown reason)"
-						}
-						w := fmt.Sprintf("%s: %s", next.ID, msg)
-						warnings = append(warnings, w)
-						p.Send(runner.InfoMsg{Text: "⚠ " + w})
-					}
-
-					// Release task lock after successful commit.
-					if useWorktree {
-						lock.Release()
-					}
-
-					// Update progress to reflect completed iteration.
-					p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
-
-					// Between-task sync check: detect if remote changed while working.
-					// Skip on the final iteration (push happens next anyway).
-					if i < count-1 {
-						if workCtx.Err() != nil {
-							break
-						}
-						fetchErr := gitsync.FetchRemote(workDir)
-						if fetchErr != nil {
-							// Fetch failed (offline) — warn and continue
-							p.Send(runner.InfoMsg{Text: "⚠ Could not reach remote between tasks — continuing offline"})
-						} else {
-							rs, rsErr := gitsync.RemoteStatus(workDir)
-							if rsErr == nil && rs.HasRemote && rs.Behind > 0 {
-								// Remote is ahead — show sync TUI and block until resolved
-								resultCh := make(chan runner.SyncCheckResult, 1)
-								p.Send(runner.SyncCheckMsg{
-									Behind:       rs.Behind,
-									Ahead:        rs.Ahead,
-									RemoteBranch: rs.RemoteBranch,
-									ResultCh:     resultCh,
-								})
-								// Wait for user's choice (or context cancellation)
-								select {
-								case result := <-resultCh:
-									if result.Action == runner.SyncAbort {
-										stopReason = runner.StopReasonInterrupted
-										break
-									}
-									if result.Message != "" {
-										p.Send(runner.InfoMsg{Text: result.Message})
-									}
-								case <-workCtx.Done():
-									stopReason = runner.StopReasonInterrupted
-								}
-								if stopReason == runner.StopReasonInterrupted {
-									break
-								}
-							}
-							// Up-to-date: continue without interruption
-						}
 					}
 				}
 
@@ -607,7 +483,7 @@ Examples:
 				result := tm.Result()
 				if result.RunAgain {
 					count = result.TaskCount
-					taskFlag = ""            // clear so next batch finds the next workable task
+					taskFlag = "" // clear so next batch finds the next workable task
 					workDir = dir // reset workDir for next iteration
 					continue
 				}
