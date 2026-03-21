@@ -135,6 +135,7 @@ Examples:
 
 		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
 		m.SetSyncDir(workDir)
+		m.SetWatcher(workDir)
 		setupUsageCallback(&m, dir, run, wc.modelDisplay, wc.activeAgent.Name())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
@@ -170,6 +171,7 @@ Examples:
 		})
 
 		_, tuiErr := p.Run()
+		m.CloseWatcher()
 		if tuiErr != nil {
 			return fmt.Errorf("TUI error: %w", tuiErr)
 		}

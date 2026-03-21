@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -134,11 +135,58 @@ type TUIModel struct {
 
 	// Sync check state (between-task remote sync)
 	sync syncState
+
+	// File watcher for live summary updates
+	watcher   *filewatcher.Watcher
+	watcherCh chan struct{}
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
 func (m *TUIModel) SetSyncDir(dir string) {
 	m.sync.dir = dir
+}
+
+// FileChangeMsg is sent when the file watcher detects changes to feature or bug files.
+type FileChangeMsg struct{}
+
+// SetWatcher configures a file watcher for live feature/bug file updates.
+// The watcher sends updates to an internal channel that the TUI listens on.
+func (m *TUIModel) SetWatcher(baseDir string) {
+	ch := make(chan struct{}, 1)
+	w, _ := filewatcher.New(baseDir, func(_ any) {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}, 300*time.Millisecond)
+
+	m.watcher = w
+	m.watcherCh = ch
+}
+
+// CloseWatcher stops the file watcher and releases associated resources.
+func (m *TUIModel) CloseWatcher() {
+	if m.watcher != nil {
+		m.watcher.Close()
+		close(m.watcherCh)
+		m.watcher = nil
+		m.watcherCh = nil
+	}
+}
+
+// listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
+// signals a file change, then delivers a FileChangeMsg.
+func listenForWatcherUpdate(ch <-chan struct{}) tea.Cmd {
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		_, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return FileChangeMsg{}
+	}
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
@@ -189,10 +237,14 @@ func (m TUIModel) StopAtTaskIDFlag() *atomic.Value {
 }
 
 func (m TUIModel) Init() tea.Cmd {
+	cmds := []tea.Cmd{tickCmd()}
 	if m.banner.TwoXExpiresIn != "" {
-		return tea.Batch(tickCmd(), next2xTick())
+		cmds = append(cmds, next2xTick())
 	}
-	return tickCmd()
+	if m.watcherCh != nil {
+		cmds = append(cmds, listenForWatcherUpdate(m.watcherCh))
+	}
+	return tea.Batch(cmds...)
 }
 
 func tickCmd() tea.Cmd {
@@ -284,6 +336,10 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case claude2xTickMsg:
 		cmd := m.handle2xTick()
 		return m, cmd
+
+	case FileChangeMsg:
+		// Re-listen for the next file change; actual re-parse is handled by TASK-004-002.
+		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case SyncCheckMsg, syncActionDoneMsg:
 		if handled, cmd := m.sync.handleSyncMsg(msg, &m.infoMessages); handled {

@@ -29,12 +29,12 @@ Bugs are prioritized over features (existing behavior). When a new bug file is a
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `TUIModel` gains a `watcher *filewatcher.Watcher` and `watcherCh chan struct{}` field (same pattern as the menu model)
-- [ ] The watcher is created in `NewTUIModel()` or via a `SetWatcher()` method, watching the work directory
-- [ ] `Init()` includes `listenForWatcherUpdate(m.watcherCh)` in its `tea.Batch`
-- [ ] `Update()` handles a file change message by triggering a live summary re-parse (see TASK-004-002)
-- [ ] The watcher is cleaned up when the TUI exits (no leaked goroutines or file handles)
-- [ ] `go vet ./...` passes
+- [x] `TUIModel` gains a `watcher *filewatcher.Watcher` and `watcherCh chan struct{}` field (same pattern as the menu model)
+- [x] The watcher is created in `NewTUIModel()` or via a `SetWatcher()` method, watching the work directory
+- [x] `Init()` includes `listenForWatcherUpdate(m.watcherCh)` in its `tea.Batch`
+- [x] `Update()` handles a file change message by triggering a live summary re-parse (see TASK-004-002)
+- [x] The watcher is cleaned up when the TUI exits (no leaked goroutines or file handles)
+- [x] `go vet ./...` passes
 
 ### TASK-004-002: Live progress bar and task count updates
 **Description:** As a user running `maggus work`, I want the progress bar and task counts to update live when feature or bug files are added or modified, so I can see the current state of the queue without waiting for the next task to start.
