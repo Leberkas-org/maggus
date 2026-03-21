@@ -15,21 +15,21 @@ const fileName = ".maggus/usage_work.jsonl"
 
 // Record represents a single task usage entry.
 type Record struct {
-	RunID                    string                      `json:"run_id"`
-	TaskID                   string                      `json:"task_id"`
-	TaskTitle                string                      `json:"task_title"`
-	PlanFile                 string                      `json:"plan_file"`
-	Model                    string                      `json:"model"`
-	Agent                    string                      `json:"agent"`
-	InputTokens              int                         `json:"input_tokens"`
-	OutputTokens             int                         `json:"output_tokens"`
-	CacheCreationInputTokens int                         `json:"cache_creation_input_tokens"`
-	CacheReadInputTokens     int                         `json:"cache_read_input_tokens"`
-	CostUSD                  float64                     `json:"cost_usd"`
+	RunID                    string                       `json:"run_id"`
+	TaskID                   string                       `json:"task_id"`
+	TaskTitle                string                       `json:"task_title"`
+	PlanFile                 string                       `json:"plan_file"`
+	Model                    string                       `json:"model"`
+	Agent                    string                       `json:"agent"`
+	InputTokens              int                          `json:"input_tokens"`
+	OutputTokens             int                          `json:"output_tokens"`
+	CacheCreationInputTokens int                          `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int                          `json:"cache_read_input_tokens"`
+	CostUSD                  float64                      `json:"cost_usd"`
 	ModelUsage               map[string]agent.ModelTokens `json:"model_usage"`
-	StartTime                time.Time                   `json:"start_time"`
-	EndTime                  time.Time                   `json:"end_time"`
-	Elapsed                  string                      `json:"elapsed"`
+	StartTime                time.Time                    `json:"start_time"`
+	EndTime                  time.Time                    `json:"end_time"`
+	Elapsed                  string                       `json:"elapsed"`
 }
 
 // Append writes one or more usage records as JSON Lines to .maggus/usage_work.jsonl.

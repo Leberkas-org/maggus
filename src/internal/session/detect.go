@@ -100,4 +100,3 @@ func DetectSessionFile(workDir string, before map[string]bool) (string, error) {
 
 	return newFiles[0], nil
 }
-
