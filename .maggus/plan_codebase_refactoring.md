@@ -76,12 +76,12 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the main `Update()` method to be a thin dispatcher that delegates to sub-components, reducing it from ~260 lines to ~80 lines.
 
 **Acceptance Criteria:**
-- [ ] `Update()` method in `tui.go` is reduced to a message router: check sync → check summary/done → handle key events → delegate message types to sub-components
-- [ ] No business logic remains inline in `Update()` switch cases — each case is a one-liner delegation
-- [ ] `tui.go` is under 700 lines (down from 1,656)
-- [ ] `go test ./internal/runner` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] `Update()` method in `tui.go` is reduced to a message router: check sync → check summary/done → handle key events → delegate message types to sub-components
+- [x] No business logic remains inline in `Update()` switch cases — each case is a one-liner delegation
+- [x] `tui.go` is under 700 lines (down from 1,656)
+- [x] `go test ./internal/runner` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-006: Extract shared TaskListComponent for list.go and status.go
 **Description:** As a developer, I want a reusable task-list browsing component that both `list` and `status` commands can embed, eliminating duplicated cursor/scroll/detail/criteria logic.
