@@ -95,16 +95,16 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a user, I want the stop picker to look clean and integrated with the existing TUI so that it feels like a native part of the work view.
 
 **Acceptance Criteria:**
-- [ ] The stop picker renders as an overlay or replaces the current tab content when active
-- [ ] Each option shows the task ID and title (truncated to fit the terminal width)
-- [ ] The currently selected option is highlighted (matching the existing TUI style)
-- [ ] "After current task" is the first option and is pre-selected
-- [ ] "Complete the plan" is the last option
-- [ ] The footer/status bar shows navigation hints (e.g. "↑/↓ select · enter confirm · esc cancel")
-- [ ] If a stop point was previously set, the picker highlights/marks that option
-- [ ] The stop indicator in the header/status bar shows the selected stop point while work continues
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] The stop picker renders as an overlay or replaces the current tab content when active
+- [x] Each option shows the task ID and title (truncated to fit the terminal width)
+- [x] The currently selected option is highlighted (matching the existing TUI style)
+- [x] "After current task" is the first option and is pre-selected
+- [x] "Complete the plan" is the last option
+- [x] The footer/status bar shows navigation hints (e.g. "↑/↓ select · enter confirm · esc cancel")
+- [x] If a stop point was previously set, the picker highlights/marks that option
+- [x] The stop indicator in the header/status bar shows the selected stop point while work continues
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-008: Clean Up Removed Code and Update Tests
 **Description:** As a developer, I want dead code from the old work sub-menu and run-again flow removed so that the codebase stays clean.
