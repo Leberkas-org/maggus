@@ -78,34 +78,12 @@ Examples:
 		workDir := dir
 
 		// Git sync check: detect remote changes and uncommitted work before starting.
-		syncDir := dir
-		var syncInfoMsg string
-
-		fetchErr := gitsync.FetchRemote(syncDir)
-		remoteStatus, _ := gitsync.RemoteStatus(syncDir)
-		workTreeStatus, _ := gitsync.WorkingTreeStatus(syncDir)
-
-		hasDirty := workTreeStatus.HasUncommittedChanges || workTreeStatus.HasUntrackedFiles
-		isBehind := remoteStatus.HasRemote && remoteStatus.Behind > 0
-
-		if !remoteStatus.HasRemote {
-			// No remote configured: silently skip
-		} else if isBehind || hasDirty {
-			// Behind remote or uncommitted changes: show interactive sync TUI
-			result, syncErr := runGitSyncTUI(syncDir)
-			if syncErr != nil {
-				return syncErr
-			}
-			if result.action == syncAbort {
-				return nil
-			}
-			if result.message != "" {
-				syncInfoMsg = result.message
-			}
-		} else if fetchErr != nil {
-			syncInfoMsg = "⚠ Could not reach remote — working offline"
-		} else {
-			syncInfoMsg = fmt.Sprintf("✓ Branch up to date with %s", remoteStatus.RemoteBranch)
+		syncInfoMsg, shouldAbort, syncErr := checkSync(dir)
+		if syncErr != nil {
+			return syncErr
+		}
+		if shouldAbort {
+			return nil
 		}
 
 		// Run-again loop: allows the user to start another batch from the summary screen.

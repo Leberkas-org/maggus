@@ -149,12 +149,12 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the pre-work git sync check logic extracted so it's independently testable and doesn't clutter RunE.
 
 **Acceptance Criteria:**
-- [ ] New function `checkSync(dir string) (syncInfoMsg string, shouldAbort bool, err error)` in `work.go` or `work_sync.go`
-- [ ] Function encapsulates: `gitsync.FetchRemote()`, `gitsync.RemoteStatus()`, `gitsync.WorkingTreeStatus()`, the interactive sync TUI call, and the result interpretation
-- [ ] RunE's sync check block (lines 162-191 in current code) is replaced by a single `checkSync()` call
-- [ ] `go test ./cmd -run TestWork` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New function `checkSync(dir string) (syncInfoMsg string, shouldAbort bool, err error)` in `work.go` or `work_sync.go`
+- [x] Function encapsulates: `gitsync.FetchRemote()`, `gitsync.RemoteStatus()`, `gitsync.WorkingTreeStatus()`, the interactive sync TUI call, and the result interpretation
+- [x] RunE's sync check block (lines 162-191 in current code) is replaced by a single `checkSync()` call
+- [x] `go test ./cmd -run TestWork` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-012: Extract task execution into a runTask function
 **Description:** As a developer, I want the per-task execution logic (find next task, acquire lock, build prompt, invoke agent, parse results) extracted so the work loop body is concise.
