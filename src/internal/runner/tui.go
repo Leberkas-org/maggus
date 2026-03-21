@@ -189,6 +189,9 @@ func (m TUIModel) StopAtTaskIDFlag() *atomic.Value {
 }
 
 func (m TUIModel) Init() tea.Cmd {
+	if m.banner.TwoXExpiresIn != "" {
+		return tea.Batch(tickCmd(), next2xTick())
+	}
 	return tickCmd()
 }
 
@@ -277,6 +280,10 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case CommitMsg:
 		m.handleCommitMsg(msg)
+
+	case claude2xTickMsg:
+		cmd := m.handle2xTick()
+		return m, cmd
 
 	case SyncCheckMsg, syncActionDoneMsg:
 		if handled, cmd := m.sync.handleSyncMsg(msg, &m.infoMessages); handled {
