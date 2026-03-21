@@ -3,7 +3,9 @@ package claude2x
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -16,10 +18,63 @@ type Status struct {
 	TwoXWindowExpiresInSeconds int    `json:"2xWindowExpiresInSeconds"`
 }
 
-// FetchStatus performs a GET request to the isclaude2x API and returns the parsed status.
+var (
+	once        sync.Once
+	cached      Status
+	fetchedAt   time.Time
+	urlOverride string
+)
+
+// FetchStatus performs a GET request to the isclaude2x API at most once per process lifetime.
+// Subsequent calls compute the current status from the cached result and elapsed time.
 // On any error (network, parse, non-200 status), it returns a zero-value Status with Is2x: false.
 func FetchStatus() Status {
-	return fetchFromURL(apiURL)
+	once.Do(func() {
+		url := apiURL
+		if urlOverride != "" {
+			url = urlOverride
+		}
+		cached = fetchFromURL(url)
+		fetchedAt = time.Now()
+	})
+	return computeStatus()
+}
+
+func computeStatus() Status {
+	if !cached.Is2x {
+		return Status{}
+	}
+	remaining := cached.TwoXWindowExpiresInSeconds - int(time.Since(fetchedAt).Seconds())
+	if remaining <= 0 {
+		return Status{Is2x: false}
+	}
+	return Status{
+		Is2x:                       true,
+		TwoXWindowExpiresInSeconds: remaining,
+		TwoXWindowExpiresIn:        formatRemaining(remaining),
+	}
+}
+
+func formatRemaining(seconds int) string {
+	h := seconds / 3600
+	m := (seconds % 3600) / 60
+	s := seconds % 60
+
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	case m > 0:
+		return fmt.Sprintf("%dm %ds", m, s)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
+}
+
+func resetCache() {
+	once = sync.Once{}
+	cached = Status{}
+	fetchedAt = time.Time{}
+	urlOverride = ""
 }
 
 func fetchFromURL(url string) Status {

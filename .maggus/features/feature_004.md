@@ -23,28 +23,28 @@ Replace the per-TUI-open API calls to `isclaude2x.com` with a single lazy-cached
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] A package-level `sync.Once` ensures the HTTP fetch runs at most once per process lifetime
-- [ ] The raw `Status` and the `time.Time` of the fetch are stored in unexported package-level vars
-- [ ] `FetchStatus()` public signature is unchanged — callers require no modification
-- [ ] `FetchStatus()` triggers the lazy fetch via `sync.Once`, then delegates to an internal `computeStatus()` that returns a freshly derived `Status`:
+- [x] A package-level `sync.Once` ensures the HTTP fetch runs at most once per process lifetime
+- [x] The raw `Status` and the `time.Time` of the fetch are stored in unexported package-level vars
+- [x] `FetchStatus()` public signature is unchanged — callers require no modification
+- [x] `FetchStatus()` triggers the lazy fetch via `sync.Once`, then delegates to an internal `computeStatus()` that returns a freshly derived `Status`:
   - If original `Is2x` was `false` (or fetch failed), return `Status{}` as before
   - Otherwise compute `remaining = TwoXWindowExpiresInSeconds - int(time.Since(fetchedAt).Seconds())`
   - If `remaining <= 0`: return `Status{Is2x: false}`
   - Else: return `Status{Is2x: true, TwoXWindowExpiresInSeconds: remaining, TwoXWindowExpiresIn: formatRemaining(remaining)}`
-- [ ] `formatRemaining(seconds int) string` produces a human-readable string matching the API format, e.g.:
+- [x] `formatRemaining(seconds int) string` produces a human-readable string matching the API format, e.g.:
   - 64484s → `"17h 54m 44s"`
   - 3723s → `"1h 2m 3s"`
   - 125s → `"2m 5s"`
   - 45s → `"45s"`
   - Omit zero components (no `"0h"` prefix), except when only seconds remain
-- [ ] An unexported `resetCache()` function exists for use in tests (resets `sync.Once` and cached vars)
-- [ ] Existing tests (`TestFetchStatus_*`) are updated to use a test server + `resetCache()` so they still exercise the real HTTP path
-- [ ] New tests cover:
+- [x] An unexported `resetCache()` function exists for use in tests (resets `sync.Once` and cached vars)
+- [x] Existing tests (`TestFetchStatus_*`) are updated to use a test server + `resetCache()` so they still exercise the real HTTP path
+- [x] New tests cover:
   - `TestComputeStatus_StillActive`: cache set with 3600s remaining, 30 min elapsed → `Is2x=true`, remaining ≈ 1800s, formatted correctly
   - `TestComputeStatus_Expired`: cache set with 10s remaining, 11+ seconds elapsed → `Is2x=false`
   - `TestComputeStatus_WasNot2x`: original `Is2x=false` → always returns `Status{}`
   - `TestFormatRemaining_*`: covers hours+min+sec, min+sec only, sec only
-- [ ] `go fmt ./...` and `go vet ./...` pass
+- [x] `go fmt ./...` and `go vet ./...` pass
 
 ### TASK-004-002: Add per-second ticker to TUI models when 2x is active
 **Description:** As a user, I want the 2x countdown in the TUI border/header to count down in real time without the app making repeated API calls, so I always see an accurate remaining time.
