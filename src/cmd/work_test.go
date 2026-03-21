@@ -170,10 +170,10 @@ func TestIsTaskAtOrPastTarget(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		completed   string
-		target      string
-		want        bool
+		name      string
+		completed string
+		target    string
+		want      bool
 	}{
 		{"completed equals target", "TASK-002", "TASK-002", true},
 		{"completed after target", "TASK-003", "TASK-002", true},

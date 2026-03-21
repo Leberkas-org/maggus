@@ -307,7 +307,7 @@ var (
 )
 
 // handleSummaryKeys, renderSummaryView, renderSummaryMenu are defined in tui_summary.go.
-// handleKeyMsg, handleStopConfirmation, handleDetailScroll, handleTabSwitch are defined in tui_keys.go.
+// handleKeyMsg, handleStopPicker, handleDetailScroll, handleTabSwitch are defined in tui_keys.go.
 // handleIterationStart, handleOutputMsg, handleToolMsg, handleSkillMsg, handleMCPMsg, handleCommitMsg, rebuildExtras are defined in tui_messages.go.
 // renderBannerView, renderHeaderInner, renderTabBar, renderDetailPanel, renderTaskTab, renderView are defined in tui_render.go.
 // toolIcon, detailAvailableHeight, clampDetailScroll, countDetailLines are defined in tui_render.go.

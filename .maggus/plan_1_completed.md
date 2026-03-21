@@ -110,15 +110,15 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a developer, I want dead code from the old work sub-menu and run-again flow removed so that the codebase stays clean.
 
 **Acceptance Criteria:**
-- [ ] `RunAgainResult` struct is removed
-- [ ] `summaryState.editingCount`, `summaryState.countInput`, `summaryState.menuChoice`, `summaryState.runAgain` fields are removed
-- [ ] `handleSummaryKeys` is simplified (no menu navigation, just exit on any key/esc/q)
-- [ ] `renderSummaryMenu` is simplified or removed (no menu to render)
-- [ ] Old stop confirmation code (`confirmingStop`, `handleStopConfirmation`) is removed
-- [ ] Work sub-menu entries in `buildSubMenus` and `buildArgs` for "work" are removed
-- [ ] All existing tests still pass after cleanup
-- [ ] No compiler warnings or unused imports remain
-- [ ] Typecheck/lint passes
+- [x] `RunAgainResult` struct is removed
+- [x] `summaryState.editingCount`, `summaryState.countInput`, `summaryState.menuChoice`, `summaryState.runAgain` fields are removed
+- [x] `handleSummaryKeys` is simplified (no menu navigation, just exit on any key/esc/q)
+- [x] `renderSummaryMenu` is simplified or removed (no menu to render)
+- [x] Old stop confirmation code (`confirmingStop`, `handleStopConfirmation`) is removed
+- [x] Work sub-menu entries in `buildSubMenus` and `buildArgs` for "work" are removed
+- [x] All existing tests still pass after cleanup
+- [x] No compiler warnings or unused imports remain
+- [x] Typecheck/lint passes
 
 ## Functional Requirements
 
