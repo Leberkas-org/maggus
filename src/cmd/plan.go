@@ -47,7 +47,7 @@ Examples:
   maggus vision A CLI tool for orchestrating AI agents
   maggus vision "Improve the vision for our e-commerce platform"`,
 	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-vision", ""),
+	RunE: runSkillCommand("/maggus-vision", "usage_vision.jsonl"),
 }
 
 var architectureCmd = &cobra.Command{
