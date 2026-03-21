@@ -29,7 +29,6 @@ type Record struct {
 	ModelUsage               map[string]agent.ModelTokens `json:"model_usage"`
 	StartTime                time.Time                    `json:"start_time"`
 	EndTime                  time.Time                    `json:"end_time"`
-	Elapsed                  string                       `json:"elapsed"`
 }
 
 // Append writes one or more usage records as JSON Lines to .maggus/usage_work.jsonl.
@@ -51,7 +50,6 @@ func AppendTo(path string, records []Record) error {
 
 	enc := json.NewEncoder(f)
 	for i := range records {
-		records[i].Elapsed = records[i].EndTime.Sub(records[i].StartTime).Truncate(time.Second).String()
 		if err := enc.Encode(records[i]); err != nil {
 			return fmt.Errorf("write usage record: %w", err)
 		}

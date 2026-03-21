@@ -160,37 +160,6 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 	if rec.OutputTokens != 3000 {
 		t.Errorf("OutputTokens = %d, want 3000", rec.OutputTokens)
 	}
-	if rec.Elapsed != "5m45s" {
-		t.Errorf("Elapsed = %q, want %q", rec.Elapsed, "5m45s")
-	}
-}
-
-func TestElapsedTimeTruncatedToSeconds(t *testing.T) {
-	dir := setupDir(t)
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2026, 1, 1, 0, 2, 30, 999_000_000, time.UTC)
-
-	records := []Record{
-		{
-			RunID:     "run-1",
-			TaskID:    "TASK-001",
-			StartTime: start,
-			EndTime:   end,
-		},
-	}
-
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
-	}
-
-	lines := readJSONL(t, filepath.Join(dir, fileName))
-	var rec Record
-	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
-		t.Fatalf("not valid JSON: %v", err)
-	}
-	if rec.Elapsed != "2m30s" {
-		t.Errorf("Elapsed = %q, want %q", rec.Elapsed, "2m30s")
-	}
 }
 
 func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
