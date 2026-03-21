@@ -87,12 +87,12 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want a reusable task-list browsing component that both `list` and `status` commands can embed, eliminating duplicated cursor/scroll/detail/criteria logic.
 
 **Acceptance Criteria:**
-- [ ] New file `src/cmd/tasklist.go` containing a `taskListComponent` struct
-- [ ] `taskListComponent` handles: cursor movement (up/down/home/end with wrapping), scroll offset management, `visibleTaskLines()` calculation, `ensureCursorVisible()`, detail viewport open/close, detail rendering via `detailState`, criteria mode delegation, action picker delegation, delete confirmation flow
-- [ ] The component accepts a configuration struct or parameters for: header line count (differs between list and status), task slice, width/height, agent name
-- [ ] `taskListComponent` has `Update(tea.KeyMsg)` and `View()` methods that the parent models call
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New file `src/cmd/tasklist.go` containing a `taskListComponent` struct
+- [x] `taskListComponent` handles: cursor movement (up/down/home/end with wrapping), scroll offset management, `visibleTaskLines()` calculation, `ensureCursorVisible()`, detail viewport open/close, detail rendering via `detailState`, criteria mode delegation, action picker delegation, delete confirmation flow
+- [x] The component accepts a configuration struct or parameters for: header line count (differs between list and status), task slice, width/height, agent name
+- [x] `taskListComponent` has `Update(tea.KeyMsg)` and `View()` methods that the parent models call
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-007: Refactor list.go to use TaskListComponent
 **Description:** As a developer, I want `list.go` to use the shared `taskListComponent` so that list-specific code only contains list-specific behavior.
