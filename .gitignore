@@ -13,3 +13,5 @@ docs/node_modules
 .maggus/RELEASE_NOTES.md
 .maggus/usage*.jsonl
 .maggus/usage*.csv
+.maggus/usage_*.jsonl
+.maggus/bugs

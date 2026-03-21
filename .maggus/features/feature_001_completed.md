@@ -21,13 +21,13 @@ Remove the `list` command entirely — Maggus has outgrown it and the `status` v
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/list.go` is deleted
-- [ ] `src/cmd/list_test.go` is deleted
-- [ ] The `list` menu item is removed from `allMenuItems` in `menu.go`
-- [ ] The `tasklist.go` shared component is NOT removed (still used by status)
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
-- [ ] `go vet ./...` passes
+- [x] `src/cmd/list.go` is deleted
+- [x] `src/cmd/list_test.go` is deleted
+- [x] The `list` menu item is removed from `allMenuItems` in `menu.go`
+- [x] The `tasklist.go` shared component is NOT removed (still used by status)
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
+- [x] `go vet ./...` passes
 
 ### TASK-001-002: Reorder AI-assisted creation group
 **Description:** As a user, I want `prompt` to appear first in the AI-assisted creation menu group so it's more prominent.

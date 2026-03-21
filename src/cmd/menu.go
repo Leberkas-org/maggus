@@ -112,7 +112,6 @@ var allMenuItems = []menuItem{
 	// Group 1: Core workflow
 	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
 	{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
-	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
 	// Group 2: Repository management
 	{name: "repos", desc: "Manage configured repositories", separator: true, shortcut: 'r', shortcutLabel: "r"},
 	// Group 3: AI-assisted creation
