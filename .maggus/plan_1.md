@@ -83,13 +83,13 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a developer, I want the work loop to stop at a specific task (not just "after current") so that the stop picker's "After TASK-X" option works correctly.
 
 **Acceptance Criteria:**
-- [ ] The work loop checks a `stopAtTaskID` field (in addition to the existing `stopFlag`)
-- [ ] When `stopAtTaskID` is set, the loop continues until that task completes, then stops
-- [ ] When `stopAfterTask` is set (no specific ID), the loop stops after the current task (existing behavior)
-- [ ] The stop reason in the summary correctly reflects "Stopped by User" for both cases
-- [ ] If the target task is skipped (blocked/already done), the loop stops at the next completed task after it or at the target point in sequence
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] The work loop checks a `stopAtTaskID` field (in addition to the existing `stopFlag`)
+- [x] When `stopAtTaskID` is set, the loop continues until that task completes, then stops
+- [x] When `stopAfterTask` is set (no specific ID), the loop stops after the current task (existing behavior)
+- [x] The stop reason in the summary correctly reflects "Stopped by User" for both cases
+- [x] If the target task is skipped (blocked/already done), the loop stops at the next completed task after it or at the target point in sequence
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-007: Render Stop Picker UI
 **Description:** As a user, I want the stop picker to look clean and integrated with the existing TUI so that it feels like a native part of the work view.

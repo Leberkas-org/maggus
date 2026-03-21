@@ -217,7 +217,7 @@ func runWorkGoroutine(params workLoopParams) {
 				if v := params.stopAtTaskID.Load(); v != nil {
 					targetID, _ = v.(string)
 				}
-				if targetID == "" || targetID == lastCompletedTaskID {
+				if targetID == "" || targetID == lastCompletedTaskID || isTaskAtOrPastTarget(tasks, lastCompletedTaskID, targetID) {
 					stopReason = runner.StopReasonUserStop
 					break
 				}
@@ -395,4 +395,28 @@ func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *r
 		return "", fmt.Errorf("ensure feature branch: %w", err)
 	}
 	return msg, nil
+}
+
+// isTaskAtOrPastTarget returns true if lastCompletedTaskID appears at or after
+// targetID in the task list ordering. This handles the case where the target
+// task was skipped (blocked/already done) — we stop at the next completed task
+// past the target's position in the sequence.
+func isTaskAtOrPastTarget(tasks []parser.Task, lastCompletedTaskID, targetID string) bool {
+	if lastCompletedTaskID == "" || targetID == "" {
+		return false
+	}
+	targetIdx := -1
+	completedIdx := -1
+	for i := range tasks {
+		if tasks[i].ID == targetID {
+			targetIdx = i
+		}
+		if tasks[i].ID == lastCompletedTaskID {
+			completedIdx = i
+		}
+	}
+	if targetIdx < 0 || completedIdx < 0 {
+		return false
+	}
+	return completedIdx >= targetIdx
 }

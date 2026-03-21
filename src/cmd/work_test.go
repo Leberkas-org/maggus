@@ -160,3 +160,39 @@ func TestFindNextUnlocked_EmptySlice(t *testing.T) {
 		t.Errorf("expected nil for empty slice, got %+v", got)
 	}
 }
+
+func TestIsTaskAtOrPastTarget(t *testing.T) {
+	tasks := []parser.Task{
+		{ID: "TASK-001", Title: "First"},
+		{ID: "TASK-002", Title: "Second"},
+		{ID: "TASK-003", Title: "Third"},
+		{ID: "TASK-004", Title: "Fourth"},
+	}
+
+	tests := []struct {
+		name        string
+		completed   string
+		target      string
+		want        bool
+	}{
+		{"completed equals target", "TASK-002", "TASK-002", true},
+		{"completed after target", "TASK-003", "TASK-002", true},
+		{"completed before target", "TASK-001", "TASK-003", false},
+		{"empty completed", "", "TASK-002", false},
+		{"empty target", "TASK-002", "", false},
+		{"both empty", "", "", false},
+		{"unknown completed", "TASK-999", "TASK-002", false},
+		{"unknown target", "TASK-002", "TASK-999", false},
+		{"last task completed past earlier target", "TASK-004", "TASK-001", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isTaskAtOrPastTarget(tasks, tt.completed, tt.target)
+			if got != tt.want {
+				t.Errorf("isTaskAtOrPastTarget(tasks, %q, %q) = %v, want %v",
+					tt.completed, tt.target, got, tt.want)
+			}
+		})
+	}
+}
