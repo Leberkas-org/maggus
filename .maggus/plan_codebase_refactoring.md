@@ -98,14 +98,14 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want `list.go` to use the shared `taskListComponent` so that list-specific code only contains list-specific behavior.
 
 **Acceptance Criteria:**
-- [ ] `listModel` embeds `taskListComponent` instead of duplicating cursor, scroll, detail, criteria fields
-- [ ] `listModel.Update()` delegates key handling to `taskListComponent.Update()` for shared behavior, only handling list-specific keys (like `alt+r` run) itself
-- [ ] `listModel.View()` uses `taskListComponent` for task list rendering
-- [ ] Removed methods from `listModel`: `visibleTaskLines()`, `ensureCursorVisible()`, `updateDetail()`, `updateCriteriaMode()`, `updateActionPicker()`, `updateConfirmDelete()`, `refreshDetailViewport()`
-- [ ] `list.go` is under 250 lines (down from 609)
-- [ ] `go test ./cmd -run TestList` passes
-- [ ] `go test ./...` passes
-- [ ] Behavior is identical: cursor wrapping, scroll, detail view, criteria mode, delete confirmation all work as before
+- [x] `listModel` embeds `taskListComponent` instead of duplicating cursor, scroll, detail, criteria fields
+- [x] `listModel.Update()` delegates key handling to `taskListComponent.Update()` for shared behavior, only handling list-specific keys (like `alt+r` run) itself
+- [x] `listModel.View()` uses `taskListComponent` for task list rendering
+- [x] Removed methods from `listModel`: `visibleTaskLines()`, `ensureCursorVisible()`, `updateDetail()`, `updateCriteriaMode()`, `updateActionPicker()`, `updateConfirmDelete()`, `refreshDetailViewport()`
+- [x] `list.go` is under 250 lines (down from 609)
+- [x] `go test ./cmd -run TestList` passes
+- [x] `go test ./...` passes
+- [x] Behavior is identical: cursor wrapping, scroll, detail view, criteria mode, delete confirmation all work as before
 
 ### TASK-008: Refactor status.go to use TaskListComponent
 **Description:** As a developer, I want `status.go` to use the shared `taskListComponent` so that status-specific code only contains plan browsing and status-specific behavior.

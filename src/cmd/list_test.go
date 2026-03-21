@@ -266,7 +266,9 @@ func TestListFirstTaskHighlightedInTUI(t *testing.T) {
 		{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md"},
 		{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md"},
 	}
-	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	m := newListModel(tasks, "claude")
+	m.Width = 120
+	m.Height = 40
 	content := m.viewList()
 
 	// Should contain the arrow indicator for first task
@@ -289,7 +291,9 @@ func TestListTUIShowsBlockedTasks(t *testing.T) {
 		{ID: "TASK-002", Title: "Blocked task", SourceFile: "plan_1.md",
 			Criteria: []parser.Criterion{{Text: "BLOCKED: waiting on something", Checked: false, Blocked: true}}},
 	}
-	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	m := newListModel(tasks, "claude")
+	m.Width = 120
+	m.Height = 40
 	content := m.viewList()
 
 	if !strings.Contains(content, "TASK-001") {
@@ -309,7 +313,9 @@ func TestListTUIHeaderShowsIncompleteCount(t *testing.T) {
 		{ID: "TASK-002", Title: "Second", SourceFile: "plan_1.md"},
 		{ID: "TASK-003", Title: "Third", SourceFile: "plan_1.md"},
 	}
-	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	m := newListModel(tasks, "claude")
+	m.Width = 120
+	m.Height = 40
 	content := m.viewList()
 
 	if !strings.Contains(content, "All incomplete tasks (3)") {
@@ -328,10 +334,12 @@ func TestListTUIScrolling(t *testing.T) {
 		})
 	}
 	// Small terminal: only ~5 task lines visible (height=15 minus header/footer)
-	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 15}
+	m := newListModel(tasks, "claude")
+	m.Width = 120
+	m.Height = 15
 
 	// Move cursor to the bottom
-	m.cursor = 10
+	m.Cursor = 10
 	m.ensureCursorVisible()
 	content := m.viewList()
 
@@ -405,7 +413,9 @@ func TestListTUIShowsIgnoredTasks(t *testing.T) {
 			Ignored:  true,
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
 	}
-	m := listModel{tasks: tasks, agentName: "claude", width: 120, height: 40}
+	m := newListModel(tasks, "claude")
+	m.Width = 120
+	m.Height = 40
 	content := m.viewList()
 
 	if !strings.Contains(content, "TASK-001") {
