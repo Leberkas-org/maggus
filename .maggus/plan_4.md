@@ -28,11 +28,11 @@ The `maggus plan`, `maggus vision`, and `maggus architecture` commands launch Cl
 **Description:** As a user running `maggus plan`, I want token usage silently logged to `.maggus/usage_plan.jsonl` so that I can track costs over time.
 
 **Acceptance Criteria:**
-- [ ] After a `maggus plan` session ends, usage is extracted from the Claude session file
-- [ ] A `usage.Record` is appended to `.maggus/usage_plan.jsonl` with: run ID (timestamp), model, agent, all token fields, model usage map, start/end time
-- [ ] If session detection or extraction fails, a warning is printed to stderr and the command exits successfully
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] After a `maggus plan` session ends, usage is extracted from the Claude session file
+- [x] A `usage.Record` is appended to `.maggus/usage_plan.jsonl` with: run ID (timestamp), model, agent, all token fields, model usage map, start/end time
+- [x] If session detection or extraction fails, a warning is printed to stderr and the command exits successfully
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-003: Wire usage extraction into vision command
 **Description:** As a user running `maggus vision`, I want token usage silently logged to `.maggus/usage_vision.jsonl` so that I can track costs over time.
