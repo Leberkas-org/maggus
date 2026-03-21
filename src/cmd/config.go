@@ -117,6 +117,9 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	protectedDisplay := strings.Join(cfg.Git.ProtectedBranchList(), ", ")
+	if len(protectedDisplay) > 40 {
+		protectedDisplay = protectedDisplay[:37] + "..."
+	}
 
 	soundValues := []string{"on", "off"}
 	soundIdx := 1
