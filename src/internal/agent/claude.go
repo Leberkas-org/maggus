@@ -142,6 +142,7 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 						OutputTokens:             event.Usage.OutputTokens,
 						CacheCreationInputTokens: event.Usage.CacheCreationInputTokens,
 						CacheReadInputTokens:     event.Usage.CacheReadInputTokens,
+						CostUSD:                  event.CostUSD,
 					})
 				}
 				if event.Subtype == "success" {
@@ -240,6 +241,7 @@ type streamEvent struct {
 	Message json.RawMessage `json:"message"`
 	Result  string          `json:"result"`
 	Usage   *streamUsage    `json:"usage,omitempty"`
+	CostUSD float64         `json:"total_cost_usd"`
 }
 
 type streamUsage struct {

@@ -33,11 +33,11 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a developer, I want to capture `total_cost_usd` from the result event so that cost information is available for display and persistence.
 
 **Acceptance Criteria:**
-- [ ] `streamEvent` struct in `internal/agent/claude.go` includes `CostUSD float64` with JSON tag `total_cost_usd`
-- [ ] `UsageMsg` struct in `internal/agent/messages.go` includes `CostUSD float64`
-- [ ] The `case "result"` handler passes `event.CostUSD` into the `UsageMsg`
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] `streamEvent` struct in `internal/agent/claude.go` includes `CostUSD float64` with JSON tag `total_cost_usd`
+- [x] `UsageMsg` struct in `internal/agent/messages.go` includes `CostUSD float64`
+- [x] The `case "result"` handler passes `event.CostUSD` into the `UsageMsg`
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-003: Add Per-Model Usage Parsing from Result Events
 **Description:** As a developer, I want to parse the `modelUsage` field from Claude Code result events so that token usage can be attributed to specific models.

@@ -76,3 +76,48 @@ func TestStreamEvent_ResultWithCacheUsage(t *testing.T) {
 		t.Errorf("Usage.CacheReadInputTokens = %d, want 6692", event.Usage.CacheReadInputTokens)
 	}
 }
+
+func TestStreamEvent_ResultWithCostUSD(t *testing.T) {
+	raw := `{
+		"type": "result",
+		"subtype": "success",
+		"result": "done",
+		"total_cost_usd": 0.0855,
+		"usage": {
+			"input_tokens": 3,
+			"output_tokens": 24,
+			"cache_creation_input_tokens": 13055,
+			"cache_read_input_tokens": 6692
+		}
+	}`
+
+	var event streamEvent
+	if err := json.Unmarshal([]byte(raw), &event); err != nil {
+		t.Fatalf("failed to unmarshal streamEvent: %v", err)
+	}
+
+	if event.CostUSD != 0.0855 {
+		t.Errorf("CostUSD = %f, want 0.0855", event.CostUSD)
+	}
+}
+
+func TestStreamEvent_ResultWithoutCostUSD(t *testing.T) {
+	raw := `{
+		"type": "result",
+		"subtype": "success",
+		"result": "done",
+		"usage": {
+			"input_tokens": 100,
+			"output_tokens": 50
+		}
+	}`
+
+	var event streamEvent
+	if err := json.Unmarshal([]byte(raw), &event); err != nil {
+		t.Fatalf("failed to unmarshal streamEvent: %v", err)
+	}
+
+	if event.CostUSD != 0 {
+		t.Errorf("CostUSD = %f, want 0", event.CostUSD)
+	}
+}

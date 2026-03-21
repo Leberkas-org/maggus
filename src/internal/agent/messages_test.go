@@ -114,3 +114,23 @@ func TestUsageMsg_CacheFieldsZero(t *testing.T) {
 		t.Errorf("UsageMsg.CacheReadInputTokens = %d, want 0", msg.CacheReadInputTokens)
 	}
 }
+
+func TestUsageMsg_CostUSD(t *testing.T) {
+	msg := UsageMsg{
+		InputTokens:              3,
+		OutputTokens:             24,
+		CacheCreationInputTokens: 13055,
+		CacheReadInputTokens:     6692,
+		CostUSD:                  0.0855,
+	}
+	if msg.CostUSD != 0.0855 {
+		t.Errorf("UsageMsg.CostUSD = %f, want 0.0855", msg.CostUSD)
+	}
+}
+
+func TestUsageMsg_CostUSDZero(t *testing.T) {
+	msg := UsageMsg{InputTokens: 100, OutputTokens: 50}
+	if msg.CostUSD != 0 {
+		t.Errorf("UsageMsg.CostUSD = %f, want 0", msg.CostUSD)
+	}
+}

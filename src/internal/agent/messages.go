@@ -44,4 +44,5 @@ type UsageMsg struct {
 	OutputTokens             int
 	CacheCreationInputTokens int
 	CacheReadInputTokens     int
+	CostUSD                  float64
 }
