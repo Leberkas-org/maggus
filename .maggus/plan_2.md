@@ -83,12 +83,12 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a user, I want usage data from my interactive session automatically saved to `usage_prompt.jsonl` when the session ends.
 
 **Acceptance Criteria:**
-- [ ] After Claude exits in `cmd/prompt.go`, the session detection (TASK-004) and extraction (TASK-005) run
-- [ ] The extracted usage record is appended to `.maggus/usage_prompt.jsonl` via the JSONL writer from TASK-001
-- [ ] The record includes: a generated run ID (timestamp-based, same format as `work`), model, agent name ("claude"), start time, end time, and token totals
-- [ ] If extraction fails (no session found, parse error), a warning is printed but the command exits cleanly (no error exit code)
+- [x] After Claude exits in `cmd/prompt.go`, the session detection (TASK-004) and extraction (TASK-005) run
+- [x] The extracted usage record is appended to `.maggus/usage_prompt.jsonl` via the JSONL writer from TASK-001
+- [x] The record includes: a generated run ID (timestamp-based, same format as `work`), model, agent name ("claude"), start time, end time, and token totals
+- [x] If extraction fails (no session found, parse error), a warning is printed but the command exits cleanly (no error exit code)
 - [ ] Manual test: run `maggus prompt`, have a short conversation, exit, verify `usage_prompt.jsonl` contains a valid JSON line with token counts
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-007: Add Prompt Command to TUI Menu
 

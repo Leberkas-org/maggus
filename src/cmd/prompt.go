@@ -5,8 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"time"
 
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/session"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/spf13/cobra"
 )
 
@@ -55,6 +59,12 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
 	}
 
+	// Snapshot session directory before launching Claude (TASK-004).
+	sessionDir, _ := session.SessionDir(dir)
+	beforeSnapshot, _ := session.SnapshotDir(sessionDir)
+
+	startTime := time.Now()
+
 	proc := exec.Command(claudePath, claudeArgs...)
 
 	// Full terminal passthrough: connect stdin, stdout, stderr directly.
@@ -75,12 +85,13 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 
 	// Wait for Claude to exit.
 	waitErr := proc.Wait()
+	endTime := time.Now()
 
 	// Stop capturing signals.
 	signal.Stop(sigCh)
 
-	// TODO(TASK-004): Capture Claude session ID from session files.
-	// TODO(TASK-005): Extract usage data and write to usage_prompt.jsonl.
+	// Extract usage data from session files (TASK-004 + TASK-005).
+	extractPromptUsage(dir, resolvedModel, beforeSnapshot, startTime, endTime)
 
 	if waitErr != nil {
 		// If Claude exited due to user Ctrl+C, that's not an error.
@@ -95,4 +106,46 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// extractPromptUsage detects the session file created during the Claude session,
+// extracts token usage, and appends a record to usage_prompt.jsonl.
+// Errors are printed as warnings but never cause a non-zero exit.
+func extractPromptUsage(dir, model string, beforeSnapshot map[string]bool, startTime, endTime time.Time) {
+	sessionFile, err := session.DetectSessionFile(dir, beforeSnapshot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not detect session file: %v\n", err)
+		return
+	}
+	if sessionFile == "" {
+		fmt.Fprintln(os.Stderr, "Warning: no new Claude session file found; skipping usage extraction")
+		return
+	}
+
+	summary, err := session.ExtractUsage(sessionFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not extract usage from session: %v\n", err)
+		return
+	}
+
+	runID := startTime.Format("20060102-150405")
+	usagePath := filepath.Join(dir, ".maggus", "usage_prompt.jsonl")
+
+	rec := usage.Record{
+		RunID:                    runID,
+		Model:                    model,
+		Agent:                    "claude",
+		InputTokens:              summary.InputTokens,
+		OutputTokens:             summary.OutputTokens,
+		CacheCreationInputTokens: summary.CacheCreationInputTokens,
+		CacheReadInputTokens:     summary.CacheReadInputTokens,
+		CostUSD:                  0,
+		ModelUsage:               summary.ModelUsage,
+		StartTime:                startTime,
+		EndTime:                  endTime,
+	}
+
+	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not write usage record: %v\n", err)
+	}
 }

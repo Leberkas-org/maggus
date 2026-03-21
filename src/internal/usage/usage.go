@@ -34,11 +34,14 @@ type Record struct {
 
 // Append writes one or more usage records as JSON Lines to .maggus/usage_work.jsonl.
 func Append(dir string, records []Record) error {
+	return AppendTo(filepath.Join(dir, fileName), records)
+}
+
+// AppendTo writes one or more usage records as JSON Lines to the given file path.
+func AppendTo(path string, records []Record) error {
 	if len(records) == 0 {
 		return nil
 	}
-
-	path := filepath.Join(dir, fileName)
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
