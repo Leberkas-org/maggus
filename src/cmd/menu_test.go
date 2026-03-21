@@ -590,3 +590,152 @@ func TestMenuView_CWDStillCentered(t *testing.T) {
 	}
 	t.Error("CWD path not found in view output")
 }
+
+func TestFormatSummaryLine(t *testing.T) {
+	tests := []struct {
+		name    string
+		summary featureSummary
+		want    string
+	}{
+		{
+			name:    "no features or bugs",
+			summary: featureSummary{},
+			want:    "No features or bugs found",
+		},
+		{
+			name: "features only, no done or blocked",
+			summary: featureSummary{
+				features: 3, tasks: 5,
+			},
+			want: "3 features (5 tasks)",
+		},
+		{
+			name: "features only with done",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3,
+			},
+			want: "3 features (5 tasks, 3 done)",
+		},
+		{
+			name: "features only with done and blocked",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3, blocked: 1,
+			},
+			want: "3 features (5 tasks, 3 done, 1 blocked)",
+		},
+		{
+			name: "bugs only",
+			summary: featureSummary{
+				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+			},
+			want: "2 bugs (4 tasks, 2 done, 1 blocked)",
+		},
+		{
+			name: "bugs only no done or blocked",
+			summary: featureSummary{
+				bugs: 1, bugTasks: 3,
+			},
+			want: "1 bugs (3 tasks)",
+		},
+		{
+			name: "both features and bugs",
+			summary: featureSummary{
+				features: 3, tasks: 5, done: 3,
+				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+			},
+			want: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)",
+		},
+		{
+			name: "both with zero done/blocked omitted",
+			summary: featureSummary{
+				features: 1, tasks: 2,
+				bugs: 1, bugTasks: 1,
+			},
+			want: "1 features (2 tasks) · 1 bugs (1 tasks)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatSummaryLine(tt.summary)
+			if got != tt.want {
+				t.Errorf("formatSummaryLine() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMenuView_SummaryShowsFeaturesAndBugs(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		cwd:    "/test",
+		width:  120,
+		height: 40,
+		summary: featureSummary{
+			features: 3, tasks: 5, done: 3,
+			bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+		},
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "3 features") {
+		t.Error("expected view to contain '3 features'")
+	}
+	if !strings.Contains(view, "2 bugs") {
+		t.Error("expected view to contain '2 bugs'")
+	}
+}
+
+func TestMenuView_SummaryNoFeaturesOrBugs(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/test",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "No features or bugs found") {
+		t.Error("expected view to contain 'No features or bugs found'")
+	}
+}
+
+func TestMenuUpdate_FeatureSummaryUpdateMsg(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	// Create feature directory and file so loadFeatureSummary returns data.
+	featDir := filepath.Join(dir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	featureContent := "# Feature\n### TASK-001: Do thing\n- [ ] criterion\n"
+	if err := os.WriteFile(filepath.Join(featDir, "feature_001.md"), []byte(featureContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ch := make(chan struct{}, 1)
+	m := menuModel{
+		items:     activeMenuItems(),
+		summary:   featureSummary{},
+		watcherCh: ch,
+	}
+
+	// Send the update message
+	updated, cmd := m.Update(featureSummaryUpdateMsg{})
+	um := updated.(menuModel)
+
+	// After receiving featureSummaryUpdateMsg, summary should be reloaded
+	if um.summary.features != 1 {
+		t.Errorf("expected 1 feature after update, got %d", um.summary.features)
+	}
+	if um.summary.tasks != 1 {
+		t.Errorf("expected 1 task after update, got %d", um.summary.tasks)
+	}
+
+	// Should return a cmd to listen for more updates
+	if cmd == nil {
+		t.Error("expected non-nil cmd after featureSummaryUpdateMsg")
+	}
+}

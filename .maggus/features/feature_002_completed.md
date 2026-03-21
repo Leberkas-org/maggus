@@ -53,16 +53,16 @@ This feature adds live-updating feature and bug statistics to the main menu usin
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `featureSummary` struct is extended to include bug counts (bugs, bugTasks, bugDone, bugBlocked) alongside existing feature counts
-- [ ] `loadFeatureSummary()` parses both features AND bugs (currently only parses features)
-- [ ] The summary line format is: `3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)` — parts with zero counts for done/blocked are omitted for brevity
-- [ ] When a `featureSummaryUpdateMsg` is received in `Update()`, the summary is reloaded by calling `loadFeatureSummary()` and the view re-renders
-- [ ] The watcher is started in `Init()` and torn down on menu exit
-- [ ] If both features and bugs are zero, the summary line shows a hint like `No features or bugs found`
-- [ ] The summary updates within ~500ms of a file change (debounce window)
-- [ ] All existing menu tests pass
-- [ ] New tests verify the summary line renders correctly for various combinations (features only, bugs only, both, neither)
-- [ ] `go vet ./...` passes
+- [x] `featureSummary` struct is extended to include bug counts (bugs, bugTasks, bugDone, bugBlocked) alongside existing feature counts
+- [x] `loadFeatureSummary()` parses both features AND bugs (currently only parses features)
+- [x] The summary line format is: `3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)` — parts with zero counts for done/blocked are omitted for brevity
+- [x] When a `featureSummaryUpdateMsg` is received in `Update()`, the summary is reloaded by calling `loadFeatureSummary()` and the view re-renders
+- [x] The watcher is started in `Init()` and torn down on menu exit
+- [x] If both features and bugs are zero, the summary line shows a hint like `No features or bugs found`
+- [x] The summary updates within ~500ms of a file change (debounce window)
+- [x] All existing menu tests pass
+- [x] New tests verify the summary line renders correctly for various combinations (features only, bugs only, both, neither)
+- [x] `go vet ./...` passes
 
 ## Task Dependency Graph
 

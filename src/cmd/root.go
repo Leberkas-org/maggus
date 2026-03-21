@@ -40,6 +40,13 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		m := newMenuModel(loadFeatureSummary())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := p.Run()
+
+		// Clean up the file watcher before processing the result.
+		if m.watcher != nil {
+			m.watcher.Close()
+			close(m.watcherCh)
+		}
+
 		if err != nil {
 			return err
 		}

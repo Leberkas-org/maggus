@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -190,32 +191,88 @@ func buildArgs(cmdName string, opts []subMenuOption) []string {
 	return nil
 }
 
-// featureSummary holds the aggregated feature statistics for the menu header.
+// featureSummaryUpdateMsg is sent when the file watcher detects changes
+// to feature or bug files, triggering a summary reload.
+type featureSummaryUpdateMsg struct{}
+
+// featureSummary holds the aggregated feature and bug statistics for the menu header.
 type featureSummary struct {
 	features int
 	tasks    int
 	done     int
 	blocked  int
+
+	bugs        int
+	bugTasks    int
+	bugDone     int
+	bugBlocked  int
 }
 
-// loadFeatureSummary computes feature statistics from the current working directory.
+// loadFeatureSummary computes feature and bug statistics from the current working directory.
 func loadFeatureSummary() featureSummary {
 	dir, err := os.Getwd()
 	if err != nil {
 		return featureSummary{}
 	}
-	features, err := parseFeatures(dir)
-	if err != nil || len(features) == 0 {
-		return featureSummary{}
-	}
+
 	var s featureSummary
-	s.features = len(features)
-	for _, f := range features {
-		s.tasks += len(f.tasks)
-		s.done += f.doneCount()
-		s.blocked += f.blockedCount()
+
+	features, err := parseFeatures(dir)
+	if err == nil {
+		s.features = len(features)
+		for _, f := range features {
+			s.tasks += len(f.tasks)
+			s.done += f.doneCount()
+			s.blocked += f.blockedCount()
+		}
 	}
+
+	bugs, err := parseBugs(dir)
+	if err == nil {
+		s.bugs = len(bugs)
+		for _, b := range bugs {
+			s.bugTasks += len(b.tasks)
+			s.bugDone += b.doneCount()
+			s.bugBlocked += b.blockedCount()
+		}
+	}
+
 	return s
+}
+
+// formatSummaryLine builds the human-readable summary string for the menu header.
+// Format: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)"
+// Zero-count parts (done, blocked) are omitted for brevity.
+func formatSummaryLine(s featureSummary) string {
+	if s.features == 0 && s.bugs == 0 {
+		return "No features or bugs found"
+	}
+
+	var parts []string
+
+	if s.features > 0 {
+		detail := fmt.Sprintf("%d tasks", s.tasks)
+		if s.done > 0 {
+			detail += fmt.Sprintf(", %d done", s.done)
+		}
+		if s.blocked > 0 {
+			detail += fmt.Sprintf(", %d blocked", s.blocked)
+		}
+		parts = append(parts, fmt.Sprintf("%d features (%s)", s.features, detail))
+	}
+
+	if s.bugs > 0 {
+		detail := fmt.Sprintf("%d tasks", s.bugTasks)
+		if s.bugDone > 0 {
+			detail += fmt.Sprintf(", %d done", s.bugDone)
+		}
+		if s.bugBlocked > 0 {
+			detail += fmt.Sprintf(", %d blocked", s.bugBlocked)
+		}
+		parts = append(parts, fmt.Sprintf("%d bugs (%s)", s.bugs, detail))
+	}
+
+	return strings.Join(parts, " · ")
 }
 
 // menuModel is the bubbletea model for the interactive main menu.
@@ -235,6 +292,10 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
+	// File watcher for live summary updates
+	watcher   *filewatcher.Watcher
+	watcherCh chan struct{}
+
 	// Sub-menu state
 	inSubMenu    bool
 	subCursor    int // cursor within sub-menu (options + Run item)
@@ -244,11 +305,37 @@ type menuModel struct {
 
 func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
+
+	ch := make(chan struct{}, 1)
+	w, _ := filewatcher.New(cwd, func(_ any) {
+		select {
+		case ch <- struct{}{}:
+		default: // don't block if channel already has a pending update
+		}
+	}, 300*time.Millisecond)
+
 	return menuModel{
 		items:       activeMenuItems(),
 		summary:     summary,
 		cwd:         cwd,
 		subMenuDefs: buildSubMenus(),
+		watcher:     w,
+		watcherCh:   ch,
+	}
+}
+
+// listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
+// signals a file change, then delivers a featureSummaryUpdateMsg.
+func listenForWatcherUpdate(ch <-chan struct{}) tea.Cmd {
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		_, ok := <-ch
+		if !ok {
+			return nil // channel closed, watcher stopped
+		}
+		return featureSummaryUpdateMsg{}
 	}
 }
 
@@ -260,6 +347,7 @@ func (m menuModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return updateCheckResultMsg{banner: startupUpdateCheck()}
 		},
+		listenForWatcherUpdate(m.watcherCh),
 	)
 }
 
@@ -284,6 +372,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
 		return m, nil
+	case featureSummaryUpdateMsg:
+		m.summary = loadFeatureSummary()
+		return m, listenForWatcherUpdate(m.watcherCh)
+
 	case hideShortcutsMsg:
 		// Only hide if this timer is still the latest one
 		if msg.timerID == m.shortcutTimerID {
@@ -460,21 +552,9 @@ func (m menuModel) View() string {
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
-	// Feature summary line
+	// Feature & bug summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	var summaryLine string
-	if m.summary.tasks == 0 {
-		summaryLine = mutedStyle.Render("No features found")
-	} else {
-		greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
-		redStyle := lipgloss.NewStyle().Foreground(styles.Error)
-		summaryLine = fmt.Sprintf("%s · %s · %s · %s",
-			mutedStyle.Render(fmt.Sprintf("%d features", m.summary.features)),
-			mutedStyle.Render(fmt.Sprintf("%d tasks", m.summary.tasks)),
-			greenStyle.Render(fmt.Sprintf("%d done", m.summary.done)),
-			redStyle.Render(fmt.Sprintf("%d blocked", m.summary.blocked)),
-		)
-	}
+	summaryLine := mutedStyle.Render(formatSummaryLine(m.summary))
 
 	var body, footer string
 	if m.inSubMenu {
