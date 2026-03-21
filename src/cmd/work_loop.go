@@ -135,16 +135,20 @@ func setupUsageCallback(m *runner.TUIModel, dir string, run *runtracker.Run, mod
 			planRel = rel
 		}
 		_ = usage.Append(dir, []usage.Record{{
-			RunID:        run.ID,
-			TaskID:       tu.TaskID,
-			TaskTitle:    tu.TaskTitle,
-			PlanFile:     planRel,
-			Model:        modelDisplay,
-			Agent:        agentName,
-			InputTokens:  tu.InputTokens,
-			OutputTokens: tu.OutputTokens,
-			StartTime:    tu.StartTime,
-			EndTime:      tu.EndTime,
+			RunID:                    run.ID,
+			TaskID:                   tu.TaskID,
+			TaskTitle:                tu.TaskTitle,
+			PlanFile:                 planRel,
+			Model:                    modelDisplay,
+			Agent:                    agentName,
+			InputTokens:              tu.InputTokens,
+			OutputTokens:             tu.OutputTokens,
+			CacheCreationInputTokens: tu.CacheCreationInputTokens,
+			CacheReadInputTokens:     tu.CacheReadInputTokens,
+			CostUSD:                  tu.CostUSD,
+			ModelUsage:               tu.ModelUsage,
+			StartTime:                tu.StartTime,
+			EndTime:                  tu.EndTime,
 		}})
 	})
 }

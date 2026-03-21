@@ -1,31 +1,38 @@
-// Package usage appends per-task token usage records to .maggus/usage.csv.
+// Package usage appends per-task token usage records to .maggus/usage_v2.csv.
 package usage
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/leberkas-org/maggus/internal/agent"
 )
 
-const fileName = ".maggus/usage.csv"
+const fileName = ".maggus/usage_v2.csv"
 
 // Record represents a single task usage entry.
 type Record struct {
-	RunID        string
-	TaskID       string
-	TaskTitle    string
-	PlanFile     string
-	Model        string
-	Agent        string
-	InputTokens  int
-	OutputTokens int
-	StartTime    time.Time
-	EndTime      time.Time
+	RunID                    string
+	TaskID                   string
+	TaskTitle                string
+	PlanFile                 string
+	Model                    string
+	Agent                    string
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	CostUSD                  float64
+	ModelUsage               map[string]agent.ModelTokens
+	StartTime                time.Time
+	EndTime                  time.Time
 }
 
-// Append writes one or more usage records to .maggus/usage.csv, creating
+// Append writes one or more usage records to .maggus/usage_v2.csv, creating
 // the file with a header row if it does not exist.
 func Append(dir string, records []Record) error {
 	if len(records) == 0 {
@@ -57,6 +64,16 @@ func Append(dir string, records []Record) error {
 
 	for _, r := range records {
 		elapsed := r.EndTime.Sub(r.StartTime).Truncate(time.Second)
+
+		modelUsageJSON := "{}"
+		if len(r.ModelUsage) > 0 {
+			b, err := json.Marshal(r.ModelUsage)
+			if err != nil {
+				return fmt.Errorf("marshal model usage: %w", err)
+			}
+			modelUsageJSON = string(b)
+		}
+
 		row := []string{
 			r.RunID,
 			r.TaskID,
@@ -66,9 +83,13 @@ func Append(dir string, records []Record) error {
 			r.Agent,
 			fmt.Sprintf("%d", r.InputTokens),
 			fmt.Sprintf("%d", r.OutputTokens),
+			fmt.Sprintf("%d", r.CacheCreationInputTokens),
+			fmt.Sprintf("%d", r.CacheReadInputTokens),
+			fmt.Sprintf("%f", r.CostUSD),
 			r.StartTime.Format(time.RFC3339),
 			r.EndTime.Format(time.RFC3339),
 			elapsed.String(),
+			modelUsageJSON,
 		}
 		if err := w.Write(row); err != nil {
 			return fmt.Errorf("write usage row: %w", err)
@@ -88,8 +109,12 @@ func header() []string {
 		"agent",
 		"input_tokens",
 		"output_tokens",
+		"cache_creation_input_tokens",
+		"cache_read_input_tokens",
+		"cost_usd",
 		"start_time",
 		"end_time",
 		"elapsed",
+		"model_usage",
 	}
 }

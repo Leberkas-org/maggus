@@ -2,10 +2,13 @@ package usage
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/leberkas-org/maggus/internal/agent"
 )
 
 func TestAppendCreatesFileWithHeader(t *testing.T) {
@@ -142,9 +145,13 @@ func TestAppendWritesCorrectColumns(t *testing.T) {
 		"claude",
 		"5000",
 		"3000",
+		"0",
+		"0",
+		"0.000000",
 		start.Format(time.RFC3339),
 		end.Format(time.RFC3339),
 		"5m45s",
+		"{}",
 	}
 
 	if len(data) != len(wantColumns) {
@@ -177,7 +184,7 @@ func TestElapsedTimeTruncatedToSeconds(t *testing.T) {
 	}
 
 	rows := readCSV(t, filepath.Join(dir, fileName))
-	elapsed := rows[1][10] // elapsed is the last column
+	elapsed := rows[1][13] // elapsed column index
 	want := "2m30s"
 	if elapsed != want {
 		t.Errorf("elapsed = %q, want %q", elapsed, want)
@@ -200,6 +207,129 @@ func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
 	err := Append(dir, records)
 	if err == nil {
 		t.Fatal("expected error for non-existent directory, got nil")
+	}
+}
+
+func TestAppendWritesCacheCostAndModelUsage(t *testing.T) {
+	dir := setupDir(t)
+	start := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 3, 20, 10, 5, 0, 0, time.UTC)
+
+	modelUsage := map[string]agent.ModelTokens{
+		"claude-opus-4-6[1m]": {
+			InputTokens:              3,
+			OutputTokens:             24,
+			CacheCreationInputTokens: 13055,
+			CacheReadInputTokens:     6692,
+			CostUSD:                  0.0855,
+		},
+	}
+
+	records := []Record{
+		{
+			RunID:                    "run-99",
+			TaskID:                   "TASK-008",
+			TaskTitle:                "Cache test",
+			PlanFile:                 "plan_2.md",
+			Model:                    "claude-opus-4-6",
+			Agent:                    "claude",
+			InputTokens:              3,
+			OutputTokens:             24,
+			CacheCreationInputTokens: 13055,
+			CacheReadInputTokens:     6692,
+			CostUSD:                  0.0855,
+			ModelUsage:               modelUsage,
+			StartTime:                start,
+			EndTime:                  end,
+		},
+	}
+
+	if err := Append(dir, records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	rows := readCSV(t, filepath.Join(dir, fileName))
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+
+	data := rows[1]
+	h := header()
+
+	// Verify column count matches header.
+	if len(data) != len(h) {
+		t.Fatalf("got %d columns, want %d", len(data), len(h))
+	}
+
+	// Check cache and cost columns by name.
+	colIndex := make(map[string]int)
+	for i, name := range h {
+		colIndex[name] = i
+	}
+
+	if got := data[colIndex["cache_creation_input_tokens"]]; got != "13055" {
+		t.Errorf("cache_creation_input_tokens = %q, want %q", got, "13055")
+	}
+	if got := data[colIndex["cache_read_input_tokens"]]; got != "6692" {
+		t.Errorf("cache_read_input_tokens = %q, want %q", got, "6692")
+	}
+	if got := data[colIndex["cost_usd"]]; got != "0.085500" {
+		t.Errorf("cost_usd = %q, want %q", got, "0.085500")
+	}
+
+	// Verify model_usage is valid JSON with expected content.
+	modelUsageJSON := data[colIndex["model_usage"]]
+	var parsed map[string]agent.ModelTokens
+	if err := json.Unmarshal([]byte(modelUsageJSON), &parsed); err != nil {
+		t.Fatalf("model_usage is not valid JSON: %v", err)
+	}
+
+	opus, ok := parsed["claude-opus-4-6[1m]"]
+	if !ok {
+		t.Fatal("model_usage missing claude-opus-4-6[1m] entry")
+	}
+	if opus.InputTokens != 3 {
+		t.Errorf("model InputTokens = %d, want 3", opus.InputTokens)
+	}
+	if opus.OutputTokens != 24 {
+		t.Errorf("model OutputTokens = %d, want 24", opus.OutputTokens)
+	}
+	if opus.CacheCreationInputTokens != 13055 {
+		t.Errorf("model CacheCreationInputTokens = %d, want 13055", opus.CacheCreationInputTokens)
+	}
+	if opus.CacheReadInputTokens != 6692 {
+		t.Errorf("model CacheReadInputTokens = %d, want 6692", opus.CacheReadInputTokens)
+	}
+	if opus.CostUSD != 0.0855 {
+		t.Errorf("model CostUSD = %f, want 0.0855", opus.CostUSD)
+	}
+}
+
+func TestAppendWritesEmptyModelUsageAsEmptyJSON(t *testing.T) {
+	dir := setupDir(t)
+	records := []Record{
+		{
+			RunID:     "run-1",
+			TaskID:    "TASK-001",
+			StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndTime:   time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
+		},
+	}
+
+	if err := Append(dir, records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	rows := readCSV(t, filepath.Join(dir, fileName))
+	h := header()
+	colIndex := make(map[string]int)
+	for i, name := range h {
+		colIndex[name] = i
+	}
+
+	modelUsageJSON := rows[1][colIndex["model_usage"]]
+	if modelUsageJSON != "{}" {
+		t.Errorf("model_usage = %q, want %q", modelUsageJSON, "{}")
 	}
 }
 

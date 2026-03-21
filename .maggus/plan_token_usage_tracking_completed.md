@@ -97,14 +97,14 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a developer, I want usage data persisted to `usage_v2.csv` with the new cache, cost, and per-model fields so that historical data accurately reflects real usage.
 
 **Acceptance Criteria:**
-- [ ] `usage.Record` struct includes `CacheCreationInputTokens int`, `CacheReadInputTokens int`, `CostUSD float64`, and `ModelUsage map[string]ModelTokens`
-- [ ] The CSV filename constant is changed to `.maggus/usage_v2.csv`
-- [ ] CSV header includes new columns: `cache_creation_input_tokens`, `cache_read_input_tokens`, `cost_usd` placed after `output_tokens`; per-model data is serialized as a JSON string in a `model_usage` column at the end
-- [ ] `Append()` writes the new columns in each row
-- [ ] The `setupUsageCallback` in `work_loop.go` passes cache, cost, and model usage fields from `TaskUsage` to `usage.Record`
-- [ ] Typecheck/lint passes
-- [ ] All existing usage tests are updated for the new column count, positions, and filename
-- [ ] New test verifies cache, cost, and model_usage columns are written correctly
+- [x] `usage.Record` struct includes `CacheCreationInputTokens int`, `CacheReadInputTokens int`, `CostUSD float64`, and `ModelUsage map[string]ModelTokens`
+- [x] The CSV filename constant is changed to `.maggus/usage_v2.csv`
+- [x] CSV header includes new columns: `cache_creation_input_tokens`, `cache_read_input_tokens`, `cost_usd` placed after `output_tokens`; per-model data is serialized as a JSON string in a `model_usage` column at the end
+- [x] `Append()` writes the new columns in each row
+- [x] The `setupUsageCallback` in `work_loop.go` passes cache, cost, and model usage fields from `TaskUsage` to `usage.Record`
+- [x] Typecheck/lint passes
+- [x] All existing usage tests are updated for the new column count, positions, and filename
+- [x] New test verifies cache, cost, and model_usage columns are written correctly
 
 ## Functional Requirements
 
