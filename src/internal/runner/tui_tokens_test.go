@@ -217,4 +217,146 @@ func TestSaveAndResetCallsOnUsageCallback(t *testing.T) {
 	}
 }
 
+func TestAddModelUsageAccumulatesPerModel(t *testing.T) {
+	ts := tokenState{}
+
+	ts.addModelUsage(agent.ModelUsageMsg{
+		Models: map[string]agent.ModelTokens{
+			"claude-sonnet": {InputTokens: 100, OutputTokens: 50, CacheCreationInputTokens: 500, CacheReadInputTokens: 200, CostUSD: 0.01},
+		},
+	})
+	ts.addModelUsage(agent.ModelUsageMsg{
+		Models: map[string]agent.ModelTokens{
+			"claude-sonnet": {InputTokens: 200, OutputTokens: 100, CacheCreationInputTokens: 1000, CacheReadInputTokens: 300, CostUSD: 0.02},
+			"claude-haiku":  {InputTokens: 50, OutputTokens: 25, CostUSD: 0.005},
+		},
+	})
+
+	// Check iter accumulation for sonnet
+	sonnet := ts.iterModelUsage["claude-sonnet"]
+	if sonnet.InputTokens != 300 {
+		t.Errorf("iter sonnet InputTokens = %d, want 300", sonnet.InputTokens)
+	}
+	if sonnet.OutputTokens != 150 {
+		t.Errorf("iter sonnet OutputTokens = %d, want 150", sonnet.OutputTokens)
+	}
+	if sonnet.CacheCreationInputTokens != 1500 {
+		t.Errorf("iter sonnet CacheCreationInputTokens = %d, want 1500", sonnet.CacheCreationInputTokens)
+	}
+	if sonnet.CacheReadInputTokens != 500 {
+		t.Errorf("iter sonnet CacheReadInputTokens = %d, want 500", sonnet.CacheReadInputTokens)
+	}
+	if diff := sonnet.CostUSD - 0.03; diff < -1e-9 || diff > 1e-9 {
+		t.Errorf("iter sonnet CostUSD = %f, want 0.03", sonnet.CostUSD)
+	}
+
+	// Check iter accumulation for haiku
+	haiku := ts.iterModelUsage["claude-haiku"]
+	if haiku.InputTokens != 50 {
+		t.Errorf("iter haiku InputTokens = %d, want 50", haiku.InputTokens)
+	}
+	if haiku.OutputTokens != 25 {
+		t.Errorf("iter haiku OutputTokens = %d, want 25", haiku.OutputTokens)
+	}
+
+	// Total should match iter (no resets yet)
+	totalSonnet := ts.totalModelUsage["claude-sonnet"]
+	if totalSonnet.InputTokens != 300 {
+		t.Errorf("total sonnet InputTokens = %d, want 300", totalSonnet.InputTokens)
+	}
+	totalHaiku := ts.totalModelUsage["claude-haiku"]
+	if totalHaiku.InputTokens != 50 {
+		t.Errorf("total haiku InputTokens = %d, want 50", totalHaiku.InputTokens)
+	}
+}
+
+func TestSaveAndResetStoresModelUsageAndResetsIter(t *testing.T) {
+	ts := tokenState{}
+
+	ts.addUsage(agent.UsageMsg{InputTokens: 100, OutputTokens: 50})
+	ts.addModelUsage(agent.ModelUsageMsg{
+		Models: map[string]agent.ModelTokens{
+			"claude-sonnet": {InputTokens: 100, OutputTokens: 50, CostUSD: 0.01},
+		},
+	})
+
+	start := time.Now().Add(-time.Minute)
+	ts.saveAndReset("TASK-010", "Model Test", "plan.md", start)
+
+	if len(ts.usages) != 1 {
+		t.Fatalf("expected 1 TaskUsage, got %d", len(ts.usages))
+	}
+
+	tu := ts.usages[0]
+	if tu.ModelUsage == nil {
+		t.Fatal("ModelUsage should not be nil")
+	}
+	sonnet, ok := tu.ModelUsage["claude-sonnet"]
+	if !ok {
+		t.Fatal("ModelUsage should contain claude-sonnet")
+	}
+	if sonnet.InputTokens != 100 {
+		t.Errorf("ModelUsage sonnet InputTokens = %d, want 100", sonnet.InputTokens)
+	}
+	if sonnet.CostUSD != 0.01 {
+		t.Errorf("ModelUsage sonnet CostUSD = %f, want 0.01", sonnet.CostUSD)
+	}
+
+	// iterModelUsage should be reset
+	if ts.iterModelUsage != nil {
+		t.Errorf("iterModelUsage should be nil after reset, got %v", ts.iterModelUsage)
+	}
+
+	// totalModelUsage should be preserved
+	totalSonnet := ts.totalModelUsage["claude-sonnet"]
+	if totalSonnet.InputTokens != 100 {
+		t.Errorf("total sonnet InputTokens = %d after reset, want 100", totalSonnet.InputTokens)
+	}
+}
+
+func TestSaveAndResetPreservesTotalModelUsageAcrossIterations(t *testing.T) {
+	ts := tokenState{}
+
+	// First iteration
+	ts.addUsage(agent.UsageMsg{InputTokens: 100, OutputTokens: 50})
+	ts.addModelUsage(agent.ModelUsageMsg{
+		Models: map[string]agent.ModelTokens{
+			"claude-sonnet": {InputTokens: 100, OutputTokens: 50},
+		},
+	})
+	ts.saveAndReset("TASK-011", "Iter 1", "plan.md", time.Now().Add(-time.Minute))
+
+	// Second iteration
+	ts.addUsage(agent.UsageMsg{InputTokens: 200, OutputTokens: 100})
+	ts.addModelUsage(agent.ModelUsageMsg{
+		Models: map[string]agent.ModelTokens{
+			"claude-sonnet": {InputTokens: 150, OutputTokens: 75},
+			"claude-haiku":  {InputTokens: 50, OutputTokens: 25},
+		},
+	})
+	ts.saveAndReset("TASK-012", "Iter 2", "plan.md", time.Now().Add(-30*time.Second))
+
+	// Verify totals accumulated across both iterations
+	totalSonnet := ts.totalModelUsage["claude-sonnet"]
+	if totalSonnet.InputTokens != 250 {
+		t.Errorf("total sonnet InputTokens = %d, want 250", totalSonnet.InputTokens)
+	}
+	if totalSonnet.OutputTokens != 125 {
+		t.Errorf("total sonnet OutputTokens = %d, want 125", totalSonnet.OutputTokens)
+	}
+	totalHaiku := ts.totalModelUsage["claude-haiku"]
+	if totalHaiku.InputTokens != 50 {
+		t.Errorf("total haiku InputTokens = %d, want 50", totalHaiku.InputTokens)
+	}
+
+	// Second TaskUsage should only have second iteration's model usage
+	tu2 := ts.usages[1]
+	if tu2.ModelUsage["claude-sonnet"].InputTokens != 150 {
+		t.Errorf("iter2 sonnet InputTokens = %d, want 150", tu2.ModelUsage["claude-sonnet"].InputTokens)
+	}
+	if _, ok := tu2.ModelUsage["claude-haiku"]; !ok {
+		t.Error("iter2 should contain claude-haiku")
+	}
+}
+
 // FormatTokens is already tested in runner_test.go (TestFormatTokens)

@@ -18,6 +18,7 @@ type TaskUsage struct {
 	CacheCreationInputTokens int
 	CacheReadInputTokens     int
 	CostUSD                  float64
+	ModelUsage               map[string]agent.ModelTokens
 	StartTime                time.Time
 	EndTime                  time.Time
 }
@@ -35,6 +36,8 @@ type tokenState struct {
 	totalCacheRead     int             // cumulative cache read tokens
 	totalCost          float64         // cumulative cost in USD
 	hasData            bool            // true if any usage data was received
+	iterModelUsage     map[string]agent.ModelTokens  // per-iteration per-model usage
+	totalModelUsage    map[string]agent.ModelTokens  // cumulative per-model usage
 	usages             []TaskUsage     // per-task usage history
 	onUsage            func(TaskUsage) // called immediately when a task's usage is finalized
 }
@@ -56,6 +59,33 @@ func (t *tokenState) addUsage(msg agent.UsageMsg) {
 	}
 }
 
+// addModelUsage accumulates per-model token usage into both iter and total maps.
+func (t *tokenState) addModelUsage(msg agent.ModelUsageMsg) {
+	if t.iterModelUsage == nil {
+		t.iterModelUsage = make(map[string]agent.ModelTokens)
+	}
+	if t.totalModelUsage == nil {
+		t.totalModelUsage = make(map[string]agent.ModelTokens)
+	}
+	for name, mt := range msg.Models {
+		existing := t.iterModelUsage[name]
+		existing.InputTokens += mt.InputTokens
+		existing.OutputTokens += mt.OutputTokens
+		existing.CacheCreationInputTokens += mt.CacheCreationInputTokens
+		existing.CacheReadInputTokens += mt.CacheReadInputTokens
+		existing.CostUSD += mt.CostUSD
+		t.iterModelUsage[name] = existing
+
+		total := t.totalModelUsage[name]
+		total.InputTokens += mt.InputTokens
+		total.OutputTokens += mt.OutputTokens
+		total.CacheCreationInputTokens += mt.CacheCreationInputTokens
+		total.CacheReadInputTokens += mt.CacheReadInputTokens
+		total.CostUSD += mt.CostUSD
+		t.totalModelUsage[name] = total
+	}
+}
+
 // saveAndReset saves the current iteration's token usage and resets iteration counters.
 // taskID, taskTitle, planFile, and startTime come from the parent model since tokenState
 // doesn't track task metadata.
@@ -72,6 +102,7 @@ func (t *tokenState) saveAndReset(taskID, taskTitle, planFile string, startTime 
 		CacheCreationInputTokens: t.iterCacheCreation,
 		CacheReadInputTokens:     t.iterCacheRead,
 		CostUSD:                  t.iterCost,
+		ModelUsage:               t.iterModelUsage,
 		StartTime:                startTime,
 		EndTime:                  time.Now(),
 	}
@@ -84,6 +115,7 @@ func (t *tokenState) saveAndReset(taskID, taskTitle, planFile string, startTime 
 	t.iterCacheCreation = 0
 	t.iterCacheRead = 0
 	t.iterCost = 0
+	t.iterModelUsage = nil
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.

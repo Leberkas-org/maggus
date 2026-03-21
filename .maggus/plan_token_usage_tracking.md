@@ -66,12 +66,12 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a developer, I want per-model token usage tracked in the TUI state so it can be displayed in the summary and persisted to CSV.
 
 **Acceptance Criteria:**
-- [ ] `tokenState` struct includes a per-iteration map `iterModelUsage map[string]ModelTokens` and a cumulative map `totalModelUsage map[string]ModelTokens` (reuse or mirror the `ModelTokens` struct from messages.go)
-- [ ] A new `addModelUsage(msg agent.ModelUsageMsg)` method accumulates per-model tokens into both iter and total maps
-- [ ] `saveAndReset()` stores the per-iteration model map in `TaskUsage` (add a `ModelUsage map[string]ModelTokens` field to `TaskUsage`) and resets the iter map
-- [ ] The TUI `Update()` method in `tui.go` routes `agent.ModelUsageMsg` to `m.tokens.addModelUsage(msg)`
-- [ ] Typecheck/lint passes
-- [ ] Unit tests verify per-model accumulation, save, and reset
+- [x] `tokenState` struct includes a per-iteration map `iterModelUsage map[string]ModelTokens` and a cumulative map `totalModelUsage map[string]ModelTokens` (reuse or mirror the `ModelTokens` struct from messages.go)
+- [x] A new `addModelUsage(msg agent.ModelUsageMsg)` method accumulates per-model tokens into both iter and total maps
+- [x] `saveAndReset()` stores the per-iteration model map in `TaskUsage` (add a `ModelUsage map[string]ModelTokens` field to `TaskUsage`) and resets the iter map
+- [x] The TUI `Update()` method in `tui.go` routes `agent.ModelUsageMsg` to `m.tokens.addModelUsage(msg)`
+- [x] Typecheck/lint passes
+- [x] Unit tests verify per-model accumulation, save, and reset
 
 ### TASK-006: Update Live Progress Token Display
 **Description:** As a user, I want the live progress view to show total input tokens (including cache) with a cache breakdown so I can see accurate usage while tasks run.

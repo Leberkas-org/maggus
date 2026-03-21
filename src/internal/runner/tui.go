@@ -232,6 +232,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agent.UsageMsg:
 		m.tokens.addUsage(msg)
 
+	case agent.ModelUsageMsg:
+		m.tokens.addModelUsage(msg)
+
 	case IterationStartMsg:
 		m.handleIterationStart(msg)
 
