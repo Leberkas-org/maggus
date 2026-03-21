@@ -111,6 +111,7 @@ func findInitialTask(cmd interface{ Println(...interface{}) }, tasks []parser.Ta
 }
 
 // capCount limits the task count to the number of workable tasks, or 1 when --task is set.
+// A count of 0 means "all workable tasks".
 func capCount(tasks []parser.Task, count int) int {
 	if taskFlag != "" {
 		return 1
@@ -121,7 +122,7 @@ func capCount(tasks []parser.Task, count int) int {
 			workable++
 		}
 	}
-	if workable < count {
+	if count <= 0 || workable < count {
 		return workable
 	}
 	return count

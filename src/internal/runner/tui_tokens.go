@@ -25,21 +25,21 @@ type TaskUsage struct {
 
 // tokenState holds all token usage tracking state for the TUI.
 type tokenState struct {
-	iterInput          int             // current iteration input tokens
-	iterOutput         int             // current iteration output tokens
-	iterCacheCreation  int             // current iteration cache creation tokens
-	iterCacheRead      int             // current iteration cache read tokens
-	iterCost           float64         // current iteration cost in USD
-	totalInput         int             // cumulative input tokens
-	totalOutput        int             // cumulative output tokens
-	totalCacheCreation int             // cumulative cache creation tokens
-	totalCacheRead     int             // cumulative cache read tokens
-	totalCost          float64         // cumulative cost in USD
-	hasData            bool            // true if any usage data was received
-	iterModelUsage     map[string]agent.ModelTokens  // per-iteration per-model usage
-	totalModelUsage    map[string]agent.ModelTokens  // cumulative per-model usage
-	usages             []TaskUsage     // per-task usage history
-	onUsage            func(TaskUsage) // called immediately when a task's usage is finalized
+	iterInput          int                          // current iteration input tokens
+	iterOutput         int                          // current iteration output tokens
+	iterCacheCreation  int                          // current iteration cache creation tokens
+	iterCacheRead      int                          // current iteration cache read tokens
+	iterCost           float64                      // current iteration cost in USD
+	totalInput         int                          // cumulative input tokens
+	totalOutput        int                          // cumulative output tokens
+	totalCacheCreation int                          // cumulative cache creation tokens
+	totalCacheRead     int                          // cumulative cache read tokens
+	totalCost          float64                      // cumulative cost in USD
+	hasData            bool                         // true if any usage data was received
+	iterModelUsage     map[string]agent.ModelTokens // per-iteration per-model usage
+	totalModelUsage    map[string]agent.ModelTokens // cumulative per-model usage
+	usages             []TaskUsage                  // per-task usage history
+	onUsage            func(TaskUsage)              // called immediately when a task's usage is finalized
 }
 
 // addUsage accumulates token counts from a usage message.

@@ -31,12 +31,12 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a user, I want `work` to default to processing all workable tasks so that I don't have to specify a count every time.
 
 **Acceptance Criteria:**
-- [ ] When `--count` is not specified, the work command processes all workable tasks (not just 1 or 3)
-- [ ] `--count` flag still works when explicitly provided (e.g. `--count 3` processes 3 tasks)
-- [ ] `--task` flag still works to target a specific task
-- [ ] The banner/header view reflects the total workable task count accurately
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] When `--count` is not specified, the work command processes all workable tasks (not just 1 or 3)
+- [x] `--count` flag still works when explicitly provided (e.g. `--count 3` processes 3 tasks)
+- [x] `--task` flag still works to target a specific task
+- [x] The banner/header view reflects the total workable task count accurately
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-003: Replace y/n Stop Confirmation with Stop Picker
 **Description:** As a user, I want Alt+S to open an interactive stop picker so that I can choose exactly when to stop working.

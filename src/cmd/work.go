@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultTaskCount = 5
+const defaultTaskCount = 0 // 0 means "all workable tasks"
 
 // failedTask records a task that the agent failed to complete.
 type failedTask struct {
@@ -40,12 +40,12 @@ var (
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
 	Short: "Work on the next N tasks from the implementation plan",
-	Long: `Reads the implementation plan and works through the next N incomplete tasks
-by prompting Claude Code. Defaults to 5 tasks if no count is specified.
+	Long: `Reads the implementation plan and works through all incomplete tasks
+by prompting Claude Code. Use --count or a positional argument to limit the number.
 
 Examples:
-  maggus work        # work on the next 5 tasks
-  maggus work 10     # work on the next 10 tasks
+  maggus work        # work on all workable tasks
+  maggus work 3      # work on the next 3 tasks
   maggus work -c 3   # work on the next 3 tasks
   maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
@@ -184,7 +184,7 @@ Examples:
 }
 
 func init() {
-	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on")
+	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on (0 = all)")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")

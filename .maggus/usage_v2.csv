@@ -1,0 +1,2 @@
+run_id,task_id,task_title,plan_file,model,agent,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,cost_usd,start_time,end_time,elapsed,model_usage
+20260321-124701,TASK-001,Remove the Work Sub-Menu from the Main Menu,.maggus\plan_1.md,default,claude,89,6374,58238,1149857,1.098711,2026-03-21T12:47:01+01:00,2026-03-21T12:49:29+01:00,2m27s,"{""claude-opus-4-6[1m]"":{""InputTokens"":89,""OutputTokens"":6374,""CacheCreationInputTokens"":58238,""CacheReadInputTokens"":1149857,""CostUSD"":1.098711}}"
