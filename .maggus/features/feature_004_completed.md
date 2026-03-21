@@ -55,20 +55,20 @@ Replace the per-TUI-open API calls to `isclaude2x.com` with a single lazy-cached
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] A new `claude2xTickMsg` type is defined in `package cmd` (e.g., in `menu.go` or a new `cmd/claude2x.go`)
-- [ ] A helper `next2xTick() tea.Cmd` returns `tea.Tick(time.Second, ...)` that emits `claude2xTickMsg`
-- [ ] `menu.go` — `Update` handles `claude2xResultMsg`: when `Is2x=true`, schedule `next2xTick()`; update `m.twoXExpiresIn` from `msg.status.TwoXWindowExpiresIn`
-- [ ] `menu.go` — `Update` handles `claude2xTickMsg`: call `claude2x.FetchStatus()` (returns cached+recomputed), update `m.is2x` and `m.twoXExpiresIn`, schedule `next2xTick()` only if `m.is2x` is still true
-- [ ] `status.go` — same `claude2xTickMsg` handling pattern; updates `m.is2x` and `m.BorderColor`
-- [ ] `config.go` — same pattern; updates `m.is2x` only (no expiry text in config view)
-- [ ] `repos.go` — same pattern; updates `m.is2x` only
-- [ ] `update.go` — same pattern; updates `m.is2x` (check whether `twoXExpiresIn` is used there)
-- [ ] `work.go` line 118 (`claude2x.FetchStatus()`) requires no change — it transparently uses the cache from TASK-004-001
-- [ ] When `Is2x` flips from true to false mid-session, the ticker stops (no more `next2xTick()` scheduled) and border/display resets to normal
-- [ ] No additional API calls are made during ticker ticks — only `FetchStatus()` which returns the cached computed value
-- [ ] `go fmt ./...` and `go vet ./...` pass
-- [ ] Existing TUI tests (`menu_test.go`, `status_test.go`, etc.) pass without modification or with minimal updates to send `claude2xTickMsg` where needed
-- [ ] New unit tests cover:
+- [x] A new `claude2xTickMsg` type is defined in `package cmd` (e.g., in `menu.go` or a new `cmd/claude2x.go`)
+- [x] A helper `next2xTick() tea.Cmd` returns `tea.Tick(time.Second, ...)` that emits `claude2xTickMsg`
+- [x] `menu.go` — `Update` handles `claude2xResultMsg`: when `Is2x=true`, schedule `next2xTick()`; update `m.twoXExpiresIn` from `msg.status.TwoXWindowExpiresIn`
+- [x] `menu.go` — `Update` handles `claude2xTickMsg`: call `claude2x.FetchStatus()` (returns cached+recomputed), update `m.is2x` and `m.twoXExpiresIn`, schedule `next2xTick()` only if `m.is2x` is still true
+- [x] `status.go` — same `claude2xTickMsg` handling pattern; updates `m.is2x` and `m.BorderColor`
+- [x] `config.go` — same pattern; updates `m.is2x` only (no expiry text in config view)
+- [x] `repos.go` — same pattern; updates `m.is2x` only
+- [x] `update.go` — same pattern; updates `m.is2x` (check whether `twoXExpiresIn` is used there)
+- [x] `work.go` line 118 (`claude2x.FetchStatus()`) requires no change — it transparently uses the cache from TASK-004-001
+- [x] When `Is2x` flips from true to false mid-session, the ticker stops (no more `next2xTick()` scheduled) and border/display resets to normal
+- [x] No additional API calls are made during ticker ticks — only `FetchStatus()` which returns the cached computed value
+- [x] `go fmt ./...` and `go vet ./...` pass
+- [x] Existing TUI tests (`menu_test.go`, `status_test.go`, etc.) pass without modification or with minimal updates to send `claude2xTickMsg` where needed
+- [x] New unit tests cover:
   - Sending `claude2xTickMsg` to a model in 2x mode → `next2xTick()` scheduled again
   - Sending `claude2xTickMsg` to a model where cache has expired → no next tick scheduled, `is2x=false`
 

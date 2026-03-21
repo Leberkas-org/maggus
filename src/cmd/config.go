@@ -271,7 +271,14 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case claude2xResultMsg:
 		m.is2x = msg.status.Is2x
+		if m.is2x {
+			return m, next2xTick()
+		}
 		return m, nil
+	case claude2xTickMsg:
+		is2x, _, tickCmd := fetch2xAndUpdate()
+		m.is2x = is2x
+		return m, tickCmd
 
 	case configResultMsg:
 		if msg.err != nil {

@@ -273,7 +273,15 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case claude2xResultMsg:
 		m.is2x = msg.status.Is2x
 		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
+		if m.is2x {
+			return m, next2xTick()
+		}
 		return m, nil
+	case claude2xTickMsg:
+		is2x, expiresIn, tickCmd := fetch2xAndUpdate()
+		m.is2x = is2x
+		m.twoXExpiresIn = expiresIn
+		return m, tickCmd
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
 		return m, nil

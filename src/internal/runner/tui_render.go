@@ -121,7 +121,7 @@ func (m TUIModel) renderHeaderInner(w int) string {
 // stopPickerEntry represents a single line in the stop picker: either a group header or a selectable item.
 type stopPickerEntry struct {
 	isHeader bool
-	itemIdx  int    // picker item index (-1 for headers)
+	itemIdx  int // picker item index (-1 for headers)
 	label    string
 }
 
