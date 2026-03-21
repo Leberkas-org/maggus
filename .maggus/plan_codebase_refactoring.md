@@ -124,15 +124,15 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the shared task-list component to have its own tests so that changes don't accidentally break both list and status commands.
 
 **Acceptance Criteria:**
-- [ ] New file `src/cmd/tasklist_test.go` with tests for:
+- [x] New file `src/cmd/tasklist_test.go` with tests for:
   - Cursor movement wraps at boundaries (top→bottom, bottom→top)
   - `ensureCursorVisible()` adjusts scroll offset correctly when cursor moves out of view
   - `visibleTaskLines()` returns correct count based on height and header lines
   - Opening detail view sets showDetail and creates viewport
   - Closing detail view resets state
   - Criteria mode enter/exit lifecycle
-- [ ] All new tests pass: `go test ./cmd -run TestTaskList -v`
-- [ ] Existing tests still pass: `go test ./...`
+- [x] All new tests pass: `go test ./cmd -run TestTaskList -v`
+- [x] Existing tests still pass: `go test ./...`
 
 ### TASK-010: Extract work loop setup into a workSetup function
 **Description:** As a developer, I want the work loop's initialization code (config loading, agent resolution, model resolution, gitignore, fingerprint, worktree mode) extracted into a named function so that RunE focuses on orchestration.
