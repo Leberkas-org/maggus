@@ -108,36 +108,6 @@ type PushStatusMsg struct {
 // QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
 type QuitMsg struct{}
 
-// SyncCheckMsg tells the TUI to show the sync resolution screen between tasks.
-// The work goroutine blocks on ResultCh until the user makes a choice.
-type SyncCheckMsg struct {
-	Behind       int
-	Ahead        int
-	RemoteBranch string
-	ResultCh     chan<- SyncCheckResult
-}
-
-// SyncCheckResult is the user's resolution choice sent back to the work goroutine.
-type SyncCheckResult struct {
-	Action  SyncAction
-	Message string // info message (e.g. "Pulled 3 commits")
-	Err     error  // non-nil if the pull action failed fatally
-}
-
-// SyncAction represents the user's choice during a between-task sync check.
-type SyncAction int
-
-const (
-	SyncProceed SyncAction = iota // continue (pull succeeded, skip, or up-to-date)
-	SyncAbort                     // user chose to abort
-)
-
-// syncActionDoneMsg is an internal message sent after a sync pull action completes.
-type syncActionDoneMsg struct {
-	err     error
-	message string
-}
-
 // TaskCriterion holds a single acceptance criterion for display in the task detail view.
 type TaskCriterion struct {
 	Text    string
@@ -255,28 +225,12 @@ type TUIModel struct {
 	quitting           bool
 
 	// Sync check state (between-task remote sync)
-	syncActive       bool                   // true when showing sync resolution screen
-	syncBehind       int                    // commits behind remote
-	syncAhead        int                    // commits ahead of remote
-	syncRemoteBranch string                 // remote branch name
-	syncResultCh     chan<- SyncCheckResult // channel to send result back to work goroutine
-	syncOptions      []syncMenuOption       // resolution menu options
-	syncCursor       int                    // selected menu item
-	syncConfirmForce bool                   // showing force-pull confirmation
-	syncRunning      bool                   // executing a pull action
-	syncErrorMsg     string                 // error from failed action (returns to menu)
-	syncDir          string                 // directory for git operations
-}
-
-// syncMenuOption represents one item in the sync resolution menu.
-type syncMenuOption struct {
-	label string
-	desc  string
+	sync syncState
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
 func (m *TUIModel) SetSyncDir(dir string) {
-	m.syncDir = dir
+	m.sync.dir = dir
 }
 
 // NewTUIModel creates a new TUI model. The cancelFunc is called on Ctrl+C to cancel the work context.
@@ -356,8 +310,12 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// Sync screen captures all keys when active
-		if m.syncActive {
-			return m.handleSyncKeys(msg)
+		if m.sync.active {
+			cmd, interrupting := m.sync.handleSyncKeys(msg, &m.cancelFunc)
+			if interrupting {
+				m.status = "Interrupting..."
+			}
+			return m, cmd
 		}
 		if m.done {
 			return m.handleSummaryKeys(msg)
@@ -582,33 +540,10 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commits = m.commits[len(m.commits)-maxCommitHistory:]
 		}
 
-	case SyncCheckMsg:
-		m.syncActive = true
-		m.syncBehind = msg.Behind
-		m.syncAhead = msg.Ahead
-		m.syncRemoteBranch = msg.RemoteBranch
-		m.syncResultCh = msg.ResultCh
-		m.syncConfirmForce = false
-		m.syncRunning = false
-		m.syncErrorMsg = ""
-		m.buildSyncOptions()
-		return m, nil
-
-	case syncActionDoneMsg:
-		m.syncRunning = false
-		if msg.err != nil {
-			m.syncErrorMsg = msg.err.Error()
-			m.buildSyncOptions() // rebuild menu so user can retry
-			return m, nil
+	case SyncCheckMsg, syncActionDoneMsg:
+		if handled, cmd := m.sync.handleSyncMsg(msg, &m.infoMessages); handled {
+			return m, cmd
 		}
-		// Action succeeded — send result and exit sync mode
-		if m.syncResultCh != nil {
-			m.syncResultCh <- SyncCheckResult{Action: SyncProceed, Message: msg.message}
-			m.syncResultCh = nil
-		}
-		m.syncActive = false
-		m.infoMessages = append(m.infoMessages, msg.message)
-		return m, nil
 	}
 
 	return m, nil
@@ -625,264 +560,6 @@ func (m *TUIModel) rebuildExtras() {
 	m.extras = strings.Join(parts, "  ")
 }
 
-// buildSyncOptions populates the sync resolution menu.
-func (m *TUIModel) buildSyncOptions() {
-	m.syncOptions = []syncMenuOption{
-		{label: "Pull", desc: "git pull"},
-		{label: "Pull with rebase", desc: "git pull --rebase"},
-		{label: "Force pull", desc: "reset to remote (discards ALL local commits and changes)"},
-		{label: "Skip", desc: "continue without pulling"},
-		{label: "Abort", desc: "stop maggus work"},
-	}
-	m.syncCursor = 0
-}
-
-// handleSyncKeys processes key events while the sync screen is active.
-func (m TUIModel) handleSyncKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Type == tea.KeyCtrlC {
-		// Ctrl+C during sync aborts the run
-		if m.syncResultCh != nil {
-			m.syncResultCh <- SyncCheckResult{Action: SyncAbort}
-			m.syncResultCh = nil
-		}
-		m.syncActive = false
-		m.status = "Interrupting..."
-		if m.cancelFunc != nil {
-			m.cancelFunc()
-			m.cancelFunc = nil
-		}
-		return m, nil
-	}
-
-	if m.syncRunning {
-		return m, nil // ignore keys while action runs
-	}
-
-	if m.syncConfirmForce {
-		switch msg.String() {
-		case "y", "Y":
-			m.syncConfirmForce = false
-			m.syncRunning = true
-			return m, m.runSyncForcePull
-		case "n", "N", "esc":
-			m.syncConfirmForce = false
-			return m, nil
-		}
-		return m, nil
-	}
-
-	switch msg.Type {
-	case tea.KeyUp:
-		if m.syncCursor > 0 {
-			m.syncCursor--
-		}
-		return m, nil
-	case tea.KeyDown:
-		if m.syncCursor < len(m.syncOptions)-1 {
-			m.syncCursor++
-		}
-		return m, nil
-	case tea.KeyEnter:
-		return m.selectSyncOption()
-	case tea.KeyEsc:
-		if m.syncResultCh != nil {
-			m.syncResultCh <- SyncCheckResult{Action: SyncAbort}
-			m.syncResultCh = nil
-		}
-		m.syncActive = false
-		m.status = "Interrupting..."
-		if m.cancelFunc != nil {
-			m.cancelFunc()
-			m.cancelFunc = nil
-		}
-		return m, nil
-	}
-
-	if len(msg.Runes) == 1 {
-		switch msg.Runes[0] {
-		case 'q':
-			if m.syncResultCh != nil {
-				m.syncResultCh <- SyncCheckResult{Action: SyncAbort}
-				m.syncResultCh = nil
-			}
-			m.syncActive = false
-			m.status = "Interrupting..."
-			if m.cancelFunc != nil {
-				m.cancelFunc()
-				m.cancelFunc = nil
-			}
-			return m, nil
-		case 'k':
-			if m.syncCursor > 0 {
-				m.syncCursor--
-			}
-		case 'j':
-			if m.syncCursor < len(m.syncOptions)-1 {
-				m.syncCursor++
-			}
-		}
-	}
-
-	return m, nil
-}
-
-func (m TUIModel) selectSyncOption() (tea.Model, tea.Cmd) {
-	if m.syncCursor >= len(m.syncOptions) {
-		return m, nil
-	}
-	opt := m.syncOptions[m.syncCursor]
-
-	switch opt.label {
-	case "Pull":
-		m.syncRunning = true
-		m.syncErrorMsg = ""
-		return m, m.runSyncPull
-	case "Pull with rebase":
-		m.syncRunning = true
-		m.syncErrorMsg = ""
-		return m, m.runSyncPullRebase
-	case "Force pull":
-		m.syncConfirmForce = true
-		return m, nil
-	case "Skip":
-		if m.syncResultCh != nil {
-			m.syncResultCh <- SyncCheckResult{Action: SyncProceed, Message: "Skipped git sync"}
-			m.syncResultCh = nil
-		}
-		m.syncActive = false
-		return m, nil
-	case "Abort":
-		if m.syncResultCh != nil {
-			m.syncResultCh <- SyncCheckResult{Action: SyncAbort}
-			m.syncResultCh = nil
-		}
-		m.syncActive = false
-		m.status = "Interrupting..."
-		if m.cancelFunc != nil {
-			m.cancelFunc()
-			m.cancelFunc = nil
-		}
-		return m, nil
-	}
-
-	return m, nil
-}
-
-// runSyncPull executes git pull as a tea.Cmd.
-func (m TUIModel) runSyncPull() tea.Msg {
-	err := syncPullFunc(m.syncDir)
-	if err != nil {
-		return syncActionDoneMsg{err: err}
-	}
-	return syncActionDoneMsg{message: fmt.Sprintf("Pulled %d commit(s) from %s", m.syncBehind, m.syncRemoteBranch)}
-}
-
-// runSyncPullRebase executes git pull --rebase as a tea.Cmd.
-func (m TUIModel) runSyncPullRebase() tea.Msg {
-	err := syncPullRebaseFunc(m.syncDir)
-	if err != nil {
-		return syncActionDoneMsg{err: err}
-	}
-	return syncActionDoneMsg{message: fmt.Sprintf("Rebased onto %s (%d commit(s))", m.syncRemoteBranch, m.syncBehind)}
-}
-
-// runSyncForcePull executes force pull (fetch + reset --hard) as a tea.Cmd.
-func (m TUIModel) runSyncForcePull() tea.Msg {
-	err := syncForcePullFunc(m.syncDir, true)
-	if err != nil {
-		return syncActionDoneMsg{err: err}
-	}
-	return syncActionDoneMsg{message: fmt.Sprintf("Force-pulled: reset to %s", m.syncRemoteBranch)}
-}
-
-// syncPullFunc, syncPullRebaseFunc, syncForcePullFunc are package-level vars
-// pointing to gitsync functions. They are set by InitSyncFuncs from the cmd package.
-var (
-	syncPullFunc       func(string) error
-	syncPullRebaseFunc func(string) error
-	syncForcePullFunc  func(string, bool) error
-)
-
-// InitSyncFuncs sets the git sync functions used by the TUI's between-task sync screen.
-// This should be called once at startup from the cmd package to inject the gitsync functions.
-func InitSyncFuncs(pull func(string) error, pullRebase func(string) error, forcePull func(string, bool) error) {
-	syncPullFunc = pull
-	syncPullRebaseFunc = pullRebase
-	syncForcePullFunc = forcePull
-}
-
-// renderSyncView renders the between-task sync resolution screen.
-func (m TUIModel) renderSyncView() string {
-	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
-	if innerW < 40 {
-		innerW = 40
-	}
-
-	var b strings.Builder
-
-	// Show header (preserves context)
-	b.WriteString(m.renderHeaderInner(innerW))
-	b.WriteString("\n")
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	b.WriteString(titleStyle.Render("Git Sync — Remote Changed") + "\n")
-	b.WriteString(styles.Separator(innerW) + "\n\n")
-
-	labelStyle := lipgloss.NewStyle().Bold(true).Width(10).Align(lipgloss.Right)
-	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	errStyle := lipgloss.NewStyle().Foreground(styles.Error)
-	warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
-
-	// Remote status
-	statusParts := []string{}
-	if m.syncBehind > 0 {
-		statusParts = append(statusParts, errStyle.Render(fmt.Sprintf("%d behind", m.syncBehind)))
-	}
-	if m.syncAhead > 0 {
-		statusParts = append(statusParts, warnStyle.Render(fmt.Sprintf("%d ahead", m.syncAhead)))
-	}
-	b.WriteString(fmt.Sprintf("%s  %s (%s)\n\n", labelStyle.Render("Remote:"), valStyle.Render(m.syncRemoteBranch), strings.Join(statusParts, ", ")))
-
-	if m.syncRunning {
-		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(spinnerFrames[m.frame])
-		b.WriteString(fmt.Sprintf("%s Running...\n", spinner))
-	} else if m.syncConfirmForce {
-		b.WriteString(errStyle.Render("⚠ Force Pull Confirmation") + "\n\n")
-		b.WriteString(errStyle.Render("This will discard ALL local commits and changes. Are you sure?") + "\n\n")
-		b.WriteString(fmt.Sprintf("  %s to confirm, %s to cancel\n",
-			lipgloss.NewStyle().Bold(true).Foreground(styles.Error).Render("y"),
-			valStyle.Render("n/esc")))
-	} else {
-		if m.syncErrorMsg != "" {
-			b.WriteString(errStyle.Render("✗ "+m.syncErrorMsg) + "\n\n")
-		}
-
-		for i, opt := range m.syncOptions {
-			cursor := "  "
-			nameStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-			descStyle := valStyle
-			if i == m.syncCursor {
-				cursor = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render("→ ")
-				nameStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-			}
-			b.WriteString(fmt.Sprintf("%s%s  %s\n", cursor, nameStyle.Render(opt.label), descStyle.Render(opt.desc)))
-		}
-	}
-
-	// Footer
-	var footer string
-	if m.syncConfirmForce {
-		footer = styles.StatusBar.Render("y: confirm · n/esc: cancel")
-	} else if !m.syncRunning {
-		footer = styles.StatusBar.Render("↑/↓: select · enter: confirm · q/esc: abort")
-	}
-
-	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenLeft(b.String(), footer, m.width, m.height)
-	}
-	return styles.Box.Render(b.String()) + "\n"
-}
-
 // Styles — aliases to the shared style package for concise rendering code.
 var (
 	boldStyle   = styles.Label
@@ -895,8 +572,8 @@ var (
 )
 
 func (m TUIModel) View() string {
-	if m.syncActive {
-		return m.renderSyncView()
+	if m.sync.active {
+		return m.sync.renderSyncView(&m)
 	}
 	if m.showSummary || m.done {
 		return m.renderSummaryView()

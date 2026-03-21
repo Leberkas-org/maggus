@@ -23,16 +23,16 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the sync resolution screen state and methods extracted into a separate file so that the TUI model is easier to understand and modify.
 
 **Acceptance Criteria:**
-- [ ] New file `src/internal/runner/tui_sync.go` contains all sync-related types, fields struct, and methods
-- [ ] Create a `syncState` struct holding: `active`, `behind`, `ahead`, `remoteBranch`, `resultCh`, `options`, `cursor`, `confirmForce`, `running`, `errorMsg`, `dir` fields
-- [ ] `TUIModel` embeds or holds a `syncState` field instead of 12 individual sync fields
-- [ ] `handleSyncKeys()`, `selectSyncOption()`, `buildSyncOptions()`, `renderSyncView()`, `runSyncPull()`, `runSyncPullRebase()`, `runSyncForcePull()` move to `tui_sync.go`
-- [ ] `syncMenuOption` type, `SyncCheckMsg`/`SyncCheckResult`/`SyncAction`/`syncActionDoneMsg` types move to `tui_sync.go`
-- [ ] `InitSyncFuncs()` and the package-level sync function vars move to `tui_sync.go`
-- [ ] All sync-related message handling in `Update()` delegates to a `handleSyncMsg()` method on syncState
-- [ ] `go test ./internal/runner` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New file `src/internal/runner/tui_sync.go` contains all sync-related types, fields struct, and methods
+- [x] Create a `syncState` struct holding: `active`, `behind`, `ahead`, `remoteBranch`, `resultCh`, `options`, `cursor`, `confirmForce`, `running`, `errorMsg`, `dir` fields
+- [x] `TUIModel` embeds or holds a `syncState` field instead of 12 individual sync fields
+- [x] `handleSyncKeys()`, `selectSyncOption()`, `buildSyncOptions()`, `renderSyncView()`, `runSyncPull()`, `runSyncPullRebase()`, `runSyncForcePull()` move to `tui_sync.go`
+- [x] `syncMenuOption` type, `SyncCheckMsg`/`SyncCheckResult`/`SyncAction`/`syncActionDoneMsg` types move to `tui_sync.go`
+- [x] `InitSyncFuncs()` and the package-level sync function vars move to `tui_sync.go`
+- [x] All sync-related message handling in `Update()` delegates to a `handleSyncMsg()` method on syncState
+- [x] `go test ./internal/runner` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-002: Extract summary state and rendering from TUIModel into tui_summary.go
 **Description:** As a developer, I want the summary/post-run screen state and rendering extracted into a separate file so that adding summary features doesn't require touching the main TUI model.
