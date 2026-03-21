@@ -70,117 +70,104 @@ Examples:
 
 		count := wc.count
 
-		// Run-again loop: allows the user to start another batch from the summary screen.
-		for {
-			setup, err := initIteration(cmd, dir, wc.modelDisplay, count)
-			if err != nil {
-				return err
-			}
-			if setup == nil {
-				return nil
-			}
-			count = setup.count
-			run := setup.run
-
-			branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, run)
-			if err != nil {
-				return err
-			}
-			if wc.useWorktree {
-				workDir = filepath.Join(repoDir, ".maggus-work", run.ID)
-				defer func() {
-					_ = worktree.Remove(repoDir, workDir)
-				}()
-			}
-
-			// Set up signal handling and cancellation.
-			sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
-			defer sigStop()
-
-			workCtx, workCancel := context.WithCancel(context.Background())
-			defer workCancel()
-
-			go func() {
-				<-sigCtx.Done()
-				sigStop()
-				workCancel()
-			}()
-
-			tuiCancel := func() {
-				sigStop()
-				workCancel()
-			}
-
-			// Build and start the TUI.
-			twoXStatus := claude2x.FetchStatus()
-			banner := runner.BannerInfo{
-				Iterations: count,
-				Branch:     run.Branch,
-				RunID:      run.ID,
-				RunDir:     run.RelativeDir(dir),
-				Agent:      wc.activeAgent.Name(),
-			}
-			if wc.useWorktree {
-				banner.Worktree = workDir
-			}
-			if twoXStatus.Is2x {
-				banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
-			}
-			runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
-
-			m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
-			m.SetSyncDir(workDir)
-			setupUsageCallback(&m, dir, run, wc.modelDisplay, wc.activeAgent.Name())
-			p := tea.NewProgram(m, tea.WithAltScreen())
-
-			tc := taskContext{
-				workCtx:       workCtx,
-				p:             p,
-				run:           run,
-				activeAgent:   wc.activeAgent,
-				resolvedModel: wc.resolvedModel,
-				notifier:      wc.notifier,
-				validIncludes: wc.validIncludes,
-				useWorktree:   wc.useWorktree,
-				repoDir:       repoDir,
-				workDir:       workDir,
-				runID:         run.ID,
-			}
-
-			runWorkGoroutine(workLoopParams{
-				tc:            tc,
-				tasks:         setup.tasks,
-				count:         count,
-				run:           run,
-				p:             p,
-				stopFlag:      m.StopFlag(),
-				stopAtTaskID:  m.StopAtTaskIDFlag(),
-				includeWarns:  wc.includeWarnings,
-				branchMsg:     branchMsg,
-				syncInfoMsg:   syncInfoMsg,
-				activeAgentNm: wc.activeAgent.Name(),
-				startHash:     captureStartHash(workDir),
-				modelDisplay:  wc.modelDisplay,
-				dir:           dir,
-			})
-
-			finalModel, tuiErr := p.Run()
-			if tuiErr != nil {
-				return fmt.Errorf("TUI error: %w", tuiErr)
-			}
-
-			if tm, ok := finalModel.(runner.TUIModel); ok {
-				result := tm.Result()
-				if result.RunAgain {
-					count = result.TaskCount
-					taskFlag = ""
-					workDir = dir
-					continue
-				}
-			}
-
+		setup, err := initIteration(cmd, dir, wc.modelDisplay, count)
+		if err != nil {
+			return err
+		}
+		if setup == nil {
 			return nil
 		}
+		count = setup.count
+		run := setup.run
+
+		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, run)
+		if err != nil {
+			return err
+		}
+		if wc.useWorktree {
+			workDir = filepath.Join(repoDir, ".maggus-work", run.ID)
+			defer func() {
+				_ = worktree.Remove(repoDir, workDir)
+			}()
+		}
+
+		// Set up signal handling and cancellation.
+		sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
+		defer sigStop()
+
+		workCtx, workCancel := context.WithCancel(context.Background())
+		defer workCancel()
+
+		go func() {
+			<-sigCtx.Done()
+			sigStop()
+			workCancel()
+		}()
+
+		tuiCancel := func() {
+			sigStop()
+			workCancel()
+		}
+
+		// Build and start the TUI.
+		twoXStatus := claude2x.FetchStatus()
+		banner := runner.BannerInfo{
+			Iterations: count,
+			Branch:     run.Branch,
+			RunID:      run.ID,
+			RunDir:     run.RelativeDir(dir),
+			Agent:      wc.activeAgent.Name(),
+		}
+		if wc.useWorktree {
+			banner.Worktree = workDir
+		}
+		if twoXStatus.Is2x {
+			banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
+		}
+		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
+
+		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
+		m.SetSyncDir(workDir)
+		setupUsageCallback(&m, dir, run, wc.modelDisplay, wc.activeAgent.Name())
+		p := tea.NewProgram(m, tea.WithAltScreen())
+
+		tc := taskContext{
+			workCtx:       workCtx,
+			p:             p,
+			run:           run,
+			activeAgent:   wc.activeAgent,
+			resolvedModel: wc.resolvedModel,
+			notifier:      wc.notifier,
+			validIncludes: wc.validIncludes,
+			useWorktree:   wc.useWorktree,
+			repoDir:       repoDir,
+			workDir:       workDir,
+			runID:         run.ID,
+		}
+
+		runWorkGoroutine(workLoopParams{
+			tc:            tc,
+			tasks:         setup.tasks,
+			count:         count,
+			run:           run,
+			p:             p,
+			stopFlag:      m.StopFlag(),
+			stopAtTaskID:  m.StopAtTaskIDFlag(),
+			includeWarns:  wc.includeWarnings,
+			branchMsg:     branchMsg,
+			syncInfoMsg:   syncInfoMsg,
+			activeAgentNm: wc.activeAgent.Name(),
+			startHash:     captureStartHash(workDir),
+			modelDisplay:  wc.modelDisplay,
+			dir:           dir,
+		})
+
+		_, tuiErr := p.Run()
+		if tuiErr != nil {
+			return fmt.Errorf("TUI error: %w", tuiErr)
+		}
+
+		return nil
 	},
 }
 

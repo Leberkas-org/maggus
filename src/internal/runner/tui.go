@@ -38,7 +38,7 @@ type InfoMsg struct {
 	Text string
 }
 
-// SummaryData, SummaryMsg, PushStatusMsg, QuitMsg, RunAgainResult, StopReason,
+// SummaryData, SummaryMsg, PushStatusMsg, QuitMsg, StopReason,
 // RemainingTask, FailedTask types are defined in tui_summary.go.
 
 // TaskCriterion holds a single acceptance criterion for display in the task detail view.
@@ -163,11 +163,6 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 // SetOnTaskUsage sets a callback that is invoked each time a task's usage is finalized.
 func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
 	m.tokens.onUsage = fn
-}
-
-// Result returns the user's choice from the summary menu.
-func (m TUIModel) Result() RunAgainResult {
-	return m.summary.runAgain
 }
 
 // TaskUsages returns the per-task token usage records.

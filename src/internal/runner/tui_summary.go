@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -69,23 +68,13 @@ type PushStatusMsg struct {
 // QuitMsg tells the TUI to transition to the "done" state (waiting for keypress to exit).
 type QuitMsg struct{}
 
-// RunAgainResult holds the user's choice from the summary menu.
-type RunAgainResult struct {
-	RunAgain  bool
-	TaskCount int
-}
-
 // summaryState holds all state for the post-run summary screen.
 type summaryState struct {
-	show         bool           // true when showing summary view
-	data         SummaryData    // summary data from the work loop
-	elapsed      time.Duration  // frozen elapsed time at summary display
-	pushStatus   string         // current push status message
-	pushDone     bool           // true when push is complete
-	menuChoice   int            // 0 = Exit, 1 = Run again
-	editingCount bool           // true when typing task count
-	countInput   string         // buffer for task count input
-	runAgain     RunAgainResult // user's final choice
+	show       bool          // true when showing summary view
+	data       SummaryData   // summary data from the work loop
+	elapsed    time.Duration // frozen elapsed time at summary display
+	pushStatus string        // current push status message
+	pushDone   bool          // true when push is complete
 }
 
 // handleSummaryMsg handles summary-related messages in Update(), returning true if the message was handled.
@@ -112,73 +101,16 @@ func (s *summaryState) handleSummaryMsg(msg tea.Msg, m *TUIModel) (handled bool)
 }
 
 // handleSummaryKeys processes key events while the summary/done screen is active.
+// Any of Q, Esc, Enter, or Ctrl+C exits.
 func (s *summaryState) handleSummaryKeys(msg tea.KeyMsg) (quitting bool, cmd tea.Cmd) {
-	if s.editingCount {
-		switch msg.Type {
-		case tea.KeyEscape:
-			s.editingCount = false
-			s.countInput = ""
-			return false, nil
-		case tea.KeyEnter:
-			n, err := strconv.Atoi(s.countInput)
-			if err != nil || n <= 0 {
-				s.countInput = ""
-				return false, nil
-			}
-			s.runAgain = RunAgainResult{RunAgain: true, TaskCount: n}
-			return true, tea.Quit
-		case tea.KeyBackspace:
-			if len(s.countInput) > 0 {
-				s.countInput = s.countInput[:len(s.countInput)-1]
-			}
-			return false, nil
-		case tea.KeyCtrlC:
-			return true, tea.Quit
-		default:
-			if len(msg.Runes) == 1 && msg.Runes[0] >= '0' && msg.Runes[0] <= '9' {
-				if len(s.countInput) < 4 { // max 9999 tasks
-					s.countInput += string(msg.Runes[0])
-				}
-			}
-			return false, nil
-		}
-	}
-
 	switch msg.Type {
-	case tea.KeyEscape:
+	case tea.KeyEscape, tea.KeyCtrlC, tea.KeyEnter:
 		return true, tea.Quit
-	case tea.KeyCtrlC:
-		return true, tea.Quit
-	case tea.KeyUp, tea.KeyShiftTab:
-		if s.menuChoice > 0 {
-			s.menuChoice--
-		}
-		return false, nil
-	case tea.KeyDown, tea.KeyTab:
-		if s.menuChoice < 1 {
-			s.menuChoice++
-		}
-		return false, nil
-	case tea.KeyEnter:
-		if s.menuChoice == 0 {
-			return true, tea.Quit
-		}
-		s.editingCount = true
-		s.countInput = ""
-		return false, nil
 	default:
 		if len(msg.Runes) == 1 {
 			switch msg.Runes[0] {
 			case 'q', 'Q':
 				return true, tea.Quit
-			case 'j':
-				if s.menuChoice < 1 {
-					s.menuChoice++
-				}
-			case 'k':
-				if s.menuChoice > 0 {
-					s.menuChoice--
-				}
 			}
 		}
 		return false, nil
@@ -408,41 +340,8 @@ afterTitle:
 	return styles.Box.Render(content.String()) + "\n"
 }
 
-// renderSummaryMenu renders the interactive menu at the bottom of the summary screen.
+// renderSummaryMenu renders the exit hint at the bottom of the summary screen.
 func (s *summaryState) renderSummaryMenu() string {
-	var menu strings.Builder
-
-	selectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
-	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	hintStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
-
-	// Exit option
-	if s.menuChoice == 0 {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", selectedStyle.Render("▸"), selectedStyle.Render("Exit")))
-	} else {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Exit")))
-	}
-
-	// Run again option
-	if s.menuChoice == 1 {
-		if s.editingCount {
-			cursor := "█"
-			countDisplay := s.countInput + cursor
-			menu.WriteString(fmt.Sprintf("  %s %s %s %s\n",
-				selectedStyle.Render("▸"),
-				selectedStyle.Render("Run again:"),
-				selectedStyle.Render(countDisplay),
-				hintStyle.Render("tasks (enter to confirm, esc to cancel)")))
-		} else {
-			menu.WriteString(fmt.Sprintf("  %s %s\n",
-				selectedStyle.Render("▸"),
-				selectedStyle.Render("Run again")))
-		}
-	} else {
-		menu.WriteString(fmt.Sprintf("  %s %s\n", normalStyle.Render(" "), normalStyle.Render("Run again")))
-	}
-
-	menu.WriteString(fmt.Sprintf("\n  %s\n", hintStyle.Render("↑/↓ select · enter confirm · q/esc exit")))
-
-	return menu.String()
+	return fmt.Sprintf("  %s\n", hintStyle.Render("Press q/esc/enter to exit"))
 }

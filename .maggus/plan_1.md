@@ -71,13 +71,13 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a user, I want the summary screen to only show "Exit" so that the experience is clean — I'll start a new run when I'm ready.
 
 **Acceptance Criteria:**
-- [ ] The summary screen no longer shows the "Run again" menu option
-- [ ] The summary screen shows only "Exit" (or auto-exits, press any key)
-- [ ] The `RunAgainResult` type and `editingCount` logic are removed from `summaryState`
-- [ ] The run-again loop in `work.go` is removed or simplified (no outer loop needed)
-- [ ] Pressing Q, Esc, Enter, or Ctrl+C on the summary screen exits
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] The summary screen no longer shows the "Run again" menu option
+- [x] The summary screen shows only "Exit" (or auto-exits, press any key)
+- [x] The `RunAgainResult` type and `editingCount` logic are removed from `summaryState`
+- [x] The run-again loop in `work.go` is removed or simplified (no outer loop needed)
+- [x] Pressing Q, Esc, Enter, or Ctrl+C on the summary screen exits
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-006: Update Work Loop to Support Stop-At-Task
 **Description:** As a developer, I want the work loop to stop at a specific task (not just "after current") so that the stop picker's "After TASK-X" option works correctly.
