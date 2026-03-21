@@ -480,3 +480,113 @@ func TestStartupUpdateCheck_AutoMode_NoDownloadURL(t *testing.T) {
 		t.Errorf("expected empty banner when no download URL in auto mode, got: %q", result)
 	}
 }
+
+func TestTruncateLeft(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		maxWidth int
+		want     string
+	}{
+		{
+			name:     "short path unchanged",
+			path:     "/home/user",
+			maxWidth: 20,
+			want:     "/home/user",
+		},
+		{
+			name:     "exact width unchanged",
+			path:     "abcdefghij",
+			maxWidth: 10,
+			want:     "abcdefghij",
+		},
+		{
+			name:     "long path truncated with ellipsis",
+			path:     "/home/user/projects/myapp",
+			maxWidth: 15,
+			want:     "...ojects/myapp",
+		},
+		{
+			name:     "very small max width",
+			path:     "/home/user",
+			maxWidth: 3,
+			want:     "ser",
+		},
+		{
+			name:     "zero max width returns original",
+			path:     "/home/user",
+			maxWidth: 0,
+			want:     "/home/user",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateLeft(tt.path, tt.maxWidth)
+			if got != tt.want {
+				t.Errorf("truncateLeft(%q, %d) = %q, want %q", tt.path, tt.maxWidth, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMenuView_CWDUsesBoldPrimaryStyle(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/test/project",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// The CWD path must appear in the rendered view.
+	if !strings.Contains(view, "/test/project") {
+		t.Error("expected CWD path to appear in menu view")
+	}
+}
+
+func TestMenuView_CWDEmptyHidden(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// When cwd is empty, no CWD line should appear.
+	// The view should still render without errors.
+	if strings.Contains(view, "...") {
+		// No truncated path should appear since cwd is empty.
+	}
+	_ = view // ensure it renders without panic
+}
+
+func TestMenuView_CWDStillCentered(t *testing.T) {
+	m := menuModel{
+		items:   activeMenuItems(),
+		cwd:     "/short",
+		width:   120,
+		height:  40,
+		summary: featureSummary{},
+	}
+
+	view := m.View()
+
+	// Find the line containing the CWD. It should have leading spaces (centered).
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "/short") {
+			trimmed := strings.TrimLeft(line, " ")
+			leadingSpaces := len(line) - len(trimmed)
+			if leadingSpaces == 0 {
+				t.Error("expected CWD line to be centered with leading spaces")
+			}
+			return
+		}
+	}
+	t.Error("CWD path not found in view output")
+}

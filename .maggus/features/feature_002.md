@@ -57,11 +57,11 @@ Currently, the 2x theme only affects the main menu (logo color + border). The st
 **Parallel:** yes — can run alongside TASK-002-001, TASK-002-002, TASK-002-004
 
 **Acceptance Criteria:**
-- [ ] Working directory line uses a bolder style (e.g., `styles.Primary` foreground or bold) instead of `styles.Muted`
-- [ ] The directory path remains left-truncated with "..." for long paths
-- [ ] The directory is still centered in the header area
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] Working directory line uses a bolder style (e.g., `styles.Primary` foreground or bold) instead of `styles.Muted`
+- [x] The directory path remains left-truncated with "..." for long paths
+- [x] The directory is still centered in the header area
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-002-004: Show working directory in the work view header
 **Description:** As a user, I want to see the current working directory in the work view header so I know which project the agent is working on.

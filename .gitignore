@@ -14,4 +14,3 @@ docs/node_modules
 .maggus/usage*.jsonl
 .maggus/usage*.csv
 .maggus/usage_*.jsonl
-.maggus/bugs
