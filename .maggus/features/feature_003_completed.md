@@ -98,12 +98,12 @@ Extend maggus to recognize and process bug report files (`.maggus/bugs/bug_N.md`
 **Parallel:** yes — can run alongside TASK-003-004
 
 **Acceptance Criteria:**
-- [ ] List command parses both features and bugs
-- [ ] Bug tasks appear before feature tasks, matching work loop ordering
-- [ ] Bug tasks are displayed with their `BUG-NNN-XXX` IDs
-- [ ] Source file column shows the bug filename
-- [ ] `go fmt ./...` and `go vet ./...` pass
-- [ ] Unit tests cover listing with mixed feature and bug tasks
+- [x] List command parses both features and bugs
+- [x] Bug tasks appear before feature tasks, matching work loop ordering
+- [x] Bug tasks are displayed with their `BUG-NNN-XXX` IDs
+- [x] Source file column shows the bug filename
+- [x] `go fmt ./...` and `go vet ./...` pass
+- [x] Unit tests cover listing with mixed feature and bug tasks
 
 ## Task Dependency Graph
 
