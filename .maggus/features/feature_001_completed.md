@@ -38,14 +38,14 @@ This feature removes the redundant field from the usage log and adds a persisten
 **Parallel:** yes — can run alongside TASK-001-001
 
 **Acceptance Criteria:**
-- [ ] `TUIModel` has a new `runStartTime time.Time` field set once in `NewTUIModel()` and never reset
-- [ ] `handleIterationStart()` does NOT reset `runStartTime` (only resets `startTime` as before)
-- [ ] The Progress tab Elapsed line shows both timers, formatted as: `Task: 2m 15s  ·  Run: 12m 30s`
-- [ ] The task timer (`startTime`) continues to reset per task as before
-- [ ] The run timer (`runStartTime`) counts continuously from TUI creation until the run ends
-- [ ] The summary screen elapsed display continues to work correctly (it already uses `SummaryData.StartTime` from the run tracker)
-- [ ] All tests in `cmd/` pass
-- [ ] `go vet ./...` passes
+- [x] `TUIModel` has a new `runStartTime time.Time` field set once in `NewTUIModel()` and never reset
+- [x] `handleIterationStart()` does NOT reset `runStartTime` (only resets `startTime` as before)
+- [x] The Progress tab Elapsed line shows both timers, formatted as: `Task: 2m 15s  ·  Run: 12m 30s`
+- [x] The task timer (`startTime`) continues to reset per task as before
+- [x] The run timer (`runStartTime`) counts continuously from TUI creation until the run ends
+- [x] The summary screen elapsed display continues to work correctly (it already uses `SummaryData.StartTime` from the run tracker)
+- [x] All tests in `cmd/` pass
+- [x] `go vet ./...` passes
 
 ## Task Dependency Graph
 

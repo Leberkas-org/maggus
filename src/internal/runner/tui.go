@@ -113,6 +113,7 @@ type TUIModel struct {
 	skills             []string
 	mcps               []string
 	startTime          time.Time
+	runStartTime       time.Time
 	frame              int
 	width              int
 	height             int
@@ -145,6 +146,7 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 	if model == "" {
 		model = "default"
 	}
+	now := time.Now()
 	return TUIModel{
 		version:          version,
 		fingerprint:      fingerprint,
@@ -152,7 +154,8 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		status:           "Waiting...",
 		output:           "-",
 		model:            model,
-		startTime:        time.Now(),
+		startTime:        now,
+		runStartTime:     now,
 		width:            120,
 		height:           40,
 		detailAutoScroll: true,

@@ -526,7 +526,8 @@ func (m TUIModel) renderTaskTab(w int) string {
 
 // renderView renders the main work-in-progress view with tabs.
 func (m TUIModel) renderView() string {
-	elapsed := time.Since(m.startTime).Truncate(time.Second)
+	taskElapsed := time.Since(m.startTime).Truncate(time.Second)
+	runElapsed := time.Since(m.runStartTime).Truncate(time.Second)
 	innerW, innerH := styles.FullScreenInnerSize(m.width, m.height)
 
 	spinner := cyanStyle.Render(spinnerFrames[m.frame])
@@ -595,7 +596,7 @@ func (m TUIModel) renderView() string {
 
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
 			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-			b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+			b.WriteString(fmt.Sprintf("  %s Task: %s  ·  Run: %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(taskElapsed.String()), grayStyle.Render(runElapsed.String())))
 
 			if m.tokens.hasData {
 				totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
