@@ -25,20 +25,20 @@ type iterationSetup struct {
 	workDir string
 }
 
-// initIteration parses plans, finds the next workable task, caps the count,
+// initIteration parses features, finds the next workable task, caps the count,
 // and creates a run tracker. Returns nil setup with no error when there is
 // nothing to do (e.g. all tasks complete/blocked).
 func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay string, count int) (*iterationSetup, error) {
-	tasks, err := parser.ParsePlans(dir)
+	tasks, err := parser.ParseFeatures(dir)
 	if err != nil {
-		return nil, fmt.Errorf("parse plans: %w", err)
+		return nil, fmt.Errorf("parse features: %w", err)
 	}
 	if len(tasks) == 0 {
-		cmd.Println("No plan files found in .maggus/")
+		cmd.Println("No feature files found in .maggus/features/")
 		return nil, nil
 	}
 
-	_ = parser.MarkCompletedPlans(dir)
+	_ = parser.MarkCompletedFeatures(dir)
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
@@ -132,15 +132,15 @@ func capCount(tasks []parser.Task, count int) int {
 // setupUsageCallback configures the TUI model to record per-task usage.
 func setupUsageCallback(m *runner.TUIModel, dir string, run *runtracker.Run, modelDisplay, agentName string) {
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		planRel := tu.PlanFile
-		if rel, err := filepath.Rel(dir, tu.PlanFile); err == nil {
-			planRel = rel
+		featureRel := tu.FeatureFile
+		if rel, err := filepath.Rel(dir, tu.FeatureFile); err == nil {
+			featureRel = rel
 		}
 		_ = usage.Append(dir, []usage.Record{{
 			RunID:                    run.ID,
 			TaskID:                   tu.TaskID,
 			TaskTitle:                tu.TaskTitle,
-			PlanFile:                 planRel,
+			FeatureFile:              featureRel,
 			Model:                    modelDisplay,
 			Agent:                    agentName,
 			InputTokens:              tu.InputTokens,
@@ -314,7 +314,7 @@ func buildSummaryData(params workLoopParams, completed int, failedTasks []failed
 	currentBranch := strings.TrimSpace(string(branchNameOut))
 
 	var remaining []runner.RemainingTask
-	latestTasks, _ := parser.ParsePlans(params.tc.workDir)
+	latestTasks, _ := parser.ParseFeatures(params.tc.workDir)
 	for _, t := range latestTasks {
 		if t.IsWorkable() {
 			remaining = append(remaining, runner.RemainingTask{ID: t.ID, Title: t.Title})

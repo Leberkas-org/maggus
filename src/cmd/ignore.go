@@ -12,8 +12,8 @@ import (
 
 var ignoreCmd = &cobra.Command{
 	Use:          "ignore",
-	Short:        "Exclude plans or tasks from the work loop",
-	Long:         `Ignore a plan or task so that it is skipped by maggus work.`,
+	Short:        "Exclude features or tasks from the work loop",
+	Long:         `Ignore a feature or task so that it is skipped by maggus work.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = cmd.Help()
@@ -21,66 +21,66 @@ var ignoreCmd = &cobra.Command{
 	},
 }
 
-var ignorePlanCmd = &cobra.Command{
-	Use:   "plan <plan-id>",
-	Short: "Ignore an entire plan file",
-	Long:  `Renames plan_<N>.md to plan_<N>_ignored.md so that it is skipped by the work loop.`,
+var ignoreFeatureCmd = &cobra.Command{
+	Use:   "feature <feature-id>",
+	Short: "Ignore an entire feature file",
+	Long:  `Renames feature_<N>.md to feature_<N>_ignored.md so that it is skipped by the work loop.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
-		return runIgnorePlan(cmd, dir, args[0])
+		return runIgnoreFeature(cmd, dir, args[0])
 	},
 }
 
-func runIgnorePlan(cmd *cobra.Command, dir string, planID string) error {
-	file, state, err := findPlanFile(dir, planID)
+func runIgnoreFeature(cmd *cobra.Command, dir string, featureID string) error {
+	file, state, err := findFeatureFile(dir, featureID)
 	if err != nil {
 		return err
 	}
 
 	switch state {
-	case planStateNotFound:
-		cmd.PrintErrln(fmt.Sprintf("Error: plan %s not found", planID))
-		return fmt.Errorf("plan %s not found", planID)
-	case planStateCompleted:
-		cmd.PrintErrln(fmt.Sprintf("Error: plan %s is already completed", planID))
-		return fmt.Errorf("plan %s is already completed", planID)
-	case planStateIgnored:
-		cmd.Println(fmt.Sprintf("Plan %s is already ignored", planID))
+	case featureStateNotFound:
+		cmd.PrintErrln(fmt.Sprintf("Error: feature %s not found", featureID))
+		return fmt.Errorf("feature %s not found", featureID)
+	case featureStateCompleted:
+		cmd.PrintErrln(fmt.Sprintf("Error: feature %s is already completed", featureID))
+		return fmt.Errorf("feature %s is already completed", featureID)
+	case featureStateIgnored:
+		cmd.Println(fmt.Sprintf("Feature %s is already ignored", featureID))
 		return nil
-	case planStateActive:
+	case featureStateActive:
 		newName := strings.TrimSuffix(file, ".md") + "_ignored.md"
 		if err := os.Rename(file, newName); err != nil {
 			return fmt.Errorf("rename %s: %w", file, err)
 		}
-		cmd.Println(fmt.Sprintf("Ignored plan %s (%s → %s)", planID, filepath.Base(file), filepath.Base(newName)))
+		cmd.Println(fmt.Sprintf("Ignored feature %s (%s → %s)", featureID, filepath.Base(file), filepath.Base(newName)))
 		return nil
 	}
 
 	return nil
 }
 
-type planState int
+type featureState int
 
 const (
-	planStateNotFound planState = iota
-	planStateActive
-	planStateIgnored
-	planStateCompleted
+	featureStateNotFound featureState = iota
+	featureStateActive
+	featureStateIgnored
+	featureStateCompleted
 )
 
-// findPlanFile locates a plan file by its numeric ID across all states (active, ignored, completed).
+// findFeatureFile locates a feature file by its numeric ID across all states (active, ignored, completed).
 // Returns the file path, its state, and any error from globbing.
-func findPlanFile(dir string, planID string) (string, planState, error) {
-	files, err := parser.GlobPlanFiles(dir, true)
+func findFeatureFile(dir string, featureID string) (string, featureState, error) {
+	files, err := parser.GlobFeatureFiles(dir, true)
 	if err != nil {
-		return "", planStateNotFound, err
+		return "", featureStateNotFound, err
 	}
 
-	target := fmt.Sprintf("plan_%s", planID)
+	target := fmt.Sprintf("feature_%s", featureID)
 
 	for _, f := range files {
 		base := filepath.Base(f)
@@ -88,22 +88,22 @@ func findPlanFile(dir string, planID string) (string, planState, error) {
 			continue
 		}
 
-		// Verify exact number match (plan_3 should not match plan_30)
+		// Verify exact number match (feature_3 should not match feature_30)
 		rest := strings.TrimPrefix(base, target)
 		if rest != ".md" && rest != "_ignored.md" && rest != "_completed.md" {
 			continue
 		}
 
 		if strings.HasSuffix(base, "_completed.md") {
-			return f, planStateCompleted, nil
+			return f, featureStateCompleted, nil
 		}
 		if strings.HasSuffix(base, "_ignored.md") {
-			return f, planStateIgnored, nil
+			return f, featureStateIgnored, nil
 		}
-		return f, planStateActive, nil
+		return f, featureStateActive, nil
 	}
 
-	return "", planStateNotFound, nil
+	return "", featureStateNotFound, nil
 }
 
 var ignoreTaskCmd = &cobra.Command{
@@ -126,8 +126,8 @@ func runIgnoreTask(cmd *cobra.Command, dir string, taskID string) error {
 		taskID = "TASK-" + taskID
 	}
 
-	// Search all plan files (including ignored, excluding completed) for this task
-	files, err := parser.GlobPlanFiles(dir, false)
+	// Search all feature files (including ignored, excluding completed) for this task
+	files, err := parser.GlobFeatureFiles(dir, false)
 	if err != nil {
 		return err
 	}
@@ -149,9 +149,9 @@ func runIgnoreTask(cmd *cobra.Command, dir string, taskID string) error {
 				return nil
 			}
 
-			// Warn if plan is ignored
+			// Warn if feature is already ignored
 			if parser.IsIgnoredFile(f) {
-				cmd.PrintErrln(fmt.Sprintf("Warning: plan is already ignored (%s)", filepath.Base(f)))
+				cmd.PrintErrln(fmt.Sprintf("Warning: feature is already ignored (%s)", filepath.Base(f)))
 			}
 
 			// Rewrite the heading atomically
@@ -215,7 +215,7 @@ func rewriteTaskHeading(filePath string, taskID string, removeIgnored bool) erro
 }
 
 func init() {
-	ignoreCmd.AddCommand(ignorePlanCmd)
+	ignoreCmd.AddCommand(ignoreFeatureCmd)
 	ignoreCmd.AddCommand(ignoreTaskCmd)
 	rootCmd.AddCommand(ignoreCmd)
 }

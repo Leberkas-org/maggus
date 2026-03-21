@@ -39,8 +39,8 @@ var (
 
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
-	Short: "Work on the next N tasks from the implementation plan",
-	Long: `Reads the implementation plan and works through all incomplete tasks
+	Short: "Work on the next N tasks from the feature files",
+	Long: `Reads feature files and works through all incomplete tasks
 by prompting Claude Code. Use --count or a positional argument to limit the number.
 
 Examples:

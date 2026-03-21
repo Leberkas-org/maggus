@@ -11,16 +11,16 @@ import (
 
 const progressBarWidth = 10
 
-type planInfo struct {
+type featureInfo struct {
 	filename  string
 	tasks     []parser.Task
 	completed bool // filename contains _completed
 	ignored   bool // filename contains _ignored
 }
 
-func (p *planInfo) doneCount() int {
+func (f *featureInfo) doneCount() int {
 	n := 0
-	for _, t := range p.tasks {
+	for _, t := range f.tasks {
 		if t.IsComplete() {
 			n++
 		}
@@ -28,9 +28,9 @@ func (p *planInfo) doneCount() int {
 	return n
 }
 
-func (p *planInfo) blockedCount() int {
+func (f *featureInfo) blockedCount() int {
 	n := 0
-	for _, t := range p.tasks {
+	for _, t := range f.tasks {
 		if !t.IsComplete() && t.IsBlocked() {
 			n++
 		}
@@ -46,11 +46,11 @@ func buildProgressBarPlain(done, total int) string {
 	return styles.ProgressBarPlain(done, total, progressBarWidth)
 }
 
-// buildSelectableTasksForPlan returns the flat list of tasks for a single plan.
+// buildSelectableTasksForFeature returns the flat list of tasks for a single feature.
 // When showAll is false, completed tasks are excluded.
-func buildSelectableTasksForPlan(plan planInfo, showAll bool) []parser.Task {
+func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.Task {
 	var selectable []parser.Task
-	for _, t := range plan.tasks {
+	for _, t := range feature.tasks {
 		if !showAll && t.IsComplete() {
 			continue
 		}
@@ -59,13 +59,13 @@ func buildSelectableTasksForPlan(plan planInfo, showAll bool) []parser.Task {
 	return selectable
 }
 
-func parsePlans(dir string) ([]planInfo, error) {
-	files, err := parser.GlobPlanFiles(dir, true)
+func parseFeatures(dir string) ([]featureInfo, error) {
+	files, err := parser.GlobFeatureFiles(dir, true)
 	if err != nil {
-		return nil, fmt.Errorf("glob plans: %w", err)
+		return nil, fmt.Errorf("glob features: %w", err)
 	}
 
-	var plans []planInfo
+	var features []featureInfo
 	for _, f := range files {
 		tasks, err := parser.ParseFile(f)
 		if err != nil {
@@ -77,22 +77,22 @@ func parsePlans(dir string) ([]planInfo, error) {
 				tasks[i].Ignored = true
 			}
 		}
-		plans = append(plans, planInfo{
+		features = append(features, featureInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
 			ignored:   ignored,
 		})
 	}
-	return plans, nil
+	return features, nil
 }
 
-func findNextTask(plans []planInfo) (string, string) {
-	for _, p := range plans {
-		if p.completed {
+func findNextTask(features []featureInfo) (string, string) {
+	for _, f := range features {
+		if f.completed {
 			continue
 		}
-		next := parser.FindNextIncomplete(p.tasks)
+		next := parser.FindNextIncomplete(f.tasks)
 		if next != nil {
 			return next.ID, next.SourceFile
 		}
@@ -101,40 +101,40 @@ func findNextTask(plans []planInfo) (string, string) {
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
-func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) {
+func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) {
 	totalTasks := 0
 	totalDone := 0
 	totalBlocked := 0
-	activePlans := 0
-	for _, p := range plans {
-		totalTasks += len(p.tasks)
-		totalDone += p.doneCount()
-		totalBlocked += p.blockedCount()
-		if !p.completed {
-			activePlans++
+	activeFeatures := 0
+	for _, f := range features {
+		totalTasks += len(f.tasks)
+		totalDone += f.doneCount()
+		totalBlocked += f.blockedCount()
+		if !f.completed {
+			activeFeatures++
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
 
-	fmt.Fprintf(w, "Maggus Status — %d plans (%d active), %d tasks total\n\n", len(plans), activePlans, totalTasks)
+	fmt.Fprintf(w, "Maggus Status — %d features (%d active), %d tasks total\n\n", len(features), activeFeatures, totalTasks)
 	fmt.Fprintf(w, " Summary: %d/%d tasks complete · %d pending · %d blocked\n", totalDone, totalTasks, totalPending, totalBlocked)
 	fmt.Fprintf(w, " Agent: %s\n", agentName)
 
-	for _, p := range plans {
-		if p.completed && !showAll {
+	for _, f := range features {
+		if f.completed && !showAll {
 			continue
 		}
 		fmt.Fprintln(w)
-		if p.completed {
-			fmt.Fprintf(w, " Tasks — %s (archived)\n", p.filename)
-		} else if p.ignored {
-			fmt.Fprintf(w, " Tasks — [~] %s (ignored)\n", p.filename)
+		if f.completed {
+			fmt.Fprintf(w, " Tasks — %s (archived)\n", f.filename)
+		} else if f.ignored {
+			fmt.Fprintf(w, " Tasks — [~] %s (ignored)\n", f.filename)
 		} else {
-			fmt.Fprintf(w, " Tasks — %s\n", p.filename)
+			fmt.Fprintf(w, " Tasks — %s\n", f.filename)
 		}
 		fmt.Fprintln(w, " ──────────────────────────────────────────")
 
-		for _, t := range p.tasks {
+		for _, t := range f.tasks {
 			var icon, prefix string
 
 			if t.Ignored {
@@ -156,7 +156,7 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 
 			fmt.Fprintf(w, " %s%s  %s: %s\n", prefix, icon, t.ID, t.Title)
 
-			if t.IsBlocked() && !p.completed {
+			if t.IsBlocked() && !f.completed {
 				for _, c := range t.Criteria {
 					if !c.Blocked {
 						continue
@@ -169,41 +169,41 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		}
 	}
 
-	// Plans table
+	// Features table
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, " Plans")
+	fmt.Fprintln(w, " Features")
 	fmt.Fprintln(w, " ──────────────────────────────────────────")
 
 	maxCountWidth := 0
-	for _, p := range plans {
-		if p.completed && !showAll {
+	for _, f := range features {
+		if f.completed && !showAll {
 			continue
 		}
-		cw := len(fmt.Sprintf("%d/%d", p.doneCount(), len(p.tasks)))
+		cw := len(fmt.Sprintf("%d/%d", f.doneCount(), len(f.tasks)))
 		if cw > maxCountWidth {
 			maxCountWidth = cw
 		}
 	}
 	countFmt := fmt.Sprintf("%%-%ds", maxCountWidth)
 
-	for _, p := range plans {
-		if p.completed && !showAll {
+	for _, f := range features {
+		if f.completed && !showAll {
 			continue
 		}
 
-		done := p.doneCount()
-		total := len(p.tasks)
+		done := f.doneCount()
+		total := len(f.tasks)
 		bar := buildProgressBarPlain(done, total)
 
 		var prefix, suffix string
 
-		if p.completed {
+		if f.completed {
 			prefix = " [x] "
 			suffix = "done"
-		} else if p.ignored {
+		} else if f.ignored {
 			prefix = " [~] "
 			suffix = "ignored"
-		} else if p.blockedCount() > 0 {
+		} else if f.blockedCount() > 0 {
 			prefix = "   "
 			suffix = "blocked"
 		} else if total > 0 && done == total {
@@ -218,6 +218,6 @@ func renderStatusPlain(w *strings.Builder, plans []planInfo, showAll bool, nextT
 		}
 
 		countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
-		fmt.Fprintf(w, "%s%-32s [%s]  %s   %s\n", prefix, p.filename, bar, countStr, suffix)
+		fmt.Fprintf(w, "%s%-32s [%s]  %s   %s\n", prefix, f.filename, bar, countStr, suffix)
 	}
 }

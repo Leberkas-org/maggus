@@ -377,7 +377,7 @@ func (m TUIModel) renderTaskTab(w int) string {
 	labelStyle := styles.Label.Width(12).Align(lipgloss.Right)
 	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
-	b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Plan:"), valStyle.Render(m.taskPlanFile)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Feature:"), valStyle.Render(m.taskFeatureFile)))
 
 	done := 0
 	for _, c := range m.taskCriteria {

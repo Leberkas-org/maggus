@@ -60,11 +60,11 @@ const listTestPlan = `# Plan: Test
 
 func writeListPlan(t *testing.T, dir, filename, content string) {
 	t.Helper()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+	featuresDir := filepath.Join(dir, ".maggus", "features")
+	if err := os.MkdirAll(featuresDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(maggusDir, filename), []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(featuresDir, filename), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -97,7 +97,7 @@ func runListCmd(t *testing.T, dir string, flags ...string) string {
 
 func TestListDefaultCount(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir)
 
@@ -122,7 +122,7 @@ func TestListDefaultCount(t *testing.T) {
 
 func TestListNoDescriptionLine(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir)
 
@@ -133,7 +133,7 @@ func TestListNoDescriptionLine(t *testing.T) {
 
 func TestListNoBlankLinesBetweenTasks(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir)
 
@@ -152,7 +152,7 @@ func TestListNoBlankLinesBetweenTasks(t *testing.T) {
 
 func TestListAllFlag(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir, "--all")
 
@@ -172,7 +172,7 @@ func TestListAllFlag(t *testing.T) {
 
 func TestListAllIgnoresCount(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir, "--all", "--count", "2")
 
@@ -185,7 +185,7 @@ func TestListAllIgnoresCount(t *testing.T) {
 
 func TestListCountFlag(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir, "--count", "2")
 
@@ -202,7 +202,7 @@ func TestListCountFlag(t *testing.T) {
 
 func TestListPlainFlag(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir)
 
@@ -216,7 +216,7 @@ func TestListPlainFlag(t *testing.T) {
 
 func TestListPlainAndAllCombined(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir, "--all")
 
@@ -231,12 +231,12 @@ func TestListPlainAndAllCombined(t *testing.T) {
 	}
 }
 
-func TestListSkipsCompletedPlanFiles(t *testing.T) {
+func TestListSkipsCompletedFeatureFiles(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1_completed.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001_completed.md", listTestPlan)
 	out := runListCmd(t, dir)
 	if !strings.Contains(out, "No pending tasks found") {
-		t.Errorf("expected 'No pending tasks found' when only completed plan exists, got:\n%s", out)
+		t.Errorf("expected 'No pending tasks found' when only completed feature file exists, got:\n%s", out)
 	}
 }
 
@@ -250,7 +250,7 @@ func TestListNoPendingTasks(t *testing.T) {
 
 func TestListFirstTaskFormat(t *testing.T) {
 	dir := t.TempDir()
-	writeListPlan(t, dir, "plan_1.md", listTestPlan)
+	writeListPlan(t, dir, "feature_001.md", listTestPlan)
 
 	out := runListCmd(t, dir)
 
@@ -263,8 +263,8 @@ func TestListFirstTaskFormat(t *testing.T) {
 func TestListFirstTaskHighlightedInTUI(t *testing.T) {
 	// Test listModel.viewList() to verify first task highlighting
 	tasks := []parser.Task{
-		{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md"},
-		{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md"},
+		{ID: "TASK-001", Title: "First task", SourceFile: "feature_001.md"},
+		{ID: "TASK-002", Title: "Second task", SourceFile: "feature_001.md"},
 	}
 	m := newListModel(tasks, "claude")
 	m.Width = 120
@@ -286,9 +286,9 @@ func TestListFirstTaskHighlightedInTUI(t *testing.T) {
 func TestListTUIShowsBlockedTasks(t *testing.T) {
 	// Blocked tasks should appear in TUI list with ⊘ icon
 	tasks := []parser.Task{
-		{ID: "TASK-001", Title: "Workable task", SourceFile: "plan_1.md",
+		{ID: "TASK-001", Title: "Workable task", SourceFile: "feature_001.md",
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
-		{ID: "TASK-002", Title: "Blocked task", SourceFile: "plan_1.md",
+		{ID: "TASK-002", Title: "Blocked task", SourceFile: "feature_001.md",
 			Criteria: []parser.Criterion{{Text: "BLOCKED: waiting on something", Checked: false, Blocked: true}}},
 	}
 	m := newListModel(tasks, "claude")
@@ -309,9 +309,9 @@ func TestListTUIShowsBlockedTasks(t *testing.T) {
 
 func TestListTUIHeaderShowsIncompleteCount(t *testing.T) {
 	tasks := []parser.Task{
-		{ID: "TASK-001", Title: "First", SourceFile: "plan_1.md"},
-		{ID: "TASK-002", Title: "Second", SourceFile: "plan_1.md"},
-		{ID: "TASK-003", Title: "Third", SourceFile: "plan_1.md"},
+		{ID: "TASK-001", Title: "First", SourceFile: "feature_001.md"},
+		{ID: "TASK-002", Title: "Second", SourceFile: "feature_001.md"},
+		{ID: "TASK-003", Title: "Third", SourceFile: "feature_001.md"},
 	}
 	m := newListModel(tasks, "claude")
 	m.Width = 120
@@ -330,7 +330,7 @@ func TestListTUIScrolling(t *testing.T) {
 		tasks = append(tasks, parser.Task{
 			ID:         fmt.Sprintf("TASK-%03d", i),
 			Title:      fmt.Sprintf("Task number %d", i),
-			SourceFile: "plan_1.md",
+			SourceFile: "feature_001.md",
 		})
 	}
 	// Small terminal: only ~5 task lines visible (height=15 minus header/footer)
@@ -369,7 +369,7 @@ func TestListPlainShowsIgnoredTasks(t *testing.T) {
 **Acceptance Criteria:**
 - [ ] Criterion B
 `
-	writeListPlan(t, dir, "plan_1.md", plan)
+	writeListPlan(t, dir, "feature_001.md", plan)
 	out := runListCmd(t, dir, "--all")
 
 	if !strings.Contains(out, "TASK-001") {
@@ -383,33 +383,33 @@ func TestListPlainShowsIgnoredTasks(t *testing.T) {
 	}
 }
 
-func TestListPlainShowsIgnoredPlanTasks(t *testing.T) {
+func TestListPlainShowsIgnoredFeatureTasks(t *testing.T) {
 	dir := t.TempDir()
-	plan := `# Plan: Ignored Plan
+	plan := `# Plan: Ignored Feature
 
 ## User Stories
 
-### TASK-001: Task in ignored plan
+### TASK-001: Task in ignored feature
 **Description:** Do thing.
 **Acceptance Criteria:**
 - [ ] Criterion A
 `
-	writeListPlan(t, dir, "plan_1_ignored.md", plan)
+	writeListPlan(t, dir, "feature_001_ignored.md", plan)
 	out := runListCmd(t, dir, "--all")
 
 	if !strings.Contains(out, "TASK-001") {
-		t.Errorf("expected TASK-001 from ignored plan in output, got:\n%s", out)
+		t.Errorf("expected TASK-001 from ignored feature file in output, got:\n%s", out)
 	}
 	if !strings.Contains(out, "[~]") {
-		t.Errorf("expected [~] marker for task from ignored plan, got:\n%s", out)
+		t.Errorf("expected [~] marker for task from ignored feature file, got:\n%s", out)
 	}
 }
 
 func TestListTUIShowsIgnoredTasks(t *testing.T) {
 	tasks := []parser.Task{
-		{ID: "TASK-001", Title: "Workable task", SourceFile: "plan_1.md",
+		{ID: "TASK-001", Title: "Workable task", SourceFile: "feature_001.md",
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
-		{ID: "TASK-002", Title: "Ignored task", SourceFile: "plan_1.md",
+		{ID: "TASK-002", Title: "Ignored task", SourceFile: "feature_001.md",
 			Ignored:  true,
 			Criteria: []parser.Criterion{{Text: "Do something", Checked: false}}},
 	}
@@ -450,7 +450,7 @@ func TestListPlainStillShowsWorkableOnly(t *testing.T) {
 **Acceptance Criteria:**
 - [x] Done
 `
-	writeListPlan(t, dir, "plan_1.md", plan)
+	writeListPlan(t, dir, "feature_001.md", plan)
 	out := runListCmd(t, dir, "--all")
 
 	if !strings.Contains(out, "TASK-001") {

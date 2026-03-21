@@ -12,7 +12,7 @@ import (
 type TaskUsage struct {
 	TaskID                   string
 	TaskTitle                string
-	PlanFile                 string
+	FeatureFile                 string
 	InputTokens              int
 	OutputTokens             int
 	CacheCreationInputTokens int
@@ -87,16 +87,16 @@ func (t *tokenState) addModelUsage(msg agent.ModelUsageMsg) {
 }
 
 // saveAndReset saves the current iteration's token usage and resets iteration counters.
-// taskID, taskTitle, planFile, and startTime come from the parent model since tokenState
+// taskID, taskTitle, featureFile, and startTime come from the parent model since tokenState
 // doesn't track task metadata.
-func (t *tokenState) saveAndReset(taskID, taskTitle, planFile string, startTime time.Time) {
+func (t *tokenState) saveAndReset(taskID, taskTitle, featureFile string, startTime time.Time) {
 	if taskID == "" || (t.iterInput == 0 && t.iterOutput == 0 && t.iterCacheCreation == 0 && t.iterCacheRead == 0) {
 		return
 	}
 	tu := TaskUsage{
 		TaskID:                   taskID,
 		TaskTitle:                taskTitle,
-		PlanFile:                 planFile,
+		FeatureFile:                 featureFile,
 		InputTokens:              t.iterInput,
 		OutputTokens:             t.iterOutput,
 		CacheCreationInputTokens: t.iterCacheCreation,

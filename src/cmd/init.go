@@ -95,7 +95,7 @@ This is the recommended first step when setting up Maggus in a new project.`,
 		}
 
 		fmt.Println("\nDone! You can now:")
-		fmt.Println("  maggus plan <description>   Create an implementation plan")
+		fmt.Println("  maggus plan <description>   Create a feature plan")
 		fmt.Println("  maggus work                  Start working on tasks")
 
 		return nil

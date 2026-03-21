@@ -23,8 +23,8 @@ var rootCmd = &cobra.Command{
 	Use:     "maggus",
 	Short:   "Your best and worst co-worker — a junior dev that just works",
 	Version: Version,
-	Long: `Maggus reads implementation plans and works through tasks one-by-one
-by prompting an AI agent (Claude Code). Provide a plan and let Maggus work.`,
+	Long: `Maggus reads feature files and works through tasks one-by-one
+by prompting an AI agent (Claude Code). Provide a feature and let Maggus work.`,
 }
 
 func init() {
@@ -37,7 +37,7 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	}
 
 	for {
-		m := newMenuModel(loadPlanSummary())
+		m := newMenuModel(loadFeatureSummary())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := p.Run()
 		if err != nil {

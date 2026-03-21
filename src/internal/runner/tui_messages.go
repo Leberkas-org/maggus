@@ -9,12 +9,12 @@ import (
 
 // handleIterationStart resets per-iteration state when a new task begins.
 func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
-	m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskPlanFile, m.startTime)
+	m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskFeatureFile, m.startTime)
 	m.currentIter = msg.Current
 	m.totalIters = msg.Total
 	m.taskID = msg.TaskID
 	m.taskTitle = msg.TaskTitle
-	m.taskPlanFile = msg.PlanFile
+	m.taskFeatureFile = msg.FeatureFile
 	m.taskDescription = msg.TaskDescription
 	m.taskCriteria = msg.TaskCriteria
 	m.remainingTasks = msg.RemainingTasks

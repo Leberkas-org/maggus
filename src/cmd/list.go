@@ -153,7 +153,7 @@ func renderListPlain(workable, ignored []parser.Task, all bool, agentName string
 var listCmd = &cobra.Command{
 	Use:   "list [N]",
 	Short: "Preview the next N upcoming workable tasks",
-	Long:  `Reads all plan files in .maggus/ and lists the next N workable (incomplete, not blocked) tasks.`,
+	Long:  `Reads all feature files in .maggus/features/ and lists the next N workable (incomplete, not blocked) tasks.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		plain, _ := cmd.Flags().GetBool("plain")
@@ -181,12 +181,12 @@ func runList(cmd *cobra.Command, dir string, plain, all bool, count int) error {
 	}
 	agentName := cfg.Agent
 
-	files, err := parser.GlobPlanFiles(dir, false)
+	files, err := parser.GlobFeatureFiles(dir, false)
 	if err != nil {
-		return fmt.Errorf("glob plans: %w", err)
+		return fmt.Errorf("glob features: %w", err)
 	}
 
-	// Collect tasks from all active plan files
+	// Collect tasks from all active feature files
 	var workable []parser.Task
 	var ignored []parser.Task
 	var incomplete []parser.Task

@@ -10,20 +10,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// setupIgnoreDir creates a temp dir with .maggus/ ready for plan files.
+// setupIgnoreDir creates a temp dir with .maggus/features/ ready for feature files.
 func setupIgnoreDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus", "features"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return dir
 }
 
-// writeIgnorePlan writes a plan file into .maggus/.
-func writeIgnorePlan(t *testing.T, dir, filename, content string) {
+// writeIgnoreFeature writes a feature file into .maggus/features/.
+func writeIgnoreFeature(t *testing.T, dir, filename, content string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, ".maggus", filename), []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".maggus", "features", filename), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -38,121 +38,121 @@ func newTestCmd(t *testing.T) (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
 	return cmd, &stdout, &stderr
 }
 
-// --- findPlanFile tests ---
+// --- findFeatureFile tests ---
 
-func TestFindPlanFile_Active(t *testing.T) {
+func TestFindFeatureFile_Active(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_3.md", "# Plan 3")
+	writeIgnoreFeature(t, dir, "feature_003.md", "# Feature 003")
 
-	file, state, err := findPlanFile(dir, "3")
+	file, state, err := findFeatureFile(dir, "003")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateActive {
-		t.Errorf("expected planStateActive, got %d", state)
+	if state != featureStateActive {
+		t.Errorf("expected featureStateActive, got %d", state)
 	}
-	if !strings.HasSuffix(file, "plan_3.md") {
-		t.Errorf("expected file ending with plan_3.md, got %s", file)
+	if !strings.HasSuffix(file, "feature_003.md") {
+		t.Errorf("expected file ending with feature_003.md, got %s", file)
 	}
 }
 
-func TestFindPlanFile_Ignored(t *testing.T) {
+func TestFindFeatureFile_Ignored(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_5_ignored.md", "# Plan 5 ignored")
+	writeIgnoreFeature(t, dir, "feature_005_ignored.md", "# Feature 005 ignored")
 
-	_, state, err := findPlanFile(dir, "5")
+	_, state, err := findFeatureFile(dir, "005")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateIgnored {
-		t.Errorf("expected planStateIgnored, got %d", state)
+	if state != featureStateIgnored {
+		t.Errorf("expected featureStateIgnored, got %d", state)
 	}
 }
 
-func TestFindPlanFile_Completed(t *testing.T) {
+func TestFindFeatureFile_Completed(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_7_completed.md", "# Plan 7 completed")
+	writeIgnoreFeature(t, dir, "feature_007_completed.md", "# Feature 007 completed")
 
-	_, state, err := findPlanFile(dir, "7")
+	_, state, err := findFeatureFile(dir, "007")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateCompleted {
-		t.Errorf("expected planStateCompleted, got %d", state)
+	if state != featureStateCompleted {
+		t.Errorf("expected featureStateCompleted, got %d", state)
 	}
 }
 
-func TestFindPlanFile_NotFound(t *testing.T) {
+func TestFindFeatureFile_NotFound(t *testing.T) {
 	dir := setupIgnoreDir(t)
 
-	_, state, err := findPlanFile(dir, "99")
+	_, state, err := findFeatureFile(dir, "099")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateNotFound {
-		t.Errorf("expected planStateNotFound, got %d", state)
+	if state != featureStateNotFound {
+		t.Errorf("expected featureStateNotFound, got %d", state)
 	}
 }
 
-func TestFindPlanFile_NoPartialMatch(t *testing.T) {
+func TestFindFeatureFile_NoPartialMatch(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_30.md", "# Plan 30")
+	writeIgnoreFeature(t, dir, "feature_030.md", "# Feature 030")
 
-	// Looking for plan 3 should NOT match plan_30
-	_, state, err := findPlanFile(dir, "3")
+	// Looking for feature 003 should NOT match feature_030
+	_, state, err := findFeatureFile(dir, "003")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateNotFound {
-		t.Errorf("expected planStateNotFound for partial ID, got %d", state)
+	if state != featureStateNotFound {
+		t.Errorf("expected featureStateNotFound for partial ID, got %d", state)
 	}
 }
 
-func TestFindPlanFile_NoPartialMatchReverse(t *testing.T) {
+func TestFindFeatureFile_NoPartialMatchReverse(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_3.md", "# Plan 3")
+	writeIgnoreFeature(t, dir, "feature_003.md", "# Feature 003")
 
-	// Looking for plan 30 should NOT match plan_3
-	_, state, err := findPlanFile(dir, "30")
+	// Looking for feature 030 should NOT match feature_003
+	_, state, err := findFeatureFile(dir, "030")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state != planStateNotFound {
-		t.Errorf("expected planStateNotFound for partial ID 30, got %d", state)
+	if state != featureStateNotFound {
+		t.Errorf("expected featureStateNotFound for partial ID 30, got %d", state)
 	}
 }
 
-// --- runIgnorePlan tests ---
+// --- runIgnoreFeature tests ---
 
-func TestRunIgnorePlan_ActiveRenames(t *testing.T) {
+func TestRunIgnoreFeature_ActiveRenames(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_1.md", "# Plan 1")
+	writeIgnoreFeature(t, dir, "feature_001.md", "# Feature 001")
 
 	cmd, stdout, _ := newTestCmd(t)
-	err := runIgnorePlan(cmd, dir, "1")
+	err := runIgnoreFeature(cmd, dir, "001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Original should be gone
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1.md")); !os.IsNotExist(err) {
-		t.Error("plan_1.md should have been renamed")
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001.md")); !os.IsNotExist(err) {
+		t.Error("feature_001.md should have been renamed")
 	}
 	// Ignored file should exist
-	if _, err := os.Stat(filepath.Join(dir, ".maggus", "plan_1_ignored.md")); err != nil {
-		t.Error("plan_1_ignored.md should exist")
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_ignored.md")); err != nil {
+		t.Error("feature_001_ignored.md should exist")
 	}
-	if !strings.Contains(stdout.String(), "Ignored plan 1") {
+	if !strings.Contains(stdout.String(), "Ignored feature 001") {
 		t.Errorf("expected success message, got: %s", stdout.String())
 	}
 }
 
-func TestRunIgnorePlan_AlreadyIgnored(t *testing.T) {
+func TestRunIgnoreFeature_AlreadyIgnored(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_2_ignored.md", "# Plan 2 ignored")
+	writeIgnoreFeature(t, dir, "feature_002_ignored.md", "# Feature 002 ignored")
 
 	cmd, stdout, _ := newTestCmd(t)
-	err := runIgnorePlan(cmd, dir, "2")
+	err := runIgnoreFeature(cmd, dir, "002")
 	if err != nil {
 		t.Fatalf("expected nil error for idempotent ignore, got: %v", err)
 	}
@@ -161,27 +161,27 @@ func TestRunIgnorePlan_AlreadyIgnored(t *testing.T) {
 	}
 }
 
-func TestRunIgnorePlan_CompletedReturnsError(t *testing.T) {
+func TestRunIgnoreFeature_CompletedReturnsError(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_4_completed.md", "# Plan 4 completed")
+	writeIgnoreFeature(t, dir, "feature_004_completed.md", "# Feature 004 completed")
 
 	cmd, _, _ := newTestCmd(t)
-	err := runIgnorePlan(cmd, dir, "4")
+	err := runIgnoreFeature(cmd, dir, "004")
 	if err == nil {
-		t.Fatal("expected error for completed plan")
+		t.Fatal("expected error for completed feature")
 	}
 	if !strings.Contains(err.Error(), "already completed") {
 		t.Errorf("expected 'already completed' error, got: %v", err)
 	}
 }
 
-func TestRunIgnorePlan_MissingReturnsError(t *testing.T) {
+func TestRunIgnoreFeature_MissingReturnsError(t *testing.T) {
 	dir := setupIgnoreDir(t)
 
 	cmd, _, _ := newTestCmd(t)
-	err := runIgnorePlan(cmd, dir, "99")
+	err := runIgnoreFeature(cmd, dir, "099")
 	if err == nil {
-		t.Fatal("expected error for missing plan")
+		t.Fatal("expected error for missing feature")
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found' error, got: %v", err)
@@ -190,7 +190,7 @@ func TestRunIgnorePlan_MissingReturnsError(t *testing.T) {
 
 // --- runIgnoreTask tests ---
 
-const samplePlanWithTask = `# Plan
+const sampleFeatureWithTask = `# Feature
 
 ### TASK-007: Sample task
 - [ ] Do something
@@ -200,7 +200,7 @@ const samplePlanWithTask = `# Plan
 - [ ] More work
 `
 
-const samplePlanWithIgnoredTask = `# Plan
+const sampleFeatureWithIgnoredTask = `# Feature
 
 ### IGNORED TASK-007: Sample task
 - [ ] Do something
@@ -208,7 +208,7 @@ const samplePlanWithIgnoredTask = `# Plan
 
 func TestRunIgnoreTask_RewritesHeading(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_1.md", samplePlanWithTask)
+	writeIgnoreFeature(t, dir, "feature_001.md", sampleFeatureWithTask)
 
 	cmd, stdout, _ := newTestCmd(t)
 	err := runIgnoreTask(cmd, dir, "TASK-007")
@@ -217,7 +217,7 @@ func TestRunIgnoreTask_RewritesHeading(t *testing.T) {
 	}
 
 	// Verify file content was rewritten
-	data, err := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestRunIgnoreTask_RewritesHeading(t *testing.T) {
 
 func TestRunIgnoreTask_AlreadyIgnored(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_1.md", samplePlanWithIgnoredTask)
+	writeIgnoreFeature(t, dir, "feature_001.md", sampleFeatureWithIgnoredTask)
 
 	cmd, stdout, _ := newTestCmd(t)
 	err := runIgnoreTask(cmd, dir, "TASK-007")
@@ -249,7 +249,7 @@ func TestRunIgnoreTask_AlreadyIgnored(t *testing.T) {
 
 func TestRunIgnoreTask_BareIDNormalizes(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_1.md", samplePlanWithTask)
+	writeIgnoreFeature(t, dir, "feature_001.md", sampleFeatureWithTask)
 
 	cmd, stdout, _ := newTestCmd(t)
 	// Pass bare "007" instead of "TASK-007"
@@ -258,7 +258,7 @@ func TestRunIgnoreTask_BareIDNormalizes(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".maggus", "plan_1.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestRunIgnoreTask_BareIDNormalizes(t *testing.T) {
 
 func TestRunIgnoreTask_MissingReturnsError(t *testing.T) {
 	dir := setupIgnoreDir(t)
-	writeIgnorePlan(t, dir, "plan_1.md", samplePlanWithTask)
+	writeIgnoreFeature(t, dir, "feature_001.md", sampleFeatureWithTask)
 
 	cmd, _, _ := newTestCmd(t)
 	err := runIgnoreTask(cmd, dir, "TASK-999")
@@ -284,13 +284,13 @@ func TestRunIgnoreTask_MissingReturnsError(t *testing.T) {
 	}
 }
 
-func TestRunIgnoreTask_NoPlanFiles(t *testing.T) {
+func TestRunIgnoreTask_NoFeatureFiles(t *testing.T) {
 	dir := setupIgnoreDir(t)
 
 	cmd, _, _ := newTestCmd(t)
 	err := runIgnoreTask(cmd, dir, "TASK-001")
 	if err == nil {
-		t.Fatal("expected error when no plan files exist")
+		t.Fatal("expected error when no feature files exist")
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found' error, got: %v", err)
@@ -301,8 +301,8 @@ func TestRunIgnoreTask_NoPlanFiles(t *testing.T) {
 
 func TestRewriteTaskHeading_AtomicWrite(t *testing.T) {
 	dir := t.TempDir()
-	filePath := filepath.Join(dir, "plan.md")
-	content := "# Plan\n\n### TASK-010: Test task\n- [ ] criterion\n"
+	filePath := filepath.Join(dir, "feature.md")
+	content := "# Feature\n\n### TASK-010: Test task\n- [ ] criterion\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -330,8 +330,8 @@ func TestRewriteTaskHeading_AtomicWrite(t *testing.T) {
 
 func TestRewriteTaskHeading_RemoveIgnored(t *testing.T) {
 	dir := t.TempDir()
-	filePath := filepath.Join(dir, "plan.md")
-	content := "# Plan\n\n### IGNORED TASK-010: Test task\n- [ ] criterion\n"
+	filePath := filepath.Join(dir, "feature.md")
+	content := "# Feature\n\n### IGNORED TASK-010: Test task\n- [ ] criterion\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -355,8 +355,8 @@ func TestRewriteTaskHeading_RemoveIgnored(t *testing.T) {
 
 func TestRewriteTaskHeading_TaskNotFound(t *testing.T) {
 	dir := t.TempDir()
-	filePath := filepath.Join(dir, "plan.md")
-	content := "# Plan\n\n### TASK-010: Test task\n"
+	filePath := filepath.Join(dir, "feature.md")
+	content := "# Feature\n\n### TASK-010: Test task\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -372,8 +372,8 @@ func TestRewriteTaskHeading_TaskNotFound(t *testing.T) {
 
 func TestRewriteTaskHeading_PreservesOtherContent(t *testing.T) {
 	dir := t.TempDir()
-	filePath := filepath.Join(dir, "plan.md")
-	content := "# Plan\n\nSome intro text.\n\n### TASK-001: First\n- [ ] a\n\n### TASK-002: Second\n- [ ] b\n"
+	filePath := filepath.Join(dir, "feature.md")
+	content := "# Feature\n\nSome intro text.\n\n### TASK-001: First\n- [ ] a\n\n### TASK-002: Second\n- [ ] b\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

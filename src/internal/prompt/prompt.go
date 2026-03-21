@@ -104,7 +104,7 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 		b.WriteString("Do not modify or switch branches — stay on your current branch.\n\n")
 	}
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
-	b.WriteString("Do NOT scan plan files to find a different task. Do NOT work on any other task.\n\n")
+	b.WriteString("Do NOT scan feature files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")
 	b.WriteString("If a criterion cannot be completed (missing dependency, needs human input, external blocker), mark it as:\n")
 	b.WriteString("  `- [x] ⚠️ BLOCKED: <original criterion text> — <reason>`\n")
@@ -113,8 +113,8 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	// Stage files but do NOT commit
 	b.WriteString("When you are done:\n")
 
-	// Update plan checkboxes
-	fmt.Fprintf(b, "1. Update the plan file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
+	// Update feature checkboxes
+	fmt.Fprintf(b, "1. Update the feature file (`%s`) checkboxes: mark completed acceptance criteria as `[x]`.\n", task.SourceFile)
 
 	b.WriteString("2. Stage all changed files with `git add *` but do NOT commit.\n")
 	b.WriteString("3. Write a commit message to `COMMIT.md` in the repository root. Include the task ID in the message.\n")

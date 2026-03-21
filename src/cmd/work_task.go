@@ -54,8 +54,8 @@ type taskContext struct {
 }
 
 // runTask executes a single task iteration: finds the next task, acquires a
-// lock (in worktree mode), builds the prompt, runs the agent, re-parses plans,
-// marks completed plans, stages renames, commits, and handles the result.
+// lock (in worktree mode), builds the prompt, runs the agent, re-parses features,
+// marks completed features, stages renames, commits, and handles the result.
 //
 // The caller's loop index (i) and total count are needed for progress tracking
 // and prompt metadata. The tasks slice is the current parsed task list.
@@ -111,10 +111,10 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	}
 
 	// Re-parse to pick up any changes the agent made.
-	parsedTasks, parseErr := parser.ParsePlans(tc.workDir)
+	parsedTasks, parseErr := parser.ParseFeatures(tc.workDir)
 	if parseErr != nil {
 		releaseLock(lock, tc.useWorktree)
-		reason := fmt.Sprintf("re-parse plans: %v", parseErr)
+		reason := fmt.Sprintf("re-parse features: %v", parseErr)
 		return taskResult{
 			action: taskSkipToNext,
 			taskID: next.ID,
@@ -122,13 +122,13 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		}
 	}
 
-	// Rename fully completed plan files before committing.
-	_ = parser.MarkCompletedPlans(tc.workDir)
+	// Rename fully completed feature files before committing.
+	_ = parser.MarkCompletedFeatures(tc.workDir)
 
-	// Stage any plan renames so they are included in the commit.
-	stagePlans := exec.Command("git", "add", "--", ".maggus/")
-	stagePlans.Dir = tc.workDir
-	_, _ = stagePlans.CombinedOutput()
+	// Stage any feature renames so they are included in the commit.
+	stageFeatures := exec.Command("git", "add", "--", ".maggus/")
+	stageFeatures.Dir = tc.workDir
+	_, _ = stageFeatures.CombinedOutput()
 
 	// Commit, release lock, update progress, and check sync.
 	result := completeTask(tc, next, lock, parsedTasks, i, count)
@@ -233,7 +233,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		Total:           count,
 		TaskID:          task.ID,
 		TaskTitle:       task.Title,
-		PlanFile:        task.SourceFile,
+		FeatureFile:     task.SourceFile,
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
 		RemainingTasks:  remaining,

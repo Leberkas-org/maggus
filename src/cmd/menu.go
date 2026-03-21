@@ -110,21 +110,21 @@ type menuItem struct {
 
 var allMenuItems = []menuItem{
 	// Group 1: Core workflow
-	{name: "work", desc: "Work through all tasks in the plan", shortcut: 'w', shortcutLabel: "w"},
-	{name: "status", desc: "Show a compact summary of plan progress", shortcut: 's', shortcutLabel: "s"},
+	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
+	{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
 	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
 	// Group 2: Repository management
 	{name: "repos", desc: "Manage configured repositories", separator: true, shortcut: 'r', shortcutLabel: "r"},
 	// Group 3: AI-assisted creation
-	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true, shortcut: 'v', shortcutLabel: "v"},
+	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, separator: true, shortcut: 'o', shortcutLabel: "o"},
+	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, shortcut: 'v', shortcutLabel: "v"},
 	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true, shortcut: 'a', shortcutLabel: "a"},
 	{name: "plan", desc: "Create an implementation plan", requiresClaude: true, shortcut: 'p', shortcutLabel: "p"},
-	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, shortcut: 'o', shortcutLabel: "o"},
 	// Group 4: Project management
 	{name: "config", desc: "Edit project settings", separator: true, shortcut: 'c', shortcutLabel: "c"},
 	{name: "worktree", desc: "Manage Maggus worktrees", shortcut: 't', shortcutLabel: "t"},
 	{name: "release", desc: "Generate RELEASE.md with changelog", shortcut: 'z', shortcutLabel: "z"},
-	{name: "clean", desc: "Remove completed plans and finished runs", shortcut: 'n', shortcutLabel: "n"},
+	{name: "clean", desc: "Remove completed features and finished runs", shortcut: 'n', shortcutLabel: "n"},
 	{name: "update", desc: "Check for and install updates", shortcut: 'u', shortcutLabel: "u"},
 	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true, shortcut: 'i', shortcutLabel: "i"},
 	// Exit
@@ -191,30 +191,30 @@ func buildArgs(cmdName string, opts []subMenuOption) []string {
 	return nil
 }
 
-// planSummary holds the aggregated plan statistics for the menu header.
-type planSummary struct {
-	plans   int
-	tasks   int
-	done    int
-	blocked int
+// featureSummary holds the aggregated feature statistics for the menu header.
+type featureSummary struct {
+	features int
+	tasks    int
+	done     int
+	blocked  int
 }
 
-// loadPlanSummary computes plan statistics from the current working directory.
-func loadPlanSummary() planSummary {
+// loadFeatureSummary computes feature statistics from the current working directory.
+func loadFeatureSummary() featureSummary {
 	dir, err := os.Getwd()
 	if err != nil {
-		return planSummary{}
+		return featureSummary{}
 	}
-	plans, err := parsePlans(dir)
-	if err != nil || len(plans) == 0 {
-		return planSummary{}
+	features, err := parseFeatures(dir)
+	if err != nil || len(features) == 0 {
+		return featureSummary{}
 	}
-	var s planSummary
-	s.plans = len(plans)
-	for _, p := range plans {
-		s.tasks += len(p.tasks)
-		s.done += p.doneCount()
-		s.blocked += p.blockedCount()
+	var s featureSummary
+	s.features = len(features)
+	for _, f := range features {
+		s.tasks += len(f.tasks)
+		s.done += f.doneCount()
+		s.blocked += f.blockedCount()
 	}
 	return s
 }
@@ -226,7 +226,7 @@ type menuModel struct {
 	selected        string   // command name chosen by the user, empty if quit
 	args            []string // args to pass to the selected command
 	quitting        bool
-	summary         planSummary
+	summary         featureSummary
 	width           int
 	height          int
 	cwd             string // current working directory, shown in header
@@ -243,7 +243,7 @@ type menuModel struct {
 	activeSubDef *subMenuDef // pointer to the active sub-menu definition (with live option state)
 }
 
-func newMenuModel(summary planSummary) menuModel {
+func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
 	return menuModel{
 		items:       activeMenuItems(),
@@ -453,16 +453,16 @@ func (m menuModel) View() string {
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
-	// Plan summary line
+	// Feature summary line
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	var summaryLine string
 	if m.summary.tasks == 0 {
-		summaryLine = mutedStyle.Render("No plans found")
+		summaryLine = mutedStyle.Render("No features found")
 	} else {
 		greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
 		redStyle := lipgloss.NewStyle().Foreground(styles.Error)
 		summaryLine = fmt.Sprintf("%s · %s · %s · %s",
-			mutedStyle.Render(fmt.Sprintf("%d plans", m.summary.plans)),
+			mutedStyle.Render(fmt.Sprintf("%d features", m.summary.features)),
 			mutedStyle.Render(fmt.Sprintf("%d tasks", m.summary.tasks)),
 			greenStyle.Render(fmt.Sprintf("%d done", m.summary.done)),
 			redStyle.Render(fmt.Sprintf("%d blocked", m.summary.blocked)),

@@ -18,7 +18,7 @@ type Record struct {
 	RunID                    string                       `json:"run_id"`
 	TaskID                   string                       `json:"task_id"`
 	TaskTitle                string                       `json:"task_title"`
-	PlanFile                 string                       `json:"plan_file"`
+	FeatureFile              string                       `json:"feature_file"`
 	Model                    string                       `json:"model"`
 	Agent                    string                       `json:"agent"`
 	InputTokens              int                          `json:"input_tokens"`

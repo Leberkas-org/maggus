@@ -54,7 +54,7 @@ type IterationStartMsg struct {
 	Total           int
 	TaskID          string
 	TaskTitle       string
-	PlanFile        string
+	FeatureFile        string
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
 	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
@@ -95,7 +95,7 @@ type TUIModel struct {
 	taskCriteria    []TaskCriterion
 	taskID          string
 	taskTitle       string
-	taskPlanFile    string
+	taskFeatureFile    string
 
 	// Recent commits
 	commits []string

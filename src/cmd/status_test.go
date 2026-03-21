@@ -7,7 +7,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 )
 
-func TestPlanInfo_DoneCount(t *testing.T) {
+func TestFeatureInfo_DoneCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -53,7 +53,7 @@ func TestPlanInfo_DoneCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &planInfo{tasks: tt.tasks}
+			p := &featureInfo{tasks: tt.tasks}
 			got := p.doneCount()
 			if got != tt.want {
 				t.Errorf("doneCount() = %d, want %d", got, tt.want)
@@ -62,7 +62,7 @@ func TestPlanInfo_DoneCount(t *testing.T) {
 	}
 }
 
-func TestPlanInfo_BlockedCount(t *testing.T) {
+func TestFeatureInfo_BlockedCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -100,7 +100,7 @@ func TestPlanInfo_BlockedCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &planInfo{tasks: tt.tasks}
+			p := &featureInfo{tasks: tt.tasks}
 			got := p.blockedCount()
 			if got != tt.want {
 				t.Errorf("blockedCount() = %d, want %d", got, tt.want)
@@ -109,8 +109,8 @@ func TestPlanInfo_BlockedCount(t *testing.T) {
 	}
 }
 
-func TestBuildSelectableTasksForPlan(t *testing.T) {
-	plan := planInfo{
+func TestBuildSelectableTasksForFeature(t *testing.T) {
+	feature := featureInfo{
 		tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
@@ -119,7 +119,7 @@ func TestBuildSelectableTasksForPlan(t *testing.T) {
 	}
 
 	t.Run("showAll false excludes complete", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(plan, false)
+		got := buildSelectableTasksForFeature(feature, false)
 		if len(got) != 1 {
 			t.Fatalf("len = %d, want 1", len(got))
 		}
@@ -129,30 +129,30 @@ func TestBuildSelectableTasksForPlan(t *testing.T) {
 	})
 
 	t.Run("showAll true includes all", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(plan, true)
+		got := buildSelectableTasksForFeature(feature, true)
 		if len(got) != 3 {
 			t.Fatalf("len = %d, want 3", len(got))
 		}
 	})
 
-	t.Run("empty plan", func(t *testing.T) {
-		got := buildSelectableTasksForPlan(planInfo{}, false)
+	t.Run("empty feature", func(t *testing.T) {
+		got := buildSelectableTasksForFeature(featureInfo{}, false)
 		if len(got) != 0 {
 			t.Errorf("len = %d, want 0", len(got))
 		}
 	})
 }
 
-func TestVisiblePlans(t *testing.T) {
-	plans := []planInfo{
+func TestVisibleFeatures(t *testing.T) {
+	plans := []featureInfo{
 		{filename: "plan_1.md", completed: false},
 		{filename: "plan_2_completed.md", completed: true},
 		{filename: "plan_3.md", completed: false},
 	}
 
 	t.Run("showAll false hides completed", func(t *testing.T) {
-		m := statusModel{plans: plans, showAll: false}
-		got := m.visiblePlans()
+		m := statusModel{features: plans, showAll: false}
+		got := m.visibleFeatures()
 		if len(got) != 2 {
 			t.Fatalf("len = %d, want 2", len(got))
 		}
@@ -162,16 +162,16 @@ func TestVisiblePlans(t *testing.T) {
 	})
 
 	t.Run("showAll true shows all", func(t *testing.T) {
-		m := statusModel{plans: plans, showAll: true}
-		got := m.visiblePlans()
+		m := statusModel{features: plans, showAll: true}
+		got := m.visibleFeatures()
 		if len(got) != 3 {
 			t.Fatalf("len = %d, want 3", len(got))
 		}
 	})
 
 	t.Run("no plans", func(t *testing.T) {
-		m := statusModel{plans: nil, showAll: false}
-		got := m.visiblePlans()
+		m := statusModel{features: nil, showAll: false}
+		got := m.visibleFeatures()
 		if len(got) != 0 {
 			t.Errorf("len = %d, want 0", len(got))
 		}
@@ -180,7 +180,7 @@ func TestVisiblePlans(t *testing.T) {
 
 func TestFindNextTask(t *testing.T) {
 	t.Run("finds first incomplete task", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -200,7 +200,7 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("skips completed plans", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1_completed.md",
 				completed: true,
@@ -223,7 +223,7 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("all complete returns empty", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -248,7 +248,7 @@ func TestFindNextTask(t *testing.T) {
 
 func TestRenderStatusPlain(t *testing.T) {
 	t.Run("basic output", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{
 				filename:  "plan_1.md",
 				completed: false,
@@ -264,7 +264,7 @@ func TestRenderStatusPlain(t *testing.T) {
 		out := sb.String()
 
 		// Header
-		if !strings.Contains(out, "1 plans (1 active), 3 tasks total") {
+		if !strings.Contains(out, "1 features (1 active), 3 tasks total") {
 			t.Error("missing header summary")
 		}
 		// Summary line
@@ -294,9 +294,9 @@ func TestRenderStatusPlain(t *testing.T) {
 		if !strings.Contains(out, "BLOCKED: dep") {
 			t.Error("missing blocked reason")
 		}
-		// Plans table
-		if !strings.Contains(out, "Plans") {
-			t.Error("missing Plans section")
+		// Features table
+		if !strings.Contains(out, "Features") {
+			t.Error("missing Features section")
 		}
 		if !strings.Contains(out, "plan_1.md") {
 			t.Error("missing plan filename in table")
@@ -304,7 +304,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan hidden when showAll false", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
@@ -325,7 +325,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan shown when showAll true", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
@@ -343,7 +343,7 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("ignored plan shown with marker", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_1_ignored.md", ignored: true, tasks: []parser.Task{
 				{ID: "TASK-001", Title: "Ign task", Ignored: true, SourceFile: "plan_1_ignored.md", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
@@ -365,13 +365,13 @@ func TestRenderStatusPlain(t *testing.T) {
 		renderStatusPlain(&sb, nil, false, "", "", "claude")
 		out := sb.String()
 
-		if !strings.Contains(out, "0 plans (0 active), 0 tasks total") {
-			t.Error("empty plans should show zero counts")
+		if !strings.Contains(out, "0 features (0 active), 0 tasks total") {
+			t.Error("empty features should show zero counts")
 		}
 	})
 
 	t.Run("plans table status labels", func(t *testing.T) {
-		plans := []planInfo{
+		plans := []featureInfo{
 			{filename: "plan_new.md", tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
@@ -403,7 +403,7 @@ func TestRenderStatusPlain(t *testing.T) {
 }
 
 func TestNewStatusModel(t *testing.T) {
-	plans := []planInfo{
+	plans := []featureInfo{
 		{
 			filename: "plan_1.md",
 			tasks: []parser.Task{
@@ -449,7 +449,7 @@ func TestNewStatusModel(t *testing.T) {
 }
 
 func TestRebuildForSelectedPlan(t *testing.T) {
-	plans := []planInfo{
+	plans := []featureInfo{
 		{filename: "plan_1.md", tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
@@ -460,8 +460,8 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 	}
 
 	t.Run("selects correct plan tasks", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 1, showAll: false}
-		m.rebuildForSelectedPlan()
+		m := statusModel{features: plans, selectedFeature: 1, showAll: false}
+		m.rebuildForSelectedFeature()
 		if len(m.Tasks) != 2 {
 			t.Fatalf("len = %d, want 2", len(m.Tasks))
 		}
@@ -471,10 +471,10 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 	})
 
 	t.Run("resets cursor", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 0}
+		m := statusModel{features: plans, selectedFeature: 0}
 		m.Cursor = 5
 		m.ScrollOffset = 3
-		m.rebuildForSelectedPlan()
+		m.rebuildForSelectedFeature()
 		if m.Cursor != 0 {
 			t.Errorf("Cursor = %d, want 0", m.Cursor)
 		}
@@ -483,17 +483,17 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 		}
 	})
 
-	t.Run("out of bounds selectedPlan resets to 0", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 99}
-		m.rebuildForSelectedPlan()
-		if m.selectedPlan != 0 {
-			t.Errorf("selectedPlan = %d, want 0", m.selectedPlan)
+	t.Run("out of bounds selectedFeature resets to 0", func(t *testing.T) {
+		m := statusModel{features: plans, selectedFeature: 99}
+		m.rebuildForSelectedFeature()
+		if m.selectedFeature != 0 {
+			t.Errorf("selectedFeature = %d, want 0", m.selectedFeature)
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
-		m := statusModel{plans: nil}
-		m.rebuildForSelectedPlan()
+		m := statusModel{features: nil}
+		m.rebuildForSelectedFeature()
 		if m.Tasks != nil {
 			t.Errorf("Tasks should be nil, got %v", m.Tasks)
 		}

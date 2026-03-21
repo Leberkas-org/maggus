@@ -13,7 +13,7 @@ func newTestTask() *parser.Task {
 		ID:          "TASK-042",
 		Title:       "Implement the thing",
 		Description: "As a dev, I want the thing so it works.",
-		SourceFile:  ".maggus/plan_2.md",
+		SourceFile:  ".maggus/features/feature_002.md",
 		Criteria: []parser.Criterion{
 			{Text: "First criterion", Checked: false},
 			{Text: "Second criterion", Checked: true},
@@ -59,13 +59,13 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 
 		// Instructions
 		"Work ONLY on TASK-042: Implement the thing",
-		"Do NOT scan plan files to find a different task",
+		"Do NOT scan feature files to find a different task",
 		"verify that every acceptance criterion",
 		"Stage all changed files",
 		"do NOT commit",
 		"COMMIT.md",
-		"Update the plan file",
-		".maggus/plan_2.md",
+		"Update the feature file",
+		".maggus/features/feature_002.md",
 		"Write an iteration log",
 		"iteration-03.md",
 		"Task selected",

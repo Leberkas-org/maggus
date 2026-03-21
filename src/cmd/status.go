@@ -31,61 +31,61 @@ var (
 type statusModel struct {
 	taskListComponent
 
-	plans        []planInfo
+	features     []featureInfo
 	showAll      bool
 	nextTaskID   string
 	nextTaskFile string
 	agentName    string
 
-	// Plan tab selection
-	selectedPlan int // index into visiblePlans()
+	// Feature tab selection
+	selectedFeature int // index into visibleFeatures()
 
 	dir string // working directory for file operations
 
-	// Temporary status note (e.g. "plan is already ignored")
+	// Temporary status note (e.g. "feature is already ignored")
 	statusNote string
 }
 
-func newStatusModel(plans []planInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
+func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
 		},
-		plans:        plans,
+		features:     features,
 		showAll:      showAll,
 		nextTaskID:   nextTaskID,
 		nextTaskFile: nextTaskFile,
 		agentName:    agentName,
 		dir:          dir,
 	}
-	visible := m.visiblePlans()
+	visible := m.visibleFeatures()
 	if len(visible) > 0 {
-		m.Tasks = buildSelectableTasksForPlan(visible[0], showAll)
+		m.Tasks = buildSelectableTasksForFeature(visible[0], showAll)
 	}
 	return m
 }
 
-// visiblePlans returns the plans that should be shown based on the showAll flag.
-func (m statusModel) visiblePlans() []planInfo {
-	var visible []planInfo
-	for _, p := range m.plans {
-		if p.completed && !m.showAll {
+// visibleFeatures returns the features that should be shown based on the showAll flag.
+func (m statusModel) visibleFeatures() []featureInfo {
+	var visible []featureInfo
+	for _, f := range m.features {
+		if f.completed && !m.showAll {
 			continue
 		}
-		visible = append(visible, p)
+		visible = append(visible, f)
 	}
 	return visible
 }
 
-// rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
-// for the currently selected plan.
-func (m *statusModel) rebuildForSelectedPlan() {
-	visible := m.visiblePlans()
-	if m.selectedPlan >= len(visible) {
-		m.selectedPlan = 0
+// rebuildForSelectedFeature rebuilds the selectable tasks and resets the cursor
+// for the currently selected feature.
+func (m *statusModel) rebuildForSelectedFeature() {
+	visible := m.visibleFeatures()
+	if m.selectedFeature >= len(visible) {
+		m.selectedFeature = 0
 	}
 	if len(visible) > 0 {
-		m.Tasks = buildSelectableTasksForPlan(visible[m.selectedPlan], m.showAll)
+		m.Tasks = buildSelectableTasksForFeature(visible[m.selectedFeature], m.showAll)
 	} else {
 		m.Tasks = nil
 	}
@@ -93,14 +93,14 @@ func (m *statusModel) rebuildForSelectedPlan() {
 	m.ScrollOffset = 0
 }
 
-// reloadPlans reloads all plans from disk and rebuilds the current view.
-func (m *statusModel) reloadPlans() {
-	plans, err := parsePlans(m.dir)
+// reloadFeatures reloads all features from disk and rebuilds the current view.
+func (m *statusModel) reloadFeatures() {
+	features, err := parseFeatures(m.dir)
 	if err == nil {
-		m.plans = plans
-		m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		m.features = features
+		m.nextTaskID, m.nextTaskFile = findNextTask(features)
 	}
-	m.rebuildForSelectedPlan()
+	m.rebuildForSelectedFeature()
 }
 
 // syncDetailSuffix updates the component's DetailSuffix from statusNote.
@@ -146,7 +146,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 			m.ConfirmDelete = false
 			return m, nil
 		}
-		m.reloadPlans()
+		m.reloadFeatures()
 		if m.Cursor >= len(m.Tasks) && m.Cursor > 0 {
 			m.Cursor--
 		}
@@ -185,35 +185,35 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "tab", "right":
-		visible := m.visiblePlans()
+		visible := m.visibleFeatures()
 		if len(visible) > 1 {
-			m.selectedPlan = (m.selectedPlan + 1) % len(visible)
-			m.rebuildForSelectedPlan()
+			m.selectedFeature = (m.selectedFeature + 1) % len(visible)
+			m.rebuildForSelectedFeature()
 		}
 		return m, nil
 	case "shift+tab", "left":
-		visible := m.visiblePlans()
+		visible := m.visibleFeatures()
 		if len(visible) > 1 {
-			m.selectedPlan--
-			if m.selectedPlan < 0 {
-				m.selectedPlan = len(visible) - 1
+			m.selectedFeature--
+			if m.selectedFeature < 0 {
+				m.selectedFeature = len(visible) - 1
 			}
-			m.rebuildForSelectedPlan()
+			m.rebuildForSelectedFeature()
 		}
 		return m, nil
 	case "alt+a":
 		m.showAll = !m.showAll
-		plans, err := parsePlans(m.dir)
+		features, err := parseFeatures(m.dir)
 		if err == nil {
-			m.plans = plans
+			m.features = features
 		}
-		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
-		m.rebuildForSelectedPlan()
+		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
+		m.rebuildForSelectedFeature()
 		return m, nil
 	case "alt+i":
 		return m.handleIgnoreTask(false)
 	case "alt+p":
-		return m.handleIgnorePlan()
+		return m.handleIgnoreFeature()
 	}
 
 	// Delegate to component for shared navigation
@@ -222,7 +222,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case taskListQuit, taskListRun:
 		return m, tea.Quit
 	case taskListDeleted:
-		m.reloadPlans()
+		m.reloadFeatures()
 	}
 	return m, cmd
 }
@@ -241,9 +241,9 @@ func (m statusModel) handleIgnoreTask(inDetail bool) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.statusNote = ""
-	visible := m.visiblePlans()
-	if m.selectedPlan < len(visible) && visible[m.selectedPlan].ignored {
-		m.statusNote = "plan is already ignored"
+	visible := m.visibleFeatures()
+	if m.selectedFeature < len(visible) && visible[m.selectedFeature].ignored {
+		m.statusNote = "feature is already ignored"
 	}
 	if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
 		m.statusNote = "error: " + err.Error()
@@ -254,7 +254,7 @@ func (m statusModel) handleIgnoreTask(inDetail bool) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	cursorTaskID := t.ID
-	m.reloadPlans()
+	m.reloadFeatures()
 	for i, st := range m.Tasks {
 		if st.ID == cursorTaskID {
 			m.Cursor = i
@@ -273,19 +273,19 @@ func (m statusModel) handleIgnoreTask(inDetail bool) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m statusModel) handleIgnorePlan() (tea.Model, tea.Cmd) {
+func (m statusModel) handleIgnoreFeature() (tea.Model, tea.Cmd) {
 	m.statusNote = ""
-	visible := m.visiblePlans()
-	if m.selectedPlan >= len(visible) {
+	visible := m.visibleFeatures()
+	if m.selectedFeature >= len(visible) {
 		return m, nil
 	}
-	p := visible[m.selectedPlan]
-	if p.completed {
+	f := visible[m.selectedFeature]
+	if f.completed {
 		return m, nil
 	}
-	fullPath := filepath.Join(m.dir, ".maggus", p.filename)
+	fullPath := filepath.Join(m.dir, ".maggus", "features", f.filename)
 	var newPath string
-	if p.ignored {
+	if f.ignored {
 		newPath = strings.TrimSuffix(fullPath, "_ignored.md") + ".md"
 	} else {
 		newPath = strings.TrimSuffix(fullPath, ".md") + "_ignored.md"
@@ -295,25 +295,25 @@ func (m statusModel) handleIgnorePlan() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	newBase := filepath.Base(newPath)
-	plans, err := parsePlans(m.dir)
+	features, err := parseFeatures(m.dir)
 	if err == nil {
-		m.plans = plans
-		m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+		m.features = features
+		m.nextTaskID, m.nextTaskFile = findNextTask(features)
 	}
-	newVisible := m.visiblePlans()
-	m.selectedPlan = 0
-	for i, vp := range newVisible {
-		if vp.filename == newBase {
-			m.selectedPlan = i
+	newVisible := m.visibleFeatures()
+	m.selectedFeature = 0
+	for i, vf := range newVisible {
+		if vf.filename == newBase {
+			m.selectedFeature = i
 			break
 		}
 	}
-	m.rebuildForSelectedPlan()
+	m.rebuildForSelectedFeature()
 	return m, nil
 }
 
 func (m statusModel) View() string {
-	if len(m.plans) == 0 {
+	if len(m.features) == 0 {
 		return m.viewEmpty()
 	}
 	if v := m.taskListComponent.View(); v != "" {
@@ -327,8 +327,8 @@ func (m statusModel) viewEmpty() string {
 
 	var sb strings.Builder
 	sb.WriteString(styles.Title.Render("Status") + "\n\n")
-	sb.WriteString(mutedStyle.Render("No plans found.") + "\n\n")
-	sb.WriteString(mutedStyle.Render("Create a plan with ") +
+	sb.WriteString(mutedStyle.Render("No features found.") + "\n\n")
+	sb.WriteString(mutedStyle.Render("Create a feature with ") +
 		lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render("maggus plan") +
 		mutedStyle.Render(" to get started.") + "\n")
 
@@ -340,9 +340,9 @@ func (m statusModel) viewEmpty() string {
 	return styles.Box.Render(sb.String()) + "\n"
 }
 
-// renderTabBar renders the horizontal plan tab bar.
+// renderTabBar renders the horizontal feature tab bar.
 func (m statusModel) renderTabBar() string {
-	visible := m.visiblePlans()
+	visible := m.visibleFeatures()
 	if len(visible) == 0 {
 		return ""
 	}
@@ -361,7 +361,7 @@ func (m statusModel) renderTabBar() string {
 			prefix = "~"
 		}
 		label := fmt.Sprintf(" %s%s %d/%d ", prefix, name, done, total)
-		if i == m.selectedPlan {
+		if i == m.selectedFeature {
 			if p.ignored {
 				tabs = append(tabs, ignoredTabStyle.Bold(true).Render(label))
 			} else {
@@ -415,26 +415,26 @@ func (m statusModel) renderTabBar() string {
 func (m statusModel) viewStatus() string {
 	var sb strings.Builder
 
-	visible := m.visiblePlans()
+	visible := m.visibleFeatures()
 
 	// Compute totals
 	totalTasks := 0
 	totalDone := 0
 	totalBlocked := 0
-	activePlans := 0
-	for _, p := range m.plans {
-		totalTasks += len(p.tasks)
-		totalDone += p.doneCount()
-		totalBlocked += p.blockedCount()
-		if !p.completed {
-			activePlans++
+	activeFeatures := 0
+	for _, f := range m.features {
+		totalTasks += len(f.tasks)
+		totalDone += f.doneCount()
+		totalBlocked += f.blockedCount()
+		if !f.completed {
+			activeFeatures++
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
 
 	// Header
-	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %d plans (%d active), %d tasks total",
-		len(m.plans), activePlans, totalTasks))
+	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %d features (%d active), %d tasks total",
+		len(m.features), activeFeatures, totalTasks))
 	sb.WriteString(header)
 	sb.WriteString("\n\n")
 
@@ -446,9 +446,9 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString("\n")
 	}
 
-	// Progress bar and summary for selected plan
-	if m.selectedPlan < len(visible) {
-		p := visible[m.selectedPlan]
+	// Progress bar and summary for selected feature
+	if m.selectedFeature < len(visible) {
+		p := visible[m.selectedFeature]
 		done := p.doneCount()
 		total := len(p.tasks)
 		blocked := p.blockedCount()
@@ -464,9 +464,9 @@ func (m statusModel) viewStatus() string {
 		sb.WriteString(statusDimStyle.Render(summary))
 	}
 
-	// Task list for selected plan
-	if m.selectedPlan < len(visible) {
-		p := visible[m.selectedPlan]
+	// Task list for selected feature
+	if m.selectedFeature < len(visible) {
+		p := visible[m.selectedFeature]
 
 		sb.WriteString("\n\n")
 		if p.completed {
@@ -552,7 +552,7 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 
-	// Status note (e.g. "plan is already ignored")
+	// Status note (e.g. "feature is already ignored")
 	if m.statusNote != "" {
 		sb.WriteString("\n")
 		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
@@ -562,7 +562,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch plan · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore plan · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore feature · alt+r: run · alt+bksp: delete · q/esc: exit")
 
 	if m.Width > 0 && m.Height > 0 {
 		return styles.FullScreen(sb.String(), footer, m.Width, m.Height)
@@ -572,8 +572,8 @@ func (m statusModel) viewStatus() string {
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show a compact summary of plan progress",
-	Long:  `Reads all plan files in .maggus/ and displays a compact progress summary.`,
+	Short: "Show a compact summary of feature progress",
+	Long:  `Reads all feature files in .maggus/ and displays a compact progress summary.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		plain, err := cmd.Flags().GetBool("plain")
 		if err != nil {
@@ -595,31 +595,31 @@ var statusCmd = &cobra.Command{
 		}
 		agentName := cfg.Agent
 
-		plans, err := parsePlans(dir)
+		features, err := parseFeatures(dir)
 		if err != nil {
 			return err
 		}
 
-		if len(plans) == 0 {
+		if len(features) == 0 {
 			if plain {
-				fmt.Fprintln(cmd.OutOrStdout(), "No plans found.")
+				fmt.Fprintln(cmd.OutOrStdout(), "No features found.")
 				return nil
 			}
 			// TUI mode: show empty status view
-			plans = []planInfo{}
+			features = []featureInfo{}
 		}
 
-		nextTaskID, nextTaskFile := findNextTask(plans)
+		nextTaskID, nextTaskFile := findNextTask(features)
 
 		if plain {
 			var sb strings.Builder
-			renderStatusPlain(&sb, plans, all, nextTaskID, nextTaskFile, agentName)
+			renderStatusPlain(&sb, features, all, nextTaskID, nextTaskFile, agentName)
 			fmt.Fprint(cmd.OutOrStdout(), sb.String())
 			return nil
 		}
 
 		// TUI mode: interactive status with detail view
-		m := newStatusModel(plans, all, nextTaskID, nextTaskFile, agentName, dir)
+		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir)
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := prog.Run()
 		if err != nil {
@@ -635,5 +635,5 @@ var statusCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
-	statusCmd.Flags().Bool("all", false, "Show completed plans in task sections and Plans table")
+	statusCmd.Flags().Bool("all", false, "Show completed features in task sections and Features table")
 }
