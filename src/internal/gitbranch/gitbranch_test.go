@@ -6,24 +6,29 @@ import (
 )
 
 func TestIsProtected(t *testing.T) {
+	defaultList := []string{"main", "master", "dev"}
 	tests := []struct {
 		branch string
+		list   []string
 		want   bool
 	}{
-		{"main", true},
-		{"master", true},
-		{"dev", true},
-		{"feature/foo", false},
-		{"fix/bar", false},
-		{"develop", false},
-		{"my-branch", false},
-		{"", false},
+		{"main", defaultList, true},
+		{"master", defaultList, true},
+		{"dev", defaultList, true},
+		{"feature/foo", defaultList, false},
+		{"fix/bar", defaultList, false},
+		{"develop", defaultList, false},
+		{"my-branch", defaultList, false},
+		{"", defaultList, false},
+		{"release", []string{"main", "release"}, true},
+		{"main", []string{"main", "release"}, true},
+		{"dev", []string{"main", "release"}, false},
 	}
 
 	for _, tt := range tests {
-		got := IsProtected(tt.branch)
+		got := IsProtected(tt.branch, tt.list)
 		if got != tt.want {
-			t.Errorf("IsProtected(%q) = %v, want %v", tt.branch, got, tt.want)
+			t.Errorf("IsProtected(%q, %v) = %v, want %v", tt.branch, tt.list, got, tt.want)
 		}
 	}
 }
@@ -56,7 +61,7 @@ func TestEnsureFeatureBranch_NonProtected(t *testing.T) {
 	initGitRepo(t, tmp)
 	checkoutBranch(t, tmp, "feature/existing")
 
-	branch, msg, err := EnsureFeatureBranch(tmp, "TASK-003")
+	branch, msg, err := EnsureFeatureBranch(tmp, "TASK-003", []string{"main", "master", "dev"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +79,7 @@ func TestEnsureFeatureBranch_Protected(t *testing.T) {
 			tmp := t.TempDir()
 			initGitRepoWithBranch(t, tmp, protected)
 
-			branch, msg, err := EnsureFeatureBranch(tmp, "TASK-003")
+			branch, msg, err := EnsureFeatureBranch(tmp, "TASK-003", []string{"main", "master", "dev"})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -97,7 +102,7 @@ func TestEnsureFeatureBranch_Protected(t *testing.T) {
 func TestEnsureFeatureBranch_NotAGitRepo(t *testing.T) {
 	tmp := t.TempDir() // no git init
 
-	branch, msg, err := EnsureFeatureBranch(tmp, "TASK-001")
+	branch, msg, err := EnsureFeatureBranch(tmp, "TASK-001", []string{"main", "master", "dev"})
 	if err != nil {
 		t.Fatalf("should not return error for non-git dir, got: %v", err)
 	}
@@ -106,6 +111,19 @@ func TestEnsureFeatureBranch_NotAGitRepo(t *testing.T) {
 	}
 	if msg == "" {
 		t.Error("expected a warning message for non-git dir")
+	}
+}
+
+func TestEnsureFeatureBranch_CustomProtectedList(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "release")
+
+	branch, _, err := EnsureFeatureBranch(tmp, "TASK-005", []string{"release", "staging"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if branch != "feature/maggustask-005" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-005")
 	}
 }
 

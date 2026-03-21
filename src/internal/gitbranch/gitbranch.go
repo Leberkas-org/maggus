@@ -7,18 +7,16 @@ import (
 	"strings"
 )
 
-// protectedBranches are branches that should not be committed to directly.
-var protectedBranches = map[string]bool{
-	"main":   true,
-	"master": true,
-	"dev":    true,
-}
-
 var taskIDSuffixRe = regexp.MustCompile(`^TASK-(.+)$`)
 
-// IsProtected returns true if the branch name is a protected branch.
-func IsProtected(branch string) bool {
-	return protectedBranches[branch]
+// IsProtected returns true if the branch name is in the protected list.
+func IsProtected(branch string, protectedList []string) bool {
+	for _, p := range protectedList {
+		if p == branch {
+			return true
+		}
+	}
+	return false
 }
 
 // FeatureBranchName generates a feature branch name from a task ID.
@@ -35,13 +33,13 @@ func FeatureBranchName(taskID string) string {
 // EnsureFeatureBranch checks the current branch and creates a feature branch if on a protected branch.
 // Returns the branch name that is now checked out and any messages to display.
 // If git is not available or the directory is not a repo, it returns a warning message and empty branch.
-func EnsureFeatureBranch(workDir string, taskID string) (branch string, msg string, err error) {
+func EnsureFeatureBranch(workDir string, taskID string, protectedList []string) (branch string, msg string, err error) {
 	current, err := currentBranch(workDir)
 	if err != nil {
 		return "", fmt.Sprintf("Warning: could not detect git branch: %v. Continuing without branch switching.", err), nil
 	}
 
-	if !IsProtected(current) {
+	if !IsProtected(current, protectedList) {
 		return current, fmt.Sprintf("On branch %s (not protected, staying here)", current), nil
 	}
 
