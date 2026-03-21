@@ -23,9 +23,9 @@ This feature adds live-updating feature and bug statistics to the main menu usin
 **Parallel:** yes — can run alongside TASK-002-003
 
 **Acceptance Criteria:**
-- [ ] `github.com/fsnotify/fsnotify` is added to `go.mod` and `go.sum` via `go get`
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` passes
+- [x] `github.com/fsnotify/fsnotify` is added to `go.mod` and `go.sum` via `go get`
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` passes
 
 ### TASK-002-002: Implement file watcher for feature and bug directories
 **Description:** As a developer, I want a reusable component that watches `.maggus/features/` and `.maggus/bugs/` directories and sends a bubbletea message when files change, so the menu can react to file system events.
