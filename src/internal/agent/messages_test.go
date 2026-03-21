@@ -134,3 +134,81 @@ func TestUsageMsg_CostUSDZero(t *testing.T) {
 		t.Errorf("UsageMsg.CostUSD = %f, want 0", msg.CostUSD)
 	}
 }
+
+func TestModelTokens(t *testing.T) {
+	mt := ModelTokens{
+		InputTokens:              3,
+		OutputTokens:             24,
+		CacheCreationInputTokens: 13055,
+		CacheReadInputTokens:     6692,
+		CostUSD:                  0.0855,
+	}
+	if mt.InputTokens != 3 {
+		t.Errorf("InputTokens = %d, want 3", mt.InputTokens)
+	}
+	if mt.OutputTokens != 24 {
+		t.Errorf("OutputTokens = %d, want 24", mt.OutputTokens)
+	}
+	if mt.CacheCreationInputTokens != 13055 {
+		t.Errorf("CacheCreationInputTokens = %d, want 13055", mt.CacheCreationInputTokens)
+	}
+	if mt.CacheReadInputTokens != 6692 {
+		t.Errorf("CacheReadInputTokens = %d, want 6692", mt.CacheReadInputTokens)
+	}
+	if mt.CostUSD != 0.0855 {
+		t.Errorf("CostUSD = %f, want 0.0855", mt.CostUSD)
+	}
+}
+
+func TestModelUsageMsg(t *testing.T) {
+	msg := ModelUsageMsg{
+		Models: map[string]ModelTokens{
+			"claude-opus-4-6[1m]": {
+				InputTokens:              3,
+				OutputTokens:             24,
+				CacheCreationInputTokens: 13055,
+				CacheReadInputTokens:     6692,
+				CostUSD:                  0.0855,
+			},
+		},
+	}
+
+	if len(msg.Models) != 1 {
+		t.Fatalf("Models length = %d, want 1", len(msg.Models))
+	}
+
+	entry, ok := msg.Models["claude-opus-4-6[1m]"]
+	if !ok {
+		t.Fatal("expected Models to contain key 'claude-opus-4-6[1m]'")
+	}
+	if entry.InputTokens != 3 {
+		t.Errorf("InputTokens = %d, want 3", entry.InputTokens)
+	}
+	if entry.CostUSD != 0.0855 {
+		t.Errorf("CostUSD = %f, want 0.0855", entry.CostUSD)
+	}
+}
+
+func TestModelUsageMsg_MultipleModels(t *testing.T) {
+	msg := ModelUsageMsg{
+		Models: map[string]ModelTokens{
+			"claude-opus-4-6[1m]": {
+				InputTokens: 100, OutputTokens: 50, CostUSD: 0.05,
+			},
+			"claude-haiku-4-5-20251001": {
+				InputTokens: 200, OutputTokens: 100, CostUSD: 0.01,
+			},
+		},
+	}
+
+	if len(msg.Models) != 2 {
+		t.Fatalf("Models length = %d, want 2", len(msg.Models))
+	}
+}
+
+func TestModelUsageMsg_Empty(t *testing.T) {
+	msg := ModelUsageMsg{Models: map[string]ModelTokens{}}
+	if len(msg.Models) != 0 {
+		t.Errorf("Models length = %d, want 0", len(msg.Models))
+	}
+}

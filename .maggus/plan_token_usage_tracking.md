@@ -43,12 +43,12 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a developer, I want to parse the `modelUsage` field from Claude Code result events so that token usage can be attributed to specific models.
 
 **Acceptance Criteria:**
-- [ ] A new `modelUsageEntry` struct is defined in `internal/agent/claude.go` with fields: `InputTokens int` (`inputTokens`), `OutputTokens int` (`outputTokens`), `CacheReadInputTokens int` (`cacheReadInputTokens`), `CacheCreationInputTokens int` (`cacheCreationInputTokens`), `CostUSD float64` (`costUSD`)
-- [ ] `streamEvent` struct includes `ModelUsage map[string]modelUsageEntry` with JSON tag `modelUsage`
-- [ ] A new `ModelUsageMsg` struct is defined in `internal/agent/messages.go` with field `Models map[string]ModelTokens` where `ModelTokens` has fields `InputTokens`, `OutputTokens`, `CacheCreationInputTokens`, `CacheReadInputTokens`, `CostUSD float64`
-- [ ] The `case "result"` handler sends a `ModelUsageMsg` when `event.ModelUsage` is non-empty
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] A new `modelUsageEntry` struct is defined in `internal/agent/claude.go` with fields: `InputTokens int` (`inputTokens`), `OutputTokens int` (`outputTokens`), `CacheReadInputTokens int` (`cacheReadInputTokens`), `CacheCreationInputTokens int` (`cacheCreationInputTokens`), `CostUSD float64` (`costUSD`)
+- [x] `streamEvent` struct includes `ModelUsage map[string]modelUsageEntry` with JSON tag `modelUsage`
+- [x] A new `ModelUsageMsg` struct is defined in `internal/agent/messages.go` with field `Models map[string]ModelTokens` where `ModelTokens` has fields `InputTokens`, `OutputTokens`, `CacheCreationInputTokens`, `CacheReadInputTokens`, `CostUSD float64`
+- [x] The `case "result"` handler sends a `ModelUsageMsg` when `event.ModelUsage` is non-empty
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-004: Update Token State to Track Cache Tokens and Cost
 **Description:** As a developer, I want the TUI token state to accumulate cache tokens and cost so they can be displayed and persisted per-task.
