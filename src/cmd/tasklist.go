@@ -48,8 +48,20 @@ type taskListComponent struct {
 	// Extra content appended to detail viewport (e.g. status note)
 	DetailSuffix string
 
+	// BorderColor overrides the default border color for full-screen views.
+	// When zero-value, defaults to styles.Primary.
+	BorderColor lipgloss.Color
+
 	// Run action — set when user presses Alt+R
 	RunTaskID string
+}
+
+// effectiveBorderColor returns the border color to use, defaulting to Primary.
+func (c *taskListComponent) effectiveBorderColor() lipgloss.Color {
+	if c.BorderColor != "" {
+		return c.BorderColor
+	}
+	return styles.Primary
 }
 
 // visibleTaskLines returns how many task lines fit in the visible area.
@@ -389,10 +401,11 @@ func (c *taskListComponent) viewDetail() string {
 	scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
 	footer := detailFooter(&c.Detail, scrollable)
 
+	bc := c.effectiveBorderColor()
 	if c.Width > 0 && c.Height > 0 {
-		return styles.FullScreenLeft(c.detailViewport.View(), footer, c.Width, c.Height)
+		return styles.FullScreenLeftColor(c.detailViewport.View(), footer, c.Width, c.Height, bc)
 	}
-	return styles.Box.Render(c.detailViewport.View()+"\n"+footer) + "\n"
+	return styles.Box.BorderForeground(bc).Render(c.detailViewport.View()+"\n"+footer) + "\n"
 }
 
 // viewConfirmDelete renders the delete confirmation dialog.
@@ -411,10 +424,11 @@ func (c *taskListComponent) viewConfirmDelete() string {
 		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
 		mutedStyle.Render("n/esc: cancel")))
 
+	bc := c.effectiveBorderColor()
 	if c.Width > 0 && c.Height > 0 {
-		return styles.FullScreen(sb.String(), "", c.Width, c.Height)
+		return styles.FullScreenColor(sb.String(), "", c.Width, c.Height, bc)
 	}
-	return styles.Box.Render(sb.String()) + "\n"
+	return styles.Box.BorderForeground(bc).Render(sb.String()) + "\n"
 }
 
 // CurrentTask returns the task at the current cursor position, or nil if no tasks.

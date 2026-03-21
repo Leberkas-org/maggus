@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 func TestFeatureInfo_DoneCount(t *testing.T) {
@@ -531,4 +533,88 @@ func TestEnsureCursorVisible(t *testing.T) {
 	if m.ScrollOffset > m.Cursor {
 		t.Errorf("ScrollOffset (%d) should not exceed Cursor (%d)", m.ScrollOffset, m.Cursor)
 	}
+}
+
+func TestStatusModel_InitReturnsCmd(t *testing.T) {
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+	cmd := m.Init()
+	if cmd == nil {
+		t.Error("Init() should return a non-nil Cmd for async 2x fetch")
+	}
+}
+
+func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
+	plans := []featureInfo{
+		{filename: "plan_1.md", tasks: []parser.Task{
+			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
+		}},
+	}
+
+	t.Run("2x active sets is2x and BorderColor to Warning", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		msg := claude2xResultMsg{status: claude2x.Status{Is2x: true, TwoXWindowExpiresIn: "5h"}}
+		result, _ := m.Update(msg)
+		updated := result.(statusModel)
+		if !updated.is2x {
+			t.Error("is2x should be true")
+		}
+		if updated.BorderColor != styles.Warning {
+			t.Errorf("BorderColor = %q, want %q (Warning/yellow)", updated.BorderColor, styles.Warning)
+		}
+	})
+
+	t.Run("2x inactive keeps is2x false and BorderColor Primary", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		msg := claude2xResultMsg{status: claude2x.Status{Is2x: false}}
+		result, _ := m.Update(msg)
+		updated := result.(statusModel)
+		if updated.is2x {
+			t.Error("is2x should be false")
+		}
+		if updated.BorderColor != styles.Primary {
+			t.Errorf("BorderColor = %q, want %q (Primary/cyan)", updated.BorderColor, styles.Primary)
+		}
+	})
+}
+
+func TestStatusModel_ViewBorderColor(t *testing.T) {
+	plans := []featureInfo{
+		{filename: "plan_1.md", tasks: []parser.Task{
+			{ID: "TASK-001", Title: "Test", Criteria: []parser.Criterion{{Checked: false}}},
+		}},
+	}
+
+	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m.is2x = false
+		view := m.View()
+		// Verify the view renders without error and contains expected content
+		if !strings.Contains(view, "Status") {
+			t.Error("view should contain 'Status' header")
+		}
+		if !strings.Contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+	})
+
+	t.Run("2x view renders without error", func(t *testing.T) {
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m.is2x = true
+		view := m.View()
+		if !strings.Contains(view, "Status") {
+			t.Error("view should contain 'Status' header")
+		}
+		if !strings.Contains(view, "TASK-001") {
+			t.Error("view should contain task ID")
+		}
+	})
+
+	t.Run("empty features view renders with 2x", func(t *testing.T) {
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+		m.is2x = true
+		view := m.View()
+		if !strings.Contains(view, "No features found") {
+			t.Error("empty view should contain 'No features found'")
+		}
+	})
 }

@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -41,6 +42,8 @@ type statusModel struct {
 	selectedFeature int // index into visibleFeatures()
 
 	dir string // working directory for file operations
+
+	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
 	// Temporary status note (e.g. "feature is already ignored")
 	statusNote string
@@ -114,13 +117,20 @@ func (m *statusModel) syncDetailSuffix() {
 }
 
 func (m statusModel) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		return claude2xResultMsg{status: claude2x.FetchStatus()}
+	}
 }
 
 func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.HandleResize(msg.Width, msg.Height)
+		return m, nil
+
+	case claude2xResultMsg:
+		m.is2x = msg.status.Is2x
+		m.BorderColor = styles.ThemeColor(m.is2x)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -334,10 +344,11 @@ func (m statusModel) viewEmpty() string {
 
 	footer := styles.StatusBar.Render("q/esc: exit")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {
-		return styles.FullScreen(sb.String(), footer, m.Width, m.Height)
+		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
 	}
-	return styles.Box.Render(sb.String()) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(sb.String()) + "\n"
 }
 
 // renderTabBar renders the horizontal feature tab bar.
@@ -564,10 +575,11 @@ func (m statusModel) viewStatus() string {
 	}
 	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore feature · alt+r: run · alt+bksp: delete · q/esc: exit")
 
+	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {
-		return styles.FullScreen(sb.String(), footer, m.Width, m.Height)
+		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
 	}
-	return styles.Box.Render(sb.String()+"\n\n"+footer) + "\n"
+	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
 }
 
 var statusCmd = &cobra.Command{
