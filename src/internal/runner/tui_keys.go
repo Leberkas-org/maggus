@@ -4,7 +4,7 @@ import tea "github.com/charmbracelet/bubbletea"
 
 // handleKeyMsg processes all key events during the normal work view.
 // Sync and summary/done screens are handled before this is called.
-func (m TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+C on summary exits immediately
 	if m.summary.show && msg.Type == tea.KeyCtrlC {
 		m.quitting = true
@@ -142,7 +142,7 @@ func (m TUIModel) applyStopPickerSelection() (tea.Model, tea.Cmd) {
 
 // handleDetailScroll processes scroll keys for the detail tab.
 // Returns the command and true if the key was handled.
-func (m TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
 	case tea.KeyUp:
 		if m.detailScrollOffset > 0 {
@@ -152,7 +152,7 @@ func (m TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 	case tea.KeyDown:
 		m.detailScrollOffset++
-		clampDetailScroll(&m)
+		clampDetailScroll(m)
 		return nil, true
 	case tea.KeyHome:
 		m.detailScrollOffset = 0
@@ -161,7 +161,7 @@ func (m TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case tea.KeyEnd:
 		m.detailScrollOffset = m.detailTotalLines
 		m.detailAutoScroll = true
-		clampDetailScroll(&m)
+		clampDetailScroll(m)
 		return nil, true
 	}
 	return nil, false
@@ -169,7 +169,7 @@ func (m TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 // handleTabSwitch processes tab-switching keys (arrow keys and number keys).
 // Returns the command and true if the key was handled.
-func (m TUIModel) handleTabSwitch(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *TUIModel) handleTabSwitch(msg tea.KeyMsg) (tea.Cmd, bool) {
 	const maxTab = 3
 	switch msg.Type {
 	case tea.KeyLeft:

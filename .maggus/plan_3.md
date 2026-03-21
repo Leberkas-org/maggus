@@ -59,14 +59,14 @@ case SummaryMsg, PushStatusMsg, QuitMsg:
 **Description:** As a user, I want to switch between tabs and scroll the detail panel during the work view so I can monitor different aspects of the running task.
 
 **Acceptance Criteria:**
-- [ ] `handleTabSwitch` is changed to a pointer receiver: `func (m *TUIModel) handleTabSwitch(msg tea.KeyMsg) (tea.Cmd, bool)`
-- [ ] `handleDetailScroll` is changed to a pointer receiver: `func (m *TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool)`
-- [ ] `handleKeyMsg` is changed to a pointer receiver: `func (m *TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd)` — required because it calls the above methods on `m`
-- [ ] The call site in `tui.go` `Update()` is updated: `case tea.KeyMsg:` now calls `m.handleKeyMsg(msg)` with the pointer receiver (note: `Update()` itself must remain a value receiver per bubbletea's `tea.Model` interface, so dereference or assign back as needed)
-- [ ] Tab switching works: left/right arrow keys and number keys 1-4 change the active tab
-- [ ] Detail panel scrolling works: up/down/pgup/pgdn/home/end scroll the detail panel on tab 1
-- [ ] Stop picker still works: Alt+S opens it, arrow keys navigate, Enter selects
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `handleTabSwitch` is changed to a pointer receiver: `func (m *TUIModel) handleTabSwitch(msg tea.KeyMsg) (tea.Cmd, bool)`
+- [x] `handleDetailScroll` is changed to a pointer receiver: `func (m *TUIModel) handleDetailScroll(msg tea.KeyMsg) (tea.Cmd, bool)`
+- [x] `handleKeyMsg` is changed to a pointer receiver: `func (m *TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd)` — required because it calls the above methods on `m`
+- [x] The call site in `tui.go` `Update()` is updated: `case tea.KeyMsg:` now calls `m.handleKeyMsg(msg)` with the pointer receiver (note: `Update()` itself must remain a value receiver per bubbletea's `tea.Model` interface, so dereference or assign back as needed)
+- [x] Tab switching works: left/right arrow keys and number keys 1-4 change the active tab
+- [x] Detail panel scrolling works: up/down/pgup/pgdn/home/end scroll the detail panel on tab 1
+- [x] Stop picker still works: Alt+S opens it, arrow keys navigate, Enter selects
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-002: Fix Missing Return for Summary Message Handling
 
