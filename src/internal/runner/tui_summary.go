@@ -43,8 +43,9 @@ type SummaryData struct {
 
 // RemainingTask is a task that was not completed during the run.
 type RemainingTask struct {
-	ID    string
-	Title string
+	ID         string
+	Title      string
+	SourceFile string // filename (not full path) of the feature/bug file
 }
 
 // FailedTask records a task that could not be completed during the run.

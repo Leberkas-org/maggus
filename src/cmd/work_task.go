@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
@@ -223,8 +224,9 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		}
 		if pastCurrent && tasks[ti].IsWorkable() {
 			remaining = append(remaining, runner.RemainingTask{
-				ID:    tasks[ti].ID,
-				Title: tasks[ti].Title,
+				ID:         tasks[ti].ID,
+				Title:      tasks[ti].Title,
+				SourceFile: filepath.Base(tasks[ti].SourceFile),
 			})
 		}
 	}

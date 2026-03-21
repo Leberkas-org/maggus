@@ -118,6 +118,65 @@ func (m TUIModel) renderHeaderInner(w int) string {
 	return b.String()
 }
 
+// stopPickerEntry represents a single line in the stop picker: either a group header or a selectable item.
+type stopPickerEntry struct {
+	isHeader bool
+	itemIdx  int    // picker item index (-1 for headers)
+	label    string
+}
+
+// buildStopPickerEntries builds the full list of render entries (headers + items) for the stop picker.
+func (m TUIModel) buildStopPickerEntries(maxLabel int) []stopPickerEntry {
+	totalItems := m.stopPickerItemCount()
+	entries := make([]stopPickerEntry, 0, totalItems+8) // extra capacity for headers
+
+	// Track current group to insert headers on source file change.
+	// The current task's feature file is stored in m.taskFeatureFile.
+	currentGroup := ""
+
+	// Determine the group for "After current task" item.
+	// Use the basename of the current task's feature file.
+	currentTaskGroup := m.taskFeatureFile
+	if currentTaskGroup != "" {
+		// Insert header for the current task's group
+		entries = append(entries, stopPickerEntry{isHeader: true, itemIdx: -1, label: currentTaskGroup})
+		currentGroup = currentTaskGroup
+	}
+
+	// Item 0: After current task
+	label := fmt.Sprintf("After current task (%s)", m.taskID)
+	label = styles.Truncate(label, maxLabel)
+	entries = append(entries, stopPickerEntry{itemIdx: 0, label: label})
+
+	// Items 1..N: After each remaining task
+	for i, t := range m.remainingTasks {
+		group := t.SourceFile
+		if group != currentGroup && group != "" {
+			entries = append(entries, stopPickerEntry{isHeader: true, itemIdx: -1, label: group})
+			currentGroup = group
+		}
+		l := fmt.Sprintf("After %s: %s", t.ID, t.Title)
+		l = styles.Truncate(l, maxLabel)
+		entries = append(entries, stopPickerEntry{itemIdx: i + 1, label: l})
+	}
+
+	// Last item: Complete the plan
+	lastIdx := totalItems - 1
+	entries = append(entries, stopPickerEntry{itemIdx: lastIdx, label: "Complete the plan"})
+
+	return entries
+}
+
+// stopPickerCursorRenderIndex returns the render-line index of the given picker cursor within the entries list.
+func stopPickerCursorRenderIndex(entries []stopPickerEntry, cursor int) int {
+	for i, e := range entries {
+		if !e.isHeader && e.itemIdx == cursor {
+			return i
+		}
+	}
+	return 0
+}
+
 // renderStopPicker renders the stop point picker overlay.
 func (m TUIModel) renderStopPicker(w int) string {
 	var b strings.Builder
@@ -127,6 +186,7 @@ func (m TUIModel) renderStopPicker(w int) string {
 	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	checkStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	indicatorStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	headerStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
 
 	b.WriteString(titleStyle.Render("Stop after…") + "\n")
 	b.WriteString(styles.Separator(w) + "\n\n")
@@ -136,34 +196,13 @@ func (m TUIModel) renderStopPicker(w int) string {
 		maxLabel = 20
 	}
 
-	// Build all item labels indexed by their picker index
-	totalItems := m.stopPickerItemCount()
-	type pickerItem struct {
-		idx   int
-		label string
-	}
-	items := make([]pickerItem, 0, totalItems)
+	entries := m.buildStopPickerEntries(maxLabel)
+	totalLines := len(entries)
 
-	// Item 0: After current task
-	label := fmt.Sprintf("After current task (%s)", m.taskID)
-	label = styles.Truncate(label, maxLabel)
-	items = append(items, pickerItem{0, label})
-
-	// Items 1..N: After each remaining task
-	for i, t := range m.remainingTasks {
-		l := fmt.Sprintf("After %s: %s", t.ID, t.Title)
-		l = styles.Truncate(l, maxLabel)
-		items = append(items, pickerItem{i + 1, l})
-	}
-
-	// Last item: Complete the plan
-	lastIdx := totalItems - 1
-	items = append(items, pickerItem{lastIdx, "Complete the plan"})
-
-	// Viewport: determine visible slice
+	// Viewport: determine visible slice (in render-line space)
 	visible := m.stopPickerVisibleHeight()
 	offset := m.stopPickerScroll
-	if totalItems <= visible {
+	if totalLines <= visible {
 		offset = 0
 	}
 
@@ -174,15 +213,20 @@ func (m TUIModel) renderStopPicker(w int) string {
 
 	// Render only the visible window
 	end := offset + visible
-	if end > totalItems {
-		end = totalItems
+	if end > totalLines {
+		end = totalLines
 	}
-	for _, item := range items[offset:end] {
-		m.renderPickerItem(&b, item.idx, item.label, selectedStyle, normalStyle, checkStyle)
+	for _, entry := range entries[offset:end] {
+		if entry.isHeader {
+			headerLabel := styles.Truncate(entry.label, maxLabel)
+			b.WriteString(fmt.Sprintf("  %s\n", headerStyle.Render(fmt.Sprintf("── %s ──", headerLabel))))
+		} else {
+			m.renderPickerItem(&b, entry.itemIdx, entry.label, selectedStyle, normalStyle, checkStyle)
+		}
 	}
 
 	// Scroll-down indicator
-	if end < totalItems {
+	if end < totalLines {
 		b.WriteString(fmt.Sprintf("  %s\n", indicatorStyle.Render("▼ more")))
 	}
 

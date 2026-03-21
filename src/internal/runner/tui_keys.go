@@ -133,23 +133,33 @@ func (m TUIModel) stopPickerVisibleHeight() int {
 }
 
 // clampStopPickerScroll adjusts scroll offset to keep the cursor visible.
+// The scroll offset operates in render-line space (including group header lines).
 func (m *TUIModel) clampStopPickerScroll() {
 	visible := m.stopPickerVisibleHeight()
-	total := m.stopPickerItemCount()
+	// Build entries to determine total render lines and cursor position
+	entries := m.buildStopPickerEntries(40) // maxLabel doesn't matter for counting
+	total := len(entries)
 
-	// If all items fit, no scrolling needed
+	// If all lines fit, no scrolling needed
 	if total <= visible {
 		m.stopPickerScroll = 0
 		return
 	}
 
+	// Find render-line index of current cursor
+	cursorLine := stopPickerCursorRenderIndex(entries, m.stopPickerCursor)
+
 	// Scroll down if cursor is below visible area
-	if m.stopPickerCursor >= m.stopPickerScroll+visible {
-		m.stopPickerScroll = m.stopPickerCursor - visible + 1
+	if cursorLine >= m.stopPickerScroll+visible {
+		m.stopPickerScroll = cursorLine - visible + 1
 	}
 	// Scroll up if cursor is above visible area
-	if m.stopPickerCursor < m.stopPickerScroll {
-		m.stopPickerScroll = m.stopPickerCursor
+	if cursorLine < m.stopPickerScroll {
+		m.stopPickerScroll = cursorLine
+		// If there's a header right above, include it in the view
+		if m.stopPickerScroll > 0 && entries[m.stopPickerScroll-1].isHeader {
+			m.stopPickerScroll--
+		}
 	}
 
 	// Clamp to valid range

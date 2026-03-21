@@ -56,11 +56,11 @@ The source feature file is not carried through. In `sendIterationStart` at `src/
 **Description:** As a user, I want to see which feature/plan each task belongs to so that I can orient myself when scrolling through many tasks.
 
 **Acceptance Criteria:**
-- [ ] `RemainingTask` includes a `SourceFile` field (or equivalent) populated from the parsed task
-- [ ] `sendIterationStart` in `src/cmd/work_task.go` passes `tasks[ti].SourceFile` into each `RemainingTask`
-- [ ] The stop picker renders a non-selectable header line before each group of tasks from the same feature file (e.g., `── feature_002.md ──`)
-- [ ] Header lines are styled distinctly (muted/dimmed) and the cursor skips over them during up/down navigation
-- [ ] The header uses only the filename (not the full path) for readability
-- [ ] Scrolling from TASK-001 correctly accounts for the extra header lines in height calculations
-- [ ] No regression in stop picker selection, cursor movement, or stop point logic
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `RemainingTask` includes a `SourceFile` field (or equivalent) populated from the parsed task
+- [x] `sendIterationStart` in `src/cmd/work_task.go` passes `tasks[ti].SourceFile` into each `RemainingTask`
+- [x] The stop picker renders a non-selectable header line before each group of tasks from the same feature file (e.g., `── feature_002.md ──`)
+- [x] Header lines are styled distinctly (muted/dimmed) and the cursor skips over them during up/down navigation
+- [x] The header uses only the filename (not the full path) for readability
+- [x] Scrolling from TASK-001 correctly accounts for the extra header lines in height calculations
+- [x] No regression in stop picker selection, cursor movement, or stop point logic
+- [x] `go vet ./...` and `go test ./...` pass
