@@ -87,11 +87,11 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a user, I want the summary view to show accurate token totals with cache breakdown, cost, and per-model breakdown so I can understand resource usage after a run.
 
 **Acceptance Criteria:**
-- [ ] The overall token line in `tui_summary.go` shows total input (including cache) with cache breakdown when cache > 0
-- [ ] A cost line is displayed: `"Cost: $X.XX"` (formatted to 2 decimal places, or more if < $0.01)
-- [ ] Per-task breakdown shows total input (including cache) per task
-- [ ] If per-model data is available, a "Per-Model Usage" section lists each model with its input (including cache), output, and cost
-- [ ] Typecheck/lint passes
+- [x] The overall token line in `tui_summary.go` shows total input (including cache) with cache breakdown when cache > 0
+- [x] A cost line is displayed: `"Cost: $X.XX"` (formatted to 2 decimal places, or more if < $0.01)
+- [x] Per-task breakdown shows total input (including cache) per task
+- [x] If per-model data is available, a "Per-Model Usage" section lists each model with its input (including cache), output, and cost
+- [x] Typecheck/lint passes
 
 ### TASK-008: Migrate Usage CSV to v2 Format
 **Description:** As a developer, I want usage data persisted to `usage_v2.csv` with the new cache, cost, and per-model fields so that historical data accurately reflects real usage.

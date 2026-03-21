@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -251,8 +252,22 @@ afterTitle:
 
 	// Token usage totals
 	if m.tokens.hasData {
-		tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.tokens.totalInput), FormatTokens(m.tokens.totalOutput))
+		totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
+		var tokenStr string
+		if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
+			tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
+				FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
+				FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
+		} else {
+			tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
+		}
 		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render(tokenStr)))
+
+		costStr := "N/A"
+		if m.tokens.totalCost > 0 {
+			costStr = FormatCost(m.tokens.totalCost)
+		}
+		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Cost:"), valStyle.Render(costStr)))
 	} else {
 		content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Tokens:"), valStyle.Render("N/A")))
 	}
@@ -262,11 +277,52 @@ afterTitle:
 		content.WriteString("\n")
 		content.WriteString(styles.Subtitle.Render("Token Usage") + "\n")
 		for _, tu := range m.tokens.usages {
-			content.WriteString(fmt.Sprintf("  %s %s  %s in / %s out\n",
+			taskIn := tu.InputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens
+			var taskTokenStr string
+			if tu.CacheCreationInputTokens > 0 || tu.CacheReadInputTokens > 0 {
+				taskTokenStr = fmt.Sprintf("%s in (cache: %s write, %s read) / %s out",
+					FormatTokens(taskIn),
+					FormatTokens(tu.CacheCreationInputTokens), FormatTokens(tu.CacheReadInputTokens),
+					FormatTokens(tu.OutputTokens))
+			} else {
+				taskTokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(taskIn), FormatTokens(tu.OutputTokens))
+			}
+			content.WriteString(fmt.Sprintf("  %s %s  %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
 				fmt.Sprintf("%-12s", tu.TaskID),
-				FormatTokens(tu.InputTokens),
-				FormatTokens(tu.OutputTokens)))
+				taskTokenStr))
+		}
+	}
+
+	// Per-model usage breakdown
+	if len(m.tokens.totalModelUsage) > 0 {
+		content.WriteString("\n")
+		content.WriteString(styles.Subtitle.Render("Per-Model Usage") + "\n")
+		// Sort model names for stable output
+		modelNames := make([]string, 0, len(m.tokens.totalModelUsage))
+		for name := range m.tokens.totalModelUsage {
+			modelNames = append(modelNames, name)
+		}
+		sort.Strings(modelNames)
+		for _, name := range modelNames {
+			mt := m.tokens.totalModelUsage[name]
+			modelIn := mt.InputTokens + mt.CacheCreationInputTokens + mt.CacheReadInputTokens
+			var modelTokenStr string
+			if mt.CacheCreationInputTokens > 0 || mt.CacheReadInputTokens > 0 {
+				modelTokenStr = fmt.Sprintf("%s in (cache: %s write, %s read) / %s out",
+					FormatTokens(modelIn),
+					FormatTokens(mt.CacheCreationInputTokens), FormatTokens(mt.CacheReadInputTokens),
+					FormatTokens(mt.OutputTokens))
+			} else {
+				modelTokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(modelIn), FormatTokens(mt.OutputTokens))
+			}
+			costStr := ""
+			if mt.CostUSD > 0 {
+				costStr = fmt.Sprintf("  %s", FormatCost(mt.CostUSD))
+			}
+			content.WriteString(fmt.Sprintf("  %s %s\n",
+				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
+				fmt.Sprintf("%s: %s%s", name, modelTokenStr, costStr)))
 		}
 	}
 
