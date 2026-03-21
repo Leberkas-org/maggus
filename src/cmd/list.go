@@ -135,20 +135,17 @@ func renderListPlain(workable, ignored []parser.Task, all bool, agentName string
 	} else {
 		fmt.Fprintf(&sb, "Next %d task(s):\n", len(workable))
 	}
-	fmt.Fprintf(&sb, "Agent: %s\n\n", agentName)
+	fmt.Fprintf(&sb, "Agent: %s\n", agentName)
 
-	idx := 1
 	for i, t := range workable {
 		prefix := "   "
 		if i == 0 {
 			prefix = " ->"
 		}
-		fmt.Fprintf(&sb, "%s #%-2d %s: %s  %s\n", prefix, idx, t.ID, t.Title, filepath.Base(t.SourceFile))
-		idx++
+		fmt.Fprintf(&sb, "%s #%-2d %s: %s  %s\n", prefix, i+1, t.ID, t.Title, filepath.Base(t.SourceFile))
 	}
-	for _, t := range ignored {
-		fmt.Fprintf(&sb, " [~]#%-2d %s: %s  %s\n", idx, t.ID, t.Title, filepath.Base(t.SourceFile))
-		idx++
+	for i, t := range ignored {
+		fmt.Fprintf(&sb, " [~]#%-2d %s: %s  %s\n", len(workable)+i+1, t.ID, t.Title, filepath.Base(t.SourceFile))
 	}
 	return sb.String()
 }

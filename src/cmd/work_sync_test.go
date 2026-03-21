@@ -39,16 +39,16 @@ func stubSyncDeps(t *testing.T, opts syncStubs) {
 }
 
 type syncStubs struct {
-	fetchRemote      func(string) error
-	remoteStatus     func(string) (gitsync.Status, error)
+	fetchRemote       func(string) error
+	remoteStatus      func(string) (gitsync.Status, error)
 	workingTreeStatus func(string) (gitsync.WorkTree, error)
-	syncTUI          func(string) (syncResult, error)
+	syncTUI           func(string) (syncResult, error)
 }
 
 func TestCheckSync_NoRemote(t *testing.T) {
 	stubSyncDeps(t, syncStubs{
-		fetchRemote:      func(string) error { return nil },
-		remoteStatus:     func(string) (gitsync.Status, error) { return gitsync.Status{HasRemote: false}, nil },
+		fetchRemote:       func(string) error { return nil },
+		remoteStatus:      func(string) (gitsync.Status, error) { return gitsync.Status{HasRemote: false}, nil },
 		workingTreeStatus: func(string) (gitsync.WorkTree, error) { return gitsync.WorkTree{}, nil },
 	})
 

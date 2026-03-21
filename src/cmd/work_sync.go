@@ -8,8 +8,8 @@ import (
 
 // Function variables for dependency injection in tests.
 var (
-	fetchRemoteFn      = gitsync.FetchRemote
-	remoteStatusFn     = func(dir string) (gitsync.Status, error) { return gitsync.RemoteStatus(dir) }
+	fetchRemoteFn       = gitsync.FetchRemote
+	remoteStatusFn      = func(dir string) (gitsync.Status, error) { return gitsync.RemoteStatus(dir) }
 	workingTreeStatusFn = func(dir string) (gitsync.WorkTree, error) { return gitsync.WorkingTreeStatus(dir) }
 )
 

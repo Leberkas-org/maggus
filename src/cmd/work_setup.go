@@ -15,11 +15,11 @@ import (
 
 // Function variables for dependency injection in tests.
 var (
-	loadConfigFn       = config.Load
-	newAgentFn         = agent.New
-	ensureGitignoreFn  = gitignore.EnsureEntries
-	fingerprintGetFn   = fingerprint.Get
-	getwdFn            = os.Getwd
+	loadConfigFn      = config.Load
+	newAgentFn        = agent.New
+	ensureGitignoreFn = gitignore.EnsureEntries
+	fingerprintGetFn  = fingerprint.Get
+	getwdFn           = os.Getwd
 )
 
 // workConfig holds all resolved configuration needed by the work loop.

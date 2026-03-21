@@ -193,15 +193,15 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want to verify that the refactoring achieved its goals and that the entire test suite passes.
 
 **Acceptance Criteria:**
-- [ ] `tui.go` is under 700 lines
-- [ ] `list.go` is under 250 lines
-- [ ] `status.go` is under 700 lines
-- [ ] `work.go` RunE function is under 200 lines
-- [ ] `go test ./...` passes with zero failures
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
-- [ ] `go fmt ./...` reports no changes needed
-- [ ] No new lint warnings introduced
+- [x] `tui.go` is under 700 lines
+- [x] `list.go` is under 250 lines
+- [x] `status.go` is under 700 lines
+- [x] `work.go` RunE function is under 200 lines
+- [x] `go test ./...` passes with zero failures
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
+- [x] `go fmt ./...` reports no changes needed
+- [x] No new lint warnings introduced
 
 ## Functional Requirements
 

@@ -21,17 +21,17 @@ type fakeAgent struct {
 
 func (f *fakeAgent) Run(_ context.Context, _ string, _ string, _ *tea.Program) error { return nil }
 func (f *fakeAgent) RunOnce(_ context.Context, _ string, _ string) (string, error)   { return "", nil }
-func (f *fakeAgent) Name() string                                                     { return f.name }
-func (f *fakeAgent) Validate() error                                                  { return f.validateErr }
+func (f *fakeAgent) Name() string                                                    { return f.name }
+func (f *fakeAgent) Validate() error                                                 { return f.validateErr }
 
 // stubSetupDeps replaces workSetup's function variables with test stubs
 // and restores originals on cleanup.
 type setupStubs struct {
-	loadConfig    func(string) (config.Config, error)
-	newAgent      func(string) (agent.Agent, error)
-	ensureIgnore  func(string) ([]string, error)
-	fingerprint   func() (string, error)
-	getwd         func() (string, error)
+	loadConfig   func(string) (config.Config, error)
+	newAgent     func(string) (agent.Agent, error)
+	ensureIgnore func(string) ([]string, error)
+	fingerprint  func() (string, error)
+	getwd        func() (string, error)
 }
 
 func stubSetupDeps(t *testing.T, s setupStubs) {
