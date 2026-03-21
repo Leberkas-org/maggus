@@ -33,10 +33,10 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a developer, I want the new JSONL usage files automatically gitignored so they are never committed.
 
 **Acceptance Criteria:**
-- [ ] `internal/gitignore/gitignore.go` `requiredEntries` includes `.maggus/usage_work.jsonl` and `.maggus/usage_prompt.jsonl`
-- [ ] Remove the old `.maggus/usage_v2.csv` entry from `requiredEntries` (keep `.maggus/usage.csv` for backward compat with older repos)
-- [ ] `init_test.go` updated to expect the new entries
-- [ ] `go test ./...` passes
+- [x] `internal/gitignore/gitignore.go` `requiredEntries` includes `.maggus/usage_work.jsonl` and `.maggus/usage_prompt.jsonl`
+- [x] Remove the old `.maggus/usage_v2.csv` entry from `requiredEntries` (keep `.maggus/usage.csv` for backward compat with older repos)
+- [x] `init_test.go` updated to expect the new entries
+- [x] `go test ./...` passes
 
 ### TASK-003: Add `maggus prompt` Command with Interactive Claude Passthrough
 
