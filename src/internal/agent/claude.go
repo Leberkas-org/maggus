@@ -138,8 +138,10 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 			case "result":
 				if event.Usage != nil {
 					p.Send(UsageMsg{
-						InputTokens:  event.Usage.InputTokens,
-						OutputTokens: event.Usage.OutputTokens,
+						InputTokens:              event.Usage.InputTokens,
+						OutputTokens:             event.Usage.OutputTokens,
+						CacheCreationInputTokens: event.Usage.CacheCreationInputTokens,
+						CacheReadInputTokens:     event.Usage.CacheReadInputTokens,
 					})
 				}
 				if event.Subtype == "success" {
@@ -241,8 +243,10 @@ type streamEvent struct {
 }
 
 type streamUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 }
 
 type assistantMessage struct {

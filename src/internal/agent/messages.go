@@ -40,6 +40,8 @@ type MCPMsg struct {
 
 // UsageMsg is sent when a result event contains token usage data.
 type UsageMsg struct {
-	InputTokens  int
-	OutputTokens int
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
 }

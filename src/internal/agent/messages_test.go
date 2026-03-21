@@ -89,3 +89,28 @@ func TestUsageMsg(t *testing.T) {
 		t.Errorf("UsageMsg.OutputTokens = %d, want %d", msg.OutputTokens, 300)
 	}
 }
+
+func TestUsageMsg_CacheFields(t *testing.T) {
+	msg := UsageMsg{
+		InputTokens:              3,
+		OutputTokens:             24,
+		CacheCreationInputTokens: 13055,
+		CacheReadInputTokens:     6692,
+	}
+	if msg.CacheCreationInputTokens != 13055 {
+		t.Errorf("UsageMsg.CacheCreationInputTokens = %d, want %d", msg.CacheCreationInputTokens, 13055)
+	}
+	if msg.CacheReadInputTokens != 6692 {
+		t.Errorf("UsageMsg.CacheReadInputTokens = %d, want %d", msg.CacheReadInputTokens, 6692)
+	}
+}
+
+func TestUsageMsg_CacheFieldsZero(t *testing.T) {
+	msg := UsageMsg{InputTokens: 100, OutputTokens: 50}
+	if msg.CacheCreationInputTokens != 0 {
+		t.Errorf("UsageMsg.CacheCreationInputTokens = %d, want 0", msg.CacheCreationInputTokens)
+	}
+	if msg.CacheReadInputTokens != 0 {
+		t.Errorf("UsageMsg.CacheReadInputTokens = %d, want 0", msg.CacheReadInputTokens)
+	}
+}
