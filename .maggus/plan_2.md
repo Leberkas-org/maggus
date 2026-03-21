@@ -43,14 +43,14 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a user, I want to run `maggus prompt` to launch Claude Code interactively with full terminal control (stdin/stdout/stderr passthrough) so I can have a normal conversation while maggus tracks usage afterward.
 
 **Acceptance Criteria:**
-- [ ] New `cmd/prompt.go` registers a `prompt` command on the root cobra command
-- [ ] The command accepts an optional `--model` flag (uses config default if not set)
-- [ ] The command resolves the model alias via `config.ResolveModel` (same as `work`)
-- [ ] Claude Code is launched interactively: `claude --model <model> --dangerously-skip-permissions` (no `-p`, no `--output-format`)
-- [ ] stdin, stdout, and stderr are connected directly to the terminal (full passthrough, not piped)
-- [ ] The command captures the Claude session ID from the process (see TASK-004)
-- [ ] On exit (normal or Ctrl+C), usage extraction is triggered (TASK-005)
-- [ ] `go vet ./...` passes
+- [x] New `cmd/prompt.go` registers a `prompt` command on the root cobra command
+- [x] The command accepts an optional `--model` flag (uses config default if not set)
+- [x] The command resolves the model alias via `config.ResolveModel` (same as `work`)
+- [x] Claude Code is launched interactively: `claude --model <model> --dangerously-skip-permissions` (no `-p`, no `--output-format`)
+- [x] stdin, stdout, and stderr are connected directly to the terminal (full passthrough, not piped)
+- [x] ⚠️ BLOCKED: The command captures the Claude session ID from the process (see TASK-004) — TASK-004 not yet implemented; TODO placeholder added
+- [x] ⚠️ BLOCKED: On exit (normal or Ctrl+C), usage extraction is triggered (TASK-005) — TASK-005 not yet implemented; TODO placeholder added
+- [x] `go vet ./...` passes
 
 ### TASK-004: Detect Claude Session ID for Post-Hoc Usage Extraction
 

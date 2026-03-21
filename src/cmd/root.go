@@ -109,6 +109,7 @@ func Execute() {
 		rootCmd.AddCommand(planCmd)
 		rootCmd.AddCommand(visionCmd)
 		rootCmd.AddCommand(architectureCmd)
+		rootCmd.AddCommand(promptCmd)
 	}
 
 	if err := rootCmd.Execute(); err != nil {
