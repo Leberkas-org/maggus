@@ -66,11 +66,11 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want unit tests for the sync, summary, and token sub-components so that they can be modified with confidence.
 
 **Acceptance Criteria:**
-- [ ] New file `src/internal/runner/tui_sync_test.go` with tests for: `buildSyncOptions` populates correct menu items, `handleSyncKeys` navigation (up/down changes cursor), sync abort sends correct result on channel
-- [ ] New file `src/internal/runner/tui_summary_test.go` with tests for: `handleSummaryKeys` menu navigation, editing count input accepts digits and rejects letters, Enter on Exit triggers quit
-- [ ] New file `src/internal/runner/tui_tokens_test.go` with tests for: `addUsage` accumulates totals, `saveAndReset` creates TaskUsage record and resets iteration counters, `FormatTokens` formatting (already tested if exists, add if not)
-- [ ] All new tests pass: `go test ./internal/runner -v`
-- [ ] Existing tests still pass: `go test ./...`
+- [x] New file `src/internal/runner/tui_sync_test.go` with tests for: `buildSyncOptions` populates correct menu items, `handleSyncKeys` navigation (up/down changes cursor), sync abort sends correct result on channel
+- [x] New file `src/internal/runner/tui_summary_test.go` with tests for: `handleSummaryKeys` menu navigation, editing count input accepts digits and rejects letters, Enter on Exit triggers quit
+- [x] New file `src/internal/runner/tui_tokens_test.go` with tests for: `addUsage` accumulates totals, `saveAndReset` creates TaskUsage record and resets iteration counters, `FormatTokens` formatting (already tested if exists, add if not)
+- [x] All new tests pass: `go test ./internal/runner -v`
+- [x] Existing tests still pass: `go test ./...`
 
 ### TASK-005: Clean up TUIModel.Update() — delegate to sub-component handlers
 **Description:** As a developer, I want the main `Update()` method to be a thin dispatcher that delegates to sub-components, reducing it from ~260 lines to ~80 lines.
