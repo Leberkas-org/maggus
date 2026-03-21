@@ -138,12 +138,12 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want the work loop's initialization code (config loading, agent resolution, model resolution, gitignore, fingerprint, worktree mode) extracted into a named function so that RunE focuses on orchestration.
 
 **Acceptance Criteria:**
-- [ ] New function `workSetup(cmd, args) (*workConfig, error)` in `work.go` or a new `work_setup.go` file
-- [ ] `workConfig` struct holds all resolved configuration: count, dir, cfg, validIncludes, includeWarnings, activeAgent, resolvedModel, modelDisplay, notifier, useWorktree
-- [ ] RunE's first ~60 lines (lines 64-160 in current code) are replaced by a single `workSetup()` call
-- [ ] `go test ./cmd -run TestWork` passes
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` reports no issues
+- [x] New function `workSetup(cmd, args) (*workConfig, error)` in `work.go` or a new `work_setup.go` file
+- [x] `workConfig` struct holds all resolved configuration: count, dir, cfg, validIncludes, includeWarnings, activeAgent, resolvedModel, modelDisplay, notifier, useWorktree
+- [x] RunE's first ~60 lines (lines 64-160 in current code) are replaced by a single `workSetup()` call
+- [x] `go test ./cmd -run TestWork` passes
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` reports no issues
 
 ### TASK-011: Extract git sync check into a checkSync function
 **Description:** As a developer, I want the pre-work git sync check logic extracted so it's independently testable and doesn't clutter RunE.
