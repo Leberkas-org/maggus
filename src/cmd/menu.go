@@ -111,8 +111,7 @@ type menuItem struct {
 var allMenuItems = []menuItem{
 	// Core workflow
 	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
-	{name: "list", desc: "Preview upcoming workable tasks", shortcut: 'l', shortcutLabel: "l"},
-	{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
+{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
 	{name: "repos", desc: "Manage configured repositories", shortcut: 'r', shortcutLabel: "r"},
 	// AI-assisted creation
 	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, separator: true, shortcut: 'o', shortcutLabel: "o"},

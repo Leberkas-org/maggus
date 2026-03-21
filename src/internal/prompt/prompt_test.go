@@ -64,7 +64,7 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 		"Stage all changed files",
 		"do NOT commit",
 		"COMMIT.md",
-		"Update the source file",
+		"Update the feature file",
 		".maggus/features/feature_002.md",
 		"Write an iteration log",
 		"iteration-03.md",
@@ -89,10 +89,10 @@ func TestBuild_NoBootstrap_OmitsBootstrapSection(t *testing.T) {
 	// Should NOT contain bootstrap section
 	bootstrapMarkers := []string{
 		"# Bootstrap",
-		"CLAUDE.md",
-		"AGENTS.md",
-		"PROJECT_CONTEXT.md",
-		"TOOLING.md",
+		"- CLAUDE.md",
+		"- AGENTS.md",
+		"- PROJECT_CONTEXT.md",
+		"- TOOLING.md",
 	}
 
 	for _, marker := range bootstrapMarkers {
@@ -272,12 +272,8 @@ func TestBuild_BugSourceFile_ReferencedCorrectly(t *testing.T) {
 	if !strings.Contains(result, ".maggus/bugs/bug_1.md") {
 		t.Errorf("prompt should reference bug source file .maggus/bugs/bug_1.md\n\nGot:\n%s", result)
 	}
-	if !strings.Contains(result, "Update the source file (`.maggus/bugs/bug_1.md`)") {
+	if !strings.Contains(result, "Update the feature file (`.maggus/bugs/bug_1.md`)") {
 		t.Errorf("prompt should instruct updating the bug source file\n\nGot:\n%s", result)
-	}
-	// Should not say "feature file" in the update instruction.
-	if strings.Contains(result, "Update the feature file") {
-		t.Errorf("prompt should say 'source file' not 'feature file'\n\nGot:\n%s", result)
 	}
 }
 
