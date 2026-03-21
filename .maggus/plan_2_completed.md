@@ -95,9 +95,9 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a user, I want to see "Prompt" as an option in the maggus interactive menu so I can launch it without remembering the CLI syntax.
 
 **Acceptance Criteria:**
-- [ ] The TUI menu (`cmd/menu.go`) includes a "Prompt" option that runs the prompt command
-- [ ] Menu item has a clear description (e.g. "Launch interactive Claude session with usage tracking")
-- [ ] `go test ./...` passes
+- [x] The TUI menu (`cmd/menu.go`) includes a "Prompt" option that runs the prompt command
+- [x] Menu item has a clear description (e.g. "Launch interactive Claude session with usage tracking")
+- [x] `go test ./...` passes
 
 ## Functional Requirements
 

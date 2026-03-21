@@ -119,6 +119,7 @@ var allMenuItems = []menuItem{
 	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, separator: true, shortcut: 'v', shortcutLabel: "v"},
 	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true, shortcut: 'a', shortcutLabel: "a"},
 	{name: "plan", desc: "Create an implementation plan", requiresClaude: true, shortcut: 'p', shortcutLabel: "p"},
+	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, shortcut: 'o', shortcutLabel: "o"},
 	// Group 4: Project management
 	{name: "config", desc: "Edit project settings", separator: true, shortcut: 'c', shortcutLabel: "c"},
 	{name: "worktree", desc: "Manage Maggus worktrees", shortcut: 't', shortcutLabel: "t"},
