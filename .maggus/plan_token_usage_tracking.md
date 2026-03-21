@@ -77,11 +77,11 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a user, I want the live progress view to show total input tokens (including cache) with a cache breakdown so I can see accurate usage while tasks run.
 
 **Acceptance Criteria:**
-- [ ] The token display in `tui_render.go` computes total input as `totalInput + totalCacheCreation + totalCacheRead`
-- [ ] When cache tokens are present, display format is: `"<total_in> in / <out> out (cache: <write> write, <read> read)"`
-- [ ] When cache tokens are zero, display format remains: `"<in> in / <out> out"`
-- [ ] Cost is displayed on a separate line: `"Cost: $X.XX"` (or "N/A" if zero)
-- [ ] Typecheck/lint passes
+- [x] The token display in `tui_render.go` computes total input as `totalInput + totalCacheCreation + totalCacheRead`
+- [x] When cache tokens are present, display format is: `"<total_in> in / <out> out (cache: <write> write, <read> read)"`
+- [x] When cache tokens are zero, display format remains: `"<in> in / <out> out"`
+- [x] Cost is displayed on a separate line: `"Cost: $X.XX"` (or "N/A" if zero)
+- [x] Typecheck/lint passes
 
 ### TASK-007: Update Summary View Token Display
 **Description:** As a user, I want the summary view to show accurate token totals with cache breakdown, cost, and per-model breakdown so I can understand resource usage after a run.

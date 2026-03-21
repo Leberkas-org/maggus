@@ -418,10 +418,25 @@ func (m TUIModel) renderView() string {
 		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
 		if m.tokens.hasData {
-			tokenStr := fmt.Sprintf("%s in / %s out", FormatTokens(m.tokens.totalInput), FormatTokens(m.tokens.totalOutput))
+			totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
+			var tokenStr string
+			if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
+				tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
+					FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
+					FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
+			} else {
+				tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
+			}
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+
+			costStr := "N/A"
+			if m.tokens.totalCost > 0 {
+				costStr = FormatCost(m.tokens.totalCost)
+			}
+			b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render(costStr)))
 		} else {
 			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+			b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render("N/A")))
 		}
 
 	case 1: // Detail (tool log)
