@@ -66,9 +66,11 @@ type configRow struct {
 	action  configAction // non-zero for action buttons
 	section string       // non-empty triggers a section header before this row
 	isSave  bool         // render with save style
+	display string       // non-empty = read-only display row (no cycling)
 }
 
-func (r configRow) isOption() bool { return r.values != nil }
+func (r configRow) isOption() bool  { return r.values != nil }
+func (r configRow) isDisplay() bool { return r.display != "" }
 
 // configResultMsg is sent after an async save/edit action completes.
 type configResultMsg struct {
@@ -82,13 +84,11 @@ type configModel struct {
 	action configAction
 	width  int
 	height int
-	dir    string // working directory for project config
-	// indices for buildConfig / saveGlobalConfig
-	globalAutoUpdateIdx int
-	// original project config (to preserve Include on save)
-	origInclude []string
-	// status feedback shown below the rows
-	statusText string
+	dir    string
+	globalAutoUpdateIdx   int
+	origInclude           []string
+	origProtectedBranches []string
+	statusText            string
 }
 
 func newConfigModel(cfg config.Config, dir string) configModel {
@@ -103,6 +103,20 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	if cfg.Worktree {
 		worktreeIdx = 0
 	}
+
+	autoBranchValues := []string{"on", "off"}
+	autoBranchIdx := 0
+	if !cfg.Git.IsAutoBranchEnabled() {
+		autoBranchIdx = 1
+	}
+
+	checkSyncValues := []string{"on", "off"}
+	checkSyncIdx := 0
+	if !cfg.Git.IsCheckSyncEnabled() {
+		checkSyncIdx = 1
+	}
+
+	protectedDisplay := strings.Join(cfg.Git.ProtectedBranchList(), ", ")
 
 	soundValues := []string{"on", "off"}
 	soundIdx := 1
@@ -141,6 +155,9 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Agent", values: agentValues, current: agentIdx, section: "Project"},
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
+		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
+		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
+		{label: "Protected branches", display: protectedDisplay},
 		{label: "Sound", values: soundValues, current: soundIdx},
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
 		{label: "  On run complete", values: runCompleteValues, current: runCompleteIdx},
@@ -165,10 +182,11 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	return configModel{
-		rows:                rows,
-		globalAutoUpdateIdx: globalAutoUpdateIdx,
-		dir:                 dir,
-		origInclude:         cfg.Include,
+		rows:                  rows,
+		globalAutoUpdateIdx:   globalAutoUpdateIdx,
+		dir:                   dir,
+		origInclude:           cfg.Include,
+		origProtectedBranches: cfg.Git.ProtectedBranchList(),
 	}
 }
 
@@ -208,6 +226,16 @@ func (m configModel) buildConfig() config.Config {
 		f := false
 		cfg.Notifications.OnError = &f
 	}
+
+	if m.optionByLabel("Auto-branch").values[m.optionByLabel("Auto-branch").current] == "off" {
+		f := false
+		cfg.Git.AutoBranch = &f
+	}
+	if m.optionByLabel("Check sync").values[m.optionByLabel("Check sync").current] == "off" {
+		f := false
+		cfg.Git.CheckSync = &f
+	}
+	cfg.Git.ProtectedBranches = m.origProtectedBranches
 
 	return cfg
 }
@@ -389,6 +417,24 @@ func (m configModel) View() string {
 				fmt.Fprintf(&sb, "     %s  %s\n",
 					normalStyle.Render(label),
 					valueStr,
+				)
+			}
+		} else if row.isDisplay() {
+			label := fmt.Sprintf("%-22s", row.label)
+			hint := mutedStyle.Render("(edit in config.yml)")
+			displayVal := mutedStyle.Render(row.display)
+			if i == m.cursor {
+				fmt.Fprintf(&sb, "  %s %s  %s  %s\n",
+					cursorStyle.Render("->"),
+					normalStyle.Render(label),
+					displayVal,
+					hint,
+				)
+			} else {
+				fmt.Fprintf(&sb, "     %s  %s  %s\n",
+					normalStyle.Render(label),
+					displayVal,
+					hint,
 				)
 			}
 		} else {
