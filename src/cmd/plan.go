@@ -62,7 +62,7 @@ Examples:
   maggus architecture "Review and improve our current architecture"`,
 	Aliases: []string{"arch"},
 	Args:    cobra.MinimumNArgs(1),
-	RunE:    runSkillCommand("/maggus-architecture", ""),
+	RunE:    runSkillCommand("/maggus-architecture", "usage_architecture.jsonl"),
 }
 
 // runSkillCommand returns a cobra RunE that launches the configured agent

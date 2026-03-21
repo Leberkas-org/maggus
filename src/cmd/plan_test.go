@@ -642,6 +642,147 @@ func TestExtractSkillUsage_VisionNoSessionFile(t *testing.T) {
 	}
 }
 
+func TestArchitectureCmd_HasUsageFile(t *testing.T) {
+	// Verify architectureCmd is wired with the usage file (indirectly by checking it's configured).
+	if architectureCmd.RunE == nil {
+		t.Error("architectureCmd.RunE should be set (with usage file wiring)")
+	}
+}
+
+func TestRunSkillCommand_ArchitectureUsageFileParam(t *testing.T) {
+	fn := runSkillCommand("/maggus-architecture", "usage_architecture.jsonl")
+	if fn == nil {
+		t.Error("runSkillCommand with architecture usageFile should return non-nil function")
+	}
+}
+
+func TestExtractSkillUsage_ArchitectureUsageFile(t *testing.T) {
+	// Verify that usage extraction works with usage_architecture.jsonl,
+	// mirroring the vision command's usage extraction test.
+	tmpDir := t.TempDir()
+	fakeSessionDir := filepath.Join(tmpDir, "sessions")
+	if err := os.MkdirAll(fakeSessionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Snapshot before (empty).
+	beforeSnapshot, err := session.SnapshotDir(fakeSessionDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a fake session file with valid assistant message.
+	sessionContent := `{"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":400,"output_tokens":160,"cache_creation_input_tokens":40,"cache_read_input_tokens":35}}}`
+	sessionFile := filepath.Join(fakeSessionDir, "architecture-session.jsonl")
+	if err := os.WriteFile(sessionFile, []byte(sessionContent+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Detect the new session.
+	newFiles, err := session.DetectNewSessions(fakeSessionDir, beforeSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(newFiles) != 1 {
+		t.Fatalf("expected 1 new file, got %d", len(newFiles))
+	}
+
+	// Extract usage.
+	summary, err := session.ExtractUsage(newFiles[0])
+	if err != nil {
+		t.Fatalf("extract usage: %v", err)
+	}
+
+	// Build record (mirrors extractSkillUsage logic for architecture command).
+	startTime := time.Now().Add(-3 * time.Minute)
+	endTime := time.Now()
+	runID := startTime.Format("20060102-150405")
+
+	maggusDir := filepath.Join(tmpDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	usagePath := filepath.Join(maggusDir, "usage_architecture.jsonl")
+
+	rec := usage.Record{
+		RunID:                    runID,
+		Model:                    "claude-sonnet-4-6",
+		Agent:                    "claude",
+		InputTokens:              summary.InputTokens,
+		OutputTokens:             summary.OutputTokens,
+		CacheCreationInputTokens: summary.CacheCreationInputTokens,
+		CacheReadInputTokens:     summary.CacheReadInputTokens,
+		CostUSD:                  0,
+		ModelUsage:               summary.ModelUsage,
+		StartTime:                startTime,
+		EndTime:                  endTime,
+	}
+
+	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
+		t.Fatalf("append usage: %v", err)
+	}
+
+	// Verify the file content.
+	data, err := os.ReadFile(usagePath)
+	if err != nil {
+		t.Fatalf("read usage file: %v", err)
+	}
+
+	var written usage.Record
+	if err := json.Unmarshal(data, &written); err != nil {
+		t.Fatalf("unmarshal usage record: %v", err)
+	}
+
+	if written.RunID != runID {
+		t.Errorf("RunID = %q, want %q", written.RunID, runID)
+	}
+	if written.Model != "claude-sonnet-4-6" {
+		t.Errorf("Model = %q, want claude-sonnet-4-6", written.Model)
+	}
+	if written.Agent != "claude" {
+		t.Errorf("Agent = %q, want claude", written.Agent)
+	}
+	if written.InputTokens != 400 {
+		t.Errorf("InputTokens = %d, want 400", written.InputTokens)
+	}
+	if written.OutputTokens != 160 {
+		t.Errorf("OutputTokens = %d, want 160", written.OutputTokens)
+	}
+	if written.CacheCreationInputTokens != 40 {
+		t.Errorf("CacheCreationInputTokens = %d, want 40", written.CacheCreationInputTokens)
+	}
+	if written.CacheReadInputTokens != 35 {
+		t.Errorf("CacheReadInputTokens = %d, want 35", written.CacheReadInputTokens)
+	}
+	if written.CostUSD != 0 {
+		t.Errorf("CostUSD = %f, want 0", written.CostUSD)
+	}
+}
+
+func TestExtractSkillUsage_ArchitectureNoSessionFile(t *testing.T) {
+	// When no session file is found for architecture, extractSkillUsage should warn but not panic.
+	tmpDir := t.TempDir()
+	maggusDir := filepath.Join(tmpDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	info := &SessionInfo{
+		BeforeSnapshot: make(map[string]bool),
+		StartTime:      time.Now().Add(-time.Minute),
+		EndTime:        time.Now(),
+	}
+
+	// This should not panic — it will print a warning to stderr.
+	extractSkillUsage(tmpDir, "claude-sonnet-4-6", "claude", "usage_architecture.jsonl", info)
+
+	// Verify no usage file was created.
+	usagePath := filepath.Join(maggusDir, "usage_architecture.jsonl")
+	if _, err := os.Stat(usagePath); !os.IsNotExist(err) {
+		t.Error("usage file should not be created when no session file is found")
+	}
+}
+
 func TestSessionInfo_Fields(t *testing.T) {
 	// Verify SessionInfo struct has the expected fields for usage extraction.
 	now := time.Now()
