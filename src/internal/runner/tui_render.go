@@ -126,6 +126,7 @@ func (m TUIModel) renderStopPicker(w int) string {
 	selectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
 	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	checkStyle := lipgloss.NewStyle().Foreground(styles.Success)
+	indicatorStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
 	b.WriteString(titleStyle.Render("Stop after…") + "\n")
 	b.WriteString(styles.Separator(w) + "\n\n")
@@ -135,21 +136,55 @@ func (m TUIModel) renderStopPicker(w int) string {
 		maxLabel = 20
 	}
 
+	// Build all item labels indexed by their picker index
+	totalItems := m.stopPickerItemCount()
+	type pickerItem struct {
+		idx   int
+		label string
+	}
+	items := make([]pickerItem, 0, totalItems)
+
 	// Item 0: After current task
 	label := fmt.Sprintf("After current task (%s)", m.taskID)
 	label = styles.Truncate(label, maxLabel)
-	m.renderPickerItem(&b, 0, label, selectedStyle, normalStyle, checkStyle)
+	items = append(items, pickerItem{0, label})
 
 	// Items 1..N: After each remaining task
 	for i, t := range m.remainingTasks {
-		label = fmt.Sprintf("After %s: %s", t.ID, t.Title)
-		label = styles.Truncate(label, maxLabel)
-		m.renderPickerItem(&b, i+1, label, selectedStyle, normalStyle, checkStyle)
+		l := fmt.Sprintf("After %s: %s", t.ID, t.Title)
+		l = styles.Truncate(l, maxLabel)
+		items = append(items, pickerItem{i + 1, l})
 	}
 
 	// Last item: Complete the plan
-	lastIdx := m.stopPickerItemCount() - 1
-	m.renderPickerItem(&b, lastIdx, "Complete the plan", selectedStyle, normalStyle, checkStyle)
+	lastIdx := totalItems - 1
+	items = append(items, pickerItem{lastIdx, "Complete the plan"})
+
+	// Viewport: determine visible slice
+	visible := m.stopPickerVisibleHeight()
+	offset := m.stopPickerScroll
+	if totalItems <= visible {
+		offset = 0
+	}
+
+	// Scroll-up indicator
+	if offset > 0 {
+		b.WriteString(fmt.Sprintf("  %s\n", indicatorStyle.Render("▲ more")))
+	}
+
+	// Render only the visible window
+	end := offset + visible
+	if end > totalItems {
+		end = totalItems
+	}
+	for _, item := range items[offset:end] {
+		m.renderPickerItem(&b, item.idx, item.label, selectedStyle, normalStyle, checkStyle)
+	}
+
+	// Scroll-down indicator
+	if end < totalItems {
+		b.WriteString(fmt.Sprintf("  %s\n", indicatorStyle.Render("▼ more")))
+	}
 
 	return b.String()
 }

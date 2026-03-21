@@ -38,20 +38,20 @@ The source feature file is not carried through. In `sendIterationStart` at `src/
 
 ## User Stories
 
-### TASK-001: Add viewport scrolling to the stop picker
+### BUG-001-001: Add viewport scrolling to the stop picker
 
 **Description:** As a user, I want the stop picker to scroll within the available terminal height so that I can navigate through all tasks even when there are 100+.
 
 **Acceptance Criteria:**
-- [ ] The stop picker renders only as many items as fit within the available inner height of the TUI
-- [ ] A scroll offset tracks which slice of items is currently visible
-- [ ] Moving the cursor past the visible top/bottom edge scrolls the view to keep the cursor visible
-- [ ] The first item ("After current task") and last item ("Complete the plan") are reachable and visible when selected
-- [ ] Scroll position indicators are shown when there are items above or below the visible area (e.g., `▲ more` / `▼ more`)
-- [ ] No regression in stop picker selection, escape/close, or the active stop point marker (●)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The stop picker renders only as many items as fit within the available inner height of the TUI
+- [x] A scroll offset tracks which slice of items is currently visible
+- [x] Moving the cursor past the visible top/bottom edge scrolls the view to keep the cursor visible
+- [x] The first item ("After current task") and last item ("Complete the plan") are reachable and visible when selected
+- [x] Scroll position indicators are shown when there are items above or below the visible area (e.g., `▲ more` / `▼ more`)
+- [x] No regression in stop picker selection, escape/close, or the active stop point marker (●)
+- [x] `go vet ./...` and `go test ./...` pass
 
-### TASK-002: Add feature file grouping to the stop picker
+### BUG-001-002: Add feature file grouping to the stop picker
 
 **Description:** As a user, I want to see which feature/plan each task belongs to so that I can orient myself when scrolling through many tasks.
 

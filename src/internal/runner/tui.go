@@ -123,6 +123,7 @@ type TUIModel struct {
 	stopAfterTask      bool            // when true, a stop point has been set
 	showStopPicker     bool            // when true, showing the stop picker overlay
 	stopPickerCursor   int             // selected index in the stop picker
+	stopPickerScroll   int             // scroll offset for the stop picker viewport
 	stopAtTaskID       string          // task ID to stop after (empty = after current task)
 	remainingTasks     []RemainingTask // upcoming workable tasks for the stop picker
 	stopFlag           *atomic.Bool    // shared flag readable from the work loop goroutine

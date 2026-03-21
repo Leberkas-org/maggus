@@ -1,6 +1,9 @@
 package runner
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
+)
 
 // handleKeyMsg processes all key events during the normal work view.
 // Sync and summary/done screens are handled before this is called.
@@ -31,9 +34,11 @@ func (m *TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.taskID != "" && !m.summary.show && msg.Alt && len(msg.Runes) == 1 && (msg.Runes[0] == 's' || msg.Runes[0] == 'S') {
 		m.showStopPicker = true
 		m.stopPickerCursor = 0
+		m.stopPickerScroll = 0
 		// If a stop point is already set, pre-select it in the picker
 		if m.stopAfterTask {
 			m.stopPickerCursor = m.stopPickerCurrentIndex()
+			m.clampStopPickerScroll()
 		}
 		return m, nil
 	}
@@ -82,12 +87,22 @@ func (m *TUIModel) handleStopPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyUp:
 		if m.stopPickerCursor > 0 {
 			m.stopPickerCursor--
+			m.clampStopPickerScroll()
 		}
 		return m, nil
 	case tea.KeyDown:
 		if m.stopPickerCursor < maxIdx {
 			m.stopPickerCursor++
+			m.clampStopPickerScroll()
 		}
+		return m, nil
+	case tea.KeyHome:
+		m.stopPickerCursor = 0
+		m.stopPickerScroll = 0
+		return m, nil
+	case tea.KeyEnd:
+		m.stopPickerCursor = maxIdx
+		m.clampStopPickerScroll()
 		return m, nil
 	case tea.KeyEnter:
 		return m.applyStopPickerSelection()
@@ -103,6 +118,51 @@ func (m *TUIModel) handleStopPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// stopPickerVisibleHeight returns how many items fit in the stop picker viewport.
+func (m TUIModel) stopPickerVisibleHeight() int {
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	// Reserve lines for: header section (~8), title (1), separator (1), blank line (1), footer (1)
+	// Plus 2 lines for potential scroll indicators (▲ more / ▼ more)
+	available := innerH - 13
+	if available < 3 {
+		available = 3
+	}
+	return available
+}
+
+// clampStopPickerScroll adjusts scroll offset to keep the cursor visible.
+func (m *TUIModel) clampStopPickerScroll() {
+	visible := m.stopPickerVisibleHeight()
+	total := m.stopPickerItemCount()
+
+	// If all items fit, no scrolling needed
+	if total <= visible {
+		m.stopPickerScroll = 0
+		return
+	}
+
+	// Scroll down if cursor is below visible area
+	if m.stopPickerCursor >= m.stopPickerScroll+visible {
+		m.stopPickerScroll = m.stopPickerCursor - visible + 1
+	}
+	// Scroll up if cursor is above visible area
+	if m.stopPickerCursor < m.stopPickerScroll {
+		m.stopPickerScroll = m.stopPickerCursor
+	}
+
+	// Clamp to valid range
+	maxScroll := total - visible
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if m.stopPickerScroll > maxScroll {
+		m.stopPickerScroll = maxScroll
+	}
+	if m.stopPickerScroll < 0 {
+		m.stopPickerScroll = 0
+	}
 }
 
 // applyStopPickerSelection applies the user's choice from the stop picker.
