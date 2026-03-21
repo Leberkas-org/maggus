@@ -36,13 +36,13 @@ This feature adds live-updating feature and bug statistics to the main menu usin
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] A new bubbletea `tea.Cmd` or goroutine-based watcher watches both `.maggus/features/` and `.maggus/bugs/` directories
-- [ ] The watcher sends a `featureSummaryUpdateMsg` (or similar) to the bubbletea program when any Create, Write, Remove, or Rename event occurs on `feature_*.md` or `bug_*.md` files
-- [ ] Events are debounced (e.g., 200-500ms) so rapid successive writes don't trigger multiple re-parses
-- [ ] The watcher handles missing directories gracefully (e.g., `.maggus/bugs/` may not exist yet)
-- [ ] The watcher is cleaned up when the menu model exits (no leaked goroutines or file handles)
-- [ ] Unit tests verify the watcher sends update messages on file changes
-- [ ] `go vet ./...` passes
+- [x] A new bubbletea `tea.Cmd` or goroutine-based watcher watches both `.maggus/features/` and `.maggus/bugs/` directories
+- [x] The watcher sends a `featureSummaryUpdateMsg` (or similar) to the bubbletea program when any Create, Write, Remove, or Rename event occurs on `feature_*.md` or `bug_*.md` files
+- [x] Events are debounced (e.g., 200-500ms) so rapid successive writes don't trigger multiple re-parses
+- [x] The watcher handles missing directories gracefully (e.g., `.maggus/bugs/` may not exist yet)
+- [x] The watcher is cleaned up when the menu model exits (no leaked goroutines or file handles)
+- [x] Unit tests verify the watcher sends update messages on file changes
+- [x] `go vet ./...` passes
 
 ### TASK-002-003: Update menu summary to show live feature and bug counts
 **Description:** As a user, I want the main menu to show live feature and bug counts with task breakdowns so I can see project progress at a glance without navigating away.
