@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/parser"
 )
 
 // handleIterationStart resets per-iteration state when a new task begins.
@@ -94,4 +95,38 @@ func (m *TUIModel) rebuildExtras() {
 		parts = append(parts, "mcp:"+s)
 	}
 	m.extras = strings.Join(parts, "  ")
+}
+
+// handleFileChange re-parses all feature and bug files to update totalIters and activeBugs.
+// currentIter is NOT changed — only totalIters is adjusted.
+func (m *TUIModel) handleFileChange() {
+	if m.workDir == "" {
+		return
+	}
+
+	bugTasks, bugErr := parser.ParseBugs(m.workDir)
+	if bugErr != nil {
+		return
+	}
+	featureTasks, featureErr := parser.ParseFeatures(m.workDir)
+	if featureErr != nil {
+		return
+	}
+
+	workable := 0
+	workableBugs := 0
+	for i := range bugTasks {
+		if bugTasks[i].IsWorkable() {
+			workable++
+			workableBugs++
+		}
+	}
+	for i := range featureTasks {
+		if featureTasks[i].IsWorkable() {
+			workable++
+		}
+	}
+
+	m.totalIters = m.currentIter + workable
+	m.activeBugs = workableBugs
 }

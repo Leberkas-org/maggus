@@ -139,6 +139,8 @@ type TUIModel struct {
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
 	watcherCh chan struct{}
+	workDir   string // directory used for re-parsing features/bugs on file changes
+	activeBugs int   // count of workable bug tasks (for hint line)
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
@@ -162,6 +164,7 @@ func (m *TUIModel) SetWatcher(baseDir string) {
 
 	m.watcher = w
 	m.watcherCh = ch
+	m.workDir = baseDir
 }
 
 // CloseWatcher stops the file watcher and releases associated resources.
@@ -338,7 +341,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case FileChangeMsg:
-		// Re-listen for the next file change; actual re-parse is handled by TASK-004-002.
+		m.handleFileChange()
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case SyncCheckMsg, syncActionDoneMsg:

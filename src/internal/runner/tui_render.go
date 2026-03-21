@@ -114,6 +114,16 @@ func (m TUIModel) renderHeaderInner(w int) string {
 		b.WriteString(progress + "\n")
 	}
 
+	// Bug hint line (shown when there are active/workable bug tasks)
+	if m.activeBugs > 0 {
+		bugHintStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		bugText := fmt.Sprintf("%d bugs active", m.activeBugs)
+		if m.activeBugs == 1 {
+			bugText = "1 bug active"
+		}
+		b.WriteString(bugHintStyle.Render(bugText) + "\n")
+	}
+
 	// Stop indicator (when a stop point is set)
 	if m.stopAfterTask {
 		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)

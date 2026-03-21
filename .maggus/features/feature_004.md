@@ -45,15 +45,15 @@ Bugs are prioritized over features (existing behavior). When a new bug file is a
 **Parallel:** yes — can run alongside TASK-004-003
 
 **Acceptance Criteria:**
-- [ ] When a file change message is received, the TUI re-parses all feature and bug files to compute updated counts (total tasks, done, blocked, workable)
-- [ ] The progress bar (`renderHeaderInner`, line 96-103 of `tui_render.go`) recalculates `totalIters` based on the updated workable task count
-- [ ] Bug tasks are counted as regular tasks in the progress bar total (e.g., `3/12 Tasks`)
-- [ ] A hint line is shown after the progress bar when bugs are active, e.g., `2 bugs active` in a distinct style (warning/yellow)
-- [ ] The hint line disappears when there are no active (workable) bug tasks
-- [ ] `currentIter` is NOT changed by live updates — only `totalIters` is adjusted
-- [ ] The stop picker's remaining task list is NOT updated live — it only refreshes at task boundaries (existing `sendIterationStart` behavior)
-- [ ] Unit tests verify progress bar recalculation with various file change scenarios
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When a file change message is received, the TUI re-parses all feature and bug files to compute updated counts (total tasks, done, blocked, workable)
+- [x] The progress bar (`renderHeaderInner`, line 96-103 of `tui_render.go`) recalculates `totalIters` based on the updated workable task count
+- [x] Bug tasks are counted as regular tasks in the progress bar total (e.g., `3/12 Tasks`)
+- [x] A hint line is shown after the progress bar when bugs are active, e.g., `2 bugs active` in a distinct style (warning/yellow)
+- [x] The hint line disappears when there are no active (workable) bug tasks
+- [x] `currentIter` is NOT changed by live updates — only `totalIters` is adjusted
+- [x] The stop picker's remaining task list is NOT updated live — it only refreshes at task boundaries (existing `sendIterationStart` behavior)
+- [x] Unit tests verify progress bar recalculation with various file change scenarios
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-004-003: Inline notification for new files
 **Description:** As a user, I want a brief notification when new bug or feature files are detected so I know work has been queued without having to watch the counters.
