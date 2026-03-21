@@ -1,9 +1,11 @@
 package runner
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/parser"
 )
@@ -99,34 +101,70 @@ func (m *TUIModel) rebuildExtras() {
 
 // handleFileChange re-parses all feature and bug files to update totalIters and activeBugs.
 // currentIter is NOT changed — only totalIters is adjusted.
-func (m *TUIModel) handleFileChange() {
+// Returns a tea.Cmd to schedule notification timeout if new tasks were detected.
+func (m *TUIModel) handleFileChange() tea.Cmd {
 	if m.workDir == "" {
-		return
+		return nil
 	}
 
 	bugTasks, bugErr := parser.ParseBugs(m.workDir)
 	if bugErr != nil {
-		return
+		return nil
 	}
 	featureTasks, featureErr := parser.ParseFeatures(m.workDir)
 	if featureErr != nil {
-		return
+		return nil
 	}
 
-	workable := 0
 	workableBugs := 0
+	workableFeatures := 0
 	for i := range bugTasks {
 		if bugTasks[i].IsWorkable() {
-			workable++
 			workableBugs++
 		}
 	}
 	for i := range featureTasks {
 		if featureTasks[i].IsWorkable() {
-			workable++
+			workableFeatures++
 		}
 	}
 
-	m.totalIters = m.currentIter + workable
+	m.totalIters = m.currentIter + workableBugs + workableFeatures
 	m.activeBugs = workableBugs
+
+	// Detect new tasks compared to previous counts
+	newBugs := workableBugs - m.prevWorkableBugs
+	newFeatures := workableFeatures - m.prevWorkableFeatures
+	m.prevWorkableBugs = workableBugs
+	m.prevWorkableFeatures = workableFeatures
+
+	if newBugs > 0 || newFeatures > 0 {
+		return m.setNotification(newBugs, newFeatures)
+	}
+	return nil
+}
+
+// setNotification builds the notification text and returns a delayed Cmd to clear it.
+func (m *TUIModel) setNotification(newBugs, newFeatures int) tea.Cmd {
+	var parts []string
+	if newBugs > 0 {
+		label := "bugs"
+		if newBugs == 1 {
+			label = "bug"
+		}
+		parts = append(parts, fmt.Sprintf("+%d %s added (will run next)", newBugs, label))
+	}
+	if newFeatures > 0 {
+		label := "features"
+		if newFeatures == 1 {
+			label = "feature"
+		}
+		parts = append(parts, fmt.Sprintf("+%d %s added", newFeatures, label))
+	}
+	m.notification = strings.Join(parts, "  ·  ")
+	m.notificationTimerID++
+	timerID := m.notificationTimerID
+	return tea.Tick(5*time.Second, func(_ time.Time) tea.Msg {
+		return notificationExpiredMsg{timerID: timerID}
+	})
 }

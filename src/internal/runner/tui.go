@@ -141,6 +141,12 @@ type TUIModel struct {
 	watcherCh chan struct{}
 	workDir   string // directory used for re-parsing features/bugs on file changes
 	activeBugs int   // count of workable bug tasks (for hint line)
+
+	// Inline notification for new file detection
+	notification        string // current notification text (empty = hidden)
+	notificationTimerID int    // monotonic ID to avoid stale timers hiding newer notifications
+	prevWorkableBugs    int    // previous workable bug count for delta detection
+	prevWorkableFeatures int   // previous workable feature count for delta detection
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
@@ -150,6 +156,11 @@ func (m *TUIModel) SetSyncDir(dir string) {
 
 // FileChangeMsg is sent when the file watcher detects changes to feature or bug files.
 type FileChangeMsg struct{}
+
+// notificationExpiredMsg is sent after a delay to clear the inline notification.
+type notificationExpiredMsg struct {
+	timerID int // only clear if this matches the current timer ID
+}
 
 // SetWatcher configures a file watcher for live feature/bug file updates.
 // The watcher sends updates to an internal channel that the TUI listens on.
@@ -341,8 +352,14 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case FileChangeMsg:
-		m.handleFileChange()
-		return m, listenForWatcherUpdate(m.watcherCh)
+		cmd := m.handleFileChange()
+		return m, tea.Batch(cmd, listenForWatcherUpdate(m.watcherCh))
+
+	case notificationExpiredMsg:
+		if msg.timerID == m.notificationTimerID {
+			m.notification = ""
+		}
+		return m, nil
 
 	case SyncCheckMsg, syncActionDoneMsg:
 		if handled, cmd := m.sync.handleSyncMsg(msg, &m.infoMessages); handled {

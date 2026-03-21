@@ -124,6 +124,22 @@ func (m TUIModel) renderHeaderInner(w int) string {
 		b.WriteString(bugHintStyle.Render(bugText) + "\n")
 	}
 
+	// Inline notification for new files (below progress bar / bug hint)
+	if m.notification != "" && !m.showStopPicker && !m.done {
+		// Notification contains styled segments; bugs part is yellow, features part is muted.
+		// We render the pre-built text which may contain both.
+		notifParts := strings.Split(m.notification, "  ·  ")
+		var styledParts []string
+		for _, p := range notifParts {
+			if strings.Contains(p, "bug") {
+				styledParts = append(styledParts, statusStyle.Render(p))
+			} else {
+				styledParts = append(styledParts, grayStyle.Render(p))
+			}
+		}
+		b.WriteString(strings.Join(styledParts, grayStyle.Render("  ·  ")) + "\n")
+	}
+
 	// Stop indicator (when a stop point is set)
 	if m.stopAfterTask {
 		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)

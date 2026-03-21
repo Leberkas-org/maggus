@@ -64,15 +64,15 @@ Bugs are prioritized over features (existing behavior). When a new bug file is a
 **Parallel:** yes — can run alongside TASK-004-002
 
 **Acceptance Criteria:**
-- [ ] When a file change results in new workable tasks compared to the previous count, a notification message appears in the header area (below the progress bar)
-- [ ] For new bugs: notification reads e.g., `+1 bug added (will run next)` styled in warning/yellow
-- [ ] For new features: notification reads e.g., `+2 features added` styled in muted/info color
-- [ ] If both new bugs and features are detected in the same debounce window, both are shown
-- [ ] The notification fades (disappears) after 5 seconds using a delayed `tea.Cmd` message
-- [ ] Multiple rapid notifications replace the previous one (don't stack)
-- [ ] The notification does not interfere with the stop picker overlay or summary screen
-- [ ] Unit tests verify notification appearance and timeout behavior
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When a file change results in new workable tasks compared to the previous count, a notification message appears in the header area (below the progress bar)
+- [x] For new bugs: notification reads e.g., `+1 bug added (will run next)` styled in warning/yellow
+- [x] For new features: notification reads e.g., `+2 features added` styled in muted/info color
+- [x] If both new bugs and features are detected in the same debounce window, both are shown
+- [x] The notification fades (disappears) after 5 seconds using a delayed `tea.Cmd` message
+- [x] Multiple rapid notifications replace the previous one (don't stack)
+- [x] The notification does not interfere with the stop picker overlay or summary screen
+- [x] Unit tests verify notification appearance and timeout behavior
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

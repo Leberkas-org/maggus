@@ -58,6 +58,280 @@ func writeBugFile(t *testing.T, dir string, filename string, tasks []struct{ id,
 	}
 }
 
+// --- Notification tests ---
+
+func TestNotification_NewBugsDetected(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          1,
+		totalIters:           2,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 1,
+	}
+
+	// First call sets baseline (no new tasks since prev matches)
+	m.handleFileChange()
+	if m.notification != "" {
+		t.Errorf("expected no notification on first call, got %q", m.notification)
+	}
+
+	// Add a bug file
+	writeBugFile(t, dir, "bug_001.md", []struct{ id, status string }{
+		{"BUG-001-001", "workable"},
+	})
+
+	cmd := m.handleFileChange()
+
+	if !strings.Contains(m.notification, "+1 bug added (will run next)") {
+		t.Errorf("expected bug notification, got %q", m.notification)
+	}
+	if cmd == nil {
+		t.Error("expected a timeout Cmd, got nil")
+	}
+}
+
+func TestNotification_NewFeaturesDetected(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          1,
+		totalIters:           2,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 1,
+	}
+
+	// Baseline
+	m.handleFileChange()
+
+	// Add 2 new features
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	cmd := m.handleFileChange()
+
+	if !strings.Contains(m.notification, "+2 features added") {
+		t.Errorf("expected feature notification, got %q", m.notification)
+	}
+	if cmd == nil {
+		t.Error("expected a timeout Cmd, got nil")
+	}
+}
+
+func TestNotification_BothBugsAndFeatures(t *testing.T) {
+	dir := t.TempDir()
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          0,
+		totalIters:           0,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 0,
+	}
+
+	// Add both bug and feature files at once
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+	writeBugFile(t, dir, "bug_001.md", []struct{ id, status string }{
+		{"BUG-001-001", "workable"},
+	})
+
+	m.handleFileChange()
+
+	if !strings.Contains(m.notification, "bug") {
+		t.Errorf("expected bug part in notification, got %q", m.notification)
+	}
+	if !strings.Contains(m.notification, "feature") {
+		t.Errorf("expected feature part in notification, got %q", m.notification)
+	}
+}
+
+func TestNotification_ReplacedOnRapidUpdates(t *testing.T) {
+	dir := t.TempDir()
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          0,
+		totalIters:           0,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 0,
+	}
+
+	// First notification
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+	m.handleFileChange()
+	firstTimerID := m.notificationTimerID
+
+	// Second notification (replaces first)
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+	})
+	m.handleFileChange()
+	secondTimerID := m.notificationTimerID
+
+	if secondTimerID <= firstTimerID {
+		t.Errorf("timer ID should increment: first=%d, second=%d", firstTimerID, secondTimerID)
+	}
+
+	// Simulate first timer expiring — should NOT clear notification
+	expired := notificationExpiredMsg{timerID: firstTimerID}
+	if expired.timerID == m.notificationTimerID {
+		t.Error("stale timer would incorrectly clear notification")
+	}
+
+	// Simulate second timer expiring — should clear notification
+	expired2 := notificationExpiredMsg{timerID: secondTimerID}
+	if expired2.timerID != m.notificationTimerID {
+		t.Error("current timer should match")
+	}
+}
+
+func TestNotification_ExpiredMsg_ClearsNotification(t *testing.T) {
+	m := TUIModel{
+		notification:        "test notification",
+		notificationTimerID: 5,
+	}
+
+	// Matching timer ID clears
+	updated, _ := m.Update(notificationExpiredMsg{timerID: 5})
+	result := updated.(TUIModel)
+	if result.notification != "" {
+		t.Errorf("expected notification cleared, got %q", result.notification)
+	}
+}
+
+func TestNotification_StaleExpiredMsg_DoesNotClear(t *testing.T) {
+	m := TUIModel{
+		notification:        "test notification",
+		notificationTimerID: 5,
+	}
+
+	// Stale timer ID does not clear
+	updated, _ := m.Update(notificationExpiredMsg{timerID: 3})
+	result := updated.(TUIModel)
+	if result.notification != "test notification" {
+		t.Errorf("expected notification unchanged, got %q", result.notification)
+	}
+}
+
+func TestNotification_NoNotificationWhenCountsDecrease(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+		{"TASK-001-002", "workable"},
+	})
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          0,
+		totalIters:           2,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 3, // was higher before
+	}
+
+	cmd := m.handleFileChange()
+
+	if m.notification != "" {
+		t.Errorf("expected no notification when counts decrease, got %q", m.notification)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd when no new tasks")
+	}
+}
+
+func TestNotification_RenderedInHeader(t *testing.T) {
+	m := TUIModel{
+		version:      "1.0.0",
+		totalIters:   5,
+		currentIter:  2,
+		notification: "+1 bug added (will run next)",
+		width:        80,
+		height:       40,
+	}
+
+	header := m.renderHeaderInner(80)
+	if !strings.Contains(header, "+1 bug added (will run next)") {
+		t.Errorf("expected notification in header, got:\n%s", header)
+	}
+}
+
+func TestNotification_HiddenWhenEmpty(t *testing.T) {
+	m := TUIModel{
+		version:      "1.0.0",
+		totalIters:   5,
+		currentIter:  2,
+		notification: "",
+		width:        80,
+		height:       40,
+	}
+
+	header := m.renderHeaderInner(80)
+	if strings.Contains(header, "added") {
+		t.Errorf("expected no notification in header, got:\n%s", header)
+	}
+}
+
+func TestNotification_HiddenDuringStopPicker(t *testing.T) {
+	m := TUIModel{
+		version:        "1.0.0",
+		totalIters:     5,
+		currentIter:    2,
+		notification:   "+1 bug added (will run next)",
+		showStopPicker: true,
+		width:          80,
+		height:         40,
+	}
+
+	header := m.renderHeaderInner(80)
+	// Notification should be suppressed when stop picker is active
+	if strings.Contains(header, "+1 bug added") {
+		t.Errorf("notification should not show during stop picker, got:\n%s", header)
+	}
+}
+
+func TestNotification_SingleFeature(t *testing.T) {
+	dir := t.TempDir()
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          0,
+		totalIters:           0,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 0,
+	}
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+	m.handleFileChange()
+
+	if !strings.Contains(m.notification, "+1 feature added") {
+		t.Errorf("expected singular 'feature', got %q", m.notification)
+	}
+	// Should not use plural
+	if strings.Contains(m.notification, "features") {
+		t.Errorf("expected singular not plural, got %q", m.notification)
+	}
+}
+
+// --- Existing file change tests ---
+
 func TestHandleFileChange_UpdatesTotalIters(t *testing.T) {
 	dir := t.TempDir()
 
