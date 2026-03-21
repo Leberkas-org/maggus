@@ -154,6 +154,7 @@ Examples:
 				run:           run,
 				p:             p,
 				stopFlag:      m.StopFlag(),
+				stopAtTaskID:  m.StopAtTaskIDFlag(),
 				includeWarns:  wc.includeWarnings,
 				branchMsg:     branchMsg,
 				syncInfoMsg:   syncInfoMsg,

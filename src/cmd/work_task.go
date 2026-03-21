@@ -35,6 +35,7 @@ type taskResult struct {
 	warning    string            // non-empty if commit succeeded but with a caveat
 	failed     *failedTask       // non-nil if the task failed
 	tasks      []parser.Task     // updated task list after re-parse (nil if unchanged)
+	taskID     string            // ID of the task that was worked on
 }
 
 // taskContext bundles the shared state needed by runTask.
@@ -81,7 +82,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	}
 
 	// Signal iteration start to the TUI.
-	sendIterationStart(tc.p, next, i, count)
+	sendIterationStart(tc.p, next, tasks, i, count)
 
 	// Build and run the prompt.
 	opts := prompt.Options{
@@ -104,6 +105,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
 		return taskResult{
 			action: taskSkipToNext,
+			taskID: next.ID,
 			failed: &failedTask{ID: next.ID, Title: next.Title, Reason: reason},
 		}
 	}
@@ -115,6 +117,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		reason := fmt.Sprintf("re-parse plans: %v", parseErr)
 		return taskResult{
 			action: taskSkipToNext,
+			taskID: next.ID,
 			failed: &failedTask{ID: next.ID, Title: next.Title, Reason: reason},
 		}
 	}
@@ -128,7 +131,9 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	_, _ = stagePlans.CombinedOutput()
 
 	// Commit, release lock, update progress, and check sync.
-	return completeTask(tc, next, lock, parsedTasks, i, count)
+	result := completeTask(tc, next, lock, parsedTasks, i, count)
+	result.taskID = next.ID
+	return result
 }
 
 // completeTask encapsulates post-agent-execution logic: committing via COMMIT.md,
@@ -197,7 +202,7 @@ func findNextWorkableTask(tasks []parser.Task, useWorktree bool, repoDir string)
 }
 
 // sendIterationStart sends the IterationStartMsg to the TUI with task details.
-func sendIterationStart(p *tea.Program, task *parser.Task, i, count int) {
+func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count int) {
 	tuiCriteria := make([]runner.TaskCriterion, len(task.Criteria))
 	for ci, c := range task.Criteria {
 		tuiCriteria[ci] = runner.TaskCriterion{
@@ -206,6 +211,23 @@ func sendIterationStart(p *tea.Program, task *parser.Task, i, count int) {
 			Blocked: c.Blocked,
 		}
 	}
+
+	// Build remaining tasks list (workable tasks after the current one).
+	var remaining []runner.RemainingTask
+	pastCurrent := false
+	for ti := range tasks {
+		if tasks[ti].ID == task.ID {
+			pastCurrent = true
+			continue
+		}
+		if pastCurrent && tasks[ti].IsWorkable() {
+			remaining = append(remaining, runner.RemainingTask{
+				ID:    tasks[ti].ID,
+				Title: tasks[ti].Title,
+			})
+		}
+	}
+
 	p.Send(runner.IterationStartMsg{
 		Current:         i + 1,
 		Total:           count,
@@ -214,6 +236,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, i, count int) {
 		PlanFile:        task.SourceFile,
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
+		RemainingTasks:  remaining,
 	})
 }
 

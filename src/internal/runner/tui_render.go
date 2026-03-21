@@ -82,10 +82,87 @@ func (m TUIModel) renderHeaderInner(w int) string {
 		b.WriteString(progress + "\n")
 	}
 
+	// Stop indicator (when a stop point is set)
+	if m.stopAfterTask {
+		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		if m.stopAtTaskID != "" {
+			b.WriteString(warnStyle.Render(fmt.Sprintf("⊘ Stopping after %s", m.stopAtTaskID)) + "\n")
+		} else {
+			b.WriteString(warnStyle.Render("⊘ Stopping after current task") + "\n")
+		}
+	}
+
 	// Separator line
 	b.WriteString(styles.Separator(w) + "\n")
 
 	return b.String()
+}
+
+// renderStopPicker renders the stop point picker overlay.
+func (m TUIModel) renderStopPicker(w int) string {
+	var b strings.Builder
+
+	titleStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+	selectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+	normalStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	checkStyle := lipgloss.NewStyle().Foreground(styles.Success)
+
+	b.WriteString(titleStyle.Render("Stop after…") + "\n")
+	b.WriteString(styles.Separator(w) + "\n\n")
+
+	maxLabel := w - 6 // margin for cursor + padding
+	if maxLabel < 20 {
+		maxLabel = 20
+	}
+
+	// Item 0: After current task
+	label := fmt.Sprintf("After current task (%s)", m.taskID)
+	label = styles.Truncate(label, maxLabel)
+	m.renderPickerItem(&b, 0, label, selectedStyle, normalStyle, checkStyle)
+
+	// Items 1..N: After each remaining task
+	for i, t := range m.remainingTasks {
+		label = fmt.Sprintf("After %s: %s", t.ID, t.Title)
+		label = styles.Truncate(label, maxLabel)
+		m.renderPickerItem(&b, i+1, label, selectedStyle, normalStyle, checkStyle)
+	}
+
+	// Last item: Complete the plan
+	lastIdx := m.stopPickerItemCount() - 1
+	m.renderPickerItem(&b, lastIdx, "Complete the plan", selectedStyle, normalStyle, checkStyle)
+
+	return b.String()
+}
+
+// renderPickerItem renders a single stop picker item with cursor and active marker.
+func (m TUIModel) renderPickerItem(b *strings.Builder, idx int, label string, selected, normal, check lipgloss.Style) {
+	cursor := "  "
+	style := normal
+	if idx == m.stopPickerCursor {
+		cursor = selected.Render("▸ ")
+		style = selected
+	}
+
+	// Show a check mark if this item is the currently active stop point
+	marker := ""
+	if m.stopAfterTask {
+		lastIdx := m.stopPickerItemCount() - 1
+		isActive := false
+		switch {
+		case idx == 0 && m.stopAtTaskID == "" && idx != lastIdx:
+			isActive = true
+		case idx > 0 && idx < lastIdx:
+			taskIdx := idx - 1
+			if taskIdx < len(m.remainingTasks) && m.remainingTasks[taskIdx].ID == m.stopAtTaskID {
+				isActive = true
+			}
+		}
+		if isActive {
+			marker = " " + check.Render("●")
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("  %s%s%s\n", cursor, style.Render(label), marker))
 }
 
 // renderTabBar renders the horizontal tab bar for the work view.
@@ -387,81 +464,86 @@ func (m TUIModel) renderView() string {
 		b.WriteString(taskLine + "\n\n")
 	}
 
-	// Tab bar
-	b.WriteString(m.renderTabBar(innerW))
+	// Stop picker overlay replaces tab content when active
+	if m.showStopPicker {
+		b.WriteString(m.renderStopPicker(innerW))
+	} else {
+		// Tab bar
+		b.WriteString(m.renderTabBar(innerW))
 
-	// Tab content
-	switch m.activeTab {
-	case 0: // Progress
-		b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+		// Tab content
+		switch m.activeTab {
+		case 0: // Progress
+			b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
 
-		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
-		recentStart := 0
-		if len(m.toolEntries) > maxToolHistory {
-			recentStart = len(m.toolEntries) - maxToolHistory
-		}
-		recentTools := m.toolEntries[recentStart:]
-		for i, entry := range recentTools {
-			prefix := grayStyle.Render("│")
-			if i == len(recentTools)-1 {
-				prefix = blueStyle.Render("▶")
+			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
+			recentStart := 0
+			if len(m.toolEntries) > maxToolHistory {
+				recentStart = len(m.toolEntries) - maxToolHistory
 			}
-			b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(entry.Description, contentWidth))))
-		}
-		for i := len(recentTools); i < maxToolHistory; i++ {
-			b.WriteString("\n")
-		}
+			recentTools := m.toolEntries[recentStart:]
+			for i, entry := range recentTools {
+				prefix := grayStyle.Render("│")
+				if i == len(recentTools)-1 {
+					prefix = blueStyle.Render("▶")
+				}
+				b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(entry.Description, contentWidth))))
+			}
+			for i := len(recentTools); i < maxToolHistory; i++ {
+				b.WriteString("\n")
+			}
 
-		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-		b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-		b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+			b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(elapsed.String())))
 
-		if m.tokens.hasData {
-			totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
-			var tokenStr string
-			if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
-				tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
-					FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
-					FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
+			if m.tokens.hasData {
+				totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
+				var tokenStr string
+				if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
+					tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
+						FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
+						FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
+				} else {
+					tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
+				}
+				b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+
+				costStr := "N/A"
+				if m.tokens.totalCost > 0 {
+					costStr = FormatCost(m.tokens.totalCost)
+				}
+				b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render(costStr)))
 			} else {
-				tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
+				b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+				b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render("N/A")))
 			}
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
 
-			costStr := "N/A"
-			if m.tokens.totalCost > 0 {
-				costStr = FormatCost(m.tokens.totalCost)
-			}
-			b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render(costStr)))
-		} else {
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
-			b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render("N/A")))
-		}
+		case 1: // Detail (tool log)
+			b.WriteString(m.renderDetailPanel(innerW, innerH-8))
 
-	case 1: // Detail (tool log)
-		b.WriteString(m.renderDetailPanel(innerW, innerH-8))
+		case 2: // Task
+			b.WriteString(m.renderTaskTab(innerW))
 
-	case 2: // Task
-		b.WriteString(m.renderTaskTab(innerW))
-
-	case 3: // Commits
-		if len(m.commits) == 0 {
-			b.WriteString(grayStyle.Render("No commits yet.") + "\n")
-		} else {
-			for _, c := range m.commits {
-				line := styles.Truncate(c, innerW-4)
-				b.WriteString(fmt.Sprintf("  %s %s\n",
-					grayStyle.Render("•"),
-					grayStyle.Render(line)))
+		case 3: // Commits
+			if len(m.commits) == 0 {
+				b.WriteString(grayStyle.Render("No commits yet.") + "\n")
+			} else {
+				for _, c := range m.commits {
+					line := styles.Truncate(c, innerW-4)
+					b.WriteString(fmt.Sprintf("  %s %s\n",
+						grayStyle.Render("•"),
+						grayStyle.Render(line)))
+				}
 			}
 		}
 	}
 
 	// Footer with context-sensitive keybindings
 	var footer string
-	if m.confirmingStop {
-		footer = lipgloss.NewStyle().Foreground(styles.Warning).Bold(true).Render("Stop after current task? (y/n)")
+	if m.showStopPicker {
+		footer = styles.StatusBar.Render("↑/↓ select · enter confirm · esc cancel")
 	} else {
 		var footerParts []string
 		footerParts = append(footerParts, "←/→ tabs")
@@ -469,18 +551,18 @@ func (m TUIModel) renderView() string {
 			footerParts = append(footerParts, "↑/↓ scroll · home/end jump")
 		}
 		if m.stopAfterTask {
-			footerParts = append(footerParts, "alt+s resume")
+			footerParts = append(footerParts, "alt+s change stop point")
 		} else {
-			footerParts = append(footerParts, "alt+s stop after task")
+			footerParts = append(footerParts, "alt+s stop")
 		}
 		footerParts = append(footerParts, "ctrl+c stop now")
 		footer = styles.StatusBar.Render(strings.Join(footerParts, " · "))
 	}
 
-	// Use warning border color when stop-after-task is active
+	// Use warning border color when stop-after-task is active or picker is shown
 	if m.width > 0 && m.height > 0 {
 		borderColor := styles.Primary
-		if m.stopAfterTask || m.confirmingStop {
+		if m.stopAfterTask || m.showStopPicker {
 			borderColor = styles.Warning
 		}
 		return styles.FullScreenLeftColor(b.String(), footer, m.width, m.height, borderColor)

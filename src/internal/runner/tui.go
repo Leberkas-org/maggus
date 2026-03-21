@@ -57,6 +57,7 @@ type IterationStartMsg struct {
 	PlanFile        string
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
+	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
 }
 
 // tickMsg is sent by the spinner ticker.
@@ -114,14 +115,18 @@ type TUIModel struct {
 	frame              int
 	width              int
 	height             int
-	activeTab          int          // 0 = Progress, 1 = Detail, 2 = Task, 3 = Commits
-	detailScrollOffset int          // scroll offset for the detail tab (in lines)
-	detailAutoScroll   bool         // true when detail tab auto-scrolls to bottom
-	detailTotalLines   int          // total rendered lines in last detail render (for scroll indicator)
-	stopAfterTask      bool         // when true, work stops after current task completes
-	confirmingStop     bool         // when true, showing "stop after task?" confirmation prompt
-	stopFlag           *atomic.Bool // shared flag readable from the work loop goroutine
-	cancelFunc         func()       // called on Ctrl+C to cancel the context
+	activeTab          int             // 0 = Progress, 1 = Detail, 2 = Task, 3 = Commits
+	detailScrollOffset int             // scroll offset for the detail tab (in lines)
+	detailAutoScroll   bool            // true when detail tab auto-scrolls to bottom
+	detailTotalLines   int             // total rendered lines in last detail render (for scroll indicator)
+	stopAfterTask      bool            // when true, a stop point has been set
+	showStopPicker     bool            // when true, showing the stop picker overlay
+	stopPickerCursor   int             // selected index in the stop picker
+	stopAtTaskID       string          // task ID to stop after (empty = after current task)
+	remainingTasks     []RemainingTask // upcoming workable tasks for the stop picker
+	stopFlag           *atomic.Bool    // shared flag readable from the work loop goroutine
+	stopAtTaskIDFlag   *atomic.Value   // shared task ID flag (stores string) for the work loop
+	cancelFunc         func()          // called on Ctrl+C to cancel the context
 	quitting           bool
 
 	// Sync check state (between-task remote sync)
@@ -150,6 +155,7 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		height:           40,
 		detailAutoScroll: true,
 		stopFlag:         &atomic.Bool{},
+		stopAtTaskIDFlag: &atomic.Value{},
 		cancelFunc:       cancelFunc,
 	}
 }
@@ -173,6 +179,13 @@ func (m TUIModel) TaskUsages() []TaskUsage {
 // to check if the user requested to stop after the current task.
 func (m TUIModel) StopFlag() *atomic.Bool {
 	return m.stopFlag
+}
+
+// StopAtTaskIDFlag returns the shared atomic value (stores string) that the
+// work loop can poll to check which task to stop after.
+// Empty string means "after current task".
+func (m TUIModel) StopAtTaskIDFlag() *atomic.Value {
+	return m.stopAtTaskIDFlag
 }
 
 func (m TUIModel) Init() tea.Cmd {

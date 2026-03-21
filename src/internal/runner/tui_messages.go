@@ -17,6 +17,7 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.taskPlanFile = msg.PlanFile
 	m.taskDescription = msg.TaskDescription
 	m.taskCriteria = msg.TaskCriteria
+	m.remainingTasks = msg.RemainingTasks
 	// Reset per-iteration state
 	m.status = "Starting..."
 	m.output = "-"

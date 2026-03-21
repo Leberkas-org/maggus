@@ -42,19 +42,19 @@ The work command has accumulated a sub-menu (task count selector + worktree togg
 **Description:** As a user, I want Alt+S to open an interactive stop picker so that I can choose exactly when to stop working.
 
 **Acceptance Criteria:**
-- [ ] Pressing Alt+S during work opens a stop picker overlay/modal instead of the y/n prompt
-- [ ] The stop picker shows these options:
+- [x] Pressing Alt+S during work opens a stop picker overlay/modal instead of the y/n prompt
+- [x] The stop picker shows these options:
   - "After current task" — stops after the currently running task completes
   - One entry per remaining upcoming task (e.g. "After TASK-005: Title") — stops after that specific task completes
   - "Complete the plan" — continues working through all tasks (cancel/dismiss the stop)
-- [ ] The user can navigate the picker with arrow keys (up/down) and confirm with Enter
-- [ ] Pressing Escape or Alt+S again closes the picker without changing anything
-- [ ] When a stop point is selected, the `stopAfterTask` flag and/or a `stopAtTaskID` field is set accordingly
-- [ ] The status bar or header shows the selected stop point (e.g. "Stopping after TASK-005")
-- [ ] If already stopped, opening the picker again allows changing or cancelling the stop point
-- [ ] The work loop respects the selected stop point (stops after the chosen task, not just the current one)
-- [ ] Typecheck/lint passes
-- [ ] Existing tests pass
+- [x] The user can navigate the picker with arrow keys (up/down) and confirm with Enter
+- [x] Pressing Escape or Alt+S again closes the picker without changing anything
+- [x] When a stop point is selected, the `stopAfterTask` flag and/or a `stopAtTaskID` field is set accordingly
+- [x] The status bar or header shows the selected stop point (e.g. "Stopping after TASK-005")
+- [x] If already stopped, opening the picker again allows changing or cancelling the stop point
+- [x] The work loop respects the selected stop point (stops after the chosen task, not just the current one)
+- [x] Typecheck/lint passes
+- [x] Existing tests pass
 
 ### TASK-004: Pass Remaining Tasks to TUI for Stop Picker
 **Description:** As a developer, I want the TUI to know about remaining upcoming tasks so that the stop picker can list them.

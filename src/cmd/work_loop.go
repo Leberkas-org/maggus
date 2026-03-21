@@ -162,6 +162,7 @@ type workLoopParams struct {
 	run           *runtracker.Run
 	p             *tea.Program
 	stopFlag      *atomic.Bool
+	stopAtTaskID  *atomic.Value // stores string: task ID to stop after (empty = after current)
 	includeWarns  []string
 	branchMsg     string
 	syncInfoMsg   string
@@ -208,13 +209,25 @@ func runWorkGoroutine(params workLoopParams) {
 		}
 
 		tasks := params.tasks
+		var lastCompletedTaskID string
 		for i := 0; i < params.count; i++ {
 			if i > 0 && params.stopFlag.Load() {
-				stopReason = runner.StopReasonUserStop
-				break
+				// Check if we should stop now or continue to a specific task.
+				targetID := ""
+				if v := params.stopAtTaskID.Load(); v != nil {
+					targetID, _ = v.(string)
+				}
+				if targetID == "" || targetID == lastCompletedTaskID {
+					stopReason = runner.StopReasonUserStop
+					break
+				}
+				// Target task not yet reached — continue working.
 			}
 
 			result := runTask(params.tc, tasks, i, params.count)
+			if result.taskID != "" {
+				lastCompletedTaskID = result.taskID
+			}
 			if result.tasks != nil {
 				tasks = result.tasks
 			}
