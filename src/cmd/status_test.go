@@ -425,25 +425,25 @@ func TestNewStatusModel(t *testing.T) {
 			t.Error("showAll should be false")
 		}
 		// showAll=false should exclude complete tasks from selectable
-		if len(m.selectableTasks) != 1 {
-			t.Fatalf("selectableTasks len = %d, want 1", len(m.selectableTasks))
+		if len(m.Tasks) != 1 {
+			t.Fatalf("Tasks len = %d, want 1", len(m.Tasks))
 		}
-		if m.selectableTasks[0].ID != "TASK-002" {
-			t.Errorf("selectable[0].ID = %q, want TASK-002", m.selectableTasks[0].ID)
+		if m.Tasks[0].ID != "TASK-002" {
+			t.Errorf("Tasks[0].ID = %q, want TASK-002", m.Tasks[0].ID)
 		}
 	})
 
 	t.Run("showAll includes complete tasks", func(t *testing.T) {
 		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp")
-		if len(m.selectableTasks) != 2 {
-			t.Errorf("selectableTasks len = %d, want 2", len(m.selectableTasks))
+		if len(m.Tasks) != 2 {
+			t.Errorf("Tasks len = %d, want 2", len(m.Tasks))
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
 		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
-		if len(m.selectableTasks) != 0 {
-			t.Errorf("selectableTasks len = %d, want 0", len(m.selectableTasks))
+		if len(m.Tasks) != 0 {
+			t.Errorf("Tasks len = %d, want 0", len(m.Tasks))
 		}
 	})
 }
@@ -462,22 +462,24 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 	t.Run("selects correct plan tasks", func(t *testing.T) {
 		m := statusModel{plans: plans, selectedPlan: 1, showAll: false}
 		m.rebuildForSelectedPlan()
-		if len(m.selectableTasks) != 2 {
-			t.Fatalf("len = %d, want 2", len(m.selectableTasks))
+		if len(m.Tasks) != 2 {
+			t.Fatalf("len = %d, want 2", len(m.Tasks))
 		}
-		if m.selectableTasks[0].ID != "TASK-010" {
-			t.Errorf("first task = %s, want TASK-010", m.selectableTasks[0].ID)
+		if m.Tasks[0].ID != "TASK-010" {
+			t.Errorf("first task = %s, want TASK-010", m.Tasks[0].ID)
 		}
 	})
 
 	t.Run("resets cursor", func(t *testing.T) {
-		m := statusModel{plans: plans, selectedPlan: 0, cursor: 5, scrollOffset: 3}
+		m := statusModel{plans: plans, selectedPlan: 0}
+		m.Cursor = 5
+		m.ScrollOffset = 3
 		m.rebuildForSelectedPlan()
-		if m.cursor != 0 {
-			t.Errorf("cursor = %d, want 0", m.cursor)
+		if m.Cursor != 0 {
+			t.Errorf("Cursor = %d, want 0", m.Cursor)
 		}
-		if m.scrollOffset != 0 {
-			t.Errorf("scrollOffset = %d, want 0", m.scrollOffset)
+		if m.ScrollOffset != 0 {
+			t.Errorf("ScrollOffset = %d, want 0", m.ScrollOffset)
 		}
 	})
 
@@ -492,8 +494,8 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 	t.Run("empty plans", func(t *testing.T) {
 		m := statusModel{plans: nil}
 		m.rebuildForSelectedPlan()
-		if m.selectableTasks != nil {
-			t.Errorf("selectableTasks should be nil, got %v", m.selectableTasks)
+		if m.Tasks != nil {
+			t.Errorf("Tasks should be nil, got %v", m.Tasks)
 		}
 	})
 }
@@ -501,29 +503,32 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 func TestEnsureCursorVisible(t *testing.T) {
 	// Use a model with fixed dimensions so visibleTaskLines returns a known value
 	m := statusModel{
-		width:  80,
-		height: 30,
-		cursor: 0,
+		taskListComponent: taskListComponent{
+			Width:       80,
+			Height:      30,
+			Cursor:      0,
+			HeaderLines: statusHeaderLines,
+		},
 	}
-	// Just verify it doesn't panic and scrollOffset stays reasonable
+	// Just verify it doesn't panic and ScrollOffset stays reasonable
 	m.ensureCursorVisible()
-	if m.scrollOffset < 0 {
-		t.Errorf("scrollOffset = %d, should not be negative", m.scrollOffset)
+	if m.ScrollOffset < 0 {
+		t.Errorf("ScrollOffset = %d, should not be negative", m.ScrollOffset)
 	}
 
 	// Cursor beyond visible range
-	m.cursor = 100
-	m.scrollOffset = 0
+	m.Cursor = 100
+	m.ScrollOffset = 0
 	m.ensureCursorVisible()
-	if m.scrollOffset <= 0 {
-		t.Errorf("scrollOffset should advance when cursor is beyond visible range, got %d", m.scrollOffset)
+	if m.ScrollOffset <= 0 {
+		t.Errorf("ScrollOffset should advance when cursor is beyond visible range, got %d", m.ScrollOffset)
 	}
 
-	// Cursor before scrollOffset
-	m.scrollOffset = 50
-	m.cursor = 10
+	// Cursor before ScrollOffset
+	m.ScrollOffset = 50
+	m.Cursor = 10
 	m.ensureCursorVisible()
-	if m.scrollOffset > m.cursor {
-		t.Errorf("scrollOffset (%d) should not exceed cursor (%d)", m.scrollOffset, m.cursor)
+	if m.ScrollOffset > m.Cursor {
+		t.Errorf("ScrollOffset (%d) should not exceed Cursor (%d)", m.ScrollOffset, m.Cursor)
 	}
 }

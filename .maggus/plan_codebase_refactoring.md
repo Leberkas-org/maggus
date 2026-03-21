@@ -111,14 +111,14 @@ This plan surgically extracts sub-models, deduplicates shared components, and br
 **Description:** As a developer, I want `status.go` to use the shared `taskListComponent` so that status-specific code only contains plan browsing and status-specific behavior.
 
 **Acceptance Criteria:**
-- [ ] `statusModel` embeds `taskListComponent` instead of duplicating cursor, scroll, detail, criteria fields
-- [ ] `statusModel.Update()` delegates shared key handling to `taskListComponent.Update()`, only handling status-specific keys (tab/shift+tab plan switching, alt+a toggle, alt+i ignore) itself
-- [ ] `statusModel.View()` uses `taskListComponent` for task list rendering within the plan context
-- [ ] Removed methods from `statusModel`: `visibleTaskLines()`, `ensureCursorVisible()`, duplicated detail/criteria/action methods
-- [ ] `status.go` is under 700 lines (down from 1,136)
-- [ ] `go test ./cmd -run TestStatus` passes
-- [ ] `go test ./...` passes
-- [ ] Behavior is identical: plan tab switching, task browsing, detail view, ignore toggle all work as before
+- [x] `statusModel` embeds `taskListComponent` instead of duplicating cursor, scroll, detail, criteria fields
+- [x] `statusModel.Update()` delegates shared key handling to `taskListComponent.Update()`, only handling status-specific keys (tab/shift+tab plan switching, alt+a toggle, alt+i ignore) itself
+- [x] `statusModel.View()` uses `taskListComponent` for task list rendering within the plan context
+- [x] Removed methods from `statusModel`: `visibleTaskLines()`, `ensureCursorVisible()`, duplicated detail/criteria/action methods
+- [x] `status.go` is under 700 lines (down from 1,136)
+- [x] `go test ./cmd -run TestStatus` passes
+- [x] `go test ./...` passes
+- [x] Behavior is identical: plan tab switching, task browsing, detail view, ignore toggle all work as before
 
 ### TASK-009: Write unit tests for TaskListComponent
 **Description:** As a developer, I want the shared task-list component to have its own tests so that changes don't accidentally break both list and status commands.
