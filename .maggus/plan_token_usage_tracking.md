@@ -54,13 +54,13 @@ This plan adds cache token tracking, cost tracking, and per-model usage breakdow
 **Description:** As a developer, I want the TUI token state to accumulate cache tokens and cost so they can be displayed and persisted per-task.
 
 **Acceptance Criteria:**
-- [ ] `TaskUsage` struct in `internal/runner/tui_tokens.go` includes `CacheCreationInputTokens int`, `CacheReadInputTokens int`, and `CostUSD float64`
-- [ ] `tokenState` struct includes per-iteration fields `iterCacheCreation`, `iterCacheRead`, `iterCost` and cumulative fields `totalCacheCreation`, `totalCacheRead`, `totalCost`
-- [ ] `addUsage()` method accumulates the three new fields for both iter and total counters
-- [ ] `addUsage()` sets `hasData = true` when any of the new fields are non-zero
-- [ ] `saveAndReset()` populates the new `TaskUsage` fields from iter counters and resets iter counters to zero
-- [ ] Typecheck/lint passes
-- [ ] Unit tests in `tui_tokens_test.go` are updated: test that cache and cost fields accumulate correctly, are included in `TaskUsage` on save, and reset properly
+- [x] `TaskUsage` struct in `internal/runner/tui_tokens.go` includes `CacheCreationInputTokens int`, `CacheReadInputTokens int`, and `CostUSD float64`
+- [x] `tokenState` struct includes per-iteration fields `iterCacheCreation`, `iterCacheRead`, `iterCost` and cumulative fields `totalCacheCreation`, `totalCacheRead`, `totalCost`
+- [x] `addUsage()` method accumulates the three new fields for both iter and total counters
+- [x] `addUsage()` sets `hasData = true` when any of the new fields are non-zero
+- [x] `saveAndReset()` populates the new `TaskUsage` fields from iter counters and resets iter counters to zero
+- [x] Typecheck/lint passes
+- [x] Unit tests in `tui_tokens_test.go` are updated: test that cache and cost fields accumulate correctly, are included in `TaskUsage` on save, and reset properly
 
 ### TASK-005: Track Per-Model Usage in Token State
 **Description:** As a developer, I want per-model token usage tracked in the TUI state so it can be displayed in the summary and persisted to CSV.

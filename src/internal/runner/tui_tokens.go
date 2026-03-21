@@ -10,33 +10,48 @@ import (
 
 // TaskUsage records token usage for a single task/iteration.
 type TaskUsage struct {
-	TaskID       string
-	TaskTitle    string
-	PlanFile     string
-	InputTokens  int
-	OutputTokens int
-	StartTime    time.Time
-	EndTime      time.Time
+	TaskID                   string
+	TaskTitle                string
+	PlanFile                 string
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	CostUSD                  float64
+	StartTime                time.Time
+	EndTime                  time.Time
 }
 
 // tokenState holds all token usage tracking state for the TUI.
 type tokenState struct {
-	iterInput   int             // current iteration input tokens
-	iterOutput  int             // current iteration output tokens
-	totalInput  int             // cumulative input tokens
-	totalOutput int             // cumulative output tokens
-	hasData     bool            // true if any usage data was received
-	usages      []TaskUsage     // per-task usage history
-	onUsage     func(TaskUsage) // called immediately when a task's usage is finalized
+	iterInput          int             // current iteration input tokens
+	iterOutput         int             // current iteration output tokens
+	iterCacheCreation  int             // current iteration cache creation tokens
+	iterCacheRead      int             // current iteration cache read tokens
+	iterCost           float64         // current iteration cost in USD
+	totalInput         int             // cumulative input tokens
+	totalOutput        int             // cumulative output tokens
+	totalCacheCreation int             // cumulative cache creation tokens
+	totalCacheRead     int             // cumulative cache read tokens
+	totalCost          float64         // cumulative cost in USD
+	hasData            bool            // true if any usage data was received
+	usages             []TaskUsage     // per-task usage history
+	onUsage            func(TaskUsage) // called immediately when a task's usage is finalized
 }
 
 // addUsage accumulates token counts from a usage message.
 func (t *tokenState) addUsage(msg agent.UsageMsg) {
 	t.iterInput += msg.InputTokens
 	t.iterOutput += msg.OutputTokens
+	t.iterCacheCreation += msg.CacheCreationInputTokens
+	t.iterCacheRead += msg.CacheReadInputTokens
+	t.iterCost += msg.CostUSD
 	t.totalInput += msg.InputTokens
 	t.totalOutput += msg.OutputTokens
-	if msg.InputTokens > 0 || msg.OutputTokens > 0 {
+	t.totalCacheCreation += msg.CacheCreationInputTokens
+	t.totalCacheRead += msg.CacheReadInputTokens
+	t.totalCost += msg.CostUSD
+	if msg.InputTokens > 0 || msg.OutputTokens > 0 || msg.CacheCreationInputTokens > 0 || msg.CacheReadInputTokens > 0 || msg.CostUSD > 0 {
 		t.hasData = true
 	}
 }
@@ -45,17 +60,20 @@ func (t *tokenState) addUsage(msg agent.UsageMsg) {
 // taskID, taskTitle, planFile, and startTime come from the parent model since tokenState
 // doesn't track task metadata.
 func (t *tokenState) saveAndReset(taskID, taskTitle, planFile string, startTime time.Time) {
-	if taskID == "" || (t.iterInput == 0 && t.iterOutput == 0) {
+	if taskID == "" || (t.iterInput == 0 && t.iterOutput == 0 && t.iterCacheCreation == 0 && t.iterCacheRead == 0) {
 		return
 	}
 	tu := TaskUsage{
-		TaskID:       taskID,
-		TaskTitle:    taskTitle,
-		PlanFile:     planFile,
-		InputTokens:  t.iterInput,
-		OutputTokens: t.iterOutput,
-		StartTime:    startTime,
-		EndTime:      time.Now(),
+		TaskID:                   taskID,
+		TaskTitle:                taskTitle,
+		PlanFile:                 planFile,
+		InputTokens:              t.iterInput,
+		OutputTokens:             t.iterOutput,
+		CacheCreationInputTokens: t.iterCacheCreation,
+		CacheReadInputTokens:     t.iterCacheRead,
+		CostUSD:                  t.iterCost,
+		StartTime:                startTime,
+		EndTime:                  time.Now(),
 	}
 	t.usages = append(t.usages, tu)
 	if t.onUsage != nil {
@@ -63,6 +81,9 @@ func (t *tokenState) saveAndReset(taskID, taskTitle, planFile string, startTime 
 	}
 	t.iterInput = 0
 	t.iterOutput = 0
+	t.iterCacheCreation = 0
+	t.iterCacheRead = 0
+	t.iterCost = 0
 }
 
 // FormatTokens formats a token count with a `k` suffix for thousands.
