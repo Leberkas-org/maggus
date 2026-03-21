@@ -62,14 +62,14 @@ Extend maggus to recognize and process bug report files (`.maggus/bugs/bug_N.md`
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `initIteration()` parses both features and bugs, merges them into a single task list with bugs first, then features
-- [ ] `FindNextIncomplete()` works on the merged list without modification
-- [ ] `--task BUG-NNN-XXX` flag works to target a specific bug task
-- [ ] `MarkCompletedBugs()` is called alongside `MarkCompletedFeatures()` after each iteration
-- [ ] Prompt builder correctly references the bug source file (not a feature file) for checkbox updates
-- [ ] `capCount()` accounts for workable tasks from both sources
-- [ ] `go fmt ./...` and `go vet ./...` pass
-- [ ] Unit tests cover merged task selection, bug-first ordering, and bug-specific task targeting
+- [x] `initIteration()` parses both features and bugs, merges them into a single task list with bugs first, then features
+- [x] `FindNextIncomplete()` works on the merged list without modification
+- [x] `--task BUG-NNN-XXX` flag works to target a specific bug task
+- [x] `MarkCompletedBugs()` is called alongside `MarkCompletedFeatures()` after each iteration
+- [x] Prompt builder correctly references the bug source file (not a feature file) for checkbox updates
+- [x] `capCount()` accounts for workable tasks from both sources
+- [x] `go fmt ./...` and `go vet ./...` pass
+- [x] Unit tests cover merged task selection, bug-first ordering, and bug-specific task targeting
 
 ### TASK-003-004: Show bugs as separate tab group in status view
 **Description:** As a user, I want to see bug files as separate tabs in the status view so I can track bug fix progress alongside features.

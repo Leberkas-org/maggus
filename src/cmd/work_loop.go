@@ -25,20 +25,32 @@ type iterationSetup struct {
 	workDir string
 }
 
-// initIteration parses features, finds the next workable task, caps the count,
+// initIteration parses features and bugs, merges them into a single task list
+// (bugs first, then features), finds the next workable task, caps the count,
 // and creates a run tracker. Returns nil setup with no error when there is
 // nothing to do (e.g. all tasks complete/blocked).
 func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay string, count int) (*iterationSetup, error) {
-	tasks, err := parser.ParseFeatures(dir)
-	if err != nil {
-		return nil, fmt.Errorf("parse features: %w", err)
+	// Parse bugs first — they take priority over features.
+	bugTasks, bugErr := parser.ParseBugs(dir)
+	if bugErr != nil {
+		return nil, fmt.Errorf("parse bugs: %w", bugErr)
 	}
+
+	featureTasks, featureErr := parser.ParseFeatures(dir)
+	if featureErr != nil {
+		return nil, fmt.Errorf("parse features: %w", featureErr)
+	}
+
+	// Merge: bugs first, then features.
+	tasks := mergeBugAndFeatureTasks(bugTasks, featureTasks)
+
 	if len(tasks) == 0 {
-		cmd.Println("No feature files found in .maggus/features/")
+		cmd.Println("No feature or bug files found.")
 		return nil, nil
 	}
 
 	_ = parser.MarkCompletedFeatures(dir)
+	_ = parser.MarkCompletedBugs(dir)
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
@@ -59,6 +71,27 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 		run:     run,
 		workDir: dir,
 	}, nil
+}
+
+// mergeBugAndFeatureTasks returns a combined task list with bugs first, then features.
+func mergeBugAndFeatureTasks(bugs, features []parser.Task) []parser.Task {
+	tasks := make([]parser.Task, 0, len(bugs)+len(features))
+	tasks = append(tasks, bugs...)
+	tasks = append(tasks, features...)
+	return tasks
+}
+
+// parseAllTasks parses both bugs and features and returns a merged task list (bugs first).
+func parseAllTasks(dir string) ([]parser.Task, error) {
+	bugTasks, bugErr := parser.ParseBugs(dir)
+	if bugErr != nil {
+		return nil, fmt.Errorf("parse bugs: %w", bugErr)
+	}
+	featureTasks, featureErr := parser.ParseFeatures(dir)
+	if featureErr != nil {
+		return nil, fmt.Errorf("parse features: %w", featureErr)
+	}
+	return mergeBugAndFeatureTasks(bugTasks, featureTasks), nil
 }
 
 // printer is satisfied by cobra.Command.
@@ -314,7 +347,7 @@ func buildSummaryData(params workLoopParams, completed int, failedTasks []failed
 	currentBranch := strings.TrimSpace(string(branchNameOut))
 
 	var remaining []runner.RemainingTask
-	latestTasks, _ := parser.ParseFeatures(params.tc.workDir)
+	latestTasks, _ := parseAllTasks(params.tc.workDir)
 	for _, t := range latestTasks {
 		if t.IsWorkable() {
 			remaining = append(remaining, runner.RemainingTask{ID: t.ID, Title: t.Title})

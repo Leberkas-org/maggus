@@ -110,11 +110,11 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		}
 	}
 
-	// Re-parse to pick up any changes the agent made.
-	parsedTasks, parseErr := parser.ParseFeatures(tc.workDir)
+	// Re-parse to pick up any changes the agent made (bugs + features).
+	parsedTasks, parseErr := parseAllTasks(tc.workDir)
 	if parseErr != nil {
 		releaseLock(lock, tc.useWorktree)
-		reason := fmt.Sprintf("re-parse features: %v", parseErr)
+		reason := fmt.Sprintf("re-parse tasks: %v", parseErr)
 		return taskResult{
 			action: taskSkipToNext,
 			taskID: next.ID,
@@ -122,8 +122,9 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		}
 	}
 
-	// Rename fully completed feature files before committing.
+	// Rename fully completed feature and bug files before committing.
 	_ = parser.MarkCompletedFeatures(tc.workDir)
+	_ = parser.MarkCompletedBugs(tc.workDir)
 
 	// Stage any feature renames so they are included in the commit.
 	stageFeatures := exec.Command("git", "add", "--", ".maggus/")
