@@ -57,12 +57,12 @@ Rethink usage data persistence from CSV to JSON Lines (`.jsonl`) for easier REST
 **Description:** As a developer, I need to identify which Claude session file corresponds to the interactive session maggus just launched, so I can extract usage data from it.
 
 **Acceptance Criteria:**
-- [ ] New `internal/session/detect.go` package with a function to find the session file
-- [ ] Detection strategy: snapshot `.claude/projects/<project-hash>/` directory listing before launch, then after Claude exits, find the new `.jsonl` file(s) that appeared (diff approach)
-- [ ] The project hash is derived from the current working directory path (Claude uses path with separators replaced by `-`, e.g. `C--c-maggus` for `C:\c\maggus` — verify the exact hashing/encoding logic by reading existing session directories)
-- [ ] Falls back gracefully if no new session file is found (log warning, skip usage extraction)
-- [ ] Unit tests cover the diff-based detection with a temp directory
-- [ ] `go test ./...` passes
+- [x] New `internal/session/detect.go` package with a function to find the session file
+- [x] Detection strategy: snapshot `.claude/projects/<project-hash>/` directory listing before launch, then after Claude exits, find the new `.jsonl` file(s) that appeared (diff approach)
+- [x] The project hash is derived from the current working directory path (Claude uses path with separators replaced by `-`, e.g. `C--c-maggus` for `C:\c\maggus` — verify the exact hashing/encoding logic by reading existing session directories)
+- [x] Falls back gracefully if no new session file is found (log warning, skip usage extraction)
+- [x] Unit tests cover the diff-based detection with a temp directory
+- [x] `go test ./...` passes
 
 ### TASK-005: Extract Usage from Claude Session JSONL Files
 
