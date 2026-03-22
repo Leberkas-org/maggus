@@ -74,7 +74,6 @@ func (m Metrics) add(delta Metrics) Metrics {
 // Settings holds the global Maggus settings stored at ~/.maggus/config.yml.
 type Settings struct {
 	AutoUpdate AutoUpdateMode `yaml:"auto_update,omitempty"`
-	Metrics    Metrics        `yaml:"metrics,omitempty"`
 }
 
 // DefaultSettings returns settings with default values.
@@ -165,8 +164,90 @@ const (
 // metricsMu serializes in-process access; the file lock handles cross-process.
 var metricsMu sync.Mutex
 
+// LoadMetricsFrom reads metrics from the given path.
+// If the file does not exist, it returns zero metrics and no error.
+func LoadMetricsFrom(path string) (Metrics, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Metrics{}, nil
+		}
+		return Metrics{}, fmt.Errorf("read metrics %s: %w", path, err)
+	}
+
+	var m Metrics
+	if err := yaml.Unmarshal(data, &m); err != nil {
+		return Metrics{}, fmt.Errorf("parse metrics %s: %w", path, err)
+	}
+	return m, nil
+}
+
+// SaveMetricsTo writes metrics to the given path.
+func SaveMetricsTo(m Metrics, path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create directory %s: %w", dir, err)
+	}
+
+	data, err := yaml.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("marshal metrics: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write metrics %s: %w", path, err)
+	}
+	return nil
+}
+
+// settingsWithMetrics is used only for reading legacy config.yml files that
+// contain an embedded metrics section, for one-time migration.
+type settingsWithMetrics struct {
+	AutoUpdate AutoUpdateMode `yaml:"auto_update,omitempty"`
+	Metrics    Metrics        `yaml:"metrics,omitempty"`
+}
+
+// migrateMetricsFromConfig checks if config.yml contains a metrics section
+// and metrics.yml does not exist. If so, it copies the metrics to metrics.yml
+// and rewrites config.yml without the metrics section.
+func migrateMetricsFromConfig(dir string) {
+	metricsPath := filepath.Join(dir, "metrics.yml")
+	configPath := filepath.Join(dir, "config.yml")
+
+	// Only migrate if metrics.yml doesn't exist yet.
+	if _, err := os.Stat(metricsPath); err == nil {
+		return
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return
+	}
+
+	var legacy settingsWithMetrics
+	if err := yaml.Unmarshal(data, &legacy); err != nil {
+		return
+	}
+
+	if legacy.Metrics.isZero() {
+		return
+	}
+
+	// Write metrics to new file.
+	if err := SaveMetricsTo(legacy.Metrics, metricsPath); err != nil {
+		return
+	}
+
+	// Rewrite config.yml without metrics.
+	clean := Settings{AutoUpdate: legacy.AutoUpdate}
+	if clean.AutoUpdate == "" {
+		clean.AutoUpdate = AutoUpdateNotify
+	}
+	_ = SaveSettingsTo(clean, configPath)
+}
+
 // IncrementMetrics atomically increments the global metrics by delta.
-// It acquires a file lock, reads current settings, adds delta, and writes back.
+// It acquires a file lock, reads current metrics, adds delta, and writes back.
 func IncrementMetrics(delta Metrics) error {
 	dir, err := Dir()
 	if err != nil {
@@ -186,8 +267,8 @@ func IncrementMetricsIn(dir string, delta Metrics) error {
 
 	var err error
 
-	configPath := filepath.Join(dir, "config.yml")
-	lockPath := filepath.Join(dir, "config.lock")
+	metricsPath := filepath.Join(dir, "metrics.yml")
+	lockPath := filepath.Join(dir, "metrics.lock")
 
 	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create config directory: %w", err)
@@ -221,34 +302,37 @@ func IncrementMetricsIn(dir string, delta Metrics) error {
 	// Ensure lock is always released.
 	defer func() { _ = os.Remove(lockPath) }()
 
-	// Read current settings.
-	settings, err := LoadSettingsFrom(configPath)
+	// Migrate legacy metrics from config.yml if needed.
+	migrateMetricsFromConfig(dir)
+
+	// Read current metrics.
+	current, err := LoadMetricsFrom(metricsPath)
 	if err != nil {
 		return err
 	}
 
 	// Add delta.
-	settings.Metrics = settings.Metrics.add(delta)
+	updated := current.add(delta)
 
 	// Write to temp file then rename (atomic).
-	tmpPath := configPath + ".tmp"
-	data, err := yaml.Marshal(settings)
+	tmpPath := metricsPath + ".tmp"
+	data, err := yaml.Marshal(updated)
 	if err != nil {
-		return fmt.Errorf("marshal settings: %w", err)
+		return fmt.Errorf("marshal metrics: %w", err)
 	}
 
 	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return fmt.Errorf("write temp settings: %w", err)
+		return fmt.Errorf("write temp metrics: %w", err)
 	}
 
 	// On Windows, os.Rename fails if dest exists and is locked.
 	// The lockfile prevents concurrent writers, so remove+rename is safe.
 	if runtime.GOOS == "windows" {
-		_ = os.Remove(configPath)
+		_ = os.Remove(metricsPath)
 	}
 
-	if err := os.Rename(tmpPath, configPath); err != nil {
-		return fmt.Errorf("rename settings: %w", err)
+	if err := os.Rename(tmpPath, metricsPath); err != nil {
+		return fmt.Errorf("rename metrics: %w", err)
 	}
 
 	return nil
