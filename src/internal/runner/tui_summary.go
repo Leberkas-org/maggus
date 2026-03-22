@@ -177,7 +177,7 @@ afterTitle:
 	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Run ID:"), valStyle.Render(s.data.RunID)))
 	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Branch:"), valStyle.Render(s.data.Branch)))
 	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Model:"), valStyle.Render(s.data.Model)))
-	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Elapsed:"), valStyle.Render(elapsed.String())))
+	content.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Elapsed:"), valStyle.Render(formatHHMMSS(elapsed))))
 	content.WriteString(fmt.Sprintf("%s  %s\n",
 		labelStyle.Render("Tasks:"),
 		lipgloss.NewStyle().Foreground(styles.Success).Render(
@@ -220,9 +220,11 @@ afterTitle:
 			} else {
 				taskTokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(taskIn), FormatTokens(tu.OutputTokens))
 			}
-			content.WriteString(fmt.Sprintf("  %s %s  %s\n",
+			taskElapsed := tu.EndTime.Sub(tu.StartTime).Truncate(time.Second)
+			content.WriteString(fmt.Sprintf("  %s %s  %s  %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
 				fmt.Sprintf("%-12s", tu.TaskID),
+				valStyle.Render(formatHHMMSS(taskElapsed)),
 				taskTokenStr))
 		}
 	}
