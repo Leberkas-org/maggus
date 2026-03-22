@@ -147,6 +147,10 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		errorIdx = 1
 	}
 
+	onCompleteValues := []string{"rename", "delete"}
+	featureActionIdx := indexOf(onCompleteValues, cfg.OnComplete.FeatureAction())
+	bugActionIdx := indexOf(onCompleteValues, cfg.OnComplete.BugAction())
+
 	// Load global auto-update setting
 	autoUpdateValues := []string{"off", "notify", "auto"}
 	autoUpdateIdx := 1 // default: notify
@@ -167,6 +171,8 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
 		{label: "  On run complete", values: runCompleteValues, current: runCompleteIdx},
 		{label: "  On error", values: errorValues, current: errorIdx},
+		{label: "  Feature", values: onCompleteValues, current: featureActionIdx, section: "On complete behaviour"},
+		{label: "  Bug", values: onCompleteValues, current: bugActionIdx},
 		// Project actions
 		{label: "Save project config", action: configActionSaveProject, isSave: true},
 		{label: "Edit project file in editor", action: configActionEditProject},
@@ -241,6 +247,15 @@ func (m configModel) buildConfig() config.Config {
 		cfg.Git.CheckSync = &f
 	}
 	cfg.Git.ProtectedBranches = m.origProtectedBranches
+
+	featureAction := m.optionByLabel("  Feature").values[m.optionByLabel("  Feature").current]
+	if featureAction == "delete" {
+		cfg.OnComplete.Feature = "delete"
+	}
+	bugAction := m.optionByLabel("  Bug").values[m.optionByLabel("  Bug").current]
+	if bugAction == "delete" {
+		cfg.OnComplete.Bug = "delete"
+	}
 
 	return cfg
 }
@@ -396,6 +411,10 @@ func (m configModel) View() string {
 		"Project": ".maggus/config.yml",
 		"Global":  "~/.maggus/config.yml",
 	}
+	// Sections without a path display just the title
+	sectionTitleOnly := map[string]bool{
+		"On complete behaviour": true,
+	}
 
 	var sb strings.Builder
 
@@ -405,9 +424,13 @@ func (m configModel) View() string {
 			if i > 0 {
 				sb.WriteString("\n")
 			}
-			path := sectionPaths[row.section]
-			sb.WriteString(titleStyle.Render(row.section) + "  " + mutedStyle.Render(path) + "\n")
-			sb.WriteString(styles.Separator(50) + "\n")
+			if sectionTitleOnly[row.section] {
+				sb.WriteString(titleStyle.Render(row.section) + "\n")
+			} else {
+				path := sectionPaths[row.section]
+				sb.WriteString(titleStyle.Render(row.section) + "  " + mutedStyle.Render(path) + "\n")
+				sb.WriteString(styles.Separator(50) + "\n")
+			}
 		}
 
 		if row.isOption() {

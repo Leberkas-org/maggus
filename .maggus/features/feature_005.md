@@ -69,13 +69,13 @@ When Maggus finishes all tasks in a feature or bug file, it currently always ren
 **Parallel:** yes — can run alongside TASK-005-002
 
 **Acceptance Criteria:**
-- [ ] In `src/cmd/config.go`, after the existing "Sound" / notification rows and before the save buttons, a section label row `"On complete behaviour:"` is rendered as a non-navigable header (use the same section mechanism as "Project" / "Global", or a simple display row — whichever fits more cleanly)
-- [ ] Two new option rows appear indented under it: `"  Feature"` with values `["rename", "delete"]` and `"  Bug"` with values `["rename", "delete"]`
-- [ ] Initial values are read from `cfg.OnComplete.FeatureAction()` and `cfg.OnComplete.BugAction()`
-- [ ] `buildConfig()` maps the TUI selections back to `cfg.OnComplete.Feature` and `cfg.OnComplete.Bug` (storing `"rename"` or `"delete"` as plain strings; when `"rename"` is selected the field is left empty to keep the YAML clean — same pattern as other optional fields)
-- [ ] Saving project config via the TUI writes the correct `on_complete:` block to `.maggus/config.yml`
-- [ ] `go build ./...` passes
-- [ ] `go test ./cmd` passes (existing config tests must not break)
+- [x] In `src/cmd/config.go`, after the existing "Sound" / notification rows and before the save buttons, a section label row `"On complete behaviour:"` is rendered as a non-navigable header (use the same section mechanism as "Project" / "Global", or a simple display row — whichever fits more cleanly)
+- [x] Two new option rows appear indented under it: `"  Feature"` with values `["rename", "delete"]` and `"  Bug"` with values `["rename", "delete"]`
+- [x] Initial values are read from `cfg.OnComplete.FeatureAction()` and `cfg.OnComplete.BugAction()`
+- [x] `buildConfig()` maps the TUI selections back to `cfg.OnComplete.Feature` and `cfg.OnComplete.Bug` (storing `"rename"` or `"delete"` as plain strings; when `"rename"` is selected the field is left empty to keep the YAML clean — same pattern as other optional fields)
+- [x] Saving project config via the TUI writes the correct `on_complete:` block to `.maggus/config.yml`
+- [x] `go build ./...` passes
+- [x] `go test ./cmd` passes (existing config tests must not break)
 
 ---
 

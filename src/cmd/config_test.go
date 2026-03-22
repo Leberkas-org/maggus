@@ -48,8 +48,8 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
-	if len(opts) != 10 {
-		t.Fatalf("expected 10 option rows, got %d", len(opts))
+	if len(opts) != 12 {
+		t.Fatalf("expected 12 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
@@ -90,6 +90,14 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 		if opts[i].current != 0 {
 			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
+	}
+
+	// On-complete defaults to rename (index 0)
+	if opts[9].label != "  Feature" || opts[9].current != 0 {
+		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[9].label, opts[9].current)
+	}
+	if opts[10].label != "  Bug" || opts[10].current != 0 {
+		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[10].label, opts[10].current)
 	}
 
 	if m.cursor != 0 {
@@ -416,6 +424,8 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 		"  On task complete",
 		"  On run complete",
 		"  On error",
+		"  Feature",
+		"  Bug",
 		"Auto-update",
 	}
 
@@ -426,6 +436,60 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 		if opts[i].label != want {
 			t.Errorf("opts[%d].label = %q, want %q", i, opts[i].label, want)
 		}
+	}
+}
+
+func TestBuildConfig_OnComplete(t *testing.T) {
+	// Default: rename (empty fields)
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
+	result := m.buildConfig()
+	if result.OnComplete.Feature != "" {
+		t.Errorf("Feature = %q, want empty (rename default)", result.OnComplete.Feature)
+	}
+	if result.OnComplete.Bug != "" {
+		t.Errorf("Bug = %q, want empty (rename default)", result.OnComplete.Bug)
+	}
+
+	// With delete configured
+	cfg := config.Config{
+		Agent:      "claude",
+		OnComplete: config.OnCompleteConfig{Feature: "delete", Bug: "delete"},
+	}
+	m2 := newConfigModel(cfg, "")
+	result2 := m2.buildConfig()
+	if result2.OnComplete.Feature != "delete" {
+		t.Errorf("Feature = %q, want delete", result2.OnComplete.Feature)
+	}
+	if result2.OnComplete.Bug != "delete" {
+		t.Errorf("Bug = %q, want delete", result2.OnComplete.Bug)
+	}
+}
+
+func TestSaveConfig_OnComplete(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Config{
+		Agent:      "claude",
+		OnComplete: config.OnCompleteConfig{Feature: "delete", Bug: "delete"},
+	}
+	if err := saveConfig(dir, cfg); err != nil {
+		t.Fatalf("saveConfig() error: %v", err)
+	}
+
+	path := filepath.Join(dir, ".maggus", "config.yml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+
+	var loaded config.Config
+	if err := yaml.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if loaded.OnComplete.FeatureAction() != "delete" {
+		t.Errorf("FeatureAction = %q, want delete", loaded.OnComplete.FeatureAction())
+	}
+	if loaded.OnComplete.BugAction() != "delete" {
+		t.Errorf("BugAction = %q, want delete", loaded.OnComplete.BugAction())
 	}
 }
 
