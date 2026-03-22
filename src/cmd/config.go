@@ -80,7 +80,9 @@ type configResultMsg struct {
 }
 
 type configModel struct {
-	rows                  []configRow
+	projectRows           []configRow
+	globalRows            []configRow
+	activeTab             int // 0 = Project, 1 = Global
 	cursor                int
 	action                configAction
 	width                 int
@@ -91,6 +93,14 @@ type configModel struct {
 	origProtectedBranches []string
 	statusText            string
 	is2x                  bool
+}
+
+// activeRows returns a pointer to the currently active tab's row slice.
+func (m *configModel) activeRows() *[]configRow {
+	if m.activeTab == 1 {
+		return &m.globalRows
+	}
+	return &m.projectRows
 }
 
 func newConfigModel(cfg config.Config, dir string) configModel {
@@ -159,9 +169,8 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		autoUpdateIdx = indexOf(autoUpdateValues, string(globalSettings.AutoUpdate))
 	}
 
-	rows := []configRow{
-		// Project section
-		{label: "Agent", values: agentValues, current: agentIdx, section: "Project"},
+	projectRows := []configRow{
+		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
@@ -173,19 +182,19 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "  On error", values: errorValues, current: errorIdx},
 		{label: "  Feature", values: onCompleteValues, current: featureActionIdx, section: "On complete behaviour"},
 		{label: "  Bug", values: onCompleteValues, current: bugActionIdx},
-		// Project actions
 		{label: "Save project config", action: configActionSaveProject, isSave: true},
 		{label: "Edit project file in editor", action: configActionEditProject},
-		// Global section
-		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx, section: "Global"},
-		// Global actions
+	}
+
+	globalRows := []configRow{
+		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx},
 		{label: "Save global config", action: configActionSaveGlobal, isSave: true},
 		{label: "Edit global file in editor", action: configActionEditGlobal},
 	}
 
-	// Find the auto-update row index for saveGlobalConfig
+	// Find the auto-update row index within globalRows for saveGlobalConfig
 	globalAutoUpdateIdx := 0
-	for i, r := range rows {
+	for i, r := range globalRows {
 		if r.label == "Auto-update" && r.isOption() {
 			globalAutoUpdateIdx = i
 			break
@@ -193,7 +202,8 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	return configModel{
-		rows:                  rows,
+		projectRows:           projectRows,
+		globalRows:            globalRows,
 		globalAutoUpdateIdx:   globalAutoUpdateIdx,
 		dir:                   dir,
 		origInclude:           cfg.Include,
@@ -201,9 +211,15 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 }
 
-// optionByLabel finds the first option row with the given label.
+// optionByLabel finds the first option row with the given label,
+// searching both projectRows and globalRows so buildConfig works from either tab.
 func (m configModel) optionByLabel(label string) configRow {
-	for _, r := range m.rows {
+	for _, r := range m.projectRows {
+		if r.label == label && r.isOption() {
+			return r
+		}
+	}
+	for _, r := range m.globalRows {
 		if r.label == label && r.isOption() {
 			return r
 		}
@@ -261,7 +277,7 @@ func (m configModel) buildConfig() config.Config {
 }
 
 func (m configModel) saveGlobalConfig() error {
-	row := m.rows[m.globalAutoUpdateIdx]
+	row := m.globalRows[m.globalAutoUpdateIdx]
 	mode := globalconfig.AutoUpdateMode(row.values[row.current])
 	settings, err := loadGlobalSettings()
 	if err != nil {
@@ -307,7 +323,8 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Clear status on any keypress
 		m.statusText = ""
 
-		itemCount := len(m.rows)
+		rows := m.activeRows()
+		itemCount := len(*rows)
 
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
@@ -325,7 +342,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 		case "left", "h":
-			if row := &m.rows[m.cursor]; row.isOption() {
+			if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current > 0 {
 					row.current--
 				} else {
@@ -333,7 +350,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "right", "l":
-			if row := &m.rows[m.cursor]; row.isOption() {
+			if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current < len(row.values)-1 {
 					row.current++
 				} else {
@@ -341,7 +358,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			row := &m.rows[m.cursor]
+			row := &(*rows)[m.cursor]
 			if row.isOption() {
 				if row.current < len(row.values)-1 {
 					row.current++
@@ -418,7 +435,8 @@ func (m configModel) View() string {
 
 	var sb strings.Builder
 
-	for i, row := range m.rows {
+	rows := *m.activeRows()
+	for i, row := range rows {
 		// Section header
 		if row.section != "" {
 			if i > 0 {

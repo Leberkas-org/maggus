@@ -31,17 +31,17 @@ The `maggus config` screen currently renders all settings in one long scrollable
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `configModel` in `src/cmd/config.go` gains an `activeTab int` field (0 = Project, 1 = Global)
-- [ ] The single `rows []configRow` field is replaced by `projectRows []configRow` and `globalRows []configRow`
-- [ ] A helper method `func (m *configModel) activeRows() *[]configRow` returns a pointer to the currently active slice so all cursor operations work on the right set without duplicating logic
-- [ ] `newConfigModel` populates `projectRows` with all current Project-section rows (Agent, Model, Worktree, Auto-branch, Check sync, Protected branches, Sound, On task complete, On run complete, On error, On complete Feature, On complete Bug, Save project config button, Edit project file button) and `globalRows` with all Global-section rows (Auto-update, Save global config button, Edit global file button)
-- [ ] The `section` header field is removed from the first row of each slice — the tab bar replaces section headers, so no `section:` string is needed on any row
-- [ ] `optionByLabel` searches only the active tab's rows (or both, in order) — must still find any label regardless of which tab is active, so `buildConfig` works correctly when called from either tab's save action
-- [ ] `buildConfig` is unchanged in logic — it still reads all option rows from both slices to construct the full `config.Config`
-- [ ] `cursor` is reset to 0 whenever the active tab changes
-- [ ] `globalAutoUpdateIdx` is updated to index into `globalRows` instead of `rows`
-- [ ] All existing `config_test.go` tests pass
-- [ ] `go build ./...` passes
+- [x] `configModel` in `src/cmd/config.go` gains an `activeTab int` field (0 = Project, 1 = Global)
+- [x] The single `rows []configRow` field is replaced by `projectRows []configRow` and `globalRows []configRow`
+- [x] A helper method `func (m *configModel) activeRows() *[]configRow` returns a pointer to the currently active slice so all cursor operations work on the right set without duplicating logic
+- [x] `newConfigModel` populates `projectRows` with all current Project-section rows (Agent, Model, Worktree, Auto-branch, Check sync, Protected branches, Sound, On task complete, On run complete, On error, On complete Feature, On complete Bug, Save project config button, Edit project file button) and `globalRows` with all Global-section rows (Auto-update, Save global config button, Edit global file button)
+- [x] The `section` header field is removed from the first row of each slice — the tab bar replaces section headers, so no `section:` string is needed on any row
+- [x] `optionByLabel` searches only the active tab's rows (or both, in order) — must still find any label regardless of which tab is active, so `buildConfig` works correctly when called from either tab's save action
+- [x] `buildConfig` is unchanged in logic — it still reads all option rows from both slices to construct the full `config.Config`
+- [x] `cursor` is reset to 0 whenever the active tab changes
+- [x] `globalAutoUpdateIdx` is updated to index into `globalRows` instead of `rows`
+- [x] All existing `config_test.go` tests pass
+- [x] `go build ./...` passes
 
 ---
 

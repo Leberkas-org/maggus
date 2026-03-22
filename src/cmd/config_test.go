@@ -9,10 +9,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// optionRows returns only the setting rows (not action buttons) from the model.
+// optionRows returns only the setting rows (not action buttons) from both slices.
 func optionRows(m configModel) []configRow {
 	var opts []configRow
-	for _, r := range m.rows {
+	for _, r := range m.projectRows {
+		if r.isOption() {
+			opts = append(opts, r)
+		}
+	}
+	for _, r := range m.globalRows {
 		if r.isOption() {
 			opts = append(opts, r)
 		}
