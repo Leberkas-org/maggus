@@ -305,7 +305,7 @@ func TestMarkCompletedFeatures(t *testing.T) {
 - [ ] Not done
 `)
 
-	if err := MarkCompletedFeatures(dir); err != nil {
+	if err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func TestMarkCompletedFeatures_SkipsBlockedFeature(t *testing.T) {
 - [ ] ⚠️ BLOCKED: Needs human input
 `)
 
-	if err := MarkCompletedFeatures(dir); err != nil {
+	if err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -355,7 +355,7 @@ func TestMarkCompletedFeatures_RenamesWhenBlockedCriterionResolved(t *testing.T)
 - [x] ⚠️ BLOCKED: Needs human input — resolved: not applicable for CLI tool
 `)
 
-	if err := MarkCompletedFeatures(dir); err != nil {
+	if err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -890,7 +890,7 @@ func TestMarkCompletedBugs(t *testing.T) {
 - [ ] Not fixed
 `)
 
-	if err := MarkCompletedBugs(dir); err != nil {
+	if err := MarkCompletedBugs(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedBugs error: %v", err)
 	}
 
@@ -905,6 +905,108 @@ func TestMarkCompletedBugs(t *testing.T) {
 	// bug_002 should still be there
 	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_002.md")); err != nil {
 		t.Error("bug_002.md should still exist")
+	}
+}
+
+func TestMarkCompletedFeatures_DeleteAction(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempFeature(t, dir, "feature_001.md", `# Feature 001
+### TASK-001: Done task
+**Acceptance Criteria:**
+- [x] Done A
+- [x] Done B
+`)
+
+	if err := MarkCompletedFeatures(dir, "delete"); err != nil {
+		t.Fatalf("MarkCompletedFeatures error: %v", err)
+	}
+
+	// feature_001 should have been deleted (not renamed)
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001.md")); !os.IsNotExist(err) {
+		t.Error("feature_001.md should have been deleted")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")); !os.IsNotExist(err) {
+		t.Error("feature_001_completed.md should NOT exist when action is delete")
+	}
+}
+
+func TestMarkCompletedFeatures_RenameAction(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempFeature(t, dir, "feature_001.md", `# Feature 001
+### TASK-001: Done task
+**Acceptance Criteria:**
+- [x] Done A
+`)
+
+	if err := MarkCompletedFeatures(dir, "rename"); err != nil {
+		t.Fatalf("MarkCompletedFeatures error: %v", err)
+	}
+
+	// Explicit "rename" should behave like default (empty string)
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")); err != nil {
+		t.Error("feature_001_completed.md should exist when action is rename")
+	}
+}
+
+func TestMarkCompletedFeatures_UnknownActionDefaultsToRename(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempFeature(t, dir, "feature_001.md", `# Feature 001
+### TASK-001: Done task
+**Acceptance Criteria:**
+- [x] Done A
+`)
+
+	if err := MarkCompletedFeatures(dir, "archive"); err != nil {
+		t.Fatalf("MarkCompletedFeatures error: %v", err)
+	}
+
+	// Unknown action should default to rename
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")); err != nil {
+		t.Error("feature_001_completed.md should exist when action is unknown")
+	}
+}
+
+func TestMarkCompletedBugs_DeleteAction(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+### BUG-001-001: Done
+**Acceptance Criteria:**
+- [x] Fixed
+- [x] Tested
+`)
+
+	if err := MarkCompletedBugs(dir, "delete"); err != nil {
+		t.Fatalf("MarkCompletedBugs error: %v", err)
+	}
+
+	// bug_001 should have been deleted
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_001.md")); !os.IsNotExist(err) {
+		t.Error("bug_001.md should have been deleted")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_001_completed.md")); !os.IsNotExist(err) {
+		t.Error("bug_001_completed.md should NOT exist when action is delete")
+	}
+}
+
+func TestMarkCompletedBugs_UnknownActionDefaultsToRename(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTempBug(t, dir, "bug_001.md", `# Bug 001
+### BUG-001-001: Done
+**Acceptance Criteria:**
+- [x] Fixed
+`)
+
+	if err := MarkCompletedBugs(dir, "something"); err != nil {
+		t.Fatalf("MarkCompletedBugs error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, ".maggus", "bugs", "bug_001_completed.md")); err != nil {
+		t.Error("bug_001_completed.md should exist when action is unknown")
 	}
 }
 

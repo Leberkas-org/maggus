@@ -301,9 +301,10 @@ func extractFeatureNumber(path string) int {
 	return n
 }
 
-// MarkCompletedFeatures renames feature files where all tasks are complete (and none are blocked)
-// by appending _completed before the .md extension (e.g. feature_001.md → feature_001_completed.md).
-func MarkCompletedFeatures(dir string) error {
+// MarkCompletedFeatures marks feature files where all tasks are complete (and none are blocked).
+// When action is "delete", the file is removed; otherwise it is renamed by appending _completed
+// before the .md extension (e.g. feature_001.md → feature_001_completed.md).
+func MarkCompletedFeatures(dir, action string) error {
 	files, err := GlobFeatureFiles(dir, false)
 	if err != nil {
 		return err
@@ -329,9 +330,15 @@ func MarkCompletedFeatures(dir string) error {
 		}
 
 		if allComplete {
-			newName := strings.TrimSuffix(f, ".md") + "_completed.md"
-			if err := os.Rename(f, newName); err != nil {
-				return fmt.Errorf("rename %s: %w", f, err)
+			if action == "delete" {
+				if err := os.Remove(f); err != nil {
+					return fmt.Errorf("delete %s: %w", f, err)
+				}
+			} else {
+				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
+				if err := os.Rename(f, newName); err != nil {
+					return fmt.Errorf("rename %s: %w", f, err)
+				}
 			}
 		}
 	}
@@ -612,9 +619,10 @@ func ParseBugsGrouped(dir string) ([]Feature, error) {
 	return bugs, nil
 }
 
-// MarkCompletedBugs renames bug files where all tasks are complete (and none are blocked)
-// by appending _completed before the .md extension (e.g. bug_001.md → bug_001_completed.md).
-func MarkCompletedBugs(dir string) error {
+// MarkCompletedBugs marks bug files where all tasks are complete (and none are blocked).
+// When action is "delete", the file is removed; otherwise it is renamed by appending _completed
+// before the .md extension (e.g. bug_001.md → bug_001_completed.md).
+func MarkCompletedBugs(dir, action string) error {
 	files, err := GlobBugFiles(dir, false)
 	if err != nil {
 		return err
@@ -639,9 +647,15 @@ func MarkCompletedBugs(dir string) error {
 		}
 
 		if allComplete {
-			newName := strings.TrimSuffix(f, ".md") + "_completed.md"
-			if err := os.Rename(f, newName); err != nil {
-				return fmt.Errorf("rename %s: %w", f, err)
+			if action == "delete" {
+				if err := os.Remove(f); err != nil {
+					return fmt.Errorf("delete %s: %w", f, err)
+				}
+			} else {
+				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
+				if err := os.Rename(f, newName); err != nil {
+					return fmt.Errorf("rename %s: %w", f, err)
+				}
 			}
 		}
 	}

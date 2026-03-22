@@ -49,13 +49,13 @@ When Maggus finishes all tasks in a feature or bug file, it currently always ren
 **Parallel:** yes — can run alongside TASK-005-003
 
 **Acceptance Criteria:**
-- [ ] `MarkCompletedFeatures(dir string)` signature changes to `MarkCompletedFeatures(dir, action string) error` in `src/internal/parser/parser.go`
-- [ ] `MarkCompletedBugs(dir string)` signature changes to `MarkCompletedBugs(dir, action string) error`
-- [ ] When `action == "delete"`, a fully-completed file is removed via `os.Remove` instead of renamed
-- [ ] When `action` is anything else (including `"rename"` or empty string), behaviour is unchanged (rename to `_completed`)
-- [ ] All existing callers in `src/cmd/work_task.go` are updated to pass `""` (empty = rename) as a temporary placeholder — the final wiring happens in TASK-005-004
-- [ ] Existing parser tests still pass; new tests cover: delete removes the file, rename still works, unknown action defaults to rename
-- [ ] `go test ./internal/parser` passes
+- [x] `MarkCompletedFeatures(dir string)` signature changes to `MarkCompletedFeatures(dir, action string) error` in `src/internal/parser/parser.go`
+- [x] `MarkCompletedBugs(dir string)` signature changes to `MarkCompletedBugs(dir, action string) error`
+- [x] When `action == "delete"`, a fully-completed file is removed via `os.Remove` instead of renamed
+- [x] When `action` is anything else (including `"rename"` or empty string), behaviour is unchanged (rename to `_completed`)
+- [x] All existing callers in `src/cmd/work_task.go` are updated to pass `""` (empty = rename) as a temporary placeholder — the final wiring happens in TASK-005-004
+- [x] Existing parser tests still pass; new tests cover: delete removes the file, rename still works, unknown action defaults to rename
+- [x] `go test ./internal/parser` passes
 
 ---
 

@@ -124,8 +124,8 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	}
 
 	// Rename fully completed feature and bug files before committing.
-	_ = parser.MarkCompletedFeatures(tc.workDir)
-	_ = parser.MarkCompletedBugs(tc.workDir)
+	_ = parser.MarkCompletedFeatures(tc.workDir, "")
+	_ = parser.MarkCompletedBugs(tc.workDir, "")
 
 	// Stage any feature renames so they are included in the commit.
 	stageFeatures := exec.Command("git", "add", "--", ".maggus/")

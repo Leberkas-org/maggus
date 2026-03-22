@@ -49,8 +49,8 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 		return nil, nil
 	}
 
-	_ = parser.MarkCompletedFeatures(dir)
-	_ = parser.MarkCompletedBugs(dir)
+	_ = parser.MarkCompletedFeatures(dir, "")
+	_ = parser.MarkCompletedBugs(dir, "")
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
