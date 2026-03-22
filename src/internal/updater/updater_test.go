@@ -110,6 +110,12 @@ func TestCheckLatestVersion_DevVersion(t *testing.T) {
 	if info.TagName != "v1.5.0" {
 		t.Errorf("expected TagName=v1.5.0, got %s", info.TagName)
 	}
+
+	// Also check dev-<timestamp> variant (local builds with BuildTime set)
+	info2 := CheckLatestVersion("dev-143027")
+	if !info2.IsNewer {
+		t.Error("expected IsNewer=true for dev-143027 version with valid release")
+	}
 }
 
 func TestCheckLatestVersion_NetworkError(t *testing.T) {

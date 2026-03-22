@@ -52,7 +52,7 @@ var timeNow = time.Now
 // Returns a banner string for notify mode, an applied-update message for auto mode,
 // or empty string for off mode / no update / dev build / cooldown not passed.
 func startupUpdateCheck() string {
-	if Version == "dev" {
+	if strings.HasPrefix(Version, "dev") {
 		return ""
 	}
 
