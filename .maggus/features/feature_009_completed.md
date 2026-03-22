@@ -103,23 +103,23 @@ run directories that no longer exist.
 **Parallel:** yes — can run alongside TASK-009-001 and TASK-009-002
 
 **Acceptance Criteria:**
-- [ ] `findCompletedRuns()` and `hasEndSection()` are deleted from `clean.go`
-- [ ] `runClean()` no longer calls `findCompletedRuns()` or iterates over run
+- [x] `findCompletedRuns()` and `hasEndSection()` are deleted from `clean.go`
+- [x] `runClean()` no longer calls `findCompletedRuns()` or iterates over run
   directories
-- [ ] The `cleanCmd` description (both `Short` and `Long`) no longer mentions
+- [x] The `cleanCmd` description (both `Short` and `Long`) no longer mentions
   run directories
-- [ ] Output messages in `runClean()` only report completed feature/bug file
+- [x] Output messages in `runClean()` only report completed feature/bug file
   counts; no "run directory(ies)" text remains
-- [ ] `clean_test.go` removes `writeRunDir()` helper and all test functions that
+- [x] `clean_test.go` removes `writeRunDir()` helper and all test functions that
   reference run directories (`TestCleanRemovesCompletedRuns`,
   `TestCleanKeepsInProgressRuns`, `TestCleanCombinedFeaturesAndRuns`,
   `TestCleanDryRun` if it references runs)
-- [ ] `setupCleanDir()` no longer creates the `runs/` subdirectory
-- [ ] Remaining clean tests (`TestCleanRemovesCompletedFeatures`,
+- [x] `setupCleanDir()` no longer creates the `runs/` subdirectory
+- [x] Remaining clean tests (`TestCleanRemovesCompletedFeatures`,
   `TestCleanNothingToClean`, `TestCleanEmptyMaggusDir`,
   `TestCleanDryRunShowsPaths`) pass unchanged
-- [ ] `go test ./cmd` passes
-- [ ] `go vet ./...` passes
+- [x] `go test ./cmd` passes
+- [x] `go vet ./...` passes
 
 ---
 
