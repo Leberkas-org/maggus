@@ -38,6 +38,19 @@ var (
 	noWorktreeFlag  bool
 )
 
+// resetWorkFlags resets all work command flags to their zero/default values.
+// This must be called before ParseFlags in menu-driven and dispatch contexts
+// so that flags from a previous invocation do not leak into the next one.
+func resetWorkFlags() {
+	countFlag = defaultTaskCount
+	noBootstrapFlag = false
+	modelFlag = ""
+	agentFlag = ""
+	taskFlag = ""
+	worktreeFlag = false
+	noWorktreeFlag = false
+}
+
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
 	Short: "Work on the next N tasks from the feature files",

@@ -67,6 +67,8 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		// Reset work command flags so previous invocations don't leak.
+		resetWorkFlags()
 		if err := sub.ParseFlags(remaining); err != nil {
 			return err
 		}

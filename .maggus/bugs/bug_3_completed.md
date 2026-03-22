@@ -12,11 +12,13 @@ After running a specific task via `maggus work --task TASK-ID` (either from the 
 ## Steps to Reproduce
 
 1. Run `maggus` (opens main menu)
-2. Go to "status" and run a specific task (Alt+R on a task) — or select "work" with `--task TASK-ID`
-3. Wait for the task to complete, return to main menu
-4. Select "work" (default, count=0 meaning "all tasks")
-5. Observe: work exits immediately — prints "Task TASK-ID not found or already complete"
-6. Restart maggus → "work" works normally again
+2. Select "status" to open the interactive status view
+3. Navigate to an open task and press Alt+R to run it
+4. `dispatchWork(taskID)` is called at `status.go:701`, which parses `--task TASK-ID` on the work cobra command
+5. Wait for the task to complete — control returns to status, then back to the menu
+6. Select "work" from the menu (default, count=0 meaning "all tasks")
+7. Observe: work exits immediately — prints "Task TASK-ID not found or already complete"
+8. Restart maggus → "work" works normally again
 
 ## Expected Behavior
 
@@ -59,11 +61,11 @@ The same issue affects all work command flags (`modelFlag`, `agentFlag`, `worktr
 **Description:** As a user, I want work command flags to be reset to defaults between menu-driven runs so that a previous `--task` run doesn't poison subsequent `work` invocations.
 
 **Acceptance Criteria:**
-- [ ] All work command flag variables (`taskFlag`, `countFlag`, `modelFlag`, `agentFlag`, `noBootstrapFlag`, `worktreeFlag`, `noWorktreeFlag`) are reset to their zero/default values before `ParseFlags` in both `root.go:70` (menu loop) and `dispatch.go:9` (dispatchWork)
-- [ ] After running `maggus work --task TASK-ID` from the status screen, selecting "work" from the menu processes all open tasks normally
-- [ ] After running `maggus work --task TASK-ID` from the menu, selecting "work" again processes all open tasks normally
-- [ ] Explicit flags passed in a new invocation still take effect (e.g. `--model opus` still works)
-- [ ] The `defaultTaskCount` constant is used when resetting `countFlag` (not hardcoded 0)
-- [ ] No regression in direct CLI usage (`maggus work --task X` from shell)
-- [ ] No regression in menu-driven work with explicit count
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] All work command flag variables (`taskFlag`, `countFlag`, `modelFlag`, `agentFlag`, `noBootstrapFlag`, `worktreeFlag`, `noWorktreeFlag`) are reset to their zero/default values before `ParseFlags` in both `root.go:70` (menu loop) and `dispatch.go:9` (dispatchWork)
+- [x] After running `maggus work --task TASK-ID` from the status screen, selecting "work" from the menu processes all open tasks normally
+- [x] After running `maggus work --task TASK-ID` from the menu, selecting "work" again processes all open tasks normally
+- [x] Explicit flags passed in a new invocation still take effect (e.g. `--model opus` still works)
+- [x] The `defaultTaskCount` constant is used when resetting `countFlag` (not hardcoded 0)
+- [x] No regression in direct CLI usage (`maggus work --task X` from shell)
+- [x] No regression in menu-driven work with explicit count
+- [x] `go vet ./...` and `go test ./...` pass
