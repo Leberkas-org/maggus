@@ -2,6 +2,7 @@ package gitbranch
 
 import (
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -171,6 +172,83 @@ func TestEnsureFeatureBranch_CustomProtectedList(t *testing.T) {
 	}
 	if branch != "feature/maggustask-005" {
 		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-005")
+	}
+}
+
+func TestEnsureFeatureBranch_ExistingBranch_CalledTwice(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+	protected := []string{"main", "master", "dev"}
+
+	// First call: creates the branch
+	branch1, msg1, err := EnsureFeatureBranch(tmp, "TASK-007", protected)
+	if err != nil {
+		t.Fatalf("first call: unexpected error: %v", err)
+	}
+	if branch1 != "feature/maggustask-007" {
+		t.Errorf("first call: branch = %q, want %q", branch1, "feature/maggustask-007")
+	}
+	if msg1 == "" {
+		t.Error("first call: expected a message")
+	}
+
+	// Go back to protected branch
+	cmd := exec.Command("git", "checkout", "master")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout master: %v\n%s", err, out)
+	}
+
+	// Second call: should switch to existing branch, not fail
+	branch2, msg2, err := EnsureFeatureBranch(tmp, "TASK-007", protected)
+	if err != nil {
+		t.Fatalf("second call: unexpected error: %v", err)
+	}
+	if branch2 != "feature/maggustask-007" {
+		t.Errorf("second call: branch = %q, want %q", branch2, "feature/maggustask-007")
+	}
+	if msg2 == "" {
+		t.Error("second call: expected a message")
+	}
+
+	got := getCurrentBranch(t, tmp)
+	if got != "feature/maggustask-007" {
+		t.Errorf("actual git branch = %q, want %q", got, "feature/maggustask-007")
+	}
+}
+
+func TestEnsureFeatureBranch_ExistingBranch_ReturnsCorrectMessage(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+	protected := []string{"main", "master", "dev"}
+
+	// Create the branch first
+	_, _, err := EnsureFeatureBranch(tmp, "TASK-008", protected)
+	if err != nil {
+		t.Fatalf("setup: unexpected error: %v", err)
+	}
+
+	// Go back to protected branch
+	cmd := exec.Command("git", "checkout", "master")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout master: %v\n%s", err, out)
+	}
+
+	// Switch to existing branch
+	branch, msg, err := EnsureFeatureBranch(tmp, "TASK-008", protected)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if branch != "feature/maggustask-008" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-008")
+	}
+	if msg == "" {
+		t.Error("expected a message about switching branches")
+	}
+	// Message should mention switching from protected branch
+	if !strings.Contains(msg, "master") || !strings.Contains(msg, "feature/maggustask-008") {
+		t.Errorf("message should mention both branches, got: %q", msg)
 	}
 }
 

@@ -72,8 +72,20 @@ func currentBranch(dir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func branchExists(dir string, branch string) bool {
+	cmd := exec.Command("git", "rev-parse", "--verify", "--quiet", branch)
+	cmd.Dir = dir
+	return cmd.Run() == nil
+}
+
 func createAndCheckout(dir string, branch string) error {
-	cmd := exec.Command("git", "checkout", "-b", branch)
+	args := []string{"checkout"}
+	if !branchExists(dir, branch) {
+		args = append(args, "-b")
+	}
+	args = append(args, branch)
+
+	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
