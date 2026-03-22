@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/notify"
@@ -52,6 +53,7 @@ type taskContext struct {
 	repoDir       string
 	workDir       string
 	runID         string
+	onComplete    config.OnCompleteConfig
 }
 
 // runTask executes a single task iteration: finds the next task, acquires a
@@ -123,9 +125,9 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		}
 	}
 
-	// Rename fully completed feature and bug files before committing.
-	_ = parser.MarkCompletedFeatures(tc.workDir, "")
-	_ = parser.MarkCompletedBugs(tc.workDir, "")
+	// Rename or delete fully completed feature and bug files before committing.
+	_ = parser.MarkCompletedFeatures(tc.workDir, tc.onComplete.FeatureAction())
+	_ = parser.MarkCompletedBugs(tc.workDir, tc.onComplete.BugAction())
 
 	// Stage any feature renames so they are included in the commit.
 	stageFeatures := exec.Command("git", "add", "--", ".maggus/")

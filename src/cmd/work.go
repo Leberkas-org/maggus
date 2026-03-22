@@ -151,6 +151,7 @@ Examples:
 			repoDir:       repoDir,
 			workDir:       workDir,
 			runID:         run.ID,
+			onComplete:    wc.cfg.OnComplete,
 		}
 
 		runWorkGoroutine(workLoopParams{

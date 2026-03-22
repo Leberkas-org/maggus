@@ -90,11 +90,11 @@ When Maggus finishes all tasks in a feature or bug file, it currently always ren
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `taskContext` struct in `src/cmd/work_task.go` (or its setup in `work.go`) has the loaded `config.Config` available (it may already be reachable — check before adding a field)
-- [ ] The two calls in `work_task.go` are updated: `parser.MarkCompletedFeatures(tc.workDir, cfg.OnComplete.FeatureAction())` and `parser.MarkCompletedBugs(tc.workDir, cfg.OnComplete.BugAction())`
-- [ ] A manual smoke test (or integration-style test if one exists) confirms: with `on_complete: {feature: delete}` in config, a fully-completed feature file is removed after the work loop; with default config, it is renamed
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] `taskContext` struct in `src/cmd/work_task.go` (or its setup in `work.go`) has the loaded `config.Config` available (it may already be reachable — check before adding a field)
+- [x] The two calls in `work_task.go` are updated: `parser.MarkCompletedFeatures(tc.workDir, cfg.OnComplete.FeatureAction())` and `parser.MarkCompletedBugs(tc.workDir, cfg.OnComplete.BugAction())`
+- [x] A manual smoke test (or integration-style test if one exists) confirms: with `on_complete: {feature: delete}` in config, a fully-completed feature file is removed after the work loop; with default config, it is renamed
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 
