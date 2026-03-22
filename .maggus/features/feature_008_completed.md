@@ -22,18 +22,18 @@ The main menu summary line currently shows verbose statistics (total tasks, done
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `featureSummary` struct includes `workable` (feature) and `bugWorkable` (bug) fields computed from `IsWorkable()` on each task
-- [ ] `loadFeatureSummary` populates the new workable fields
-- [ ] `formatSummaryLine` is replaced by a new function (or updated signature) that returns a lipgloss-styled string with the new format
-- [ ] Format when both exist: `3 features, {5} open tasks · 2 bugs, {3} open tasks` where `{5}` is green and `{3}` is red (only the number is colored, surrounding text stays muted)
-- [ ] Format when only features: `3 features, {5} open tasks` (green number)
-- [ ] Format when only bugs: `2 bugs, {3} open tasks` (red number)
-- [ ] When all counts are zero: `No open tasks` in muted gray
-- [ ] "open tasks" means workable: incomplete AND not blocked AND not ignored
-- [ ] The summary line in `View()` no longer wraps the result in `mutedStyle.Render()` since the function now returns pre-styled output
-- [ ] Existing tests in `menu_test.go` for `formatSummaryLine` are updated to match new format and behavior
-- [ ] The `TestMenuView_SummaryShowsFeaturesAndBugs` and `TestMenuView_SummaryNoFeaturesOrBugs` tests are updated
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `featureSummary` struct includes `workable` (feature) and `bugWorkable` (bug) fields computed from `IsWorkable()` on each task
+- [x] `loadFeatureSummary` populates the new workable fields
+- [x] `formatSummaryLine` is replaced by a new function (or updated signature) that returns a lipgloss-styled string with the new format
+- [x] Format when both exist: `3 features, {5} open tasks · 2 bugs, {3} open tasks` where `{5}` is green and `{3}` is red (only the number is colored, surrounding text stays muted)
+- [x] Format when only features: `3 features, {5} open tasks` (green number)
+- [x] Format when only bugs: `2 bugs, {3} open tasks` (red number)
+- [x] When all counts are zero: `No open tasks` in muted gray
+- [x] "open tasks" means workable: incomplete AND not blocked AND not ignored
+- [x] The summary line in `View()` no longer wraps the result in `mutedStyle.Render()` since the function now returns pre-styled output
+- [x] Existing tests in `menu_test.go` for `formatSummaryLine` are updated to match new format and behavior
+- [x] The `TestMenuView_SummaryShowsFeaturesAndBugs` and `TestMenuView_SummaryNoFeaturesOrBugs` tests are updated
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 
