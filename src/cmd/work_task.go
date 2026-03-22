@@ -93,9 +93,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		NoBootstrap: noBootstrapFlag,
 		Include:     tc.validIncludes,
 		RunID:       tc.runID,
-		RunDir:      tc.run.RelativeDir(tc.workDir),
 		Iteration:   i + 1,
-		IterLog:     tc.run.RelativeIterationLogPath(tc.workDir, i+1),
 	}
 
 	builtPrompt := prompt.Build(next, opts)
