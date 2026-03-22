@@ -351,6 +351,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case FileChangeMsg:
+		if m.summary.show {
+			return m, listenForWatcherUpdate(m.watcherCh)
+		}
 		cmd := m.handleFileChange()
 		return m, tea.Batch(cmd, listenForWatcherUpdate(m.watcherCh))
 

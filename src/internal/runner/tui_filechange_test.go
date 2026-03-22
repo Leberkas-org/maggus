@@ -542,3 +542,89 @@ func TestBugHintLine_Hidden_WhenNoBugs(t *testing.T) {
 		t.Errorf("expected no bug hint when activeBugs=0, got:\n%s", header)
 	}
 }
+
+// --- Summary screen frozen state tests ---
+
+func TestFileChangeMsg_NoOpWhenSummaryVisible(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "done"},
+		{"TASK-001-002", "done"},
+		{"TASK-001-003", "done"},
+	})
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 3,
+		totalIters:  3,
+		summary:     summaryState{show: true},
+	}
+
+	// Add new workable tasks while summary is visible
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	updated, _ := m.Update(FileChangeMsg{})
+	result := updated.(TUIModel)
+
+	// totalIters must remain frozen at 3
+	if result.totalIters != 3 {
+		t.Errorf("totalIters = %d, want 3 (summary must stay frozen)", result.totalIters)
+	}
+	if result.notification != "" {
+		t.Errorf("notification should not be set while summary is visible, got %q", result.notification)
+	}
+}
+
+func TestFileChangeMsg_NoNotificationWhenSummaryVisible(t *testing.T) {
+	dir := t.TempDir()
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 2,
+		totalIters:  2,
+		summary:     summaryState{show: true},
+	}
+
+	writeBugFile(t, dir, "bug_001.md", []struct{ id, status string }{
+		{"BUG-001-001", "workable"},
+	})
+
+	updated, _ := m.Update(FileChangeMsg{})
+	result := updated.(TUIModel)
+
+	if result.notification != "" {
+		t.Errorf("expected no notification during summary, got %q", result.notification)
+	}
+}
+
+func TestFileChangeMsg_ResumesAfterSummaryHidden(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 1,
+		totalIters:  1,
+		summary:     summaryState{show: false},
+	}
+
+	// Add a new feature while summary is NOT visible — should update normally
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	m.handleFileChange()
+
+	// 3 workable + currentIter(1) = 4
+	if m.totalIters != 4 {
+		t.Errorf("totalIters = %d, want 4 (file watcher should resume normally)", m.totalIters)
+	}
+}
