@@ -83,6 +83,7 @@ type configModel struct {
 	projectRows           []configRow
 	globalRows            []configRow
 	activeTab             int // 0 = Project, 1 = Global
+	tabFocused            bool
 	cursor                int
 	action                configAction
 	width                 int
@@ -329,20 +330,36 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
+		case "1":
+			m.activeTab = 0
+			m.cursor = 0
+			m.tabFocused = false
+		case "2":
+			m.activeTab = 1
+			m.cursor = 0
+			m.tabFocused = false
 		case "up", "k":
-			if m.cursor > 0 {
+			if m.tabFocused {
+				// Already at tab bar, do nothing
+			} else if m.cursor > 0 {
 				m.cursor--
 			} else {
-				m.cursor = itemCount - 1
+				// At row 0, move focus to tab bar
+				m.tabFocused = true
 			}
 		case "down", "j":
-			if m.cursor < itemCount-1 {
-				m.cursor++
-			} else {
+			if m.tabFocused {
+				m.tabFocused = false
 				m.cursor = 0
+			} else if m.cursor < itemCount-1 {
+				m.cursor++
 			}
 		case "left", "h":
-			if row := &(*rows)[m.cursor]; row.isOption() {
+			if m.tabFocused {
+				// Switch to the other tab
+				m.activeTab = 1 - m.activeTab
+				m.cursor = 0
+			} else if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current > 0 {
 					row.current--
 				} else {
@@ -350,7 +367,11 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "right", "l":
-			if row := &(*rows)[m.cursor]; row.isOption() {
+			if m.tabFocused {
+				// Switch to the other tab
+				m.activeTab = 1 - m.activeTab
+				m.cursor = 0
+			} else if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current < len(row.values)-1 {
 					row.current++
 				} else {
@@ -358,15 +379,20 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			row := &(*rows)[m.cursor]
-			if row.isOption() {
-				if row.current < len(row.values)-1 {
-					row.current++
-				} else {
-					row.current = 0
-				}
+			if m.tabFocused {
+				m.tabFocused = false
+				m.cursor = 0
 			} else {
-				return m, m.executeAction(row.action)
+				row := &(*rows)[m.cursor]
+				if row.isOption() {
+					if row.current < len(row.values)-1 {
+						row.current++
+					} else {
+						row.current = 0
+					}
+				} else {
+					return m, m.executeAction(row.action)
+				}
 			}
 		}
 	}
@@ -415,6 +441,44 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 	return nil
 }
 
+func (m configModel) renderTabBar() string {
+	tabNames := []string{"Project", "Global"}
+
+	activeStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(styles.Primary).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.Primary).
+		Padding(0, 1)
+
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted).
+		Padding(0, 1)
+
+	focusedActiveStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("0")).
+		Background(styles.Primary).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.Primary).
+		Padding(0, 1)
+
+	var tabs []string
+	for i, name := range tabNames {
+		if i == m.activeTab {
+			if m.tabFocused {
+				tabs = append(tabs, focusedActiveStyle.Render(name))
+			} else {
+				tabs = append(tabs, activeStyle.Render(name))
+			}
+		} else {
+			tabs = append(tabs, inactiveStyle.Render(name))
+		}
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
+}
+
 func (m configModel) View() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
@@ -424,16 +488,16 @@ func (m configModel) View() string {
 	normalStyle := lipgloss.NewStyle()
 	saveStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
 
-	sectionPaths := map[string]string{
-		"Project": ".maggus/config.yml",
-		"Global":  "~/.maggus/config.yml",
-	}
 	// Sections without a path display just the title
 	sectionTitleOnly := map[string]bool{
 		"On complete behaviour": true,
 	}
 
 	var sb strings.Builder
+
+	// Render tab bar
+	sb.WriteString(m.renderTabBar())
+	sb.WriteString("\n\n")
 
 	rows := *m.activeRows()
 	for i, row := range rows {
@@ -445,9 +509,7 @@ func (m configModel) View() string {
 			if sectionTitleOnly[row.section] {
 				sb.WriteString(titleStyle.Render(row.section) + "\n")
 			} else {
-				path := sectionPaths[row.section]
-				sb.WriteString(titleStyle.Render(row.section) + "  " + mutedStyle.Render(path) + "\n")
-				sb.WriteString(styles.Separator(50) + "\n")
+				sb.WriteString(titleStyle.Render(row.section) + "\n")
 			}
 		}
 
@@ -523,7 +585,7 @@ func (m configModel) View() string {
 	}
 
 	content := sb.String()
-	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: exit")
+	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {

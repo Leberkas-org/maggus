@@ -57,38 +57,38 @@ The `maggus config` screen currently renders all settings in one long scrollable
 **Acceptance Criteria:**
 
 **Tab bar rendering:**
-- [ ] The `View()` method renders a tab bar above the row list. Example layout (exact styling may vary as long as it is clear):
+- [x] The `View()` method renders a tab bar above the row list. Example layout (exact styling may vary as long as it is clear):
   ```
   ┌─────────┐  Global
   │ Project │
   └─────────┘
   ```
   Active tab has a visible border (lipgloss `Border` or `Underline` style); inactive tab is muted. The border style must be consistent with the existing `styles` package colours.
-- [ ] The tab bar is rendered as a special first visual element — it is NOT a `configRow` entry in the slice; it is hardcoded in `View()` above the row list
-- [ ] When the cursor is at position `-1` or a dedicated "tab bar focused" state, the tab bar is highlighted to show keyboard focus. Use a separate `tabFocused bool` field on the model, set to `true` when the user navigates up past row 0
+- [x] The tab bar is rendered as a special first visual element — it is NOT a `configRow` entry in the slice; it is hardcoded in `View()` above the row list
+- [x] When the cursor is at position `-1` or a dedicated "tab bar focused" state, the tab bar is highlighted to show keyboard focus. Use a separate `tabFocused bool` field on the model, set to `true` when the user navigates up past row 0
 
 **Key handling — switching tabs:**
-- [ ] Pressing `1` from anywhere sets `activeTab = 0` (Project), resets cursor to 0, clears `tabFocused`
-- [ ] Pressing `2` from anywhere sets `activeTab = 1` (Global), resets cursor to 0, clears `tabFocused`
-- [ ] When `tabFocused` is `true`, pressing `left` or `right` (or `h`/`l`) switches to the other tab (wraps: Project ↔ Global), resets cursor to 0, keeps `tabFocused = true`
-- [ ] When `tabFocused` is `false` and cursor is at row 0, pressing `up` (or `k`) sets `tabFocused = true` instead of wrapping to the last row
-- [ ] When `tabFocused` is `true`, pressing `down` (or `j`) or `enter` clears `tabFocused` and sets cursor to 0 (first row of the active tab)
+- [x] Pressing `1` from anywhere sets `activeTab = 0` (Project), resets cursor to 0, clears `tabFocused`
+- [x] Pressing `2` from anywhere sets `activeTab = 1` (Global), resets cursor to 0, clears `tabFocused`
+- [x] When `tabFocused` is `true`, pressing `left` or `right` (or `h`/`l`) switches to the other tab (wraps: Project ↔ Global), resets cursor to 0, keeps `tabFocused = true`
+- [x] When `tabFocused` is `false` and cursor is at row 0, pressing `up` (or `k`) sets `tabFocused = true` instead of wrapping to the last row
+- [x] When `tabFocused` is `true`, pressing `down` (or `j`) or `enter` clears `tabFocused` and sets cursor to 0 (first row of the active tab)
 
 **Key handling — within a tab:**
-- [ ] When `tabFocused` is `false`, `up`/`down` navigate rows within the active tab only (no cross-tab wrapping — hitting the bottom of Global does not jump to Project)
-- [ ] When `tabFocused` is `false`, `left`/`right` on an option row still cycles values exactly as before
-- [ ] `enter` on an action button still executes the action (save / edit)
+- [x] When `tabFocused` is `false`, `up`/`down` navigate rows within the active tab only (no cross-tab wrapping — hitting the bottom of Global does not jump to Project)
+- [x] When `tabFocused` is `false`, `left`/`right` on an option row still cycles values exactly as before
+- [x] `enter` on an action button still executes the action (save / edit)
 
 **Footer:**
-- [ ] The footer hint bar is updated to include tab-switching hints: `1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q/esc: exit`
+- [x] The footer hint bar is updated to include tab-switching hints: `1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q/esc: exit`
 
 **Existing behaviour preserved:**
-- [ ] Saving project config still writes `.maggus/config.yml` with all project settings
-- [ ] Saving global config still writes `~/.maggus/config.yml` with global settings
-- [ ] Status messages ("Saved project config", error text) still appear after save/edit actions
-- [ ] Window resize still works correctly
-- [ ] `go build ./...` passes
-- [ ] `go test ./cmd` passes (all existing config tests pass)
+- [x] Saving project config still writes `.maggus/config.yml` with all project settings
+- [x] Saving global config still writes `~/.maggus/config.yml` with global settings
+- [x] Status messages ("Saved project config", error text) still appear after save/edit actions
+- [x] Window resize still works correctly
+- [x] `go build ./...` passes
+- [x] `go test ./cmd` passes (all existing config tests pass)
 
 ---
 
