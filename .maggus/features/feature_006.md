@@ -53,12 +53,12 @@ When maggus is idling in the main menu and a new feature or bug file appears (or
 **Parallel:** yes — can run alongside TASK-006-003
 
 **Acceptance Criteria:**
-- [ ] A new option row labeled `"Auto-work"` is added to the **Project** tab in `cmd/config.go`, positioned logically near other behavioral settings (e.g. after "Worktree" or "Sound")
-- [ ] The row cycles through values: `disabled` → `enabled` → `delayed` → `disabled` (left/right arrow keys)
-- [ ] The current value is loaded from `config.Load()` when the config screen opens
-- [ ] Saving the config writes the selected value back to `.maggus/config.yml` under the `auto_work` key
-- [ ] Display labels are user-friendly: `"disabled"`, `"enabled"`, `"delayed (5s)"`
-- [ ] `go vet ./...` passes
+- [x] A new option row labeled `"Auto-work"` is added to the **Project** tab in `cmd/config.go`, positioned logically near other behavioral settings (e.g. after "Worktree" or "Sound")
+- [x] The row cycles through values: `disabled` → `enabled` → `delayed` → `disabled` (left/right arrow keys)
+- [x] The current value is loaded from `config.Load()` when the config screen opens
+- [x] Saving the config writes the selected value back to `.maggus/config.yml` under the `auto_work` key
+- [x] Display labels are user-friendly: `"disabled"`, `"enabled"`, `"delayed (5s)"`
+- [x] `go vet ./...` passes
 
 ---
 
