@@ -69,7 +69,6 @@ type BannerInfo struct {
 	Iterations    int
 	Branch        string
 	RunID         string
-	RunDir        string
 	Worktree      string // empty if not using worktree
 	Agent         string // agent name (e.g. "claude", "opencode")
 	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode

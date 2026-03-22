@@ -60,34 +60,34 @@ inline logic so that no `.maggus/runs/` directory is ever created.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/internal/runtracker/runtracker.go` is deleted
-- [ ] `src/internal/runtracker/runtracker_test.go` is deleted
-- [ ] `.maggus/runs` entry is removed from `.gitignore`
-- [ ] `runner.BannerInfo` in `src/internal/runner/tui.go` no longer has a
+- [x] `src/internal/runtracker/runtracker.go` is deleted
+- [x] `src/internal/runtracker/runtracker_test.go` is deleted
+- [x] `.maggus/runs` entry is removed from `.gitignore`
+- [x] `runner.BannerInfo` in `src/internal/runner/tui.go` no longer has a
   `RunDir` field; any render line that displayed it in `tui_render.go` is
   removed
-- [ ] `iterationSetup` in `work_loop.go` replaces `run *runtracker.Run` with
+- [x] `iterationSetup` in `work_loop.go` replaces `run *runtracker.Run` with
   `runID string` and `startTime time.Time`
-- [ ] `initIteration()` in `work_loop.go` generates the RunID as
+- [x] `initIteration()` in `work_loop.go` generates the RunID as
   `time.Now().Format("20060102-150405")` and captures `time.Now()` as
   `startTime`; the `runtracker.New()` call is gone
-- [ ] `workLoopParams` in `work_loop.go` replaces `run *runtracker.Run` with
+- [x] `workLoopParams` in `work_loop.go` replaces `run *runtracker.Run` with
   `runID string` and `startTime time.Time`
-- [ ] `runWorkGoroutine()` no longer calls `run.Finalize()` in its defer
-- [ ] `buildSummaryData()` uses `params.runID` and `params.startTime` directly
+- [x] `runWorkGoroutine()` no longer calls `run.Finalize()` in its defer
+- [x] `buildSummaryData()` uses `params.runID` and `params.startTime` directly
   instead of `params.run.*`
-- [ ] `setupUsageCallback()` in `work_loop.go` takes a plain `runID string`
+- [x] `setupUsageCallback()` in `work_loop.go` takes a plain `runID string`
   instead of `*runtracker.Run`
-- [ ] `setupBranch()` in `work_loop.go` takes a plain `runID string` instead of
+- [x] `setupBranch()` in `work_loop.go` takes a plain `runID string` instead of
   `*runtracker.Run`; the worktree path is constructed with that string
-- [ ] `taskContext` in `work_task.go` no longer has a `run *runtracker.Run`
+- [x] `taskContext` in `work_task.go` no longer has a `run *runtracker.Run`
   field; `runTask()` no longer passes `RunDir` or `IterLog` to `prompt.Options`
-- [ ] `work.go` is updated: the current git branch is obtained with a small
+- [x] `work.go` is updated: the current git branch is obtained with a small
   inline git command (matching the existing pattern in `buildSummaryData`);
   `banner.RunDir` is removed; all call sites of updated helpers are adjusted
-- [ ] No import of `runtracker` package remains anywhere in `src/`
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] No import of `runtracker` package remains anywhere in `src/`
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

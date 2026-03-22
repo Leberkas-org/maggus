@@ -8,22 +8,23 @@ import (
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/runtracker"
 	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/leberkas-org/maggus/internal/worktree"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // iterationSetup holds everything needed to start the work loop TUI.
 type iterationSetup struct {
-	tasks   []parser.Task
-	next    *parser.Task
-	count   int
-	run     *runtracker.Run
-	workDir string
+	tasks     []parser.Task
+	next      *parser.Task
+	count     int
+	runID     string
+	startTime time.Time
+	workDir   string
 }
 
 // initIteration parses features and bugs, merges them into a single task list
@@ -60,17 +61,16 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 
 	count = capCount(tasks, count)
 
-	run, err := runtracker.New(dir, modelDisplay, count)
-	if err != nil {
-		return nil, fmt.Errorf("create run tracker: %w", err)
-	}
+	now := time.Now()
+	runID := now.Format("20060102-150405")
 
 	return &iterationSetup{
-		tasks:   tasks,
-		next:    next,
-		count:   count,
-		run:     run,
-		workDir: dir,
+		tasks:     tasks,
+		next:      next,
+		count:     count,
+		runID:     runID,
+		startTime: now,
+		workDir:   dir,
 	}, nil
 }
 
@@ -170,14 +170,14 @@ func countWorkable(tasks []parser.Task) int {
 }
 
 // setupUsageCallback configures the TUI model to record per-task usage.
-func setupUsageCallback(m *runner.TUIModel, dir string, run *runtracker.Run, modelDisplay, agentName string) {
+func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDisplay, agentName string) {
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 		featureRel := tu.FeatureFile
 		if rel, err := filepath.Rel(dir, tu.FeatureFile); err == nil {
 			featureRel = rel
 		}
 		_ = usage.Append(dir, []usage.Record{{
-			RunID:                    run.ID,
+			RunID:                    runID,
 			TaskID:                   tu.TaskID,
 			TaskTitle:                tu.TaskTitle,
 			FeatureFile:              featureRel,
@@ -205,7 +205,8 @@ type workLoopParams struct {
 	tasks         []parser.Task
 	count         int
 	unlimited     bool // when true, loop until no workable tasks remain (count=0 / "all" mode)
-	run           *runtracker.Run
+	runID         string
+	startTime     time.Time
 	p             *tea.Program
 	stopFlag      *atomic.Bool
 	stopAtTaskID  *atomic.Value // stores string: task ID to stop after (empty = after current)
@@ -223,7 +224,6 @@ type workLoopParams struct {
 func runWorkGoroutine(params workLoopParams) {
 	go func() {
 		defer func() {
-			_ = params.run.Finalize(params.tc.workDir)
 			params.p.Send(runner.QuitMsg{})
 		}()
 
@@ -399,10 +399,10 @@ func buildSummaryData(params workLoopParams, completed int, failedTasks []failed
 	}
 
 	return runner.SummaryData{
-		RunID:          params.run.ID,
+		RunID:          params.runID,
 		Branch:         currentBranch,
 		Model:          params.modelDisplay,
-		StartTime:      params.run.StartTime,
+		StartTime:      params.startTime,
 		TasksCompleted: completed,
 		TasksTotal:     params.count,
 		CommitStart:    params.startHash,
@@ -453,11 +453,11 @@ func captureStartHash(workDir string) string {
 
 // setupBranch handles worktree creation or feature branch creation.
 // Returns the branch message (non-worktree mode) or empty string.
-func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, run *runtracker.Run, gitCfg config.GitConfig) (string, error) {
+func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, runID string, gitCfg config.GitConfig) (string, error) {
 	if useWorktree {
 		cleanStaleWorktrees(repoDir)
 		branchName := gitbranch.BranchName(nextTask.ID)
-		wtPath := filepath.Join(repoDir, ".maggus-work", run.ID)
+		wtPath := filepath.Join(repoDir, ".maggus-work", runID)
 		if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
 			return "", fmt.Errorf("create worktree: %w", err)
 		}

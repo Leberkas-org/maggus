@@ -16,7 +16,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/runtracker"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 )
 
@@ -45,7 +44,6 @@ type taskResult struct {
 type taskContext struct {
 	workCtx       context.Context
 	p             *tea.Program
-	run           *runtracker.Run
 	activeAgent   agent.Agent
 	resolvedModel string
 	notifier      *notify.Notifier
