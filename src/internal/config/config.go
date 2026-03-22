@@ -90,6 +90,30 @@ func (g GitConfig) ProtectedBranchList() []string {
 	return filtered
 }
 
+// OnCompleteConfig holds settings for what happens when a feature or bug file is fully completed.
+type OnCompleteConfig struct {
+	Feature string `yaml:"feature"`
+	Bug     string `yaml:"bug"`
+}
+
+// FeatureAction returns the action to take when a feature file is completed.
+// Returns "delete" when configured as such, otherwise defaults to "rename".
+func (o OnCompleteConfig) FeatureAction() string {
+	if o.Feature == "delete" {
+		return "delete"
+	}
+	return "rename"
+}
+
+// BugAction returns the action to take when a bug file is completed.
+// Returns "delete" when configured as such, otherwise defaults to "rename".
+func (o OnCompleteConfig) BugAction() string {
+	if o.Bug == "delete" {
+		return "delete"
+	}
+	return "rename"
+}
+
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
 	Agent         string              `yaml:"agent"`
@@ -98,6 +122,7 @@ type Config struct {
 	Worktree      bool                `yaml:"worktree"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git           GitConfig           `yaml:"git"`
+	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,
