@@ -427,7 +427,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.autoWork {
 			case config.AutoWorkEnabled:
 				m.selected = "work"
-				m.args = []string{"--count", "999"}
+				m.args = []string{"--count", "0"}
 				return m, tea.Quit
 			case config.AutoWorkDelayed:
 				if !m.autoWorkActive {
@@ -451,7 +451,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.autoWorkCountdown <= 0 {
 			m.autoWorkActive = false
 			m.selected = "work"
-			m.args = []string{"--count", "999"}
+			m.args = []string{"--count", "0"}
 			return m, tea.Quit
 		}
 		return m, autoWorkTick(m.autoWorkCountdownID)
