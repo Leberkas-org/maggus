@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -28,6 +29,11 @@ type updateCheckResultMsg struct {
 // hideShortcutsMsg is sent after a delay to hide the shortcut underlines.
 type hideShortcutsMsg struct {
 	timerID int // only hide if this matches the current timer ID
+}
+
+// autoWorkTickMsg is sent every second while the delayed auto-work countdown is active.
+type autoWorkTickMsg struct {
+	id int // countdown ID; stale ticks (from a previous countdown) are ignored
 }
 
 // loadSettings is injectable for testing.
@@ -298,6 +304,12 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
+	// Auto-work state
+	autoWork            string // "disabled" | "enabled" | "delayed" — cached from config
+	autoWorkActive      bool   // true while the delayed countdown is running
+	autoWorkCountdown   int    // seconds remaining (5 → 0)
+	autoWorkCountdownID int    // monotonic counter to discard stale tick messages
+
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
 	watcherCh chan struct{}
@@ -312,6 +324,11 @@ type menuModel struct {
 func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
 
+	autoWork := config.AutoWorkDisabled
+	if cfg, err := config.Load(cwd); err == nil {
+		autoWork = cfg.AutoWork
+	}
+
 	ch := make(chan struct{}, 1)
 	w, _ := filewatcher.New(cwd, func(_ any) {
 		select {
@@ -324,10 +341,19 @@ func newMenuModel(summary featureSummary) menuModel {
 		items:       activeMenuItems(),
 		summary:     summary,
 		cwd:         cwd,
+		autoWork:    autoWork,
 		subMenuDefs: buildSubMenus(),
 		watcher:     w,
 		watcherCh:   ch,
 	}
+}
+
+// autoWorkTick returns a Cmd that fires an autoWorkTickMsg after one second.
+// The id parameter is used to discard ticks from superseded countdowns.
+func autoWorkTick(id int) tea.Cmd {
+	return tea.Tick(time.Second, func(_ time.Time) tea.Msg {
+		return autoWorkTickMsg{id: id}
+	})
 }
 
 // listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
@@ -380,7 +406,45 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
+		// Re-read config so changes made in the config TUI take effect immediately.
+		if cwd, err := os.Getwd(); err == nil {
+			if cfg, err := config.Load(cwd); err == nil {
+				m.autoWork = cfg.AutoWork
+			}
+		}
+		workable := m.summary.workable + m.summary.bugWorkable
+		if workable > 0 {
+			switch m.autoWork {
+			case config.AutoWorkEnabled:
+				m.selected = "work"
+				m.args = []string{"--count", "999"}
+				return m, tea.Quit
+			case config.AutoWorkDelayed:
+				if !m.autoWorkActive {
+					m.autoWorkActive = true
+					m.autoWorkCountdown = 5
+					m.autoWorkCountdownID++
+					return m, tea.Batch(
+						listenForWatcherUpdate(m.watcherCh),
+						autoWorkTick(m.autoWorkCountdownID),
+					)
+				}
+			}
+		}
 		return m, listenForWatcherUpdate(m.watcherCh)
+
+	case autoWorkTickMsg:
+		if !m.autoWorkActive || msg.id != m.autoWorkCountdownID {
+			return m, nil
+		}
+		m.autoWorkCountdown--
+		if m.autoWorkCountdown <= 0 {
+			m.autoWorkActive = false
+			m.selected = "work"
+			m.args = []string{"--count", "999"}
+			return m, tea.Quit
+		}
+		return m, autoWorkTick(m.autoWorkCountdownID)
 
 	case hideShortcutsMsg:
 		// Only hide if this timer is still the latest one
@@ -390,6 +454,18 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Any key press cancels an active auto-work countdown.
+		if m.autoWorkActive {
+			m.autoWorkActive = false
+			m.autoWorkCountdown = 0
+			m.autoWorkCountdownID++
+			if msg.String() == "ctrl+c" {
+				m.quitting = true
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
 		if msg.Alt {
 			// Show shortcuts and schedule auto-hide
 			m.showShortcuts = true
@@ -599,6 +675,13 @@ func (m menuModel) View() string {
 	if m.updateBanner != "" {
 		updateStyle := lipgloss.NewStyle().Foreground(styles.Success).Bold(true)
 		header += "\n" + centerLine(updateStyle.Render(m.updateBanner), contentW)
+	}
+
+	// Show auto-work countdown when active
+	if m.autoWorkActive {
+		countdownStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+		countdownLine := countdownStyle.Render(fmt.Sprintf("Auto-work starting in %ds… press any key to cancel", m.autoWorkCountdown))
+		header += "\n" + centerLine(countdownLine, contentW)
 	}
 
 	content := header + "\n\n" + body
