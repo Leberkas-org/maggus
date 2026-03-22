@@ -1,5 +1,5 @@
 agent: claude
-model: opus
+model: ""
 include: []
 worktree: false
 notifications:
@@ -14,3 +14,6 @@ git:
         - master
         - dev
     check_sync: false
+on_complete:
+    feature: delete
+    bug: delete

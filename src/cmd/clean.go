@@ -11,7 +11,7 @@ import (
 var cleanCmd = &cobra.Command{
 	Use:   "clean",
 	Short: "Remove completed feature and bug files",
-	Long:  `Removes all _completed.md feature and bug files from .maggus/features/.`,
+	Long:  `Removes all _completed.md files from .maggus/features/ and .maggus/bugs/.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dryRun, err := cmd.Flags().GetBool("dry-run")
 		if err != nil {
@@ -35,7 +35,12 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		return err
 	}
 
-	if len(completedFeatures) == 0 {
+	completedBugs, err := findCompletedBugs(dir)
+	if err != nil {
+		return err
+	}
+
+	if len(completedFeatures) == 0 && len(completedBugs) == 0 {
 		fmt.Fprintln(out, "Nothing to clean.")
 		return nil
 	}
@@ -59,11 +64,25 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		}
 	}
 
+	for _, p := range completedBugs {
+		rel, _ := filepath.Rel(dir, p)
+		if rel == "" {
+			rel = p
+		}
+		if dryRun {
+			fmt.Fprintf(out, "  bug: %s\n", filepath.ToSlash(rel))
+		} else {
+			if err := os.Remove(p); err != nil {
+				return fmt.Errorf("remove bug %s: %w", rel, err)
+			}
+		}
+	}
+
 	if dryRun {
 		fmt.Fprintln(out)
-		fmt.Fprintf(out, "Would remove %d completed feature file(s).\n", len(completedFeatures))
+		fmt.Fprintf(out, "Would remove %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
 	} else {
-		fmt.Fprintf(out, "Removed %d completed feature file(s).\n", len(completedFeatures))
+		fmt.Fprintf(out, "Removed %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
 	}
 
 	return nil
@@ -75,6 +94,16 @@ func findCompletedFeatures(dir string) ([]string, error) {
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("glob completed features: %w", err)
+	}
+	return files, nil
+}
+
+// findCompletedBugs returns paths to all _completed.md bug files in .maggus/bugs/.
+func findCompletedBugs(dir string) ([]string, error) {
+	pattern := filepath.Join(dir, ".maggus", "bugs", "bug_*_completed.md")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("glob completed bugs: %w", err)
 	}
 	return files, nil
 }
