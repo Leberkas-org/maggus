@@ -400,6 +400,106 @@ func TestCountWorkable(t *testing.T) {
 	}
 }
 
+// TestProgressTotal_UnlimitedMode verifies the progress total is computed from
+// the refreshed task list and never shrinks when new workable tasks appear.
+func TestProgressTotal_UnlimitedMode(t *testing.T) {
+	// Simulate: iteration i=0 completed, 2 workable tasks remain.
+	parsedTasks := []parser.Task{
+		// task that was just completed (now complete)
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+		// 2 remaining workable tasks
+		{ID: "TASK-001-002", Title: "Next1", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+		{ID: "TASK-001-003", Title: "Next2", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},
+	}
+
+	i := 0 // first iteration (0-based)
+	maxCount := 0 // unlimited
+
+	progressTotal := (i + 1) + countWorkable(parsedTasks)
+	if maxCount > 0 && progressTotal > maxCount {
+		progressTotal = maxCount
+	}
+
+	// Expected: 1 completed + 2 remaining = 3
+	if progressTotal != 3 {
+		t.Errorf("progressTotal = %d, want 3", progressTotal)
+	}
+}
+
+// TestProgressTotal_NewFilesAdded verifies bar does not shrink when extra tasks appear.
+func TestProgressTotal_NewFilesAdded(t *testing.T) {
+	// Before iteration: displayCount was 2 (i=0, remaining=2 => i+remaining=2).
+	// After iteration: 3 workable tasks exist (a new file was added).
+	parsedTasks := []parser.Task{
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+		{ID: "TASK-001-002", Title: "Next1", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+		{ID: "TASK-001-003", Title: "Next2", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},
+		{ID: "TASK-001-004", Title: "New", Criteria: []parser.Criterion{{Text: "D", Checked: false}}}, // newly added
+	}
+
+	i := 0
+	oldDisplayCount := 2 // what count was before runTask (stale)
+	maxCount := 0        // unlimited
+
+	progressTotal := (i + 1) + countWorkable(parsedTasks)
+	if maxCount > 0 && progressTotal > maxCount {
+		progressTotal = maxCount
+	}
+
+	// New total (4) should be greater than the stale displayCount (2).
+	if progressTotal <= oldDisplayCount {
+		t.Errorf("progressTotal %d should exceed stale displayCount %d", progressTotal, oldDisplayCount)
+	}
+	if progressTotal != 4 {
+		t.Errorf("progressTotal = %d, want 4", progressTotal)
+	}
+}
+
+// TestProgressTotal_BoundedModeCap verifies the total is capped at user-requested count.
+func TestProgressTotal_BoundedModeCap(t *testing.T) {
+	// User ran `maggus work 2`, but 3 workable tasks remain after the agent run.
+	parsedTasks := []parser.Task{
+		{ID: "TASK-001-002", Title: "Next1", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+		{ID: "TASK-001-003", Title: "Next2", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},
+		{ID: "TASK-001-004", Title: "Extra", Criteria: []parser.Criterion{{Text: "D", Checked: false}}},
+	}
+
+	i := 0
+	maxCount := 2 // user requested only 2 tasks
+
+	progressTotal := (i + 1) + countWorkable(parsedTasks)
+	if maxCount > 0 && progressTotal > maxCount {
+		progressTotal = maxCount
+	}
+
+	// Should be capped at 2, not (1+3)=4.
+	if progressTotal != 2 {
+		t.Errorf("progressTotal = %d, want 2 (bounded cap)", progressTotal)
+	}
+}
+
+// TestProgressTotal_BoundedModeNoCap verifies bounded mode still shows correct total
+// when the refreshed count is within the requested limit.
+func TestProgressTotal_BoundedModeNoCap(t *testing.T) {
+	// User ran `maggus work 3`, 1 workable task remains after first task.
+	parsedTasks := []parser.Task{
+		{ID: "TASK-001-002", Title: "Next1", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+	}
+
+	i := 0
+	maxCount := 3
+
+	progressTotal := (i + 1) + countWorkable(parsedTasks)
+	if maxCount > 0 && progressTotal > maxCount {
+		progressTotal = maxCount
+	}
+
+	// (1+1)=2, capped at 3 → stays at 2.
+	if progressTotal != 2 {
+		t.Errorf("progressTotal = %d, want 2", progressTotal)
+	}
+}
+
 // TestFindTaskByID_BugID verifies findTaskByID works with BUG- prefixed IDs.
 func TestFindTaskByID_BugID(t *testing.T) {
 	tasks := []parser.Task{

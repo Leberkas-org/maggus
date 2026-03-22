@@ -288,7 +288,11 @@ func runWorkGoroutine(params workLoopParams) {
 				displayCount = i + remaining
 			}
 
-			result := runTask(params.tc, tasks, i, displayCount)
+			maxCount := 0
+		if !params.unlimited {
+			maxCount = params.count
+		}
+		result := runTask(params.tc, tasks, i, displayCount, maxCount)
 			if result.taskID != "" {
 				lastCompletedTaskID = result.taskID
 			}
