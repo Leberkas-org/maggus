@@ -164,6 +164,42 @@ func TestWatcherBugDirectory(t *testing.T) {
 	}
 }
 
+func TestWatcherRecoversAfterInternalWatcherClosed(t *testing.T) {
+	baseDir := t.TempDir()
+	featDir := filepath.Join(baseDir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	send := func(any) { count.Add(1) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Simulate the OS handle going stale by closing the internal fsnotify.Watcher.
+	w.fsw.Close()
+
+	// Allow time for the watcher to detect the closure and reconnect.
+	time.Sleep(500 * time.Millisecond)
+
+	// Write a file — the recovered watcher must detect this.
+	file := filepath.Join(featDir, "feature_001.md")
+	if err := os.WriteFile(file, []byte("# Feature 1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for debounce to fire.
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg after recovery, got %d", count.Load())
+	}
+}
+
 func TestWatcherCloseNoLeak(t *testing.T) {
 	baseDir := t.TempDir()
 	featDir := filepath.Join(baseDir, ".maggus", "features")

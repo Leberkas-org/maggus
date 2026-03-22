@@ -26,6 +26,7 @@ type Watcher struct {
 	debounce time.Duration
 	done     chan struct{}
 	wg       sync.WaitGroup
+	dirs     []string
 }
 
 // New creates a Watcher that monitors the features and bugs directories
@@ -33,14 +34,14 @@ type Watcher struct {
 // The debounce duration controls how long to wait after the last event
 // before sending an UpdateMsg via the send function.
 func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error) {
-	fsw, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, err
-	}
-
 	dirs := []string{
 		filepath.Join(baseDir, ".maggus", "features"),
 		filepath.Join(baseDir, ".maggus", "bugs"),
+	}
+
+	fsw, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
 	}
 
 	for _, d := range dirs {
@@ -56,6 +57,7 @@ func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error
 		send:     send,
 		debounce: debounce,
 		done:     make(chan struct{}),
+		dirs:     dirs,
 	}
 
 	w.wg.Add(1)
@@ -65,10 +67,57 @@ func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error
 }
 
 // Close stops the watcher and waits for the goroutine to exit.
+// Closing w.done is sufficient to unblock the loop goroutine; the
+// underlying fsnotify.Watcher is closed afterward once the goroutine exits.
 func (w *Watcher) Close() {
 	close(w.done)
-	w.fsw.Close()
 	w.wg.Wait()
+	w.fsw.Close()
+}
+
+// reconnect recreates the underlying fsnotify.Watcher and re-adds the
+// watched directories. It uses exponential backoff (100 ms → 30 s) between
+// attempts. Returns false if w.done is closed (caller should exit).
+func (w *Watcher) reconnect() bool {
+	const (
+		baseDelay = 100 * time.Millisecond
+		maxDelay  = 30 * time.Second
+	)
+	delay := baseDelay
+
+	for {
+		select {
+		case <-w.done:
+			return false
+		case <-time.After(delay):
+		}
+
+		fsw, err := fsnotify.NewWatcher()
+		if err != nil {
+			delay = min(delay*2, maxDelay)
+			continue
+		}
+
+		for _, d := range w.dirs {
+			if info, err := os.Stat(d); err == nil && info.IsDir() {
+				_ = fsw.Add(d)
+			}
+		}
+
+		// Check done once more before committing the new watcher, so we
+		// don't leak it if Close() was called while we were creating it.
+		select {
+		case <-w.done:
+			fsw.Close()
+			return false
+		default:
+		}
+
+		old := w.fsw
+		w.fsw = fsw
+		old.Close()
+		return true
+	}
 }
 
 func (w *Watcher) loop() {
@@ -87,7 +136,11 @@ func (w *Watcher) loop() {
 
 		case event, ok := <-w.fsw.Events:
 			if !ok {
-				return
+				// fsnotify channel closed unexpectedly — attempt to reconnect.
+				if !w.reconnect() {
+					return
+				}
+				continue
 			}
 			if !isRelevantEvent(event) {
 				continue
@@ -102,7 +155,11 @@ func (w *Watcher) loop() {
 
 		case _, ok := <-w.fsw.Errors:
 			if !ok {
-				return
+				// fsnotify channel closed unexpectedly — attempt to reconnect.
+				if !w.reconnect() {
+					return
+				}
+				continue
 			}
 			// Ignore watcher errors — they are non-fatal.
 
