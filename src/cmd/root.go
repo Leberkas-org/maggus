@@ -15,7 +15,18 @@ import (
 )
 
 // Version is set at build time via -ldflags.
+// For dev builds, use: go build -ldflags "-X github.com/leberkas-org/maggus/cmd.BuildTime=$(date +%H%M%S)"
 var Version = "dev"
+
+// BuildTime is set at build time via -ldflags for dev build counters.
+var BuildTime = ""
+
+func init() {
+	if Version == "dev" && BuildTime != "" {
+		Version = "dev-" + BuildTime
+	}
+	rootCmd.Version = Version
+}
 
 // caps holds the detected tool capabilities for this run.
 var caps capabilities.Capabilities

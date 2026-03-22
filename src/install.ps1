@@ -2,8 +2,9 @@ $scriptpath = $MyInvocation.MyCommand.Path
 $dir = Split-Path $scriptpath
 Push-Location $dir
 
-Write-Host "Compile to C:\bin\maggus.exe"
+$buildTime = Get-Date -Format "HHmmss"
+Write-Host "Compile to C:\bin\maggus.exe (dev-$buildTime)"
 
-go build -o C:\bin\maggus.exe
+go build -ldflags "-X github.com/leberkas-org/maggus/cmd.BuildTime=$buildTime" -o C:\bin\maggus.exe
 
 Pop-Location
