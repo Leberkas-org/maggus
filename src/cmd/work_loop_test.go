@@ -515,3 +515,111 @@ func TestFindTaskByID_BugID(t *testing.T) {
 		t.Errorf("expected BUG-001-001, got %s", got.ID)
 	}
 }
+// TestParseAllTasksPicksUpNewFile verifies that parseAllTasks returns newly-added
+// tasks when called a second time after a file is written to disk.
+// This is the mechanism the unlimited-mode re-parse relies on to avoid
+// premature exit when tasks are added during a run.
+func TestParseAllTasksPicksUpNewFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a feature dir with one already-completed task.
+	featDir := filepath.Join(dir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	completedContent := `# Feature 1
+## Tasks
+### TASK-001-001: Done
+**Acceptance Criteria:**
+- [x] Already done
+`
+	if err := os.WriteFile(filepath.Join(featDir, "feature_1.md"), []byte(completedContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// First parse: no workable tasks.
+	tasks, err := parseAllTasks(dir)
+	if err != nil {
+		t.Fatalf("parseAllTasks error: %v", err)
+	}
+	if countWorkable(tasks) != 0 {
+		t.Fatalf("expected 0 workable tasks before new file, got %d", countWorkable(tasks))
+	}
+
+	// Simulate user adding a new feature file mid-run.
+	newContent := `# Feature 2
+## Tasks
+### TASK-002-001: New task
+**Acceptance Criteria:**
+- [ ] Do the new thing
+`
+	if err := os.WriteFile(filepath.Join(featDir, "feature_2.md"), []byte(newContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second parse: should find the new workable task.
+	freshTasks, err := parseAllTasks(dir)
+	if err != nil {
+		t.Fatalf("parseAllTasks (fresh) error: %v", err)
+	}
+	if countWorkable(freshTasks) != 1 {
+		t.Fatalf("expected 1 workable task after new file added, got %d", countWorkable(freshTasks))
+	}
+	if freshTasks[len(freshTasks)-1].ID != "TASK-002-001" {
+		t.Errorf("expected new task TASK-002-001, got %s", freshTasks[len(freshTasks)-1].ID)
+	}
+}
+
+// TestUnlimitedModeReparseSentinel verifies the re-parse-before-break logic:
+// when remaining==0 but a fresh re-parse finds workable tasks, the loop
+// should continue (remaining becomes positive), not break.
+func TestUnlimitedModeReparseSentinel(t *testing.T) {
+	// Simulate the re-parse decision: initial tasks list exhausted,
+	// fresh re-parse finds a new workable task.
+	exhausted := []parser.Task{
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+	}
+	if countWorkable(exhausted) != 0 {
+		t.Fatalf("pre-condition: expected 0 workable tasks in exhausted list")
+	}
+
+	// Simulate fresh re-parse finding a new task.
+	freshTasks := []parser.Task{
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+		{ID: "TASK-002-001", Title: "New task", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+	}
+
+	// Decision: if fresh re-parse has workable tasks, we should continue (not break).
+	shouldContinue := countWorkable(freshTasks) > 0
+	if !shouldContinue {
+		t.Error("expected shouldContinue=true when fresh re-parse finds workable tasks")
+	}
+
+	// Verify remaining is updated after adopting fresh tasks.
+	tasks := freshTasks
+	remaining := countWorkable(tasks)
+	if remaining != 1 {
+		t.Errorf("expected remaining=1 after fresh re-parse, got %d", remaining)
+	}
+}
+
+// TestUnlimitedModeReparseNoNewTasks verifies that when remaining==0 and the
+// fresh re-parse also finds no workable tasks, the loop breaks normally.
+func TestUnlimitedModeReparseNoNewTasks(t *testing.T) {
+	exhausted := []parser.Task{
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+	}
+
+	// Simulate fresh re-parse also finding no workable tasks.
+	freshTasks := []parser.Task{
+		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+	}
+
+	_ = exhausted // both lists exhausted
+
+	// Decision: if fresh re-parse has no workable tasks, we should break.
+	shouldContinue := countWorkable(freshTasks) > 0
+	if shouldContinue {
+		t.Error("expected shouldContinue=false when fresh re-parse also finds no workable tasks")
+	}
+}

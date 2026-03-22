@@ -283,7 +283,13 @@ func runWorkGoroutine(params workLoopParams) {
 				// Peek ahead: count remaining workable tasks for progress display.
 				remaining := countWorkable(tasks)
 				if remaining == 0 {
-					break
+					// Fresh re-parse: check if any tasks were added since the last iteration.
+					if freshTasks, rerr := parseAllTasks(params.dir); rerr == nil && countWorkable(freshTasks) > 0 {
+						tasks = freshTasks
+						remaining = countWorkable(tasks)
+					} else {
+						break
+					}
 				}
 				displayCount = i + remaining
 			}
