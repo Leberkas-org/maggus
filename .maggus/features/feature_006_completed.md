@@ -58,40 +58,40 @@ Maggus will persistently track lifetime usage counters across all repositories a
 **Acceptance Criteria:**
 
 **`startup_count`:**
-- [ ] Incremented once per process in a `PersistentPreRun` hook on the root command (`src/cmd/root.go`). Fires for every subcommand invocation (`work`, `list`, `status`, `config`, etc.)
-- [ ] Failures to write metrics are logged to stderr at most once and never abort the command
+- [x] Incremented once per process in a `PersistentPreRun` hook on the root command (`src/cmd/root.go`). Fires for every subcommand invocation (`work`, `list`, `status`, `config`, etc.)
+- [x] Failures to write metrics are logged to stderr at most once and never abort the command
 
 **`work_runs`:**
-- [ ] Incremented at the start of `workCmd.RunE` in `src/cmd/work.go`, before the work loop begins
+- [x] Incremented at the start of `workCmd.RunE` in `src/cmd/work.go`, before the work loop begins
 
 **`tasks_completed`:**
-- [ ] Incremented in `runWorkGoroutine` (`src/cmd/work_loop.go`) each time `result.committed` is `true` (same location as the existing `completed++` counter)
+- [x] Incremented in `runWorkGoroutine` (`src/cmd/work_loop.go`) each time `result.committed` is `true` (same location as the existing `completed++` counter)
 
 **`tasks_failed`:**
-- [ ] Incremented in `runWorkGoroutine` each time a task is added to `failedTasks`
+- [x] Incremented in `runWorkGoroutine` each time a task is added to `failedTasks`
 
 **`tasks_skipped`:**
-- [ ] Incremented in `runWorkGoroutine` for each task logged as ignored at the start of the loop (the existing ignored-task log block)
+- [x] Incremented in `runWorkGoroutine` for each task logged as ignored at the start of the loop (the existing ignored-task log block)
 
 **`features_completed` and `bugs_completed`:**
-- [ ] `MarkCompletedFeatures` and `MarkCompletedBugs` in `src/internal/parser/parser.go` are updated to return `(int, error)` — the integer is the count of files actually renamed or deleted
-- [ ] In `src/cmd/work_task.go`, the returned counts are used to populate `FeaturesCompleted` and `BugsCompleted` in a single `IncrementMetrics` call after both functions run
-- [ ] **Note:** If TASK-005-002 has already changed these signatures, integrate cleanly rather than re-changing them. Both changes (return count + accept action string) must coexist.
+- [x] `MarkCompletedFeatures` and `MarkCompletedBugs` in `src/internal/parser/parser.go` are updated to return `(int, error)` — the integer is the count of files actually renamed or deleted
+- [x] In `src/cmd/work_task.go`, the returned counts are used to populate `FeaturesCompleted` and `BugsCompleted` in a single `IncrementMetrics` call after both functions run
+- [x] **Note:** If TASK-005-002 has already changed these signatures, integrate cleanly rather than re-changing them. Both changes (return count + accept action string) must coexist.
 
 **`tokens_used`:**
-- [ ] Incremented inside `setupUsageCallback` in `src/cmd/work_loop.go`, summing `tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens` for each completed task usage event
+- [x] Incremented inside `setupUsageCallback` in `src/cmd/work_loop.go`, summing `tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens` for each completed task usage event
 
 **`agent_errors`:**
-- [ ] Incremented in `runWorkGoroutine` when the agent subprocess returns a non-nil error or the task result action is `taskBreak` due to an agent error (not a user stop/ctrl+c)
+- [x] Incremented in `runWorkGoroutine` when the agent subprocess returns a non-nil error or the task result action is `taskBreak` due to an agent error (not a user stop/ctrl+c)
 
 **`git_commits`:**
-- [ ] Incremented in `src/cmd/work_task.go` after a successful `gitcommit.Commit` call
+- [x] Incremented in `src/cmd/work_task.go` after a successful `gitcommit.Commit` call
 
 **General:**
-- [ ] All `IncrementMetrics` calls use a `Metrics` struct with only the relevant fields set (all others remain zero so they add nothing)
-- [ ] All increment errors are silently swallowed (log to stderr at debug level only) — metric failures must never abort a work run
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] All `IncrementMetrics` calls use a `Metrics` struct with only the relevant fields set (all others remain zero so they add nothing)
+- [x] All increment errors are silently swallowed (log to stderr at debug level only) — metric failures must never abort a work run
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

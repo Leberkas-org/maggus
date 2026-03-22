@@ -304,17 +304,19 @@ func extractFeatureNumber(path string) int {
 // MarkCompletedFeatures marks feature files where all tasks are complete (and none are blocked).
 // When action is "delete", the file is removed; otherwise it is renamed by appending _completed
 // before the .md extension (e.g. feature_001.md → feature_001_completed.md).
-func MarkCompletedFeatures(dir, action string) error {
+// Returns the number of files actually renamed or deleted.
+func MarkCompletedFeatures(dir, action string) (int, error) {
 	files, err := GlobFeatureFiles(dir, false)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	count := 0
 	for _, f := range files {
 
 		tasks, err := ParseFile(f)
 		if err != nil {
-			return err
+			return count, err
 		}
 
 		if len(tasks) == 0 {
@@ -332,18 +334,19 @@ func MarkCompletedFeatures(dir, action string) error {
 		if allComplete {
 			if action == "delete" {
 				if err := os.Remove(f); err != nil {
-					return fmt.Errorf("delete %s: %w", f, err)
+					return count, fmt.Errorf("delete %s: %w", f, err)
 				}
 			} else {
 				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
 				if err := os.Rename(f, newName); err != nil {
-					return fmt.Errorf("rename %s: %w", f, err)
+					return count, fmt.Errorf("rename %s: %w", f, err)
 				}
 			}
+			count++
 		}
 	}
 
-	return nil
+	return count, nil
 }
 
 // DeleteTask removes a task section (### TASK-ID: ... up to the next ### or EOF)
@@ -622,16 +625,18 @@ func ParseBugsGrouped(dir string) ([]Feature, error) {
 // MarkCompletedBugs marks bug files where all tasks are complete (and none are blocked).
 // When action is "delete", the file is removed; otherwise it is renamed by appending _completed
 // before the .md extension (e.g. bug_001.md → bug_001_completed.md).
-func MarkCompletedBugs(dir, action string) error {
+// Returns the number of files actually renamed or deleted.
+func MarkCompletedBugs(dir, action string) (int, error) {
 	files, err := GlobBugFiles(dir, false)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	count := 0
 	for _, f := range files {
 		tasks, err := ParseFile(f)
 		if err != nil {
-			return err
+			return count, err
 		}
 
 		if len(tasks) == 0 {
@@ -649,16 +654,17 @@ func MarkCompletedBugs(dir, action string) error {
 		if allComplete {
 			if action == "delete" {
 				if err := os.Remove(f); err != nil {
-					return fmt.Errorf("delete %s: %w", f, err)
+					return count, fmt.Errorf("delete %s: %w", f, err)
 				}
 			} else {
 				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
 				if err := os.Rename(f, newName); err != nil {
-					return fmt.Errorf("rename %s: %w", f, err)
+					return count, fmt.Errorf("rename %s: %w", f, err)
 				}
 			}
+			count++
 		}
 	}
 
-	return nil
+	return count, nil
 }

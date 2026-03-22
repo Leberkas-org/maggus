@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,11 @@ var rootCmd = &cobra.Command{
 	Version: Version,
 	Long: `Maggus reads feature files and works through tasks one-by-one
 by prompting an AI agent (Claude Code). Provide a feature and let Maggus work.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if err := globalconfig.IncrementMetrics(globalconfig.Metrics{StartupCount: 1}); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to update metrics: %v\n", err)
+		}
+	},
 }
 
 func init() {

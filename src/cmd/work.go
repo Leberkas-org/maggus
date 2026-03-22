@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tasklock"
@@ -50,6 +51,8 @@ Examples:
   maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{WorkRuns: 1})
+
 		wc, err := workSetup(cmd, args)
 		if err != nil {
 			return err

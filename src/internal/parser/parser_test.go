@@ -305,7 +305,7 @@ func TestMarkCompletedFeatures(t *testing.T) {
 - [ ] Not done
 `)
 
-	if err := MarkCompletedFeatures(dir, ""); err != nil {
+	if _, err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func TestMarkCompletedFeatures_SkipsBlockedFeature(t *testing.T) {
 - [ ] ⚠️ BLOCKED: Needs human input
 `)
 
-	if err := MarkCompletedFeatures(dir, ""); err != nil {
+	if _, err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -355,7 +355,7 @@ func TestMarkCompletedFeatures_RenamesWhenBlockedCriterionResolved(t *testing.T)
 - [x] ⚠️ BLOCKED: Needs human input — resolved: not applicable for CLI tool
 `)
 
-	if err := MarkCompletedFeatures(dir, ""); err != nil {
+	if _, err := MarkCompletedFeatures(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -890,7 +890,7 @@ func TestMarkCompletedBugs(t *testing.T) {
 - [ ] Not fixed
 `)
 
-	if err := MarkCompletedBugs(dir, ""); err != nil {
+	if _, err := MarkCompletedBugs(dir, ""); err != nil {
 		t.Fatalf("MarkCompletedBugs error: %v", err)
 	}
 
@@ -918,7 +918,7 @@ func TestMarkCompletedFeatures_DeleteAction(t *testing.T) {
 - [x] Done B
 `)
 
-	if err := MarkCompletedFeatures(dir, "delete"); err != nil {
+	if _, err := MarkCompletedFeatures(dir, "delete"); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -940,7 +940,7 @@ func TestMarkCompletedFeatures_RenameAction(t *testing.T) {
 - [x] Done A
 `)
 
-	if err := MarkCompletedFeatures(dir, "rename"); err != nil {
+	if _, err := MarkCompletedFeatures(dir, "rename"); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -959,7 +959,7 @@ func TestMarkCompletedFeatures_UnknownActionDefaultsToRename(t *testing.T) {
 - [x] Done A
 `)
 
-	if err := MarkCompletedFeatures(dir, "archive"); err != nil {
+	if _, err := MarkCompletedFeatures(dir, "archive"); err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
 	}
 
@@ -979,7 +979,7 @@ func TestMarkCompletedBugs_DeleteAction(t *testing.T) {
 - [x] Tested
 `)
 
-	if err := MarkCompletedBugs(dir, "delete"); err != nil {
+	if _, err := MarkCompletedBugs(dir, "delete"); err != nil {
 		t.Fatalf("MarkCompletedBugs error: %v", err)
 	}
 
@@ -1001,7 +1001,7 @@ func TestMarkCompletedBugs_UnknownActionDefaultsToRename(t *testing.T) {
 - [x] Fixed
 `)
 
-	if err := MarkCompletedBugs(dir, "something"); err != nil {
+	if _, err := MarkCompletedBugs(dir, "something"); err != nil {
 		t.Fatalf("MarkCompletedBugs error: %v", err)
 	}
 

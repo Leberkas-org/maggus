@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/runtracker"
@@ -49,8 +50,8 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 		return nil, nil
 	}
 
-	_ = parser.MarkCompletedFeatures(dir, "")
-	_ = parser.MarkCompletedBugs(dir, "")
+	_, _ = parser.MarkCompletedFeatures(dir, "")
+	_, _ = parser.MarkCompletedBugs(dir, "")
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
@@ -185,6 +186,10 @@ func setupUsageCallback(m *runner.TUIModel, dir string, run *runtracker.Run, mod
 			StartTime:                tu.StartTime,
 			EndTime:                  tu.EndTime,
 		}})
+		totalTokens := int64(tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens)
+		if totalTokens > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
+		}
 	})
 }
 
@@ -236,10 +241,15 @@ func runWorkGoroutine(params workLoopParams) {
 		completed := 0
 
 		// Log ignored tasks.
+		var ignoredCount int64
 		for i := range params.tasks {
 			if !params.tasks[i].IsComplete() && params.tasks[i].Ignored {
 				params.p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", params.tasks[i].ID)})
+				ignoredCount++
 			}
+		}
+		if ignoredCount > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksSkipped: ignoredCount})
 		}
 
 		tasks := params.tasks
@@ -267,12 +277,14 @@ func runWorkGoroutine(params workLoopParams) {
 			}
 			if result.failed != nil {
 				failedTasks = append(failedTasks, *result.failed)
+				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
 			}
 			if result.warning != "" {
 				warnings = append(warnings, result.warning)
 			}
 			if result.committed {
 				completed++
+				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
 			}
 
 			switch result.action {
