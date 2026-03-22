@@ -199,7 +199,11 @@ func buildArgs(cmdName string, opts []subMenuOption) []string {
 
 // featureSummaryUpdateMsg is sent when the file watcher detects changes
 // to feature or bug files, triggering a summary reload.
-type featureSummaryUpdateMsg struct{}
+// HasNewFile mirrors filewatcher.UpdateMsg.HasNewFile: true when a Create
+// event was seen in the debounce window.
+type featureSummaryUpdateMsg struct {
+	HasNewFile bool
+}
 
 // featureSummary holds the aggregated feature and bug statistics for the menu header.
 type featureSummary struct {
@@ -312,7 +316,7 @@ type menuModel struct {
 
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
-	watcherCh chan struct{}
+	watcherCh chan bool
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -329,10 +333,14 @@ func newMenuModel(summary featureSummary) menuModel {
 		autoWork = cfg.AutoWork
 	}
 
-	ch := make(chan struct{}, 1)
-	w, _ := filewatcher.New(cwd, func(_ any) {
+	ch := make(chan bool, 1)
+	w, _ := filewatcher.New(cwd, func(msg any) {
+		hasNew := false
+		if u, ok := msg.(filewatcher.UpdateMsg); ok {
+			hasNew = u.HasNewFile
+		}
 		select {
-		case ch <- struct{}{}:
+		case ch <- hasNew:
 		default: // don't block if channel already has a pending update
 		}
 	}, 300*time.Millisecond)
@@ -358,16 +366,16 @@ func autoWorkTick(id int) tea.Cmd {
 
 // listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
 // signals a file change, then delivers a featureSummaryUpdateMsg.
-func listenForWatcherUpdate(ch <-chan struct{}) tea.Cmd {
+func listenForWatcherUpdate(ch <-chan bool) tea.Cmd {
 	if ch == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		_, ok := <-ch
+		hasNew, ok := <-ch
 		if !ok {
 			return nil // channel closed, watcher stopped
 		}
-		return featureSummaryUpdateMsg{}
+		return featureSummaryUpdateMsg{HasNewFile: hasNew}
 	}
 }
 
@@ -412,8 +420,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.autoWork = cfg.AutoWork
 			}
 		}
+		// Only trigger auto-work when a new file was created; pure Write/Remove/Rename
+		// events refresh the summary display but must not dispatch work.
 		workable := m.summary.workable + m.summary.bugWorkable
-		if workable > 0 {
+		if msg.HasNewFile && workable > 0 {
 			switch m.autoWork {
 			case config.AutoWorkEnabled:
 				m.selected = "work"

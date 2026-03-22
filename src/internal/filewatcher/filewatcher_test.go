@@ -55,7 +55,11 @@ func TestWatcherSendsUpdateOnFileChange(t *testing.T) {
 	}
 
 	var count atomic.Int32
-	send := func(any) { count.Add(1) }
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
 
 	w, err := New(baseDir, send, 50*time.Millisecond)
 	if err != nil {
@@ -63,6 +67,7 @@ func TestWatcherSendsUpdateOnFileChange(t *testing.T) {
 	}
 	defer w.Close()
 
+	// Creating a new file should set HasNewFile = true.
 	file := filepath.Join(featDir, "feature_001.md")
 	if err := os.WriteFile(file, []byte("# Feature 1"), 0o644); err != nil {
 		t.Fatal(err)
@@ -72,6 +77,11 @@ func TestWatcherSendsUpdateOnFileChange(t *testing.T) {
 
 	if count.Load() < 1 {
 		t.Errorf("expected at least 1 UpdateMsg, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when creating a new file")
+		}
 	}
 }
 
@@ -83,7 +93,11 @@ func TestWatcherDebounce(t *testing.T) {
 	}
 
 	var count atomic.Int32
-	send := func(any) { count.Add(1) }
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
 
 	w, err := New(baseDir, send, 200*time.Millisecond)
 	if err != nil {
@@ -91,6 +105,7 @@ func TestWatcherDebounce(t *testing.T) {
 	}
 	defer w.Close()
 
+	// First write creates the file (Create event), subsequent writes update it.
 	file := filepath.Join(featDir, "feature_001.md")
 	for range 5 {
 		if err := os.WriteFile(file, []byte("update"), 0o644); err != nil {
@@ -105,6 +120,12 @@ func TestWatcherDebounce(t *testing.T) {
 	c := count.Load()
 	if c != 1 {
 		t.Errorf("expected exactly 1 debounced UpdateMsg, got %d", c)
+	}
+	// The first write creates a new file, so HasNewFile must be true.
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when window includes a Create event")
+		}
 	}
 }
 
@@ -144,7 +165,11 @@ func TestWatcherBugDirectory(t *testing.T) {
 	}
 
 	var count atomic.Int32
-	send := func(any) { count.Add(1) }
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
 
 	w, err := New(baseDir, send, 50*time.Millisecond)
 	if err != nil {
@@ -152,6 +177,7 @@ func TestWatcherBugDirectory(t *testing.T) {
 	}
 	defer w.Close()
 
+	// Creating a new bug file should set HasNewFile = true.
 	file := filepath.Join(bugDir, "bug_001.md")
 	if err := os.WriteFile(file, []byte("# Bug 1"), 0o644); err != nil {
 		t.Fatal(err)
@@ -161,6 +187,11 @@ func TestWatcherBugDirectory(t *testing.T) {
 
 	if count.Load() < 1 {
 		t.Errorf("expected at least 1 UpdateMsg for bug file, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when creating a new bug file")
+		}
 	}
 }
 
@@ -172,7 +203,11 @@ func TestWatcherRecoversAfterInternalWatcherClosed(t *testing.T) {
 	}
 
 	var count atomic.Int32
-	send := func(any) { count.Add(1) }
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
 
 	w, err := New(baseDir, send, 50*time.Millisecond)
 	if err != nil {
@@ -186,7 +221,7 @@ func TestWatcherRecoversAfterInternalWatcherClosed(t *testing.T) {
 	// Allow time for the watcher to detect the closure and reconnect.
 	time.Sleep(500 * time.Millisecond)
 
-	// Write a file — the recovered watcher must detect this.
+	// Create a new file — the recovered watcher must detect this.
 	file := filepath.Join(featDir, "feature_001.md")
 	if err := os.WriteFile(file, []byte("# Feature 1"), 0o644); err != nil {
 		t.Fatal(err)
@@ -197,6 +232,84 @@ func TestWatcherRecoversAfterInternalWatcherClosed(t *testing.T) {
 
 	if count.Load() < 1 {
 		t.Errorf("expected at least 1 UpdateMsg after recovery, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when creating a new file after recovery")
+		}
+	}
+}
+
+func TestWatcherWriteOnlyEventsHasNewFileFalse(t *testing.T) {
+	baseDir := t.TempDir()
+	featDir := filepath.Join(baseDir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pre-create the file so subsequent writes are Write events, not Create events.
+	file := filepath.Join(featDir, "feature_001.md")
+	if err := os.WriteFile(file, []byte("initial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var lastMsg atomic.Value
+	send := func(msg any) { lastMsg.Store(msg) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Wait for the watcher to settle after setup.
+	time.Sleep(200 * time.Millisecond)
+	lastMsg.Store(UpdateMsg{}) // reset
+
+	// Write to the existing file — should produce only Write events.
+	if err := os.WriteFile(file, []byte("updated content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if msg.HasNewFile {
+			t.Error("expected HasNewFile = false for pure Write event on existing file")
+		}
+	}
+}
+
+func TestWatcherCreateEventHasNewFileTrue(t *testing.T) {
+	baseDir := t.TempDir()
+	featDir := filepath.Join(baseDir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var lastMsg atomic.Value
+	send := func(msg any) { lastMsg.Store(msg) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Create a brand-new file — should produce a Create event.
+	file := filepath.Join(featDir, "feature_002.md")
+	if err := os.WriteFile(file, []byte("# New Feature"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when a new file is created")
+		}
+	} else {
+		t.Error("expected an UpdateMsg to be sent")
 	}
 }
 
