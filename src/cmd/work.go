@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tasklock"
@@ -37,6 +38,19 @@ var (
 	noWorktreeFlag  bool
 )
 
+// resetWorkFlags resets all work command flags to their zero/default values.
+// This must be called before ParseFlags in menu-driven and dispatch contexts
+// so that flags from a previous invocation do not leak into the next one.
+func resetWorkFlags() {
+	countFlag = defaultTaskCount
+	noBootstrapFlag = false
+	modelFlag = ""
+	agentFlag = ""
+	taskFlag = ""
+	worktreeFlag = false
+	noWorktreeFlag = false
+}
+
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
 	Short: "Work on the next N tasks from the feature files",
@@ -50,6 +64,8 @@ Examples:
   maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{WorkRuns: 1})
+
 		wc, err := workSetup(cmd, args)
 		if err != nil {
 			return err
@@ -151,12 +167,14 @@ Examples:
 			repoDir:       repoDir,
 			workDir:       workDir,
 			runID:         run.ID,
+			onComplete:    wc.cfg.OnComplete,
 		}
 
 		runWorkGoroutine(workLoopParams{
 			tc:            tc,
 			tasks:         setup.tasks,
 			count:         count,
+			unlimited:     wc.count == 0 && taskFlag == "",
 			run:           run,
 			p:             p,
 			stopFlag:      m.StopFlag(),

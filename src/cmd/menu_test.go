@@ -593,73 +593,70 @@ func TestMenuView_CWDStillCentered(t *testing.T) {
 
 func TestFormatSummaryLine(t *testing.T) {
 	tests := []struct {
-		name    string
-		summary featureSummary
-		want    string
+		name         string
+		summary      featureSummary
+		wantContains []string
+		wantAbsent   []string
 	}{
 		{
-			name:    "no features or bugs",
-			summary: featureSummary{},
-			want:    "No features or bugs found",
+			name:         "no open tasks",
+			summary:      featureSummary{},
+			wantContains: []string{"No open tasks"},
 		},
 		{
-			name: "features only, no done or blocked",
+			name: "all tasks done, zero workable",
 			summary: featureSummary{
-				features: 3, tasks: 5,
+				features: 3, tasks: 5, done: 5, workable: 0,
 			},
-			want: "3 features (5 tasks)",
+			wantContains: []string{"No open tasks"},
 		},
 		{
-			name: "features only with done",
+			name: "features only with workable",
 			summary: featureSummary{
-				features: 3, tasks: 5, done: 3,
+				features: 3, tasks: 5, done: 2, workable: 3,
 			},
-			want: "3 features (5 tasks, 3 done)",
+			wantContains: []string{"3 features,", "3", "open tasks"},
+			wantAbsent:   []string{"bugs"},
 		},
 		{
-			name: "features only with done and blocked",
+			name: "bugs only with workable",
 			summary: featureSummary{
-				features: 3, tasks: 5, done: 3, blocked: 1,
+				bugs: 2, bugTasks: 4, bugDone: 1, bugWorkable: 3,
 			},
-			want: "3 features (5 tasks, 3 done, 1 blocked)",
-		},
-		{
-			name: "bugs only",
-			summary: featureSummary{
-				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
-			},
-			want: "2 bugs (4 tasks, 2 done, 1 blocked)",
-		},
-		{
-			name: "bugs only no done or blocked",
-			summary: featureSummary{
-				bugs: 1, bugTasks: 3,
-			},
-			want: "1 bugs (3 tasks)",
+			wantContains: []string{"2 bugs,", "3", "open tasks"},
+			wantAbsent:   []string{"features"},
 		},
 		{
 			name: "both features and bugs",
 			summary: featureSummary{
-				features: 3, tasks: 5, done: 3,
-				bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+				features: 3, tasks: 5, done: 0, workable: 5,
+				bugs: 2, bugTasks: 4, bugDone: 1, bugWorkable: 3,
 			},
-			want: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)",
+			wantContains: []string{"3 features,", "5", "2 bugs,", "3", "open tasks"},
 		},
 		{
-			name: "both with zero done/blocked omitted",
+			name: "features present but zero workable, bugs have workable",
 			summary: featureSummary{
-				features: 1, tasks: 2,
-				bugs: 1, bugTasks: 1,
+				features: 1, tasks: 1, done: 1, workable: 0,
+				bugs: 1, bugTasks: 2, bugWorkable: 2,
 			},
-			want: "1 features (2 tasks) · 1 bugs (1 tasks)",
+			wantContains: []string{"1 bugs,", "2", "open tasks"},
+			wantAbsent:   []string{"No open tasks"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatSummaryLine(tt.summary)
-			if got != tt.want {
-				t.Errorf("formatSummaryLine() = %q, want %q", got, tt.want)
+			for _, want := range tt.wantContains {
+				if !strings.Contains(got, want) {
+					t.Errorf("formatSummaryLine() = %q, want it to contain %q", got, want)
+				}
+			}
+			for _, absent := range tt.wantAbsent {
+				if strings.Contains(got, absent) {
+					t.Errorf("formatSummaryLine() = %q, want it NOT to contain %q", got, absent)
+				}
 			}
 		})
 	}
@@ -672,17 +669,20 @@ func TestMenuView_SummaryShowsFeaturesAndBugs(t *testing.T) {
 		width:  120,
 		height: 40,
 		summary: featureSummary{
-			features: 3, tasks: 5, done: 3,
-			bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1,
+			features: 3, tasks: 5, done: 3, workable: 2,
+			bugs: 2, bugTasks: 4, bugDone: 2, bugBlocked: 1, bugWorkable: 1,
 		},
 	}
 
 	view := m.View()
-	if !strings.Contains(view, "3 features") {
-		t.Error("expected view to contain '3 features'")
+	if !strings.Contains(view, "3 features,") {
+		t.Error("expected view to contain '3 features,'")
 	}
-	if !strings.Contains(view, "2 bugs") {
-		t.Error("expected view to contain '2 bugs'")
+	if !strings.Contains(view, "2 bugs,") {
+		t.Error("expected view to contain '2 bugs,'")
+	}
+	if !strings.Contains(view, "open tasks") {
+		t.Error("expected view to contain 'open tasks'")
 	}
 }
 
@@ -696,8 +696,8 @@ func TestMenuView_SummaryNoFeaturesOrBugs(t *testing.T) {
 	}
 
 	view := m.View()
-	if !strings.Contains(view, "No features or bugs found") {
-		t.Error("expected view to contain 'No features or bugs found'")
+	if !strings.Contains(view, "No open tasks") {
+		t.Error("expected view to contain 'No open tasks'")
 	}
 }
 

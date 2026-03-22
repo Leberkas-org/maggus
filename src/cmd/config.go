@@ -80,7 +80,10 @@ type configResultMsg struct {
 }
 
 type configModel struct {
-	rows                  []configRow
+	projectRows           []configRow
+	globalRows            []configRow
+	activeTab             int // 0 = Project, 1 = Global
+	tabFocused            bool
 	cursor                int
 	action                configAction
 	width                 int
@@ -91,6 +94,14 @@ type configModel struct {
 	origProtectedBranches []string
 	statusText            string
 	is2x                  bool
+}
+
+// activeRows returns a pointer to the currently active tab's row slice.
+func (m *configModel) activeRows() *[]configRow {
+	if m.activeTab == 1 {
+		return &m.globalRows
+	}
+	return &m.projectRows
 }
 
 func newConfigModel(cfg config.Config, dir string) configModel {
@@ -147,6 +158,10 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		errorIdx = 1
 	}
 
+	onCompleteValues := []string{"rename", "delete"}
+	featureActionIdx := indexOf(onCompleteValues, cfg.OnComplete.FeatureAction())
+	bugActionIdx := indexOf(onCompleteValues, cfg.OnComplete.BugAction())
+
 	// Load global auto-update setting
 	autoUpdateValues := []string{"off", "notify", "auto"}
 	autoUpdateIdx := 1 // default: notify
@@ -155,9 +170,8 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		autoUpdateIdx = indexOf(autoUpdateValues, string(globalSettings.AutoUpdate))
 	}
 
-	rows := []configRow{
-		// Project section
-		{label: "Agent", values: agentValues, current: agentIdx, section: "Project"},
+	projectRows := []configRow{
+		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
@@ -167,19 +181,21 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
 		{label: "  On run complete", values: runCompleteValues, current: runCompleteIdx},
 		{label: "  On error", values: errorValues, current: errorIdx},
-		// Project actions
+		{label: "  Feature", values: onCompleteValues, current: featureActionIdx, section: "On complete behaviour"},
+		{label: "  Bug", values: onCompleteValues, current: bugActionIdx},
 		{label: "Save project config", action: configActionSaveProject, isSave: true},
 		{label: "Edit project file in editor", action: configActionEditProject},
-		// Global section
-		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx, section: "Global"},
-		// Global actions
+	}
+
+	globalRows := []configRow{
+		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx},
 		{label: "Save global config", action: configActionSaveGlobal, isSave: true},
 		{label: "Edit global file in editor", action: configActionEditGlobal},
 	}
 
-	// Find the auto-update row index for saveGlobalConfig
+	// Find the auto-update row index within globalRows for saveGlobalConfig
 	globalAutoUpdateIdx := 0
-	for i, r := range rows {
+	for i, r := range globalRows {
 		if r.label == "Auto-update" && r.isOption() {
 			globalAutoUpdateIdx = i
 			break
@@ -187,7 +203,8 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	return configModel{
-		rows:                  rows,
+		projectRows:           projectRows,
+		globalRows:            globalRows,
 		globalAutoUpdateIdx:   globalAutoUpdateIdx,
 		dir:                   dir,
 		origInclude:           cfg.Include,
@@ -195,9 +212,15 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 }
 
-// optionByLabel finds the first option row with the given label.
+// optionByLabel finds the first option row with the given label,
+// searching both projectRows and globalRows so buildConfig works from either tab.
 func (m configModel) optionByLabel(label string) configRow {
-	for _, r := range m.rows {
+	for _, r := range m.projectRows {
+		if r.label == label && r.isOption() {
+			return r
+		}
+	}
+	for _, r := range m.globalRows {
 		if r.label == label && r.isOption() {
 			return r
 		}
@@ -242,11 +265,20 @@ func (m configModel) buildConfig() config.Config {
 	}
 	cfg.Git.ProtectedBranches = m.origProtectedBranches
 
+	featureAction := m.optionByLabel("  Feature").values[m.optionByLabel("  Feature").current]
+	if featureAction == "delete" {
+		cfg.OnComplete.Feature = "delete"
+	}
+	bugAction := m.optionByLabel("  Bug").values[m.optionByLabel("  Bug").current]
+	if bugAction == "delete" {
+		cfg.OnComplete.Bug = "delete"
+	}
+
 	return cfg
 }
 
 func (m configModel) saveGlobalConfig() error {
-	row := m.rows[m.globalAutoUpdateIdx]
+	row := m.globalRows[m.globalAutoUpdateIdx]
 	mode := globalconfig.AutoUpdateMode(row.values[row.current])
 	settings, err := loadGlobalSettings()
 	if err != nil {
@@ -292,25 +324,42 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Clear status on any keypress
 		m.statusText = ""
 
-		itemCount := len(m.rows)
+		rows := m.activeRows()
+		itemCount := len(*rows)
 
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
+		case "1":
+			m.activeTab = 0
+			m.cursor = 0
+			m.tabFocused = false
+		case "2":
+			m.activeTab = 1
+			m.cursor = 0
+			m.tabFocused = false
 		case "up", "k":
-			if m.cursor > 0 {
+			if m.tabFocused {
+				// Already at tab bar, do nothing
+			} else if m.cursor > 0 {
 				m.cursor--
 			} else {
-				m.cursor = itemCount - 1
+				// At row 0, move focus to tab bar
+				m.tabFocused = true
 			}
 		case "down", "j":
-			if m.cursor < itemCount-1 {
-				m.cursor++
-			} else {
+			if m.tabFocused {
+				m.tabFocused = false
 				m.cursor = 0
+			} else if m.cursor < itemCount-1 {
+				m.cursor++
 			}
 		case "left", "h":
-			if row := &m.rows[m.cursor]; row.isOption() {
+			if m.tabFocused {
+				// Switch to the other tab
+				m.activeTab = 1 - m.activeTab
+				m.cursor = 0
+			} else if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current > 0 {
 					row.current--
 				} else {
@@ -318,7 +367,11 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "right", "l":
-			if row := &m.rows[m.cursor]; row.isOption() {
+			if m.tabFocused {
+				// Switch to the other tab
+				m.activeTab = 1 - m.activeTab
+				m.cursor = 0
+			} else if row := &(*rows)[m.cursor]; row.isOption() {
 				if row.current < len(row.values)-1 {
 					row.current++
 				} else {
@@ -326,15 +379,20 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			row := &m.rows[m.cursor]
-			if row.isOption() {
-				if row.current < len(row.values)-1 {
-					row.current++
-				} else {
-					row.current = 0
-				}
+			if m.tabFocused {
+				m.tabFocused = false
+				m.cursor = 0
 			} else {
-				return m, m.executeAction(row.action)
+				row := &(*rows)[m.cursor]
+				if row.isOption() {
+					if row.current < len(row.values)-1 {
+						row.current++
+					} else {
+						row.current = 0
+					}
+				} else {
+					return m, m.executeAction(row.action)
+				}
 			}
 		}
 	}
@@ -383,6 +441,44 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 	return nil
 }
 
+func (m configModel) renderTabBar() string {
+	tabNames := []string{"Project", "Global"}
+
+	activeStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(styles.Primary).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.Primary).
+		Padding(0, 1)
+
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted).
+		Padding(0, 1)
+
+	focusedActiveStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("0")).
+		Background(styles.Primary).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(styles.Primary).
+		Padding(0, 1)
+
+	var tabs []string
+	for i, name := range tabNames {
+		if i == m.activeTab {
+			if m.tabFocused {
+				tabs = append(tabs, focusedActiveStyle.Render(name))
+			} else {
+				tabs = append(tabs, activeStyle.Render(name))
+			}
+		} else {
+			tabs = append(tabs, inactiveStyle.Render(name))
+		}
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
+}
+
 func (m configModel) View() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
@@ -392,22 +488,29 @@ func (m configModel) View() string {
 	normalStyle := lipgloss.NewStyle()
 	saveStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
 
-	sectionPaths := map[string]string{
-		"Project": ".maggus/config.yml",
-		"Global":  "~/.maggus/config.yml",
+	// Sections without a path display just the title
+	sectionTitleOnly := map[string]bool{
+		"On complete behaviour": true,
 	}
 
 	var sb strings.Builder
 
-	for i, row := range m.rows {
+	// Render tab bar
+	sb.WriteString(m.renderTabBar())
+	sb.WriteString("\n\n")
+
+	rows := *m.activeRows()
+	for i, row := range rows {
 		// Section header
 		if row.section != "" {
 			if i > 0 {
 				sb.WriteString("\n")
 			}
-			path := sectionPaths[row.section]
-			sb.WriteString(titleStyle.Render(row.section) + "  " + mutedStyle.Render(path) + "\n")
-			sb.WriteString(styles.Separator(50) + "\n")
+			if sectionTitleOnly[row.section] {
+				sb.WriteString(titleStyle.Render(row.section) + "\n")
+			} else {
+				sb.WriteString(titleStyle.Render(row.section) + "\n")
+			}
 		}
 
 		if row.isOption() {
@@ -482,7 +585,7 @@ func (m configModel) View() string {
 	}
 
 	content := sb.String()
-	footer := styles.StatusBar.Render("up/down: navigate | left/right: change value | enter: select | q/esc: exit")
+	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {

@@ -457,6 +457,48 @@ func TestGitConfig_ProtectedBranchList(t *testing.T) {
 	}
 }
 
+func TestOnCompleteConfig_FeatureAction(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"zero value returns rename", "", "rename"},
+		{"rename returns rename", "rename", "rename"},
+		{"delete returns delete", "delete", "delete"},
+		{"unknown returns rename", "archive", "rename"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oc := OnCompleteConfig{Feature: tt.value}
+			if got := oc.FeatureAction(); got != tt.want {
+				t.Errorf("FeatureAction() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOnCompleteConfig_BugAction(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"zero value returns rename", "", "rename"},
+		{"rename returns rename", "rename", "rename"},
+		{"delete returns delete", "delete", "delete"},
+		{"unknown returns rename", "archive", "rename"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oc := OnCompleteConfig{Bug: tt.value}
+			if got := oc.BugAction(); got != tt.want {
+				t.Errorf("BugAction() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func boolPtr(b bool) *bool { return &b }
 
 func TestLoad_WithGitConfig(t *testing.T) {

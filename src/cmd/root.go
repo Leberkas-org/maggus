@@ -9,12 +9,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
 )
 
 // Version is set at build time via -ldflags.
+// For dev builds, use: go build -ldflags "-X github.com/leberkas-org/maggus/cmd.BuildTime=$(date +%H%M%S)"
 var Version = "dev"
+
+// BuildTime is set at build time via -ldflags for dev build counters.
+var BuildTime = ""
+
+func init() {
+	if Version == "dev" && BuildTime != "" {
+		Version = "dev-" + BuildTime
+	}
+	rootCmd.Version = Version
+}
 
 // caps holds the detected tool capabilities for this run.
 var caps capabilities.Capabilities
@@ -25,6 +37,11 @@ var rootCmd = &cobra.Command{
 	Version: Version,
 	Long: `Maggus reads feature files and works through tasks one-by-one
 by prompting an AI agent (Claude Code). Provide a feature and let Maggus work.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if err := globalconfig.IncrementMetrics(globalconfig.Metrics{StartupCount: 1}); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to update metrics: %v\n", err)
+		}
+	},
 }
 
 func init() {
@@ -61,6 +78,8 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		// Reset work command flags so previous invocations don't leak.
+		resetWorkFlags()
 		if err := sub.ParseFlags(remaining); err != nil {
 			return err
 		}

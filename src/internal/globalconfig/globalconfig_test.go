@@ -3,8 +3,11 @@ package globalconfig
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadFrom_NonExistent(t *testing.T) {
@@ -365,5 +368,228 @@ func TestAutoUpdateMode_IsValid(t *testing.T) {
 	}
 	if AutoUpdateMode("bogus").IsValid() {
 		t.Fatal("bogus should not be valid")
+	}
+}
+
+// --- Metrics tests ---
+
+func TestMetrics_isZero(t *testing.T) {
+	if !(Metrics{}).isZero() {
+		t.Fatal("empty Metrics should be zero")
+	}
+	if (Metrics{WorkRuns: 1}).isZero() {
+		t.Fatal("non-empty Metrics should not be zero")
+	}
+}
+
+func TestIncrementMetricsIn_ZeroDeltaNoOp(t *testing.T) {
+	dir := t.TempDir()
+	metricsPath := filepath.Join(dir, "metrics.yml")
+
+	// Write initial metrics.
+	if err := SaveMetricsTo(Metrics{WorkRuns: 1}, metricsPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	info, _ := os.Stat(metricsPath)
+	modBefore := info.ModTime()
+
+	// Zero delta should be a no-op — file should not be rewritten.
+	if err := IncrementMetricsIn(dir, Metrics{}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	info2, _ := os.Stat(metricsPath)
+	if !info2.ModTime().Equal(modBefore) {
+		t.Fatal("zero delta should not rewrite the file")
+	}
+}
+
+func TestIncrementMetricsIn_SingleIncrement(t *testing.T) {
+	dir := t.TempDir()
+	metricsPath := filepath.Join(dir, "metrics.yml")
+
+	if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 3, TasksCompleted: 1}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	m, err := LoadMetricsFrom(metricsPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if m.WorkRuns != 3 {
+		t.Fatalf("expected WorkRuns=3, got %d", m.WorkRuns)
+	}
+	if m.TasksCompleted != 1 {
+		t.Fatalf("expected TasksCompleted=1, got %d", m.TasksCompleted)
+	}
+	// Untouched fields should remain zero.
+	if m.GitCommits != 0 {
+		t.Fatalf("expected GitCommits=0, got %d", m.GitCommits)
+	}
+}
+
+func TestIncrementMetricsIn_AccumulatesMultipleCalls(t *testing.T) {
+	dir := t.TempDir()
+	metricsPath := filepath.Join(dir, "metrics.yml")
+
+	for range 5 {
+		if err := IncrementMetricsIn(dir, Metrics{StartupCount: 1}); err != nil {
+			t.Fatalf("increment: %v", err)
+		}
+	}
+
+	m, err := LoadMetricsFrom(metricsPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if m.StartupCount != 5 {
+		t.Fatalf("expected StartupCount=5, got %d", m.StartupCount)
+	}
+}
+
+func TestIncrementMetricsIn_DoesNotTouchConfigYml(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	// Write initial config with auto_update set.
+	if err := SaveSettingsTo(Settings{AutoUpdate: AutoUpdateAuto}, configPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	infoBefore, _ := os.Stat(configPath)
+	modBefore := infoBefore.ModTime()
+
+	if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 1}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	// config.yml should be untouched.
+	infoAfter, _ := os.Stat(configPath)
+	if !infoAfter.ModTime().Equal(modBefore) {
+		t.Fatal("IncrementMetricsIn should not modify config.yml")
+	}
+
+	// Settings should not contain metrics.
+	s, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if s.AutoUpdate != AutoUpdateAuto {
+		t.Fatalf("expected auto_update=auto, got %q", s.AutoUpdate)
+	}
+
+	// Metrics should be in metrics.yml.
+	m, err := LoadMetricsFrom(filepath.Join(dir, "metrics.yml"))
+	if err != nil {
+		t.Fatalf("load metrics: %v", err)
+	}
+	if m.WorkRuns != 1 {
+		t.Fatalf("expected WorkRuns=1, got %d", m.WorkRuns)
+	}
+}
+
+func TestIncrementMetricsIn_ConcurrentIncrements(t *testing.T) {
+	dir := t.TempDir()
+	metricsPath := filepath.Join(dir, "metrics.yml")
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines)
+
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 1}); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("concurrent increment error: %v", err)
+	}
+
+	m, err := LoadMetricsFrom(metricsPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if m.WorkRuns != goroutines {
+		t.Fatalf("expected WorkRuns=%d, got %d", goroutines, m.WorkRuns)
+	}
+}
+
+func TestIncrementMetricsIn_MigratesFromConfigYml(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	// Write a legacy config.yml with embedded metrics.
+	legacy := "auto_update: auto\nmetrics:\n  startup_count: 10\n  work_runs: 5\n"
+	if err := os.WriteFile(configPath, []byte(legacy), 0o644); err != nil {
+		t.Fatalf("write legacy config: %v", err)
+	}
+
+	// Increment should trigger migration.
+	if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 1}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	// metrics.yml should contain migrated + incremented values.
+	m, err := LoadMetricsFrom(filepath.Join(dir, "metrics.yml"))
+	if err != nil {
+		t.Fatalf("load metrics: %v", err)
+	}
+	if m.StartupCount != 10 {
+		t.Fatalf("expected migrated StartupCount=10, got %d", m.StartupCount)
+	}
+	if m.WorkRuns != 6 {
+		t.Fatalf("expected migrated+incremented WorkRuns=6, got %d", m.WorkRuns)
+	}
+
+	// config.yml should no longer contain metrics.
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if contains := string(data); len(data) > 0 {
+		var check settingsWithMetrics
+		if err := yaml.Unmarshal(data, &check); err != nil {
+			t.Fatalf("parse config: %v", err)
+		}
+		if !check.Metrics.isZero() {
+			t.Fatalf("config.yml should not contain metrics after migration, got %+v", check.Metrics)
+		}
+		_ = contains
+	}
+}
+
+func TestLoadMetricsFrom_NonExistent(t *testing.T) {
+	m, err := LoadMetricsFrom(filepath.Join(t.TempDir(), "nope.yml"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !m.isZero() {
+		t.Fatalf("expected zero metrics, got %+v", m)
+	}
+}
+
+func TestSaveAndLoadMetrics(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "metrics.yml")
+	m := Metrics{WorkRuns: 3, TokensUsed: 1000}
+
+	if err := SaveMetricsTo(m, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadMetricsFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.WorkRuns != 3 {
+		t.Fatalf("expected WorkRuns=3, got %d", loaded.WorkRuns)
+	}
+	if loaded.TokensUsed != 1000 {
+		t.Fatalf("expected TokensUsed=1000, got %d", loaded.TokensUsed)
 	}
 }

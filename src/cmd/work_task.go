@@ -8,7 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -52,6 +54,7 @@ type taskContext struct {
 	repoDir       string
 	workDir       string
 	runID         string
+	onComplete    config.OnCompleteConfig
 }
 
 // runTask executes a single task iteration: finds the next task, acquires a
@@ -102,6 +105,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 			return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
 		}
 		tc.notifier.PlayError()
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{AgentErrors: 1})
 		reason := err.Error()
 		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
 		return taskResult{
@@ -123,9 +127,15 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		}
 	}
 
-	// Rename fully completed feature and bug files before committing.
-	_ = parser.MarkCompletedFeatures(tc.workDir)
-	_ = parser.MarkCompletedBugs(tc.workDir)
+	// Rename or delete fully completed feature and bug files before committing.
+	featuresCompleted, _ := parser.MarkCompletedFeatures(tc.workDir, tc.onComplete.FeatureAction())
+	bugsCompleted, _ := parser.MarkCompletedBugs(tc.workDir, tc.onComplete.BugAction())
+	if featuresCompleted > 0 || bugsCompleted > 0 {
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{
+			FeaturesCompleted: int64(featuresCompleted),
+			BugsCompleted:     int64(bugsCompleted),
+		})
+	}
 
 	// Stage any feature renames so they are included in the commit.
 	stageFeatures := exec.Command("git", "add", "--", ".maggus/")
@@ -163,6 +173,7 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 	}
 
 	if commitResult.Committed {
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{GitCommits: 1})
 		tc.p.Send(runner.CommitMsg{Message: commitResult.Message})
 		tc.notifier.PlayTaskComplete()
 		result.committed = true

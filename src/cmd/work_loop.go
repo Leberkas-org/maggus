@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/runtracker"
@@ -49,8 +50,8 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 		return nil, nil
 	}
 
-	_ = parser.MarkCompletedFeatures(dir)
-	_ = parser.MarkCompletedBugs(dir)
+	_, _ = parser.MarkCompletedFeatures(dir, "")
+	_, _ = parser.MarkCompletedBugs(dir, "")
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
@@ -150,16 +151,22 @@ func capCount(tasks []parser.Task, count int) int {
 	if taskFlag != "" {
 		return 1
 	}
-	workable := 0
-	for i := range tasks {
-		if tasks[i].IsWorkable() {
-			workable++
-		}
-	}
+	workable := countWorkable(tasks)
 	if count <= 0 || workable < count {
 		return workable
 	}
 	return count
+}
+
+// countWorkable returns the number of workable (incomplete + not blocked + not ignored) tasks.
+func countWorkable(tasks []parser.Task) int {
+	n := 0
+	for i := range tasks {
+		if tasks[i].IsWorkable() {
+			n++
+		}
+	}
+	return n
 }
 
 // setupUsageCallback configures the TUI model to record per-task usage.
@@ -185,6 +192,10 @@ func setupUsageCallback(m *runner.TUIModel, dir string, run *runtracker.Run, mod
 			StartTime:                tu.StartTime,
 			EndTime:                  tu.EndTime,
 		}})
+		totalTokens := int64(tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens)
+		if totalTokens > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
+		}
 	})
 }
 
@@ -193,6 +204,7 @@ type workLoopParams struct {
 	tc            taskContext
 	tasks         []parser.Task
 	count         int
+	unlimited     bool // when true, loop until no workable tasks remain (count=0 / "all" mode)
 	run           *runtracker.Run
 	p             *tea.Program
 	stopFlag      *atomic.Bool
@@ -236,15 +248,21 @@ func runWorkGoroutine(params workLoopParams) {
 		completed := 0
 
 		// Log ignored tasks.
+		var ignoredCount int64
 		for i := range params.tasks {
 			if !params.tasks[i].IsComplete() && params.tasks[i].Ignored {
 				params.p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", params.tasks[i].ID)})
+				ignoredCount++
 			}
+		}
+		if ignoredCount > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksSkipped: ignoredCount})
 		}
 
 		tasks := params.tasks
 		var lastCompletedTaskID string
-		for i := 0; i < params.count; i++ {
+		loopCount := params.count
+		for i := 0; params.unlimited || i < loopCount; i++ {
 			if i > 0 && params.stopFlag.Load() {
 				// Check if we should stop now or continue to a specific task.
 				targetID := ""
@@ -258,7 +276,19 @@ func runWorkGoroutine(params workLoopParams) {
 				// Target task not yet reached — continue working.
 			}
 
-			result := runTask(params.tc, tasks, i, params.count)
+			// In unlimited mode, use the current iteration count for display purposes.
+			displayCount := loopCount
+			if params.unlimited {
+				displayCount = i + 1 // at minimum, show current iteration
+				// Peek ahead: count remaining workable tasks for progress display.
+				remaining := countWorkable(tasks)
+				if remaining == 0 {
+					break
+				}
+				displayCount = i + remaining
+			}
+
+			result := runTask(params.tc, tasks, i, displayCount)
 			if result.taskID != "" {
 				lastCompletedTaskID = result.taskID
 			}
@@ -267,12 +297,14 @@ func runWorkGoroutine(params workLoopParams) {
 			}
 			if result.failed != nil {
 				failedTasks = append(failedTasks, *result.failed)
+				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
 			}
 			if result.warning != "" {
 				warnings = append(warnings, result.warning)
 			}
 			if result.committed {
 				completed++
+				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
 			}
 
 			switch result.action {
@@ -324,7 +356,14 @@ func runWorkGoroutine(params workLoopParams) {
 			}
 		}
 
-		summary := buildSummaryData(params, completed, failedTasks, stopReason, errorDetail, warnings)
+		// In unlimited mode, use completed count as the effective total for the summary.
+		effectiveCount := params.count
+		if params.unlimited {
+			effectiveCount = completed + len(failedTasks)
+		}
+		summaryParams := params
+		summaryParams.count = effectiveCount
+		summary := buildSummaryData(summaryParams, completed, failedTasks, stopReason, errorDetail, warnings)
 
 		params.tc.notifier.PlayRunComplete()
 		params.p.Send(runner.SummaryMsg{Data: summary})

@@ -201,11 +201,13 @@ type featureSummary struct {
 	tasks    int
 	done     int
 	blocked  int
+	workable int
 
 	bugs        int
 	bugTasks    int
 	bugDone     int
 	bugBlocked  int
+	bugWorkable int
 }
 
 // loadFeatureSummary computes feature and bug statistics from the current working directory.
@@ -224,6 +226,11 @@ func loadFeatureSummary() featureSummary {
 			s.tasks += len(f.tasks)
 			s.done += f.doneCount()
 			s.blocked += f.blockedCount()
+			for _, t := range f.tasks {
+				if t.IsWorkable() {
+					s.workable++
+				}
+			}
 		}
 	}
 
@@ -234,45 +241,44 @@ func loadFeatureSummary() featureSummary {
 			s.bugTasks += len(b.tasks)
 			s.bugDone += b.doneCount()
 			s.bugBlocked += b.blockedCount()
+			for _, t := range b.tasks {
+				if t.IsWorkable() {
+					s.bugWorkable++
+				}
+			}
 		}
 	}
 
 	return s
 }
 
-// formatSummaryLine builds the human-readable summary string for the menu header.
-// Format: "3 features (5 tasks, 3 done) · 2 bugs (4 tasks, 2 done, 1 blocked)"
-// Zero-count parts (done, blocked) are omitted for brevity.
+// formatSummaryLine builds a lipgloss-styled summary string for the menu header.
+// Format: "3 features, 5 open tasks · 2 bugs, 3 open tasks"
+// Feature open count is green, bug open count is red, surrounding text is muted.
 func formatSummaryLine(s featureSummary) string {
-	if s.features == 0 && s.bugs == 0 {
-		return "No features or bugs found"
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
+	redStyle := lipgloss.NewStyle().Foreground(styles.Error)
+
+	if s.workable == 0 && s.bugWorkable == 0 {
+		return mutedStyle.Render("No open tasks")
 	}
 
 	var parts []string
 
 	if s.features > 0 {
-		detail := fmt.Sprintf("%d tasks", s.tasks)
-		if s.done > 0 {
-			detail += fmt.Sprintf(", %d done", s.done)
-		}
-		if s.blocked > 0 {
-			detail += fmt.Sprintf(", %d blocked", s.blocked)
-		}
-		parts = append(parts, fmt.Sprintf("%d features (%s)", s.features, detail))
+		parts = append(parts, mutedStyle.Render(fmt.Sprintf("%d features, ", s.features))+
+			greenStyle.Render(fmt.Sprintf("%d", s.workable))+
+			mutedStyle.Render(" open tasks"))
 	}
 
 	if s.bugs > 0 {
-		detail := fmt.Sprintf("%d tasks", s.bugTasks)
-		if s.bugDone > 0 {
-			detail += fmt.Sprintf(", %d done", s.bugDone)
-		}
-		if s.bugBlocked > 0 {
-			detail += fmt.Sprintf(", %d blocked", s.bugBlocked)
-		}
-		parts = append(parts, fmt.Sprintf("%d bugs (%s)", s.bugs, detail))
+		parts = append(parts, mutedStyle.Render(fmt.Sprintf("%d bugs, ", s.bugs))+
+			redStyle.Render(fmt.Sprintf("%d", s.bugWorkable))+
+			mutedStyle.Render(" open tasks"))
 	}
 
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, mutedStyle.Render(" · "))
 }
 
 // menuModel is the bubbletea model for the interactive main menu.
@@ -552,9 +558,8 @@ func (m menuModel) View() string {
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
 
-	// Feature & bug summary line
-	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	summaryLine := mutedStyle.Render(formatSummaryLine(m.summary))
+	// Feature & bug summary line (pre-styled by formatSummaryLine)
+	summaryLine := formatSummaryLine(m.summary)
 
 	var body, footer string
 	if m.inSubMenu {
