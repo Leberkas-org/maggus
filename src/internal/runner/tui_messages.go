@@ -129,7 +129,7 @@ func (m *TUIModel) handleFileChange() tea.Cmd {
 		}
 	}
 
-	m.totalIters = m.currentIter + workableBugs + workableFeatures
+	m.totalIters = (m.currentIter - 1) + workableBugs + workableFeatures
 	m.activeBugs = workableBugs
 
 	// Detect new tasks compared to previous counts
