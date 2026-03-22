@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -34,9 +36,45 @@ func (m AutoUpdateMode) IsValid() bool {
 	return false
 }
 
+// Metrics holds lifetime usage counters that accumulate across all sessions.
+type Metrics struct {
+	StartupCount      int64 `yaml:"startup_count,omitempty" json:"-"`
+	WorkRuns          int64 `yaml:"work_runs,omitempty" json:"-"`
+	TasksCompleted    int64 `yaml:"tasks_completed,omitempty" json:"-"`
+	TasksFailed       int64 `yaml:"tasks_failed,omitempty" json:"-"`
+	TasksSkipped      int64 `yaml:"tasks_skipped,omitempty" json:"-"`
+	FeaturesCompleted int64 `yaml:"features_completed,omitempty" json:"-"`
+	BugsCompleted     int64 `yaml:"bugs_completed,omitempty" json:"-"`
+	TokensUsed        int64 `yaml:"tokens_used,omitempty" json:"-"`
+	AgentErrors       int64 `yaml:"agent_errors,omitempty" json:"-"`
+	GitCommits        int64 `yaml:"git_commits,omitempty" json:"-"`
+}
+
+// isZero returns true if all fields are zero (no increment needed).
+func (m Metrics) isZero() bool {
+	return m == Metrics{}
+}
+
+// add returns a new Metrics with each field summed from m and delta.
+func (m Metrics) add(delta Metrics) Metrics {
+	return Metrics{
+		StartupCount:      m.StartupCount + delta.StartupCount,
+		WorkRuns:          m.WorkRuns + delta.WorkRuns,
+		TasksCompleted:    m.TasksCompleted + delta.TasksCompleted,
+		TasksFailed:       m.TasksFailed + delta.TasksFailed,
+		TasksSkipped:      m.TasksSkipped + delta.TasksSkipped,
+		FeaturesCompleted: m.FeaturesCompleted + delta.FeaturesCompleted,
+		BugsCompleted:     m.BugsCompleted + delta.BugsCompleted,
+		TokensUsed:        m.TokensUsed + delta.TokensUsed,
+		AgentErrors:       m.AgentErrors + delta.AgentErrors,
+		GitCommits:        m.GitCommits + delta.GitCommits,
+	}
+}
+
 // Settings holds the global Maggus settings stored at ~/.maggus/config.yml.
 type Settings struct {
 	AutoUpdate AutoUpdateMode `yaml:"auto_update,omitempty"`
+	Metrics    Metrics        `yaml:"metrics,omitempty"`
 }
 
 // DefaultSettings returns settings with default values.
@@ -115,6 +153,104 @@ func SaveSettingsTo(s Settings, path string) error {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("write global settings %s: %w", path, err)
 	}
+	return nil
+}
+
+const (
+	lockRetries    = 10
+	lockRetryDelay = 50 * time.Millisecond
+	staleLockAge   = 30 * time.Second
+)
+
+// metricsMu serializes in-process access; the file lock handles cross-process.
+var metricsMu sync.Mutex
+
+// IncrementMetrics atomically increments the global metrics by delta.
+// It acquires a file lock, reads current settings, adds delta, and writes back.
+func IncrementMetrics(delta Metrics) error {
+	dir, err := Dir()
+	if err != nil {
+		return err
+	}
+	return IncrementMetricsIn(dir, delta)
+}
+
+// IncrementMetricsIn atomically increments metrics in the given config directory.
+func IncrementMetricsIn(dir string, delta Metrics) error {
+	if delta.isZero() {
+		return nil
+	}
+
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+
+	var err error
+
+	configPath := filepath.Join(dir, "config.yml")
+	lockPath := filepath.Join(dir, "config.lock")
+
+	if err = os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+
+	// Acquire lock with retries.
+	var lockFile *os.File
+	for i := 0; i < lockRetries; i++ {
+		// Remove stale locks.
+		if info, err := os.Stat(lockPath); err == nil {
+			if time.Since(info.ModTime()) > staleLockAge {
+				_ = os.Remove(lockPath)
+			}
+		}
+
+		lockFile, err = os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err == nil {
+			break
+		}
+		// On Windows, concurrent access may return "Access is denied"
+		// instead of os.ErrExist. Retry on any error.
+		if i < lockRetries-1 {
+			time.Sleep(lockRetryDelay)
+		}
+	}
+	if lockFile == nil {
+		return fmt.Errorf("acquire metrics lock: timed out after %d retries", lockRetries)
+	}
+	_ = lockFile.Close()
+
+	// Ensure lock is always released.
+	defer func() { _ = os.Remove(lockPath) }()
+
+	// Read current settings.
+	settings, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		return err
+	}
+
+	// Add delta.
+	settings.Metrics = settings.Metrics.add(delta)
+
+	// Write to temp file then rename (atomic).
+	tmpPath := configPath + ".tmp"
+	data, err := yaml.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal settings: %w", err)
+	}
+
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return fmt.Errorf("write temp settings: %w", err)
+	}
+
+	// On Windows, os.Rename fails if dest exists and is locked.
+	// The lockfile prevents concurrent writers, so remove+rename is safe.
+	if runtime.GOOS == "windows" {
+		_ = os.Remove(configPath)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		return fmt.Errorf("rename settings: %w", err)
+	}
+
 	return nil
 }
 

@@ -3,6 +3,7 @@ package globalconfig
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -365,5 +366,139 @@ func TestAutoUpdateMode_IsValid(t *testing.T) {
 	}
 	if AutoUpdateMode("bogus").IsValid() {
 		t.Fatal("bogus should not be valid")
+	}
+}
+
+// --- Metrics tests ---
+
+func TestMetrics_isZero(t *testing.T) {
+	if !(Metrics{}).isZero() {
+		t.Fatal("empty Metrics should be zero")
+	}
+	if (Metrics{WorkRuns: 1}).isZero() {
+		t.Fatal("non-empty Metrics should not be zero")
+	}
+}
+
+func TestIncrementMetricsIn_ZeroDeltaNoOp(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	// Write initial config.
+	if err := SaveSettingsTo(Settings{AutoUpdate: AutoUpdateAuto}, configPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	info, _ := os.Stat(configPath)
+	modBefore := info.ModTime()
+
+	// Zero delta should be a no-op — file should not be rewritten.
+	if err := IncrementMetricsIn(dir, Metrics{}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	info2, _ := os.Stat(configPath)
+	if !info2.ModTime().Equal(modBefore) {
+		t.Fatal("zero delta should not rewrite the file")
+	}
+}
+
+func TestIncrementMetricsIn_SingleIncrement(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 3, TasksCompleted: 1}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	s, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if s.Metrics.WorkRuns != 3 {
+		t.Fatalf("expected WorkRuns=3, got %d", s.Metrics.WorkRuns)
+	}
+	if s.Metrics.TasksCompleted != 1 {
+		t.Fatalf("expected TasksCompleted=1, got %d", s.Metrics.TasksCompleted)
+	}
+	// Untouched fields should remain zero.
+	if s.Metrics.GitCommits != 0 {
+		t.Fatalf("expected GitCommits=0, got %d", s.Metrics.GitCommits)
+	}
+}
+
+func TestIncrementMetricsIn_AccumulatesMultipleCalls(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	for range 5 {
+		if err := IncrementMetricsIn(dir, Metrics{StartupCount: 1}); err != nil {
+			t.Fatalf("increment: %v", err)
+		}
+	}
+
+	s, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if s.Metrics.StartupCount != 5 {
+		t.Fatalf("expected StartupCount=5, got %d", s.Metrics.StartupCount)
+	}
+}
+
+func TestIncrementMetricsIn_PreservesExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	// Write initial config with auto_update set.
+	if err := SaveSettingsTo(Settings{AutoUpdate: AutoUpdateAuto}, configPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 1}); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	s, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if s.AutoUpdate != AutoUpdateAuto {
+		t.Fatalf("expected auto_update=auto, got %q", s.AutoUpdate)
+	}
+	if s.Metrics.WorkRuns != 1 {
+		t.Fatalf("expected WorkRuns=1, got %d", s.Metrics.WorkRuns)
+	}
+}
+
+func TestIncrementMetricsIn_ConcurrentIncrements(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines)
+
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			if err := IncrementMetricsIn(dir, Metrics{WorkRuns: 1}); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("concurrent increment error: %v", err)
+	}
+
+	s, err := LoadSettingsFrom(configPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if s.Metrics.WorkRuns != goroutines {
+		t.Fatalf("expected WorkRuns=%d, got %d", goroutines, s.Metrics.WorkRuns)
 	}
 }
