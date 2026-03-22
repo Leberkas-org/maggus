@@ -161,6 +161,7 @@ Examples:
 			tc:            tc,
 			tasks:         setup.tasks,
 			count:         count,
+			unlimited:     wc.count == 0 && taskFlag == "",
 			run:           run,
 			p:             p,
 			stopFlag:      m.StopFlag(),
