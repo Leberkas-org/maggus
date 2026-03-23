@@ -2,7 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
@@ -10,11 +17,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/leberkas-org/maggus/internal/worktree"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 // iterationSetup holds everything needed to start the work loop TUI.
@@ -169,6 +171,113 @@ func countWorkable(tasks []parser.Task) int {
 	return n
 }
 
+// featureGroup represents a single source file (feature or bug) and all tasks within it.
+type featureGroup struct {
+	id    string        // base filename without extension (e.g. "feature_001", "bug_001")
+	file  string        // full path to the source file
+	tasks []parser.Task // all tasks from this file (may include complete/blocked)
+	isBug bool
+}
+
+// buildApprovedFeatureGroups parses bug and feature files, groups them by source file,
+// filters by approval state, and returns the ordered list (bugs first, then features).
+// Bug files and feature files are both subject to approval in opt-in mode.
+func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, error) {
+	approvals, err := approval.Load(dir)
+	if err != nil {
+		return nil, fmt.Errorf("load approvals: %w", err)
+	}
+	approvalRequired := cfg.IsApprovalRequired()
+
+	// Bug groups first.
+	bugFiles, err := parser.GlobBugFiles(dir, false)
+	if err != nil {
+		return nil, fmt.Errorf("glob bugs: %w", err)
+	}
+
+	var groups []featureGroup
+
+	for _, f := range bugFiles {
+		if _, err := parser.MigrateLegacyBugIDs(f); err != nil {
+			return nil, fmt.Errorf("migrate bug IDs: %w", err)
+		}
+		tasks, err := parser.ParseFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f, err)
+		}
+		if parser.IsIgnoredFile(f) {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		id := strings.TrimSuffix(filepath.Base(f), ".md")
+		if !approval.IsApproved(approvals, id, approvalRequired) {
+			continue
+		}
+		groups = append(groups, featureGroup{id: id, file: f, tasks: tasks, isBug: true})
+	}
+
+	// Feature groups next.
+	featureFiles, err := parser.GlobFeatureFiles(dir, false)
+	if err != nil {
+		return nil, fmt.Errorf("glob features: %w", err)
+	}
+
+	for _, f := range featureFiles {
+		tasks, err := parser.ParseFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f, err)
+		}
+		if parser.IsIgnoredFile(f) {
+			for i := range tasks {
+				tasks[i].Ignored = true
+			}
+		}
+		id := strings.TrimSuffix(filepath.Base(f), ".md")
+		if !approval.IsApproved(approvals, id, approvalRequired) {
+			continue
+		}
+		groups = append(groups, featureGroup{id: id, file: f, tasks: tasks, isBug: false})
+	}
+
+	return groups, nil
+}
+
+// filterTasksBySourceFile returns only tasks whose SourceFile matches file.
+func filterTasksBySourceFile(tasks []parser.Task, file string) []parser.Task {
+	var result []parser.Task
+	for _, t := range tasks {
+		if t.SourceFile == file {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// findGroupForTask finds the first feature group containing an incomplete task with the given ID.
+func findGroupForTask(groups []featureGroup, taskID string) *featureGroup {
+	for i := range groups {
+		for _, t := range groups[i].tasks {
+			if t.ID == taskID && !t.IsComplete() {
+				return &groups[i]
+			}
+		}
+	}
+	return nil
+}
+
+// firstWorkableTask returns the first workable task from the first group that has one.
+func firstWorkableTask(groups []featureGroup) *parser.Task {
+	for _, g := range groups {
+		for i := range g.tasks {
+			if g.tasks[i].IsWorkable() {
+				return &g.tasks[i]
+			}
+		}
+	}
+	return nil
+}
+
 // setupUsageCallback configures the TUI model to record per-task usage.
 func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDisplay, agentName string) {
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
@@ -202,9 +311,10 @@ func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDispl
 // workLoopParams bundles the parameters for runWorkGoroutine.
 type workLoopParams struct {
 	tc            taskContext
-	tasks         []parser.Task
-	count         int
-	unlimited     bool // when true, loop until no workable tasks remain (count=0 / "all" mode)
+	tasks         []parser.Task  // flat merged list — used for summary remaining tasks
+	featureGroups []featureGroup // ordered approved groups to work (bugs first, then features)
+	count         int            // number of features to work (0 = determined by autoContinue)
+	autoContinue  bool           // from config: continue to next feature after completing one
 	runID         string
 	startTime     time.Time
 	p             *tea.Program
@@ -219,8 +329,10 @@ type workLoopParams struct {
 	dir           string
 }
 
-// runWorkGoroutine runs the work loop in a goroutine, sending TUI events.
-// It reports completed count and failed tasks via the returned channels.
+// runWorkGoroutine runs the feature-centric work loop in a goroutine, sending TUI events.
+// It processes one feature group at a time: all tasks in a feature are completed before
+// moving to the next. Feature progression is controlled by --count (feature limit) and
+// the auto_continue config option.
 func runWorkGoroutine(params workLoopParams) {
 	go func() {
 		defer func() {
@@ -241,146 +353,201 @@ func runWorkGoroutine(params workLoopParams) {
 			params.p.Send(runner.InfoMsg{Text: params.syncInfoMsg})
 		}
 
-		stopReason := runner.StopReasonComplete
-		var errorDetail string
-		var warnings []string
-		var failedTasks []failedTask
-		completed := 0
+		// Determine effective feature limit.
+		// --count 0 (default) + auto_continue:false (default) → 1 feature
+		// --count 0 + auto_continue:true → all features
+		// --count N > 0 → N features (explicit, overrides auto_continue)
+		effectiveFeatureLimit := params.count
+		if effectiveFeatureLimit == 0 && !params.autoContinue {
+			effectiveFeatureLimit = 1
+		}
+		featureUnlimited := effectiveFeatureLimit == 0
 
-		// Log ignored tasks.
+		groups := params.featureGroups
+		featureTotal := len(groups)
+
+		// Log ignored tasks from all groups upfront.
 		var ignoredCount int64
-		for i := range params.tasks {
-			if !params.tasks[i].IsComplete() && params.tasks[i].Ignored {
-				params.p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", params.tasks[i].ID)})
-				ignoredCount++
+		for _, g := range groups {
+			for i := range g.tasks {
+				if !g.tasks[i].IsComplete() && g.tasks[i].Ignored {
+					params.p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", g.tasks[i].ID)})
+					ignoredCount++
+				}
 			}
 		}
 		if ignoredCount > 0 {
 			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksSkipped: ignoredCount})
 		}
 
-		tasks := params.tasks
-		var lastCompletedTaskID string
-		loopCount := params.count
-		for i := 0; params.unlimited || i < loopCount; i++ {
-			if i > 0 && params.stopFlag.Load() {
-				// Check if we should stop now or continue to a specific task.
-				targetID := ""
-				if v := params.stopAtTaskID.Load(); v != nil {
-					targetID, _ = v.(string)
-				}
-				if targetID == "" || targetID == lastCompletedTaskID || isTaskAtOrPastTarget(tasks, lastCompletedTaskID, targetID) {
-					stopReason = runner.StopReasonUserStop
-					break
-				}
-				// Target task not yet reached — continue working.
-			}
-
-			// In unlimited mode, use the current iteration count for display purposes.
-			displayCount := loopCount
-			if params.unlimited {
-				displayCount = i + 1 // at minimum, show current iteration
-				// Peek ahead: count remaining workable tasks for progress display.
-				remaining := countWorkable(tasks)
-				if remaining == 0 {
-					// Fresh re-parse: check if any tasks were added since the last iteration.
-					if freshTasks, rerr := parseAllTasks(params.dir); rerr == nil && countWorkable(freshTasks) > 0 {
-						tasks = freshTasks
-						remaining = countWorkable(tasks)
-					} else {
-						break
-					}
-				}
-				displayCount = i + remaining
-			}
-
-			maxCount := 0
-		if !params.unlimited {
-			maxCount = params.count
+		if featureTotal == 0 {
+			params.p.Send(runner.InfoMsg{Text: "No approved features available."})
+			summaryParams := params
+			summaryParams.count = 0
+			summary := buildSummaryData(summaryParams, 0, nil, runner.StopReasonNoTasks, "no approved features", nil)
+			params.tc.notifier.PlayRunComplete()
+			params.p.Send(runner.SummaryMsg{Data: summary})
+			pushToRemote(params.p, params.tc.workDir, 0, summary.Branch)
+			return
 		}
-		result := runTask(params.tc, tasks, i, displayCount, maxCount)
-			if result.taskID != "" {
-				lastCompletedTaskID = result.taskID
-			}
-			if result.tasks != nil {
-				tasks = result.tasks
-			}
-			if result.failed != nil {
-				failedTasks = append(failedTasks, *result.failed)
-				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
-			}
-			if result.warning != "" {
-				warnings = append(warnings, result.warning)
-			}
-			if result.committed {
-				completed++
-				_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
-			}
 
-			switch result.action {
-			case taskBreak:
-				if result.stopReason != 0 {
-					stopReason = result.stopReason
-				} else if completed == 0 {
-					stopReason = runner.StopReasonNoTasks
-				}
-			case taskRetry:
-				i--
-				continue
-			case taskSkipToNext:
-				continue
-			case taskContinue:
-				// proceed normally
-			}
+		stopReason := runner.StopReasonComplete
+		var errorDetail string
+		var warnings []string
+		var failedTasks []failedTask
+		totalCompleted := 0
+		featuresDone := 0
 
-			if result.action == taskBreak {
+		for fi, group := range groups {
+			if !featureUnlimited && featuresDone >= effectiveFeatureLimit {
 				break
 			}
+			if params.tc.workCtx.Err() != nil {
+				stopReason = runner.StopReasonInterrupted
+				break
+			}
+
+			// Between-feature stop flag check (only after the first feature starts).
+			if featuresDone > 0 && params.stopFlag.Load() {
+				stopReason = runner.StopReasonUserStop
+				break
+			}
+
+			// Set feature context in task context for TUI progress display.
+			tc := params.tc
+			tc.featureSourceFile = group.file
+			tc.featureCurrent = fi + 1
+			tc.featureTotal = featureTotal
+
+			// Run all tasks in this feature group.
+			grResult := runGroupTasks(tc, params, group)
+			totalCompleted += grResult.completed
+			failedTasks = append(failedTasks, grResult.failed...)
+			warnings = append(warnings, grResult.warnings...)
+
+			if grResult.stopped {
+				stopReason = grResult.stopReason
+				break
+			}
+
+			featuresDone++
 		}
 
 		// Determine final stop reason.
 		if len(failedTasks) > 0 && stopReason == runner.StopReasonComplete {
 			stopReason = runner.StopReasonPartialComplete
 		}
-		if completed == 0 && stopReason == runner.StopReasonComplete {
+		if totalCompleted == 0 && stopReason == runner.StopReasonComplete {
 			if len(warnings) > 0 {
 				stopReason = runner.StopReasonError
 				errorDetail = "agent ran but produced no commits"
 			} else {
 				stopReason = runner.StopReasonNoTasks
-				total, done, blocked, ignored := 0, 0, 0, 0
-				for i := range tasks {
-					total++
-					switch {
-					case tasks[i].IsComplete():
-						done++
-					case tasks[i].IsBlocked():
-						blocked++
-					case tasks[i].Ignored:
-						ignored++
-					}
-				}
-				errorDetail = fmt.Sprintf(
-					"tasks: %d total, %d complete, %d blocked, %d ignored, count=%d",
-					total, done, blocked, ignored, params.count)
 			}
 		}
 
-		// In unlimited mode, use completed count as the effective total for the summary.
-		effectiveCount := params.count
-		if params.unlimited {
-			effectiveCount = completed + len(failedTasks)
-		}
+		// Use actual task count (completed + failed) as the effective total for the summary.
 		summaryParams := params
-		summaryParams.count = effectiveCount
-		summary := buildSummaryData(summaryParams, completed, failedTasks, stopReason, errorDetail, warnings)
+		summaryParams.count = totalCompleted + len(failedTasks)
+		summary := buildSummaryData(summaryParams, totalCompleted, failedTasks, stopReason, errorDetail, warnings)
 
 		params.tc.notifier.PlayRunComplete()
 		params.p.Send(runner.SummaryMsg{Data: summary})
 
 		// Push commits to remote in the background.
-		pushToRemote(params.p, params.tc.workDir, completed, summary.Branch)
+		pushToRemote(params.p, params.tc.workDir, totalCompleted, summary.Branch)
 	}()
+}
+
+// groupTasksResult holds the outcome of running all tasks in a feature group.
+type groupTasksResult struct {
+	completed  int
+	failed     []failedTask
+	warnings   []string
+	stopped    bool
+	stopReason runner.StopReason
+}
+
+// runGroupTasks runs all workable tasks within a single feature group.
+// The inner loop mirrors the old task loop but is scoped to one source file.
+func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) groupTasksResult {
+	var result groupTasksResult
+
+	groupTasks := group.tasks
+
+	if countWorkable(groupTasks) == 0 {
+		return result
+	}
+
+	var lastCompletedTaskID string
+
+	for innerI := 0; ; innerI++ {
+		if tc.workCtx.Err() != nil {
+			result.stopped = true
+			result.stopReason = runner.StopReasonInterrupted
+			return result
+		}
+
+		// Between-task stop flag check (after first task).
+		if innerI > 0 && params.stopFlag.Load() {
+			targetID := ""
+			if v := params.stopAtTaskID.Load(); v != nil {
+				targetID, _ = v.(string)
+			}
+			if targetID == "" || targetID == lastCompletedTaskID || isTaskAtOrPastTarget(groupTasks, lastCompletedTaskID, targetID) {
+				result.stopped = true
+				result.stopReason = runner.StopReasonUserStop
+				return result
+			}
+		}
+
+		// Compute display count from remaining workable tasks in this group.
+		workableRemaining := countWorkable(groupTasks)
+		if workableRemaining == 0 {
+			break
+		}
+		displayCount := innerI + workableRemaining
+
+		taskResult := runTask(tc, groupTasks, innerI, displayCount, 0)
+		if taskResult.taskID != "" {
+			lastCompletedTaskID = taskResult.taskID
+		}
+
+		// Update group task list from re-parsed result, scoped to this source file.
+		if taskResult.tasks != nil {
+			groupTasks = filterTasksBySourceFile(taskResult.tasks, group.file)
+		}
+
+		if taskResult.failed != nil {
+			result.failed = append(result.failed, *taskResult.failed)
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
+		}
+		if taskResult.warning != "" {
+			result.warnings = append(result.warnings, taskResult.warning)
+		}
+		if taskResult.committed {
+			result.completed++
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
+		}
+
+		switch taskResult.action {
+		case taskBreak:
+			if taskResult.stopReason != 0 {
+				result.stopped = true
+				result.stopReason = taskResult.stopReason
+			}
+			return result
+		case taskRetry:
+			innerI--
+			continue
+		case taskSkipToNext:
+			continue
+		case taskContinue:
+			// proceed normally
+		}
+	}
+
+	return result
 }
 
 // buildSummaryData constructs the summary data for the end-of-run summary screen.

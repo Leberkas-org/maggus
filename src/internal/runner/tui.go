@@ -59,6 +59,8 @@ type IterationStartMsg struct {
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
 	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
+	FeatureCurrent  int             // 1-based index of current feature (0 if not feature-centric)
+	FeatureTotal    int             // total number of features being processed
 }
 
 // tickMsg is sent by the spinner ticker.
@@ -82,6 +84,11 @@ type TUIModel struct {
 	fingerprint string
 	currentIter int
 	totalIters  int
+
+	// Feature-centric progress (set when running in feature mode)
+	featureCurrent int // 1-based index of current feature
+	featureTotal   int // total features being processed
+	featureMode    bool // true when running in feature-centric mode
 
 	// Banner / startup info
 	banner       BannerInfo

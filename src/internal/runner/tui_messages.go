@@ -14,13 +14,24 @@ import (
 func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskFeatureFile, m.startTime)
 	m.currentIter = msg.Current
-	m.totalIters = max(msg.Total, m.totalIters)
+	// In feature mode, reset the task counter when entering a new feature.
+	// In non-feature mode, use max to avoid bar shrinkage when new tasks appear.
+	if msg.FeatureTotal > 0 && (msg.FeatureCurrent != m.featureCurrent || !m.featureMode) {
+		m.totalIters = msg.Total
+	} else {
+		m.totalIters = max(msg.Total, m.totalIters)
+	}
 	m.taskID = msg.TaskID
 	m.taskTitle = msg.TaskTitle
 	m.taskFeatureFile = msg.FeatureFile
 	m.taskDescription = msg.TaskDescription
 	m.taskCriteria = msg.TaskCriteria
 	m.remainingTasks = msg.RemainingTasks
+	if msg.FeatureTotal > 0 {
+		m.featureCurrent = msg.FeatureCurrent
+		m.featureTotal = msg.FeatureTotal
+		m.featureMode = true
+	}
 	// Reset per-iteration state
 	m.status = "Starting..."
 	m.output = "-"
@@ -129,7 +140,10 @@ func (m *TUIModel) handleFileChange() tea.Cmd {
 		}
 	}
 
-	m.totalIters = (m.currentIter - 1) + workableBugs + workableFeatures
+	// In feature mode, totalIters tracks tasks within the current feature — don't overwrite.
+	if !m.featureMode {
+		m.totalIters = (m.currentIter - 1) + workableBugs + workableFeatures
+	}
 	m.activeBugs = workableBugs
 
 	// Detect new tasks compared to previous counts

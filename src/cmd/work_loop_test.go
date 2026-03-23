@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
 )
 
@@ -621,5 +623,278 @@ func TestUnlimitedModeReparseNoNewTasks(t *testing.T) {
 	shouldContinue := countWorkable(freshTasks) > 0
 	if shouldContinue {
 		t.Error("expected shouldContinue=false when fresh re-parse also finds no workable tasks")
+	}
+}
+
+// ─── Feature-centric tests ────────────────────────────────────────────────────
+
+// incompleteTaskContent returns a feature file body with one incomplete task.
+func incompleteTaskContent(taskID, taskTitle string) string {
+	return "# Feature\n## Tasks\n### " + taskID + ": " + taskTitle + "\n**Acceptance Criteria:**\n- [ ] Done\n"
+}
+
+// incompleteBugContent returns a bug file body with one incomplete task.
+func incompleteBugContent(taskID, taskTitle string) string {
+	return "# Bug\n## Tasks\n### " + taskID + ": " + taskTitle + "\n**Acceptance Criteria:**\n- [ ] Done\n"
+}
+
+// writeApprovals writes an approval file granting approval to the given IDs.
+func writeApprovals(t *testing.T, dir string, approvedIDs ...string) {
+	t.Helper()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	a := make(approval.Approvals)
+	for _, id := range approvedIDs {
+		a[id] = true
+	}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_OptOutAllApproved verifies that opt-out mode
+// approves all groups by default (no approval file needed).
+func TestBuildApprovedFeatureGroups_OptOutAllApproved(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	writeFeatureFile(t, dir, "feature_002.md", incompleteTaskContent("TASK-002-001", "Add another"))
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("opt-out: expected 2 groups, got %d", len(groups))
+	}
+}
+
+// TestBuildApprovedFeatureGroups_OptInNoApprovals verifies that opt-in mode
+// returns no groups when nothing has been approved.
+func TestBuildApprovedFeatureGroups_OptInNoApprovals(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("opt-in with no approvals: expected 0 groups, got %d", len(groups))
+	}
+}
+
+// TestBuildApprovedFeatureGroups_OptInPartialApproval verifies that only
+// explicitly approved features are included in opt-in mode.
+func TestBuildApprovedFeatureGroups_OptInPartialApproval(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	writeFeatureFile(t, dir, "feature_002.md", incompleteTaskContent("TASK-002-001", "Add another"))
+	writeApprovals(t, dir, "feature_001")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Errorf("opt-in with one approval: expected 1 group, got %d", len(groups))
+	}
+	if groups[0].id != "feature_001" {
+		t.Errorf("expected group id 'feature_001', got %q", groups[0].id)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_BugsFirst verifies that bug groups come before
+// feature groups in the returned list.
+func TestBuildApprovedFeatureGroups_BugsFirst(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	writeBugFile(t, dir, "bug_001.md", incompleteBugContent("BUG-001-001", "Fix crash"))
+	// Approve both
+	writeApprovals(t, dir, "feature_001", "bug_001")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(groups))
+	}
+	if !groups[0].isBug {
+		t.Errorf("expected first group to be a bug, got id=%q", groups[0].id)
+	}
+	if groups[1].isBug {
+		t.Errorf("expected second group to be a feature, got id=%q", groups[1].id)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_EmptyDir verifies that an empty directory
+// returns an empty list without error.
+func TestBuildApprovedFeatureGroups_EmptyDir(t *testing.T) {
+	dir := setupCleanDir(t)
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("empty dir: expected 0 groups, got %d", len(groups))
+	}
+}
+
+// TestFilterTasksBySourceFile verifies that only tasks from the matching source
+// file are returned.
+func TestFilterTasksBySourceFile(t *testing.T) {
+	tasks := []parser.Task{
+		{ID: "TASK-001-001", SourceFile: "/path/to/feature_001.md"},
+		{ID: "TASK-001-002", SourceFile: "/path/to/feature_001.md"},
+		{ID: "TASK-002-001", SourceFile: "/path/to/feature_002.md"},
+	}
+
+	got := filterTasksBySourceFile(tasks, "/path/to/feature_001.md")
+	if len(got) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(got))
+	}
+	for _, t2 := range got {
+		if t2.SourceFile != "/path/to/feature_001.md" {
+			t.Errorf("unexpected source file %q", t2.SourceFile)
+		}
+	}
+}
+
+// TestFilterTasksBySourceFile_NoMatch verifies empty result when no tasks match.
+func TestFilterTasksBySourceFile_NoMatch(t *testing.T) {
+	tasks := []parser.Task{
+		{ID: "TASK-001-001", SourceFile: "/path/to/feature_001.md"},
+	}
+	got := filterTasksBySourceFile(tasks, "/path/to/feature_999.md")
+	if len(got) != 0 {
+		t.Errorf("expected 0 tasks, got %d", len(got))
+	}
+}
+
+// TestFindGroupForTask_Found verifies finding a group by task ID.
+func TestFindGroupForTask_Found(t *testing.T) {
+	groups := []featureGroup{
+		{
+			id: "feature_001",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
+			},
+		},
+		{
+			id: "feature_002",
+			tasks: []parser.Task{
+				{ID: "TASK-002-001", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
+			},
+		},
+	}
+
+	got := findGroupForTask(groups, "TASK-002-001")
+	if got == nil {
+		t.Fatal("expected non-nil group")
+	}
+	if got.id != "feature_002" {
+		t.Errorf("expected feature_002, got %q", got.id)
+	}
+}
+
+// TestFindGroupForTask_CompletedTaskNotFound verifies that completed tasks are
+// not matched (they cannot be targeted by --task).
+func TestFindGroupForTask_CompletedTaskNotFound(t *testing.T) {
+	groups := []featureGroup{
+		{
+			id: "feature_001",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}}, // complete
+			},
+		},
+	}
+
+	got := findGroupForTask(groups, "TASK-001-001")
+	if got != nil {
+		t.Errorf("expected nil for completed task, got %+v", got)
+	}
+}
+
+// TestFindGroupForTask_NotFound verifies nil when task ID is unknown.
+func TestFindGroupForTask_NotFound(t *testing.T) {
+	groups := []featureGroup{
+		{
+			id: "feature_001",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
+			},
+		},
+	}
+
+	got := findGroupForTask(groups, "TASK-999-001")
+	if got != nil {
+		t.Errorf("expected nil for unknown task, got %+v", got)
+	}
+}
+
+// TestFirstWorkableTask_Found verifies the first workable task is returned.
+func TestFirstWorkableTask_Found(t *testing.T) {
+	groups := []featureGroup{
+		{
+			id: "feature_001",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},  // complete
+				{ID: "TASK-001-002", Criteria: []parser.Criterion{{Text: "B", Checked: false}}}, // workable
+			},
+		},
+	}
+
+	got := firstWorkableTask(groups)
+	if got == nil {
+		t.Fatal("expected non-nil task")
+	}
+	if got.ID != "TASK-001-002" {
+		t.Errorf("expected TASK-001-002, got %q", got.ID)
+	}
+}
+
+// TestFirstWorkableTask_Empty verifies nil is returned when no workable task exists.
+func TestFirstWorkableTask_Empty(t *testing.T) {
+	groups := []featureGroup{
+		{
+			id: "feature_001",
+			tasks: []parser.Task{
+				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
+			},
+		},
+	}
+
+	got := firstWorkableTask(groups)
+	if got != nil {
+		t.Errorf("expected nil, got %+v", got)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_CompletedFileExcluded verifies that _completed.md
+// files are not included in the group list.
+func TestBuildApprovedFeatureGroups_CompletedFileExcluded(t *testing.T) {
+	dir := setupCleanDir(t)
+
+	// Completed file — should be excluded by GlobFeatureFiles.
+	completedPath := filepath.Join(dir, ".maggus", "features", "feature_001_completed.md")
+	content := "# Feature\n## Tasks\n### TASK-001-001: Done\n**Acceptance Criteria:**\n- [x] Done\n"
+	if err := os.WriteFile(completedPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("expected 0 groups (completed file excluded), got %d", len(groups))
 	}
 }

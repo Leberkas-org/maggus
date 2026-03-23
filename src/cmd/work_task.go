@@ -53,6 +53,11 @@ type taskContext struct {
 	workDir       string
 	runID         string
 	onComplete    config.OnCompleteConfig
+
+	// Feature-centric context (set per-group by runWorkGoroutine).
+	featureSourceFile string // scope parsedTasks to this source file for progress calculation
+	featureCurrent    int    // 1-based index of current feature (for TUI display)
+	featureTotal      int    // total features being processed (for TUI display)
 }
 
 // runTask executes a single task iteration: finds the next task, acquires a
@@ -85,7 +90,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Signal iteration start to the TUI.
-	sendIterationStart(tc.p, next, tasks, i, count)
+	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal)
 
 	// Build and run the prompt.
 	opts := prompt.Options{
@@ -139,8 +144,15 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	stageFeatures.Dir = tc.workDir
 	_, _ = stageFeatures.CombinedOutput()
 
+	// Scope parsedTasks to the current feature source file when in feature mode.
+	// This ensures progress calculation and result.tasks reflect only this feature's tasks.
+	scopedTasks := parsedTasks
+	if tc.featureSourceFile != "" {
+		scopedTasks = filterTasksBySourceFile(parsedTasks, tc.featureSourceFile)
+	}
+
 	// Commit, release lock, update progress, and check sync.
-	result := completeTask(tc, next, lock, parsedTasks, i, count, maxCount)
+	result := completeTask(tc, next, lock, scopedTasks, i, count, maxCount)
 	result.taskID = next.ID
 	return result
 }
@@ -218,7 +230,7 @@ func findNextWorkableTask(tasks []parser.Task, useWorktree bool, repoDir string)
 }
 
 // sendIterationStart sends the IterationStartMsg to the TUI with task details.
-func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count int) {
+func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count, featureCurrent, featureTotal int) {
 	tuiCriteria := make([]runner.TaskCriterion, len(task.Criteria))
 	for ci, c := range task.Criteria {
 		tuiCriteria[ci] = runner.TaskCriterion{
@@ -254,6 +266,8 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
 		RemainingTasks:  remaining,
+		FeatureCurrent:  featureCurrent,
+		FeatureTotal:    featureTotal,
 	})
 }
 

@@ -69,17 +69,17 @@ Rework the execution model from task-count-based runs to a feature-centric conti
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] Work loop groups tasks by feature file and processes one feature at a time
-- [ ] Only features that pass `approval.IsApproved()` are eligible for execution
-- [ ] After all tasks in a feature complete, the feature is marked done (existing rename/delete logic preserved)
-- [ ] If `auto_continue: false` (default), maggus stops after the first feature completes
-- [ ] If `auto_continue: true`, maggus moves to the next approved feature without stopping
-- [ ] `--count` flag is repurposed to mean "number of features to work on" (not tasks); `0` means all
-- [ ] `--task` flag continues to work for targeting a specific task within the current feature
-- [ ] No approved features available → prints clear message and exits cleanly
-- [ ] Existing TUI progress display updated to show "Feature N/M, Task X/Y"
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] Work loop groups tasks by feature file and processes one feature at a time
+- [x] Only features that pass `approval.IsApproved()` are eligible for execution
+- [x] After all tasks in a feature complete, the feature is marked done (existing rename/delete logic preserved)
+- [x] If `auto_continue: false` (default), maggus stops after the first feature completes
+- [x] If `auto_continue: true`, maggus moves to the next approved feature without stopping
+- [x] `--count` flag is repurposed to mean "number of features to work on" (not tasks); `0` means all
+- [x] `--task` flag continues to work for targeting a specific task within the current feature
+- [x] No approved features available → prints clear message and exits cleanly
+- [x] Existing TUI progress display updated to show "Feature N/M, Task X/Y"
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-001-004: Structured run log file
 **Description:** As a user, I want a log file per run so that I can tail it from another terminal or inspect it after the fact.

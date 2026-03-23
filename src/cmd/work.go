@@ -54,14 +54,16 @@ func resetWorkFlags() {
 
 var workCmd = &cobra.Command{
 	Use:   "work [count]",
-	Short: "Work on the next N tasks from the feature files",
-	Long: `Reads feature files and works through all incomplete tasks
-by prompting Claude Code. Use --count or a positional argument to limit the number.
+	Short: "Work on the next N approved features from the feature files",
+	Long: `Reads feature files and works through all approved features one at a time.
+Each feature's tasks are completed before moving to the next. Use --count or a
+positional argument to limit the number of features worked. By default, one
+feature is worked per run (override with auto_continue: true in config).
 
 Examples:
-  maggus work        # work on all workable tasks
-  maggus work 3      # work on the next 3 tasks
-  maggus work -c 3   # work on the next 3 tasks
+  maggus work        # work on the next approved feature (or all if auto_continue: true)
+  maggus work 3      # work on the next 3 approved features
+  maggus work -c 3   # work on the next 3 approved features
   maggus work --model opus   # override model for this run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -99,10 +101,58 @@ Examples:
 		if setup == nil {
 			return nil
 		}
-		count = setup.count
 		runID := setup.runID
 
-		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, runID, wc.cfg.Git)
+		// Build feature groups with approval filtering (bugs first, then features).
+		featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
+		if fgErr != nil {
+			return fmt.Errorf("build feature groups: %w", fgErr)
+		}
+
+		// When --task is set, restrict to the single group containing that task.
+		if taskFlag != "" {
+			targetGroup := findGroupForTask(featureGroups, taskFlag)
+			if targetGroup == nil {
+				cmd.Println(fmt.Sprintf("Task %s not found in any approved feature or bug.", taskFlag))
+				return nil
+			}
+			featureGroups = []featureGroup{*targetGroup}
+		}
+
+		// Remove groups with no workable tasks.
+		var workableGroups []featureGroup
+		for _, g := range featureGroups {
+			if countWorkable(g.tasks) > 0 {
+				workableGroups = append(workableGroups, g)
+			}
+		}
+		featureGroups = workableGroups
+
+		if len(featureGroups) == 0 {
+			if wc.cfg.IsApprovalRequired() {
+				cmd.Println("No approved features available. Use 'maggus approve' to approve features for execution.")
+			} else {
+				cmd.Println("No workable features or bugs found.")
+			}
+			return nil
+		}
+
+		// Determine feature count for banner and loop cap.
+		featureCount := len(featureGroups)
+		if count > 0 && count < featureCount {
+			featureCount = count
+		}
+		if !wc.cfg.IsAutoContinueEnabled() && count == 0 {
+			featureCount = 1 // default: 1 feature unless count overrides
+		}
+
+		// Find the first workable task for branch naming.
+		branchTask := firstWorkableTask(featureGroups)
+		if branchTask == nil {
+			branchTask = setup.next // fallback
+		}
+
+		branchMsg, err := setupBranch(wc.useWorktree, repoDir, branchTask, runID, wc.cfg.Git)
 		if err != nil {
 			return err
 		}
@@ -141,7 +191,7 @@ Examples:
 		currentBranch := strings.TrimSpace(string(branchOut))
 
 		banner := runner.BannerInfo{
-			Iterations: count,
+			Iterations: featureCount,
 			Branch:     currentBranch,
 			RunID:      runID,
 			Agent:      wc.activeAgent.Name(),
@@ -178,8 +228,9 @@ Examples:
 		runWorkGoroutine(workLoopParams{
 			tc:            tc,
 			tasks:         setup.tasks,
-			count:         count,
-			unlimited:     wc.count == 0 && taskFlag == "",
+			featureGroups: featureGroups,
+			count:         wc.count, // 0 = unlimited/auto via autoContinue; N = explicit feature limit
+			autoContinue:  wc.cfg.IsAutoContinueEnabled(),
 			runID:         runID,
 			startTime:     setup.startTime,
 			p:             p,
@@ -205,7 +256,7 @@ Examples:
 }
 
 func init() {
-	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of tasks to work on (0 = all)")
+	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of features to work on (0 = all or 1 if auto_continue is false)")
 	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")

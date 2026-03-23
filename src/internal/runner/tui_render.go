@@ -21,7 +21,7 @@ func (m TUIModel) renderBannerView() string {
 		b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Agent:"), m.banner.Agent))
 	}
 	b.WriteString(fmt.Sprintf("%s  %s\n", boldStyle.Render("Model:"), m.model))
-	b.WriteString(fmt.Sprintf("%s  %d\n", boldStyle.Render("Tasks:"), m.banner.Iterations))
+	b.WriteString(fmt.Sprintf("%s  %d\n", boldStyle.Render("Features:"), m.banner.Iterations))
 	if m.banner.Branch != "" {
 		b.WriteString(fmt.Sprintf("%s %s\n", boldStyle.Render("Branch:"), m.banner.Branch))
 	}
@@ -109,8 +109,14 @@ func (m TUIModel) renderHeaderInner(w int) string {
 	if m.totalIters > 0 {
 		barWidth := 20
 		bar := styles.ProgressBar(m.currentIter, m.totalIters, barWidth)
-		progress := fmt.Sprintf("[%s] %s", bar,
-			greenStyle.Render(fmt.Sprintf("%d/%d Tasks", m.currentIter, m.totalIters)))
+		var progressText string
+		if m.featureMode && m.featureTotal > 0 {
+			progressText = fmt.Sprintf("Feature %d/%d, Task %d/%d",
+				m.featureCurrent, m.featureTotal, m.currentIter, m.totalIters)
+		} else {
+			progressText = fmt.Sprintf("%d/%d Tasks", m.currentIter, m.totalIters)
+		}
+		progress := fmt.Sprintf("[%s] %s", bar, greenStyle.Render(progressText))
 		b.WriteString(progress + "\n")
 	}
 
