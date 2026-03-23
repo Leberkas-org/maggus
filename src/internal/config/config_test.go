@@ -501,6 +501,139 @@ func TestOnCompleteConfig_BugAction(t *testing.T) {
 
 func boolPtr(b bool) *bool { return &b }
 
+func TestConfig_IsApprovalRequired(t *testing.T) {
+	tests := []struct {
+		name string
+		mode string
+		want bool
+	}{
+		{"zero value defaults to opt-in (required)", "", true},
+		{"opt-in requires approval", "opt-in", true},
+		{"opt-out does not require approval", "opt-out", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{ApprovalMode: tt.mode}
+			if got := cfg.IsApprovalRequired(); got != tt.want {
+				t.Errorf("IsApprovalRequired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_IsAutoContinueEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *bool
+		want bool
+	}{
+		{"nil defaults to false", nil, false},
+		{"explicit true enables auto-continue", boolPtr(true), true},
+		{"explicit false disables auto-continue", boolPtr(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{AutoContinue: tt.val}
+			if got := cfg.IsAutoContinueEnabled(); got != tt.want {
+				t.Errorf("IsAutoContinueEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_ApprovalModeDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.ApprovalMode != "opt-in" {
+		t.Errorf("ApprovalMode = %q, want %q", cfg.ApprovalMode, "opt-in")
+	}
+	if !cfg.IsApprovalRequired() {
+		t.Error("expected IsApprovalRequired() to be true by default")
+	}
+}
+
+func TestLoad_ApprovalModeOptOut(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `approval_mode: opt-out
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.ApprovalMode != "opt-out" {
+		t.Errorf("ApprovalMode = %q, want %q", cfg.ApprovalMode, "opt-out")
+	}
+	if cfg.IsApprovalRequired() {
+		t.Error("expected IsApprovalRequired() to be false for opt-out")
+	}
+}
+
+func TestLoad_AutoContinueDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.AutoContinue != nil {
+		t.Errorf("expected AutoContinue to be nil by default, got %v", *cfg.AutoContinue)
+	}
+	if cfg.IsAutoContinueEnabled() {
+		t.Error("expected IsAutoContinueEnabled() to be false by default")
+	}
+}
+
+func TestLoad_AutoContinueTrue(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `auto_continue: true
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.IsAutoContinueEnabled() {
+		t.Error("expected IsAutoContinueEnabled() to be true")
+	}
+}
+
 func TestLoad_WithGitConfig(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

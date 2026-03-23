@@ -121,16 +121,36 @@ const (
 	AutoWorkDelayed  = "delayed"  // Show a 5-second countdown before dispatching.
 )
 
+// ApprovalMode values control whether features require explicit approval before maggus works on them.
+const (
+	ApprovalModeOptIn  = "opt-in"  // Default: features must be explicitly approved.
+	ApprovalModeOptOut = "opt-out" // All features are worked on unless explicitly unapproved.
+)
+
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Agent         string              `yaml:"agent"`
-	Model         string              `yaml:"model"`
-	Include       []string            `yaml:"include"`
-	Worktree      bool                `yaml:"worktree"`
-	AutoWork      string              `yaml:"auto_work"`
+	Agent        string              `yaml:"agent"`
+	Model        string              `yaml:"model"`
+	Include      []string            `yaml:"include"`
+	Worktree     bool                `yaml:"worktree"`
+	AutoWork     string              `yaml:"auto_work"`
+	ApprovalMode string              `yaml:"approval_mode"`
+	AutoContinue *bool               `yaml:"auto_continue"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git           GitConfig           `yaml:"git"`
 	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
+}
+
+// IsApprovalRequired returns true when approval_mode is opt-in (the default).
+// Features must be explicitly approved before maggus will work on them.
+func (c Config) IsApprovalRequired() bool {
+	return c.ApprovalMode != ApprovalModeOptOut
+}
+
+// IsAutoContinueEnabled returns true when auto_continue is explicitly set to true.
+// Default is false: maggus stops after each feature completes.
+func (c Config) IsAutoContinueEnabled() bool {
+	return c.AutoContinue != nil && *c.AutoContinue
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,
@@ -158,6 +178,10 @@ func Load(dir string) (Config, error) {
 
 	if cfg.AutoWork == "" {
 		cfg.AutoWork = AutoWorkDisabled
+	}
+
+	if cfg.ApprovalMode == "" {
+		cfg.ApprovalMode = ApprovalModeOptIn
 	}
 
 	return cfg, nil
