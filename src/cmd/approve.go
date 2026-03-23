@@ -214,11 +214,11 @@ func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
 
 // pickerModel is a simple bubbletea model for selecting a feature ID from a list.
 type pickerModel struct {
-	title    string
-	items    []string
-	cursor   int
-	selected string
-	done     bool
+	title     string
+	items     []string
+	cursor    int
+	selected  string
+	done      bool
 	cancelled bool
 }
 

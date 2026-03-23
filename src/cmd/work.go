@@ -8,12 +8,14 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 	"github.com/leberkas-org/maggus/internal/worktree"
@@ -37,6 +39,10 @@ var (
 	taskFlag        string
 	worktreeFlag    bool
 	noWorktreeFlag  bool
+
+	// Daemon-mode flags (hidden; set by 'maggus start', not users directly).
+	daemonRunFlag   bool
+	daemonRunIDFlag string
 )
 
 // resetWorkFlags resets all work command flags to their zero/default values.
@@ -50,6 +56,8 @@ func resetWorkFlags() {
 	taskFlag = ""
 	worktreeFlag = false
 	noWorktreeFlag = false
+	daemonRunFlag = false
+	daemonRunIDFlag = ""
 }
 
 var workCmd = &cobra.Command{
@@ -79,8 +87,9 @@ Examples:
 		workDir := dir
 
 		// Git sync check: detect remote changes and uncommitted work before starting.
+		// Skipped in daemon mode — sync is auto-continued if it arises between tasks.
 		var syncInfoMsg string
-		if wc.cfg.Git.IsCheckSyncEnabled() {
+		if wc.cfg.Git.IsCheckSyncEnabled() && !daemonRunFlag {
 			var shouldAbort bool
 			var syncErr error
 			syncInfoMsg, shouldAbort, syncErr = checkSync(dir)
@@ -102,6 +111,12 @@ Examples:
 			return nil
 		}
 		runID := setup.runID
+
+		// In daemon mode, use the run ID provided by 'maggus start' so that
+		// the daemon process writes into the same run directory.
+		if daemonRunFlag && daemonRunIDFlag != "" {
+			runID = daemonRunIDFlag
+		}
 
 		// Build feature groups with approval filtering (bugs first, then features).
 		featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
@@ -181,35 +196,76 @@ Examples:
 			workCancel()
 		}
 
-		// Build and start the TUI.
-		twoXStatus := claude2x.FetchStatus()
-		cwd, _ := os.Getwd()
-
-		branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-		branchCmd.Dir = dir
-		branchOut, _ := branchCmd.Output()
-		currentBranch := strings.TrimSpace(string(branchOut))
-
-		banner := runner.BannerInfo{
-			Iterations: featureCount,
-			Branch:     currentBranch,
-			RunID:      runID,
-			Agent:      wc.activeAgent.Name(),
-			CWD:        cwd,
-		}
-		if wc.useWorktree {
-			banner.Worktree = workDir
-		}
-		if twoXStatus.Is2x {
-			banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
-		}
+		// Initialise sync functions used by the between-task sync check.
 		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
 
-		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
-		m.SetSyncDir(workDir)
-		m.SetWatcher(workDir)
-		setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
-		p := tea.NewProgram(m, tea.WithAltScreen())
+		// Open structured run log; failures are non-fatal.
+		runLogger, logErr := runlog.Open(runID, dir)
+		if logErr != nil {
+			cmd.Printf("Warning: could not open run log: %v\n", logErr)
+		}
+		defer func() { _ = runLogger.Close() }()
+
+		// Build the bubbletea program and stop-flag controls.
+		// In daemon mode we use a headless null model (no terminal required).
+		// In normal mode we build the full interactive TUI.
+		var p *tea.Program
+		stopFlagAtomic := &atomic.Bool{}
+		stopAtTaskIDAtomic := &atomic.Value{}
+		var tuiModel *runner.TUIModel // non-nil only in interactive mode
+
+		if daemonRunFlag {
+			// Write this process's PID so 'maggus stop' can find us.
+			if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
+				cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
+			}
+			defer removeDaemonPID(dir)
+
+			// Create a pipe as a never-blocking stdin substitute so bubbletea
+			// does not quit unexpectedly when it reads EOF from /dev/null.
+			pipeR, pipeW, pipeErr := os.Pipe()
+			if pipeErr == nil {
+				defer pipeW.Close()
+				defer pipeR.Close()
+				p = tea.NewProgram(nullTUIModel{}, tea.WithoutRenderer(), tea.WithInput(pipeR))
+			} else {
+				p = tea.NewProgram(nullTUIModel{}, tea.WithoutRenderer())
+			}
+		} else {
+			twoXStatus := claude2x.FetchStatus()
+			cwd, _ := os.Getwd()
+
+			branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+			branchCmd.Dir = dir
+			branchOut, _ := branchCmd.Output()
+			currentBranch := strings.TrimSpace(string(branchOut))
+
+			banner := runner.BannerInfo{
+				Iterations: featureCount,
+				Branch:     currentBranch,
+				RunID:      runID,
+				Agent:      wc.activeAgent.Name(),
+				CWD:        cwd,
+			}
+			if wc.useWorktree {
+				banner.Worktree = workDir
+			}
+			if twoXStatus.Is2x {
+				banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
+			}
+
+			m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
+			m.SetSyncDir(workDir)
+			m.SetWatcher(workDir)
+			setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
+			m.SetOnToolUse(func(taskID, toolType, description string) {
+				runLogger.ToolUse(taskID, toolType, description)
+			})
+			p = tea.NewProgram(m, tea.WithAltScreen())
+			stopFlagAtomic = m.StopFlag()
+			stopAtTaskIDAtomic = m.StopAtTaskIDFlag()
+			tuiModel = &m
+		}
 
 		tc := taskContext{
 			workCtx:       workCtx,
@@ -223,6 +279,7 @@ Examples:
 			workDir:       workDir,
 			runID:         runID,
 			onComplete:    wc.cfg.OnComplete,
+			logger:        runLogger,
 		}
 
 		runWorkGoroutine(workLoopParams{
@@ -234,8 +291,8 @@ Examples:
 			runID:         runID,
 			startTime:     setup.startTime,
 			p:             p,
-			stopFlag:      m.StopFlag(),
-			stopAtTaskID:  m.StopAtTaskIDFlag(),
+			stopFlag:      stopFlagAtomic,
+			stopAtTaskID:  stopAtTaskIDAtomic,
 			includeWarns:  wc.includeWarnings,
 			branchMsg:     branchMsg,
 			syncInfoMsg:   syncInfoMsg,
@@ -246,7 +303,9 @@ Examples:
 		})
 
 		_, tuiErr := p.Run()
-		m.CloseWatcher()
+		if tuiModel != nil {
+			tuiModel.CloseWatcher()
+		}
 		if tuiErr != nil {
 			return fmt.Errorf("TUI error: %w", tuiErr)
 		}
@@ -263,6 +322,13 @@ func init() {
 	workCmd.Flags().StringVar(&taskFlag, "task", "", "run a specific task by ID (e.g. TASK-001)")
 	workCmd.Flags().BoolVar(&worktreeFlag, "worktree", false, "run in an isolated git worktree")
 	workCmd.Flags().BoolVar(&noWorktreeFlag, "no-worktree", false, "force disable worktree mode (overrides config)")
+
+	// Hidden flags used internally by 'maggus start' to launch the daemon work loop.
+	workCmd.Flags().BoolVar(&daemonRunFlag, "daemon-run", false, "run the work loop as a daemon (no TUI)")
+	workCmd.Flags().StringVar(&daemonRunIDFlag, "daemon-run-id", "", "run ID to use in daemon mode")
+	_ = workCmd.Flags().MarkHidden("daemon-run")
+	_ = workCmd.Flags().MarkHidden("daemon-run-id")
+
 	rootCmd.AddCommand(workCmd)
 }
 

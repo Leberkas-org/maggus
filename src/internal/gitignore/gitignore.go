@@ -14,6 +14,7 @@ var requiredEntries = []string{
 	".maggus/usage*.csv",
 	".maggus/usage_*.jsonl",
 	".maggus/feature_approvals.yml",
+	".maggus/daemon.pid",
 	"COMMIT.md",
 }
 

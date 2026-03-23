@@ -66,6 +66,9 @@ func (m *TUIModel) handleToolMsg(msg agent.ToolMsg) {
 		m.detailScrollOffset = m.detailTotalLines
 	}
 	clampDetailScroll(m)
+	if m.onToolUse != nil {
+		m.onToolUse(m.taskID, msg.Type, msg.Description)
+	}
 }
 
 // handleSkillMsg adds a unique skill name and rebuilds the extras display.

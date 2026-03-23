@@ -560,12 +560,12 @@ func TestHandleFileChange_TotalDoesNotDecreaseAfterTaskCompletes(t *testing.T) {
 
 func TestBugHintLine_Rendered(t *testing.T) {
 	m := TUIModel{
-		version:    "1.0.0",
-		totalIters: 5,
+		version:     "1.0.0",
+		totalIters:  5,
 		currentIter: 2,
-		activeBugs: 3,
-		width:      80,
-		height:     40,
+		activeBugs:  3,
+		width:       80,
+		height:      40,
 	}
 
 	header := m.renderHeaderInner(80)
@@ -577,12 +577,12 @@ func TestBugHintLine_Rendered(t *testing.T) {
 
 func TestBugHintLine_SingleBug(t *testing.T) {
 	m := TUIModel{
-		version:    "1.0.0",
-		totalIters: 5,
+		version:     "1.0.0",
+		totalIters:  5,
 		currentIter: 2,
-		activeBugs: 1,
-		width:      80,
-		height:     40,
+		activeBugs:  1,
+		width:       80,
+		height:      40,
 	}
 
 	header := m.renderHeaderInner(80)
@@ -598,12 +598,12 @@ func TestBugHintLine_SingleBug(t *testing.T) {
 
 func TestBugHintLine_Hidden_WhenNoBugs(t *testing.T) {
 	m := TUIModel{
-		version:    "1.0.0",
-		totalIters: 5,
+		version:     "1.0.0",
+		totalIters:  5,
 		currentIter: 2,
-		activeBugs: 0,
-		width:      80,
-		height:     40,
+		activeBugs:  0,
+		width:       80,
+		height:      40,
 	}
 
 	header := m.renderHeaderInner(80)

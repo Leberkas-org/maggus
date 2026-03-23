@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const statusHeaderLines = 9 // title + blank + tab bar (~2) + separator + blank + progress + blank + tasks header + separator
+const statusHeaderLines = 11 // title + daemon line + blank + tab bar (~2) + separator + blank + progress + blank + tasks header + separator
 
 // Lipgloss styles for the status command.
 var (
@@ -47,6 +47,13 @@ type statusModel struct {
 
 	// Temporary status note (e.g. "feature is already ignored")
 	statusNote string
+
+	// Live log panel
+	showLog      bool
+	logLines     []string
+	logScroll    int
+	logAutoScroll bool
+	daemon        daemonStatus
 }
 
 func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
@@ -54,12 +61,13 @@ func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFi
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
 		},
-		features:     features,
-		showAll:      showAll,
-		nextTaskID:   nextTaskID,
-		nextTaskFile: nextTaskFile,
-		agentName:    agentName,
-		dir:          dir,
+		features:      features,
+		showAll:       showAll,
+		nextTaskID:    nextTaskID,
+		nextTaskFile:  nextTaskFile,
+		agentName:     agentName,
+		dir:           dir,
+		logAutoScroll: true,
 	}
 	visible := m.visibleFeatures()
 	if len(visible) > 0 {
@@ -123,9 +131,12 @@ func (m *statusModel) syncDetailSuffix() {
 }
 
 func (m statusModel) Init() tea.Cmd {
-	return func() tea.Msg {
-		return claude2xResultMsg{status: claude2x.FetchStatus()}
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			return claude2xResultMsg{status: claude2x.FetchStatus()}
+		},
+		logPollTick(),
+	)
 }
 
 func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -147,6 +158,16 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.BorderColor = styles.ThemeColor(m.is2x)
 		return m, tickCmd
 
+	case logPollTickMsg:
+		m.daemon = loadDaemonStatus(m.dir)
+		if m.daemon.LogPath != "" {
+			newLines := readLastNLogLines(m.daemon.LogPath, 50)
+			m.applyLogLines(newLines)
+		} else {
+			m.logLines = nil
+		}
+		return m, logPollTick()
+
 	case tea.KeyMsg:
 		if m.ConfirmDelete {
 			return m.updateStatusConfirmDelete(msg)
@@ -159,6 +180,35 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	cmd := m.UpdateViewport(msg)
 	return m, cmd
+}
+
+// applyLogLines updates the log line buffer and adjusts the scroll position.
+// If auto-scroll is active, the view is pinned to the bottom.
+func (m *statusModel) applyLogLines(newLines []string) {
+	prevLen := len(m.logLines)
+	m.logLines = newLines
+	if m.logAutoScroll {
+		m.logScroll = m.maxLogScroll()
+	} else if len(newLines) > prevLen {
+		// Preserve relative position as new lines arrive.
+		m.logScroll += len(newLines) - prevLen
+		if m.logScroll > m.maxLogScroll() {
+			m.logScroll = m.maxLogScroll()
+		}
+	}
+	if m.logScroll < 0 {
+		m.logScroll = 0
+	}
+}
+
+// maxLogScroll returns the maximum valid scroll offset for the log panel.
+func (m *statusModel) maxLogScroll() int {
+	visible := m.visibleTaskLines()
+	max := len(m.logLines) - visible
+	if max < 0 {
+		max = 0
+	}
+	return max
 }
 
 func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -201,6 +251,40 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// When the log panel is active, j/k/up/down scroll the log.
+	if m.showLog {
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+		case "l", "L":
+			m.showLog = false
+			return m, nil
+		case "j", "down":
+			m.logAutoScroll = false
+			m.logScroll++
+			if m.logScroll > m.maxLogScroll() {
+				m.logScroll = m.maxLogScroll()
+			}
+			return m, nil
+		case "k", "up":
+			m.logAutoScroll = false
+			m.logScroll--
+			if m.logScroll < 0 {
+				m.logScroll = 0
+			}
+			return m, nil
+		case "G":
+			m.logAutoScroll = true
+			m.logScroll = m.maxLogScroll()
+			return m, nil
+		case "g":
+			m.logAutoScroll = false
+			m.logScroll = 0
+			return m, nil
+		}
+		return m, nil
+	}
+
 	// Clear status note on any key except alt+i/alt+p
 	if msg.String() != "alt+i" && msg.String() != "alt+p" {
 		m.statusNote = ""
@@ -208,6 +292,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.syncDetailSuffix()
 
 	switch msg.String() {
+	case "l", "L":
+		m.showLog = true
+		m.logAutoScroll = true
+		m.logScroll = m.maxLogScroll()
+		return m, nil
 	case "tab", "right":
 		visible := m.visibleFeatures()
 		if len(visible) > 1 {
@@ -355,6 +444,9 @@ func (m statusModel) View() string {
 	if v := m.taskListComponent.View(); v != "" {
 		return v
 	}
+	if m.showLog {
+		return m.viewLog()
+	}
 	return m.viewStatus()
 }
 
@@ -464,6 +556,113 @@ func (m statusModel) renderTabBar() string {
 	return " " + strings.Join(lines, "\n ")
 }
 
+// renderDaemonStatusLine returns a one-line string showing daemon state and
+// current feature/task progress (for use in the status header).
+func (m statusModel) renderDaemonStatusLine() string {
+	if m.daemon.Running {
+		indicator := statusCyanStyle.Render("●")
+		line := fmt.Sprintf(" %s daemon running (PID %d)", indicator, m.daemon.PID)
+		if m.daemon.CurrentFeature != "" {
+			line += statusDimStyle.Render(" · "+m.daemon.CurrentFeature)
+		}
+		if m.daemon.CurrentTask != "" {
+			line += statusDimStyle.Render(" · "+m.daemon.CurrentTask)
+		}
+		return line
+	}
+	if m.daemon.RunID != "" {
+		return statusDimStyle.Render(fmt.Sprintf(" ○ daemon not running · last run: %s", m.daemon.RunID))
+	}
+	return statusDimStyle.Render(" ○ daemon not running")
+}
+
+// viewLog renders the live log panel, replacing the task list content area.
+func (m statusModel) viewLog() string {
+	var sb strings.Builder
+
+	// Re-use the same header structure as viewStatus (title + daemon line + tabs + progress).
+	visible := m.visibleFeatures()
+
+	totalTasks := 0
+	totalDone := 0
+	totalBlocked := 0
+	activeFeatures := 0
+	totalBugs := 0
+	activeBugs := 0
+	for _, f := range m.features {
+		totalTasks += len(f.tasks)
+		totalDone += f.doneCount()
+		totalBlocked += f.blockedCount()
+		if f.isBug {
+			totalBugs++
+			if !f.completed {
+				activeBugs++
+			}
+		} else {
+			if !f.completed {
+				activeFeatures++
+			}
+		}
+	}
+	featureCount := len(m.features) - totalBugs
+
+	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
+	if totalBugs > 0 {
+		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
+	}
+	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %s, %d tasks total", headerParts, totalTasks))
+	sb.WriteString(header)
+	sb.WriteString("\n")
+	sb.WriteString(m.renderDaemonStatusLine())
+	sb.WriteString("\n")
+
+	if len(visible) > 0 {
+		sb.WriteString(m.renderTabBar())
+		sb.WriteString("\n")
+		sb.WriteString(" " + styles.Separator(42))
+		sb.WriteString("\n")
+	}
+
+	// Log panel title
+	sb.WriteString("\n")
+	logTitle := styles.Title.Render(" Live Log")
+	if m.daemon.LogPath != "" {
+		logTitle += statusDimStyle.Render("  " + m.daemon.RunID+"/run.log")
+	}
+	sb.WriteString(logTitle)
+	sb.WriteString("\n")
+	sb.WriteString(" " + styles.Separator(42))
+
+	visibleLines := m.visibleTaskLines()
+
+	if len(m.logLines) == 0 {
+		sb.WriteString("\n")
+		sb.WriteString(statusDimStyle.Render("  No active run"))
+	} else {
+		end := min(m.logScroll+visibleLines, len(m.logLines))
+		start := max(m.logScroll, 0)
+		for _, line := range m.logLines[start:end] {
+			sb.WriteString("\n")
+			sb.WriteString(statusDimStyle.Render(" " + line))
+		}
+		if len(m.logLines) > visibleLines {
+			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))
+			if m.logAutoScroll {
+				scrollHint += " (auto)"
+			}
+			sb.WriteString("\n")
+			sb.WriteString(statusDimStyle.Render(scrollHint))
+		}
+	}
+
+	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · l: task list · q/esc: exit")
+	borderColor := styles.ThemeColor(m.is2x)
+	if m.Width > 0 && m.Height > 0 {
+		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
+	}
+	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
+}
+
 func (m statusModel) viewStatus() string {
 	var sb strings.Builder
 
@@ -502,7 +701,9 @@ func (m statusModel) viewStatus() string {
 	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %s, %d tasks total",
 		headerParts, totalTasks))
 	sb.WriteString(header)
-	sb.WriteString("\n\n")
+	sb.WriteString("\n")
+	sb.WriteString(m.renderDaemonStatusLine())
+	sb.WriteString("\n")
 
 	// Tab bar
 	if len(visible) > 0 {
@@ -545,10 +746,7 @@ func (m statusModel) viewStatus() string {
 
 		// Determine visible window for scrolling
 		visibleLines := m.visibleTaskLines()
-		end := m.ScrollOffset + visibleLines
-		if end > len(m.Tasks) {
-			end = len(m.Tasks)
-		}
+		end := min(m.ScrollOffset+visibleLines, len(m.Tasks))
 
 		for taskIdx := m.ScrollOffset; taskIdx < end; taskIdx++ {
 			t := m.Tasks[taskIdx]
@@ -628,7 +826,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore feature · alt+r: run · alt+bksp: delete · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {

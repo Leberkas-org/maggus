@@ -479,6 +479,8 @@ func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) gr
 		return result
 	}
 
+	tc.logger.FeatureStart(group.id)
+
 	var lastCompletedTaskID string
 
 	for innerI := 0; ; innerI++ {
@@ -547,6 +549,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) gr
 		}
 	}
 
+	tc.logger.FeatureComplete(group.id)
 	return result
 }
 
@@ -622,6 +625,11 @@ func pushToRemote(p *tea.Program, workDir string, completed int, currentBranch s
 
 // captureStartHash gets the current short HEAD hash.
 func captureStartHash(workDir string) string {
+	return captureShortHash(workDir)
+}
+
+// captureShortHash returns the current short HEAD git hash, or empty string on error.
+func captureShortHash(workDir string) string {
 	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 	cmd.Dir = workDir
 	out, _ := cmd.Output()

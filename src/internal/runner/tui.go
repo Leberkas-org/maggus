@@ -86,8 +86,8 @@ type TUIModel struct {
 	totalIters  int
 
 	// Feature-centric progress (set when running in feature mode)
-	featureCurrent int // 1-based index of current feature
-	featureTotal   int // total features being processed
+	featureCurrent int  // 1-based index of current feature
+	featureTotal   int  // total features being processed
 	featureMode    bool // true when running in feature-centric mode
 
 	// Banner / startup info
@@ -143,16 +143,19 @@ type TUIModel struct {
 	sync syncState
 
 	// File watcher for live summary updates
-	watcher   *filewatcher.Watcher
-	watcherCh chan struct{}
-	workDir   string // directory used for re-parsing features/bugs on file changes
-	activeBugs int   // count of workable bug tasks (for hint line)
+	watcher    *filewatcher.Watcher
+	watcherCh  chan struct{}
+	workDir    string // directory used for re-parsing features/bugs on file changes
+	activeBugs int    // count of workable bug tasks (for hint line)
 
 	// Inline notification for new file detection
-	notification        string // current notification text (empty = hidden)
-	notificationTimerID int    // monotonic ID to avoid stale timers hiding newer notifications
-	prevWorkableBugs    int    // previous workable bug count for delta detection
-	prevWorkableFeatures int   // previous workable feature count for delta detection
+	notification         string // current notification text (empty = hidden)
+	notificationTimerID  int    // monotonic ID to avoid stale timers hiding newer notifications
+	prevWorkableBugs     int    // previous workable bug count for delta detection
+	prevWorkableFeatures int    // previous workable feature count for delta detection
+
+	// Tool use callback: invoked with (taskID, toolType, description) on each tool event.
+	onToolUse func(taskID, toolType, description string)
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
@@ -236,6 +239,12 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 // SetOnTaskUsage sets a callback that is invoked each time a task's usage is finalized.
 func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
 	m.tokens.onUsage = fn
+}
+
+// SetOnToolUse sets a callback that is invoked each time a tool use event is received.
+// The callback receives the current task ID, tool type, and tool description.
+func (m *TUIModel) SetOnToolUse(fn func(taskID, toolType, description string)) {
+	m.onToolUse = fn
 }
 
 // TaskUsages returns the per-task token usage records.

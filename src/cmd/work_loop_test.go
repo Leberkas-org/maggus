@@ -385,10 +385,10 @@ func TestInitIteration_EmptyNoBugsNoFeatures(t *testing.T) {
 func TestCountWorkable(t *testing.T) {
 	tasks := []parser.Task{
 		{ID: "BUG-001-001", Title: "Fix", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
-		{ID: "BUG-001-002", Title: "Fixed", Criteria: []parser.Criterion{{Text: "B", Checked: true}}},                        // complete
-		{ID: "TASK-001-001", Title: "Add", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},                          // workable
+		{ID: "BUG-001-002", Title: "Fixed", Criteria: []parser.Criterion{{Text: "B", Checked: true}}},                             // complete
+		{ID: "TASK-001-001", Title: "Add", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},                             // workable
 		{ID: "TASK-001-002", Title: "Block", Criteria: []parser.Criterion{{Text: "BLOCKED: dep", Checked: false, Blocked: true}}}, // blocked
-		{ID: "TASK-001-003", Title: "Ign", Criteria: []parser.Criterion{{Text: "D", Checked: false}}, Ignored: true},            // ignored
+		{ID: "TASK-001-003", Title: "Ign", Criteria: []parser.Criterion{{Text: "D", Checked: false}}, Ignored: true},              // ignored
 	}
 
 	got := countWorkable(tasks)
@@ -414,7 +414,7 @@ func TestProgressTotal_UnlimitedMode(t *testing.T) {
 		{ID: "TASK-001-003", Title: "Next2", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},
 	}
 
-	i := 0 // first iteration (0-based)
+	i := 0        // first iteration (0-based)
 	maxCount := 0 // unlimited
 
 	progressTotal := (i + 1) + countWorkable(parsedTasks)
@@ -517,6 +517,7 @@ func TestFindTaskByID_BugID(t *testing.T) {
 		t.Errorf("expected BUG-001-001, got %s", got.ID)
 	}
 }
+
 // TestParseAllTasksPicksUpNewFile verifies that parseAllTasks returns newly-added
 // tasks when called a second time after a file is written to disk.
 // This is the mechanism the unlimited-mode re-parse relies on to avoid

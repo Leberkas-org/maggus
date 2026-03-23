@@ -129,13 +129,13 @@ const (
 
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Agent        string              `yaml:"agent"`
-	Model        string              `yaml:"model"`
-	Include      []string            `yaml:"include"`
-	Worktree     bool                `yaml:"worktree"`
-	AutoWork     string              `yaml:"auto_work"`
-	ApprovalMode string              `yaml:"approval_mode"`
-	AutoContinue *bool               `yaml:"auto_continue"`
+	Agent         string              `yaml:"agent"`
+	Model         string              `yaml:"model"`
+	Include       []string            `yaml:"include"`
+	Worktree      bool                `yaml:"worktree"`
+	AutoWork      string              `yaml:"auto_work"`
+	ApprovalMode  string              `yaml:"approval_mode"`
+	AutoContinue  *bool               `yaml:"auto_continue"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git           GitConfig           `yaml:"git"`
 	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
