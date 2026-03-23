@@ -47,17 +47,17 @@ Rework the execution model from task-count-based runs to a feature-centric conti
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] New package `internal/approval` with `Load`, `Save`, `Approve`, `Unapprove`, `IsApproved` functions
-- [ ] Approval state stored in `.maggus/feature_approvals.yml` (feature ID → approved bool)
-- [ ] `maggus approve <feature-id>` marks a feature approved; when called with no argument it shows an interactive picker listing unapproved features
-- [ ] `maggus unapprove <feature-id>` revokes approval; when called with no argument it shows an interactive picker listing approved features
-- [ ] Interactive picker uses arrow keys to select, Enter to confirm, Esc/q to cancel
-- [ ] Both commands print confirmation of the change
-- [ ] When `approval_mode: opt-out`, `IsApproved` returns `true` for all features by default
-- [ ] When `approval_mode: opt-in`, `IsApproved` returns `false` unless explicitly approved
-- [ ] `feature_approvals.yml` is added to `.gitignore` entries managed by `internal/gitignore`
-- [ ] Typecheck/lint passes
-- [ ] Unit tests are written and successful
+- [x] New package `internal/approval` with `Load`, `Save`, `Approve`, `Unapprove`, `IsApproved` functions
+- [x] Approval state stored in `.maggus/feature_approvals.yml` (feature ID → approved bool)
+- [x] `maggus approve <feature-id>` marks a feature approved; when called with no argument it shows an interactive picker listing unapproved features
+- [x] `maggus unapprove <feature-id>` revokes approval; when called with no argument it shows an interactive picker listing approved features
+- [x] Interactive picker uses arrow keys to select, Enter to confirm, Esc/q to cancel
+- [x] Both commands print confirmation of the change
+- [x] When `approval_mode: opt-out`, `IsApproved` returns `true` for all features by default
+- [x] When `approval_mode: opt-in`, `IsApproved` returns `false` unless explicitly approved
+- [x] `feature_approvals.yml` is added to `.gitignore` entries managed by `internal/gitignore`
+- [x] Typecheck/lint passes
+- [x] Unit tests are written and successful
 
 ### TASK-001-003: Rework work loop to be feature-centric
 **Description:** As a user, I want maggus to complete an entire feature before moving on so that work is coherent and reviewable at feature boundaries.
