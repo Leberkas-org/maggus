@@ -114,12 +114,20 @@ func (o OnCompleteConfig) BugAction() string {
 	return "rename"
 }
 
+// AutoWork values control when maggus automatically starts working from the main menu.
+const (
+	AutoWorkDisabled = "disabled" // Default: no automatic work dispatch.
+	AutoWorkEnabled  = "enabled"  // Dispatch work immediately when workable tasks appear.
+	AutoWorkDelayed  = "delayed"  // Show a 5-second countdown before dispatching.
+)
+
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
 	Agent         string              `yaml:"agent"`
 	Model         string              `yaml:"model"`
 	Include       []string            `yaml:"include"`
 	Worktree      bool                `yaml:"worktree"`
+	AutoWork      string              `yaml:"auto_work"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git           GitConfig           `yaml:"git"`
 	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
@@ -146,6 +154,10 @@ func Load(dir string) (Config, error) {
 
 	if cfg.Agent == "" {
 		cfg.Agent = "claude"
+	}
+
+	if cfg.AutoWork == "" {
+		cfg.AutoWork = AutoWorkDisabled
 	}
 
 	return cfg, nil

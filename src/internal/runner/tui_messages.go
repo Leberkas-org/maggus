@@ -14,7 +14,7 @@ import (
 func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskFeatureFile, m.startTime)
 	m.currentIter = msg.Current
-	m.totalIters = msg.Total
+	m.totalIters = max(msg.Total, m.totalIters)
 	m.taskID = msg.TaskID
 	m.taskTitle = msg.TaskTitle
 	m.taskFeatureFile = msg.FeatureFile
@@ -129,7 +129,7 @@ func (m *TUIModel) handleFileChange() tea.Cmd {
 		}
 	}
 
-	m.totalIters = m.currentIter + workableBugs + workableFeatures
+	m.totalIters = (m.currentIter - 1) + workableBugs + workableFeatures
 	m.activeBugs = workableBugs
 
 	// Detect new tasks compared to previous counts

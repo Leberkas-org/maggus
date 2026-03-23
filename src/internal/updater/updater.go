@@ -68,7 +68,7 @@ func CheckLatestVersion(currentVersion string) UpdateInfo {
 	}
 
 	var isNewer bool
-	if currentVersion == "dev" {
+	if strings.HasPrefix(currentVersion, "dev") {
 		// Any valid release is newer than a dev build.
 		isNewer = true
 	} else {

@@ -356,7 +356,7 @@ func (m updateModel) renderContent() string {
 
 	// Current version
 	currentDisplay := m.currentVersion
-	if currentDisplay != "dev" {
+	if !strings.HasPrefix(currentDisplay, "dev") {
 		currentDisplay = "v" + strings.TrimPrefix(currentDisplay, "v")
 	}
 	fmt.Fprintf(&content, "%s  %s\n", labelStyle.Render("Current:"), valStyle.Render(currentDisplay))

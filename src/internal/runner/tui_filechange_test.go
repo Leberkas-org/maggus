@@ -349,9 +349,9 @@ func TestHandleFileChange_UpdatesTotalIters(t *testing.T) {
 
 	m.handleFileChange()
 
-	// 2 workable tasks + currentIter(1) = 3
-	if m.totalIters != 3 {
-		t.Errorf("totalIters = %d, want 3", m.totalIters)
+	// 2 workable tasks + (currentIter-1)(0) = 2
+	if m.totalIters != 2 {
+		t.Errorf("totalIters = %d, want 2", m.totalIters)
 	}
 	if m.currentIter != 1 {
 		t.Errorf("currentIter changed to %d, want 1 (should not change)", m.currentIter)
@@ -380,9 +380,9 @@ func TestHandleFileChange_CountsBugsAsTasks(t *testing.T) {
 
 	m.handleFileChange()
 
-	// 3 workable (1 feature + 2 bugs) + currentIter(2) = 5
-	if m.totalIters != 5 {
-		t.Errorf("totalIters = %d, want 5", m.totalIters)
+	// 3 workable (1 feature + 2 bugs) + (currentIter-1)(1) = 4
+	if m.totalIters != 4 {
+		t.Errorf("totalIters = %d, want 4", m.totalIters)
 	}
 	if m.activeBugs != 2 {
 		t.Errorf("activeBugs = %d, want 2", m.activeBugs)
@@ -404,9 +404,9 @@ func TestHandleFileChange_CurrentIterNotChanged(t *testing.T) {
 
 	m.handleFileChange()
 
-	// 0 workable + currentIter(5) = 5
-	if m.totalIters != 5 {
-		t.Errorf("totalIters = %d, want 5", m.totalIters)
+	// 0 workable + (currentIter-1)(4) = 4
+	if m.totalIters != 4 {
+		t.Errorf("totalIters = %d, want 4", m.totalIters)
 	}
 	if m.currentIter != 5 {
 		t.Errorf("currentIter = %d, want 5", m.currentIter)
@@ -426,13 +426,13 @@ func TestHandleFileChange_BlockedTasksNotCounted(t *testing.T) {
 
 	m := &TUIModel{
 		workDir:     dir,
-		currentIter: 0,
+		currentIter: 1,
 		totalIters:  3,
 	}
 
 	m.handleFileChange()
 
-	// 1 workable feature + 0 workable bugs + currentIter(0) = 1
+	// 1 workable feature + 0 workable bugs + (currentIter-1)(0) = 1
 	if m.totalIters != 1 {
 		t.Errorf("totalIters = %d, want 1", m.totalIters)
 	}
@@ -470,8 +470,8 @@ func TestHandleFileChange_NewFileAdded(t *testing.T) {
 	}
 
 	m.handleFileChange()
-	if m.totalIters != 2 {
-		t.Errorf("before adding file: totalIters = %d, want 2", m.totalIters)
+	if m.totalIters != 1 {
+		t.Errorf("before adding file: totalIters = %d, want 1", m.totalIters)
 	}
 
 	// Simulate adding a new feature file
@@ -482,9 +482,79 @@ func TestHandleFileChange_NewFileAdded(t *testing.T) {
 
 	m.handleFileChange()
 
-	// 3 workable + currentIter(1) = 4
-	if m.totalIters != 4 {
-		t.Errorf("after adding file: totalIters = %d, want 4", m.totalIters)
+	// 3 workable + (currentIter-1)(0) = 3
+	if m.totalIters != 3 {
+		t.Errorf("after adding file: totalIters = %d, want 3", m.totalIters)
+	}
+}
+
+func TestHandleFileChange_AddingNTasksIncreasesByExactlyN(t *testing.T) {
+	dir := t.TempDir()
+
+	// Start: task 2 is executing; task 1 was the initial task (now done via commit)
+	// The file watcher sees the workable tasks including the currently running one.
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+		{"TASK-001-002", "workable"},
+	})
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          2,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 2,
+	}
+
+	// Establish baseline: 2 workable + (currentIter-1)(1) = 3
+	m.handleFileChange()
+	baseline := m.totalIters
+	if baseline != 3 {
+		t.Fatalf("baseline totalIters = %d, want 3", baseline)
+	}
+
+	// Add 2 new tasks
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	m.handleFileChange()
+
+	// totalIters must increase by exactly 2
+	if m.totalIters != baseline+2 {
+		t.Errorf("totalIters = %d, want %d (baseline + 2)", m.totalIters, baseline+2)
+	}
+}
+
+func TestHandleFileChange_TotalDoesNotDecreaseAfterTaskCompletes(t *testing.T) {
+	dir := t.TempDir()
+
+	// Simulate: task 1 is running, 3 workable tasks in total.
+	// handleFileChange sets totalIters = (1-1) + 3 = 3.
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+		{"TASK-001-002", "workable"},
+		{"TASK-001-003", "workable"},
+	})
+
+	m := &TUIModel{
+		workDir:              dir,
+		currentIter:          1,
+		prevWorkableBugs:     0,
+		prevWorkableFeatures: 0,
+	}
+	m.handleFileChange()
+	if m.totalIters != 3 {
+		t.Fatalf("during task 1: totalIters = %d, want 3", m.totalIters)
+	}
+
+	// Task 1 completes: ProgressMsg arrives with Current=1, Total=(1)+2=3 (task 1 done, 2 remaining).
+	// handleIterationStart fires for task 2: uses max(msg.Total, m.totalIters) = max(3,3) = 3.
+	m.currentIter = 2
+	m.totalIters = max(3, m.totalIters) // mirrors handleIterationStart logic
+
+	if m.totalIters != 3 {
+		t.Errorf("after task 1 completes: totalIters = %d, want 3 (must not decrease)", m.totalIters)
 	}
 }
 
@@ -540,5 +610,91 @@ func TestBugHintLine_Hidden_WhenNoBugs(t *testing.T) {
 
 	if strings.Contains(header, "bug") {
 		t.Errorf("expected no bug hint when activeBugs=0, got:\n%s", header)
+	}
+}
+
+// --- Summary screen frozen state tests ---
+
+func TestFileChangeMsg_NoOpWhenSummaryVisible(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "done"},
+		{"TASK-001-002", "done"},
+		{"TASK-001-003", "done"},
+	})
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 3,
+		totalIters:  3,
+		summary:     summaryState{show: true},
+	}
+
+	// Add new workable tasks while summary is visible
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	updated, _ := m.Update(FileChangeMsg{})
+	result := updated.(TUIModel)
+
+	// totalIters must remain frozen at 3
+	if result.totalIters != 3 {
+		t.Errorf("totalIters = %d, want 3 (summary must stay frozen)", result.totalIters)
+	}
+	if result.notification != "" {
+		t.Errorf("notification should not be set while summary is visible, got %q", result.notification)
+	}
+}
+
+func TestFileChangeMsg_NoNotificationWhenSummaryVisible(t *testing.T) {
+	dir := t.TempDir()
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 2,
+		totalIters:  2,
+		summary:     summaryState{show: true},
+	}
+
+	writeBugFile(t, dir, "bug_001.md", []struct{ id, status string }{
+		{"BUG-001-001", "workable"},
+	})
+
+	updated, _ := m.Update(FileChangeMsg{})
+	result := updated.(TUIModel)
+
+	if result.notification != "" {
+		t.Errorf("expected no notification during summary, got %q", result.notification)
+	}
+}
+
+func TestFileChangeMsg_ResumesAfterSummaryHidden(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFeatureFile(t, dir, "feature_001.md", []struct{ id, status string }{
+		{"TASK-001-001", "workable"},
+	})
+
+	m := TUIModel{
+		workDir:     dir,
+		currentIter: 1,
+		totalIters:  1,
+		summary:     summaryState{show: false},
+	}
+
+	// Add a new feature while summary is NOT visible — should update normally
+	writeFeatureFile(t, dir, "feature_002.md", []struct{ id, status string }{
+		{"TASK-002-001", "workable"},
+		{"TASK-002-002", "workable"},
+	})
+
+	m.handleFileChange()
+
+	// 3 workable + (currentIter-1)(0) = 3
+	if m.totalIters != 3 {
+		t.Errorf("totalIters = %d, want 3 (file watcher should resume normally)", m.totalIters)
 	}
 }

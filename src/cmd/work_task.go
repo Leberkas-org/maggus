@@ -16,7 +16,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/runtracker"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 )
 
@@ -45,7 +44,6 @@ type taskResult struct {
 type taskContext struct {
 	workCtx       context.Context
 	p             *tea.Program
-	run           *runtracker.Run
 	activeAgent   agent.Agent
 	resolvedModel string
 	notifier      *notify.Notifier
@@ -63,7 +61,8 @@ type taskContext struct {
 //
 // The caller's loop index (i) and total count are needed for progress tracking
 // and prompt metadata. The tasks slice is the current parsed task list.
-func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
+// maxCount is the user-requested task limit (0 = unlimited; used to cap progress total).
+func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskResult {
 	if tc.workCtx.Err() != nil {
 		return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
 	}
@@ -93,9 +92,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 		NoBootstrap: noBootstrapFlag,
 		Include:     tc.validIncludes,
 		RunID:       tc.runID,
-		RunDir:      tc.run.RelativeDir(tc.workDir),
 		Iteration:   i + 1,
-		IterLog:     tc.run.RelativeIterationLogPath(tc.workDir, i+1),
 	}
 
 	builtPrompt := prompt.Build(next, opts)
@@ -143,7 +140,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 	_, _ = stageFeatures.CombinedOutput()
 
 	// Commit, release lock, update progress, and check sync.
-	result := completeTask(tc, next, lock, parsedTasks, i, count)
+	result := completeTask(tc, next, lock, parsedTasks, i, count, maxCount)
 	result.taskID = next.ID
 	return result
 }
@@ -151,7 +148,8 @@ func runTask(tc taskContext, tasks []parser.Task, i, count int) taskResult {
 // completeTask encapsulates post-agent-execution logic: committing via COMMIT.md,
 // releasing the task lock, sending progress updates, and running between-task sync checks.
 // It returns a taskResult indicating whether the loop should continue, break, or skip.
-func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedTasks []parser.Task, i, count int) taskResult {
+// maxCount is the user-requested task limit; when >0 the computed progress total is capped at it.
+func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedTasks []parser.Task, i, count, maxCount int) taskResult {
 	// Commit using COMMIT.md.
 	commitResult, commitErr := gitcommit.CommitIteration(tc.workDir, task.ID+": "+task.Title)
 	if commitErr != nil {
@@ -187,7 +185,12 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 	}
 
 	// Update progress to reflect completed iteration.
-	tc.p.Send(runner.ProgressMsg{Current: i + 1, Total: count})
+	// Compute total from refreshed task list so the bar never shrinks when new files appear.
+	progressTotal := (i + 1) + countWorkable(parsedTasks)
+	if maxCount > 0 && progressTotal > maxCount {
+		progressTotal = maxCount
+	}
+	tc.p.Send(runner.ProgressMsg{Current: i + 1, Total: progressTotal})
 
 	// Between-task sync check: detect if remote changed while working.
 	// Skip on the final iteration (push happens next anyway).

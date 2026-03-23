@@ -18,9 +18,7 @@ type Options struct {
 
 	// Run metadata
 	RunID     string
-	RunDir    string
 	Iteration int
-	IterLog   string
 
 	// Worktree indicates this session is running inside a git worktree.
 	Worktree bool
@@ -71,9 +69,7 @@ func writeBootstrap(b *strings.Builder, includes []string) {
 func writeRunMetadata(b *strings.Builder, opts Options) {
 	b.WriteString("# Run Metadata\n\n")
 	fmt.Fprintf(b, "- **RUN_ID:** %s\n", opts.RunID)
-	fmt.Fprintf(b, "- **RUN_DIR:** %s\n", opts.RunDir)
 	fmt.Fprintf(b, "- **ITERATION:** %d\n", opts.Iteration)
-	fmt.Fprintf(b, "- **ITER_LOG:** %s\n", opts.IterLog)
 	if opts.Worktree {
 		b.WriteString("- **WORKTREE:** true\n")
 		fmt.Fprintf(b, "- **WORKTREE_DIR:** %s\n", opts.WorktreeDir)
@@ -106,9 +102,11 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
 	b.WriteString("Do NOT scan feature files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")
-	b.WriteString("If a criterion cannot be completed (missing dependency, needs human input, external blocker), mark it as:\n")
-	b.WriteString("  `- [x] ⚠️ BLOCKED: <original criterion text> — <reason>`\n")
-	b.WriteString("This tells Maggus to skip this task in future runs.\n\n")
+	b.WriteString("If a criterion is TRULY impossible to complete — a required external tool or API is unavailable, ")
+	b.WriteString("it requires a human decision you cannot make, or it would require a complete architectural redesign — mark it as:\n")
+	b.WriteString("  `- [~] ⚠️ BLOCKED: <original criterion text> — <reason>`\n")
+	b.WriteString("Do NOT block a criterion just because it is difficult or you hit an error. ")
+	b.WriteString("Try to fix problems yourself first. Only block as an absolute last resort.\n\n")
 
 	// Stage files but do NOT commit
 	b.WriteString("When you are done:\n")
@@ -119,14 +117,8 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("2. Stage all changed files with `git add *` but do NOT commit.\n")
 	b.WriteString("3. Write a commit message to `COMMIT.md` in the repository root. Include the task ID in the message.\n")
 
-	// Write iteration log
-	fmt.Fprintf(b, "4. Write an iteration log to `%s` before finishing. The log must include:\n", opts.IterLog)
-	b.WriteString("   - Task selected (ID and title)\n")
-	b.WriteString("   - Commands run and their outcomes\n")
-	b.WriteString("   - Any deviations or skips from the acceptance criteria\n")
-
 	// Update project memory
-	b.WriteString("5. Create or update `.maggus/MEMORY.md` only if something non-obvious was learned during this task. ")
+	b.WriteString("4. Create or update `.maggus/MEMORY.md` only if something non-obvious was learned during this task. ")
 	b.WriteString("This file is a reference for future sessions — keep it architectural, not historical. ")
 	b.WriteString("ONLY add entries for: non-obvious platform quirks, gotchas discovered during implementation, ")
 	b.WriteString("important constraints or invariants that are not evident from reading the code, ")
@@ -136,7 +128,7 @@ func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("If nothing non-obvious was learned, skip this step entirely. Do NOT commit this file.\n")
 
 	// Append release notes
-	b.WriteString("6. Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. ")
+	b.WriteString("5. Append a short release note entry to `.maggus/RELEASE_NOTES.md` describing user-visible changes made in this task. ")
 	b.WriteString("Use the format: `## TASK-NNN: Title` followed by 1-3 bullet points. ")
 	b.WriteString("Focus on what changed from the user's perspective, not implementation details. ")
 	b.WriteString("If the task has no user-visible changes, skip this step. Do NOT commit this file.\n")

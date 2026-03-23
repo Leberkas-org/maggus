@@ -69,7 +69,6 @@ type BannerInfo struct {
 	Iterations    int
 	Branch        string
 	RunID         string
-	RunDir        string
 	Worktree      string // empty if not using worktree
 	Agent         string // agent name (e.g. "claude", "opencode")
 	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode
@@ -352,6 +351,9 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case FileChangeMsg:
+		if m.summary.show {
+			return m, listenForWatcherUpdate(m.watcherCh)
+		}
 		cmd := m.handleFileChange()
 		return m, tea.Batch(cmd, listenForWatcherUpdate(m.watcherCh))
 

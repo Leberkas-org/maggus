@@ -24,9 +24,7 @@ func newTestTask() *parser.Task {
 func newTestOpts() Options {
 	return Options{
 		RunID:     "20260309-120000",
-		RunDir:    ".maggus/runs/20260309-120000",
 		Iteration: 3,
-		IterLog:   ".maggus/runs/20260309-120000/iteration-03.md",
 	}
 }
 
@@ -46,9 +44,7 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 		// Run metadata
 		"# Run Metadata",
 		"RUN_ID:** 20260309-120000",
-		"RUN_DIR:** .maggus/runs/20260309-120000",
 		"ITERATION:** 3",
-		"ITER_LOG:** .maggus/runs/20260309-120000/iteration-03.md",
 
 		// Task
 		"TASK-042",
@@ -66,11 +62,6 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 		"COMMIT.md",
 		"Update the feature file",
 		".maggus/features/feature_002.md",
-		"Write an iteration log",
-		"iteration-03.md",
-		"Task selected",
-		"Commands run",
-		"deviations or skips",
 	}
 
 	for _, want := range checks {
@@ -241,17 +232,17 @@ func TestBuild_ContainsReleaseNotesInstruction(t *testing.T) {
 		}
 	}
 
-	// Verify it appears as step 6 (after step 5 about MEMORY.md)
-	memoryIdx := strings.Index(result, "5. Create or update `.maggus/MEMORY.md`")
-	releaseIdx := strings.Index(result, "6. Append a short release note entry")
+	// Verify it appears as step 5 (after step 4 about MEMORY.md)
+	memoryIdx := strings.Index(result, "4. Create or update `.maggus/MEMORY.md`")
+	releaseIdx := strings.Index(result, "5. Append a short release note entry")
 	if memoryIdx == -1 {
-		t.Fatal("step 5 (MEMORY.md) not found")
+		t.Fatal("step 4 (MEMORY.md) not found")
 	}
 	if releaseIdx == -1 {
-		t.Fatal("step 6 (RELEASE_NOTES.md) not found")
+		t.Fatal("step 5 (RELEASE_NOTES.md) not found")
 	}
 	if releaseIdx <= memoryIdx {
-		t.Error("step 6 (release notes) should appear after step 5 (MEMORY.md)")
+		t.Error("step 5 (release notes) should appear after step 4 (MEMORY.md)")
 	}
 }
 

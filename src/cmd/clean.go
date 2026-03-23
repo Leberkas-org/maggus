@@ -1,19 +1,17 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var cleanCmd = &cobra.Command{
 	Use:   "clean",
-	Short: "Remove completed feature files and finished run directories",
-	Long:  `Removes all _completed.md feature files from .maggus/features/ and run directories that have finished (contain an ## End section in run.md).`,
+	Short: "Remove completed feature and bug files",
+	Long:  `Removes all _completed.md files from .maggus/features/ and .maggus/bugs/.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dryRun, err := cmd.Flags().GetBool("dry-run")
 		if err != nil {
@@ -37,12 +35,12 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		return err
 	}
 
-	completedRuns, err := findCompletedRuns(dir)
+	completedBugs, err := findCompletedBugs(dir)
 	if err != nil {
 		return err
 	}
 
-	if len(completedFeatures) == 0 && len(completedRuns) == 0 {
+	if len(completedFeatures) == 0 && len(completedBugs) == 0 {
 		fmt.Fprintln(out, "Nothing to clean.")
 		return nil
 	}
@@ -66,25 +64,25 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		}
 	}
 
-	for _, r := range completedRuns {
-		rel, _ := filepath.Rel(dir, r)
+	for _, p := range completedBugs {
+		rel, _ := filepath.Rel(dir, p)
 		if rel == "" {
-			rel = r
+			rel = p
 		}
 		if dryRun {
-			fmt.Fprintf(out, "  run:  %s\n", filepath.ToSlash(rel))
+			fmt.Fprintf(out, "  bug: %s\n", filepath.ToSlash(rel))
 		} else {
-			if err := os.RemoveAll(r); err != nil {
-				return fmt.Errorf("remove run dir %s: %w", rel, err)
+			if err := os.Remove(p); err != nil {
+				return fmt.Errorf("remove bug %s: %w", rel, err)
 			}
 		}
 	}
 
 	if dryRun {
 		fmt.Fprintln(out)
-		fmt.Fprintf(out, "Would remove %d completed feature(s), %d run directory(ies).\n", len(completedFeatures), len(completedRuns))
+		fmt.Fprintf(out, "Would remove %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
 	} else {
-		fmt.Fprintf(out, "Removed %d completed feature(s), %d run directory(ies).\n", len(completedFeatures), len(completedRuns))
+		fmt.Fprintf(out, "Removed %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
 	}
 
 	return nil
@@ -100,45 +98,14 @@ func findCompletedFeatures(dir string) ([]string, error) {
 	return files, nil
 }
 
-// findCompletedRuns returns paths to run directories in .maggus/runs/ whose run.md contains an "## End" section.
-func findCompletedRuns(dir string) ([]string, error) {
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
+// findCompletedBugs returns paths to all _completed.md bug files in .maggus/bugs/.
+func findCompletedBugs(dir string) ([]string, error) {
+	pattern := filepath.Join(dir, ".maggus", "bugs", "bug_*_completed.md")
+	files, err := filepath.Glob(pattern)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read runs directory: %w", err)
+		return nil, fmt.Errorf("glob completed bugs: %w", err)
 	}
-
-	var completed []string
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		runMdPath := filepath.Join(runsDir, e.Name(), "run.md")
-		if hasEndSection(runMdPath) {
-			completed = append(completed, filepath.Join(runsDir, e.Name()))
-		}
-	}
-	return completed, nil
-}
-
-// hasEndSection returns true if the file at path contains a line starting with "## End".
-func hasEndSection(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "## End") {
-			return true
-		}
-	}
-	return false
+	return files, nil
 }
 
 func init() {

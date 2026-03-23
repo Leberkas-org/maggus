@@ -715,7 +715,7 @@ func TestMenuUpdate_FeatureSummaryUpdateMsg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ch := make(chan struct{}, 1)
+	ch := make(chan bool, 1)
 	m := menuModel{
 		items:     activeMenuItems(),
 		summary:   featureSummary{},

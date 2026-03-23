@@ -59,6 +59,35 @@ func TestUpdate_DevVersion(t *testing.T) {
 	}
 }
 
+func TestUpdate_DevTimestampVersion(t *testing.T) {
+	defer setupUpdateTest(t)()
+	Version = "dev-143027"
+	checkLatestVersion = func(v string) updater.UpdateInfo {
+		return updater.UpdateInfo{
+			TagName:     "v1.5.0",
+			DownloadURL: "https://example.com/maggus.zip",
+			IsNewer:     true,
+			Body:        "New release",
+		}
+	}
+
+	m := newUpdateModel(Version)
+	model, _ := m.Update(updateCheckMsg{info: checkLatestVersion("dev-143027")})
+	um := model.(updateModel)
+
+	if um.phase != phaseConfirm {
+		t.Errorf("expected phaseConfirm, got %d", um.phase)
+	}
+
+	// Check view shows "dev-143027 → v1.5.0" (no "v" prefix on dev versions)
+	um.width = 120
+	um.height = 40
+	view := um.View()
+	if got := view; !contains(got, "dev-143027") || !contains(got, "v1.5.0") {
+		t.Errorf("expected dev-143027 and v1.5.0 in view, got: %s", got)
+	}
+}
+
 func TestUpdate_DevVersion_ApplySuccessful(t *testing.T) {
 	defer setupUpdateTest(t)()
 	Version = "dev"

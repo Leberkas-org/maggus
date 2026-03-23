@@ -53,8 +53,8 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
-	if len(opts) != 12 {
-		t.Fatalf("expected 12 option rows, got %d", len(opts))
+	if len(opts) != 13 {
+		t.Fatalf("expected 13 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
@@ -75,34 +75,42 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 		t.Errorf("worktree current = %d, want 1 (off)", opts[2].current)
 	}
 
-	// Auto-branch defaults to on (index 0)
+	// Auto-work defaults to disabled (index 0)
+	if opts[3].label != "Auto-work" {
+		t.Errorf("opts[3].label = %q, want Auto-work", opts[3].label)
+	}
 	if opts[3].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+		t.Errorf("auto-work current = %d, want 0 (disabled)", opts[3].current)
+	}
+
+	// Auto-branch defaults to on (index 0)
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 
 	// Check sync defaults to on (index 0)
-	if opts[4].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
+	if opts[5].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
 	}
 
 	// Sound defaults to off (index 1)
-	if opts[5].current != 1 {
-		t.Errorf("sound current = %d, want 1 (off)", opts[5].current)
+	if opts[6].current != 1 {
+		t.Errorf("sound current = %d, want 1 (off)", opts[6].current)
 	}
 
 	// Notification sub-options default to on (index 0) when nil
-	for i := 6; i <= 8; i++ {
+	for i := 7; i <= 9; i++ {
 		if opts[i].current != 0 {
 			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
 	}
 
 	// On-complete defaults to rename (index 0)
-	if opts[9].label != "  Feature" || opts[9].current != 0 {
-		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[9].label, opts[9].current)
+	if opts[10].label != "  Feature" || opts[10].current != 0 {
+		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[10].label, opts[10].current)
 	}
-	if opts[10].label != "  Bug" || opts[10].current != 0 {
-		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[10].label, opts[10].current)
+	if opts[11].label != "  Bug" || opts[11].current != 0 {
+		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[11].label, opts[11].current)
 	}
 
 	if m.cursor != 0 {
@@ -138,19 +146,23 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 	if opts[2].current != 0 {
 		t.Errorf("worktree current = %d, want 0 (on)", opts[2].current)
 	}
-	// Auto-branch defaults to on (index 0) — not set in config
+	// Auto-work defaults to disabled (index 0) — not set in config
 	if opts[3].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+		t.Errorf("auto-work current = %d, want 0 (disabled)", opts[3].current)
+	}
+	// Auto-branch defaults to on (index 0) — not set in config
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 	// Check sync defaults to on (index 0) — not set in config
-	if opts[4].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
-	}
 	if opts[5].current != 0 {
-		t.Errorf("sound current = %d, want 0 (on)", opts[5].current)
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
+	}
+	if opts[6].current != 0 {
+		t.Errorf("sound current = %d, want 0 (on)", opts[6].current)
 	}
 	// All notification sub-options set to false → off (index 1)
-	for i := 6; i <= 8; i++ {
+	for i := 7; i <= 9; i++ {
 		if opts[i].current != 1 {
 			t.Errorf("opts[%d].current = %d, want 1 (off)", i, opts[i].current)
 		}
@@ -423,6 +435,7 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 		"Agent",
 		"Model",
 		"Worktree",
+		"Auto-work",
 		"Auto-branch",
 		"Check sync",
 		"Sound",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -99,14 +100,14 @@ Examples:
 			return nil
 		}
 		count = setup.count
-		run := setup.run
+		runID := setup.runID
 
-		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, run, wc.cfg.Git)
+		branchMsg, err := setupBranch(wc.useWorktree, repoDir, setup.next, runID, wc.cfg.Git)
 		if err != nil {
 			return err
 		}
 		if wc.useWorktree {
-			workDir = filepath.Join(repoDir, ".maggus-work", run.ID)
+			workDir = filepath.Join(repoDir, ".maggus-work", runID)
 			defer func() {
 				_ = worktree.Remove(repoDir, workDir)
 			}()
@@ -133,11 +134,16 @@ Examples:
 		// Build and start the TUI.
 		twoXStatus := claude2x.FetchStatus()
 		cwd, _ := os.Getwd()
+
+		branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+		branchCmd.Dir = dir
+		branchOut, _ := branchCmd.Output()
+		currentBranch := strings.TrimSpace(string(branchOut))
+
 		banner := runner.BannerInfo{
 			Iterations: count,
-			Branch:     run.Branch,
-			RunID:      run.ID,
-			RunDir:     run.RelativeDir(dir),
+			Branch:     currentBranch,
+			RunID:      runID,
 			Agent:      wc.activeAgent.Name(),
 			CWD:        cwd,
 		}
@@ -152,13 +158,12 @@ Examples:
 		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
 		m.SetSyncDir(workDir)
 		m.SetWatcher(workDir)
-		setupUsageCallback(&m, dir, run, wc.modelDisplay, wc.activeAgent.Name())
+		setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
 		tc := taskContext{
 			workCtx:       workCtx,
 			p:             p,
-			run:           run,
 			activeAgent:   wc.activeAgent,
 			resolvedModel: wc.resolvedModel,
 			notifier:      wc.notifier,
@@ -166,7 +171,7 @@ Examples:
 			useWorktree:   wc.useWorktree,
 			repoDir:       repoDir,
 			workDir:       workDir,
-			runID:         run.ID,
+			runID:         runID,
 			onComplete:    wc.cfg.OnComplete,
 		}
 
@@ -175,7 +180,8 @@ Examples:
 			tasks:         setup.tasks,
 			count:         count,
 			unlimited:     wc.count == 0 && taskFlag == "",
-			run:           run,
+			runID:         runID,
+			startTime:     setup.startTime,
 			p:             p,
 			stopFlag:      m.StopFlag(),
 			stopAtTaskID:  m.StopAtTaskIDFlag(),

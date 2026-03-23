@@ -117,6 +117,15 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		worktreeIdx = 0
 	}
 
+	autoWorkValues := []string{"disabled", "enabled", "delayed (5s)"}
+	autoWorkIdx := 0
+	switch cfg.AutoWork {
+	case config.AutoWorkEnabled:
+		autoWorkIdx = 1
+	case config.AutoWorkDelayed:
+		autoWorkIdx = 2
+	}
+
 	autoBranchValues := []string{"on", "off"}
 	autoBranchIdx := 0
 	if !cfg.Git.IsAutoBranchEnabled() {
@@ -174,6 +183,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
+		{label: "Auto-work", values: autoWorkValues, current: autoWorkIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
 		{label: "Protected branches", display: protectedDisplay},
@@ -272,6 +282,16 @@ func (m configModel) buildConfig() config.Config {
 	bugAction := m.optionByLabel("  Bug").values[m.optionByLabel("  Bug").current]
 	if bugAction == "delete" {
 		cfg.OnComplete.Bug = "delete"
+	}
+
+	autoWorkRow := m.optionByLabel("Auto-work")
+	switch autoWorkRow.values[autoWorkRow.current] {
+	case "enabled":
+		cfg.AutoWork = config.AutoWorkEnabled
+	case "delayed (5s)":
+		cfg.AutoWork = config.AutoWorkDelayed
+	default:
+		cfg.AutoWork = config.AutoWorkDisabled
 	}
 
 	return cfg
