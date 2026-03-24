@@ -73,12 +73,12 @@ Consolidate feature gating into a single approval system by surfacing approve/un
 **Parallel:** yes — can run alongside TASK-002-004 once TASK-002-002 is merged
 
 **Acceptance Criteria:**
-- [ ] `renderTabBar()` shows `✓` prefix for approved features and `✗` prefix for unapproved features in each tab label (e.g. ` ✓ feature_001 2/4 ` vs ` ✗ feature_002 0/3 `)
-- [ ] Approved tabs use the existing primary/selected color (cyan for selected, muted for unselected)
-- [ ] Unapproved tabs use a dim warning color (e.g. `styles.Warning` faint) for both selected and unselected states — distinct from approved but not alarming
-- [ ] `renderStatusPlain()` replaces the old `[~] ignored` prefix with `[✗]` and `"unapproved"` suffix for unapproved features; approved features show no special prefix/suffix
-- [ ] Layout does not break at narrow terminal widths
-- [ ] `go test ./...` passes
+- [x] `renderTabBar()` shows `✓` prefix for approved features and `✗` prefix for unapproved features in each tab label (e.g. ` ✓ feature_001 2/4 ` vs ` ✗ feature_002 0/3 `)
+- [x] Approved tabs use the existing primary/selected color (cyan for selected, muted for unselected)
+- [x] Unapproved tabs use a dim warning color (e.g. `styles.Warning` faint) for both selected and unselected states — distinct from approved but not alarming
+- [x] `renderStatusPlain()` replaces the old `[~] ignored` prefix with `[✗]` and `"unapproved"` suffix for unapproved features; approved features show no special prefix/suffix
+- [x] Layout does not break at narrow terminal widths
+- [x] `go test ./...` passes
 
 ---
 

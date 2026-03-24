@@ -486,7 +486,7 @@ func (m statusModel) renderTabBar() string {
 	selectedBugStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Error)
 	unselectedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	unselectedBugStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
-	ignoredTabStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
+	unapprovedTabStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 
 	var tabs []string
 	needsSep := false
@@ -502,22 +502,22 @@ func (m statusModel) renderTabBar() string {
 		done := p.doneCount()
 		total := len(p.tasks)
 		name := strings.TrimSuffix(p.filename, ".md")
-		prefix := ""
-		if p.ignored {
-			prefix = "~"
+		approvalMark := "✓"
+		if !p.approved {
+			approvalMark = "✗"
 		}
-		label := fmt.Sprintf(" %s%s %d/%d ", prefix, name, done, total)
+		label := fmt.Sprintf(" %s %s %d/%d ", approvalMark, name, done, total)
 		if i == m.selectedFeature {
-			if p.ignored {
-				tabs = append(tabs, ignoredTabStyle.Bold(true).Render(label))
+			if !p.approved {
+				tabs = append(tabs, unapprovedTabStyle.Bold(true).Render(label))
 			} else if p.isBug {
 				tabs = append(tabs, selectedBugStyle.Render(label))
 			} else {
 				tabs = append(tabs, selectedStyle.Render(label))
 			}
 		} else {
-			if p.ignored {
-				tabs = append(tabs, ignoredTabStyle.Render(label))
+			if !p.approved {
+				tabs = append(tabs, unapprovedTabStyle.Render(label))
 			} else if p.isBug {
 				tabs = append(tabs, unselectedBugStyle.Render(label))
 			} else {

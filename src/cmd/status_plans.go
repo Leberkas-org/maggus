@@ -233,8 +233,8 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 		fmt.Fprintln(w)
 		if f.completed {
 			fmt.Fprintf(w, " Tasks — %s (archived)\n", f.filename)
-		} else if f.ignored {
-			fmt.Fprintf(w, " Tasks — [~] %s (ignored)\n", f.filename)
+		} else if !f.approved {
+			fmt.Fprintf(w, " Tasks — [✗] %s (unapproved)\n", f.filename)
 		} else {
 			fmt.Fprintf(w, " Tasks — %s\n", f.filename)
 		}
@@ -306,9 +306,9 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 		if f.completed {
 			prefix = " [x] "
 			suffix = "done"
-		} else if f.ignored {
-			prefix = " [~] "
-			suffix = "ignored"
+		} else if !f.approved {
+			prefix = " [✗] "
+			suffix = "unapproved"
 		} else if f.blockedCount() > 0 {
 			prefix = "   "
 			suffix = "blocked"

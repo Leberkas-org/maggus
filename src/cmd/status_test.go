@@ -344,21 +344,24 @@ func TestRenderStatusPlain(t *testing.T) {
 		}
 	})
 
-	t.Run("ignored plan shown with marker", func(t *testing.T) {
+	t.Run("unapproved plan shown with marker", func(t *testing.T) {
 		plans := []featureInfo{
-			{filename: "plan_1_ignored.md", ignored: true, tasks: []parser.Task{
-				{ID: "TASK-001", Title: "Ign task", Ignored: true, SourceFile: "plan_1_ignored.md", Criteria: []parser.Criterion{{Checked: false}}},
+			{filename: "plan_1.md", approved: false, tasks: []parser.Task{
+				{ID: "TASK-001", Title: "Unapproved task", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
 		}
 		var sb strings.Builder
 		renderStatusPlain(&sb, plans, false, "", "", "claude")
 		out := sb.String()
 
-		if !strings.Contains(out, "[~]") {
-			t.Error("ignored plan/task should show [~] marker")
+		if !strings.Contains(out, "[✗]") {
+			t.Error("unapproved plan should show [✗] marker")
 		}
-		if !strings.Contains(out, "(ignored)") {
-			t.Error("ignored plan should show (ignored)")
+		if !strings.Contains(out, "(unapproved)") {
+			t.Error("unapproved plan should show (unapproved)")
+		}
+		if !strings.Contains(out, "unapproved") {
+			t.Error("unapproved plan should show 'unapproved' suffix in features table")
 		}
 	})
 
@@ -374,17 +377,17 @@ func TestRenderStatusPlain(t *testing.T) {
 
 	t.Run("plans table status labels", func(t *testing.T) {
 		plans := []featureInfo{
-			{filename: "plan_new.md", tasks: []parser.Task{
+			{filename: "plan_new.md", approved: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
-			{filename: "plan_progress.md", tasks: []parser.Task{
+			{filename: "plan_progress.md", approved: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 				{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
-			{filename: "plan_done.md", tasks: []parser.Task{
+			{filename: "plan_done.md", approved: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
-			{filename: "plan_blocked.md", tasks: []parser.Task{
+			{filename: "plan_blocked.md", approved: true, tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Text: "BLOCKED: x", Blocked: true}}},
 			}},
 		}
@@ -856,8 +859,8 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 
 func TestRenderTabBar_BugSeparator(t *testing.T) {
 	items := []featureInfo{
-		{filename: "feature_001.md", tasks: []parser.Task{{ID: "T1"}}},
-		{filename: "bug_001.md", isBug: true, tasks: []parser.Task{{ID: "B1"}}},
+		{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
+		{filename: "bug_001.md", isBug: true, approved: true, tasks: []parser.Task{{ID: "B1"}}},
 	}
 	m := statusModel{features: items, showAll: false}
 	m.Width = 120
@@ -866,4 +869,52 @@ func TestRenderTabBar_BugSeparator(t *testing.T) {
 	if !strings.Contains(bar, "┃") {
 		t.Error("tab bar should contain ┃ separator between features and bugs")
 	}
+}
+
+func TestRenderTabBar_ApprovalMark(t *testing.T) {
+	t.Run("approved feature shows checkmark", func(t *testing.T) {
+		items := []featureInfo{
+			{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
+		}
+		m := statusModel{features: items, showAll: false}
+		m.Width = 120
+		bar := m.renderTabBar()
+		if !strings.Contains(bar, "✓") {
+			t.Error("approved feature tab should show ✓ mark")
+		}
+		if strings.Contains(bar, "✗") {
+			t.Error("approved feature tab should not show ✗ mark")
+		}
+	})
+
+	t.Run("unapproved feature shows cross", func(t *testing.T) {
+		items := []featureInfo{
+			{filename: "feature_001.md", approved: false, tasks: []parser.Task{{ID: "T1"}}},
+		}
+		m := statusModel{features: items, showAll: false}
+		m.Width = 120
+		bar := m.renderTabBar()
+		if !strings.Contains(bar, "✗") {
+			t.Error("unapproved feature tab should show ✗ mark")
+		}
+		if strings.Contains(bar, "✓") {
+			t.Error("unapproved feature tab should not show ✓ mark")
+		}
+	})
+
+	t.Run("mixed approved and unapproved", func(t *testing.T) {
+		items := []featureInfo{
+			{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
+			{filename: "feature_002.md", approved: false, tasks: []parser.Task{{ID: "T2"}}},
+		}
+		m := statusModel{features: items, showAll: false}
+		m.Width = 120
+		bar := m.renderTabBar()
+		if !strings.Contains(bar, "✓") {
+			t.Error("tab bar should contain ✓ for approved feature")
+		}
+		if !strings.Contains(bar, "✗") {
+			t.Error("tab bar should contain ✗ for unapproved feature")
+		}
+	})
 }
