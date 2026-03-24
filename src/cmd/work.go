@@ -86,6 +86,27 @@ Examples:
 		repoDir := dir
 		workDir := dir
 
+		// Mutual exclusion: prevent work from running while a daemon is active.
+		if !daemonRunFlag {
+			daemonPID, pidErr := readDaemonPID(dir)
+			if pidErr != nil {
+				return fmt.Errorf("check daemon status: %w", pidErr)
+			}
+			if daemonPID != 0 {
+				if isProcessRunning(daemonPID) {
+					return fmt.Errorf("daemon is running (PID %d) — stop it first with 'maggus stop'", daemonPID)
+				}
+				// Stale PID file — clean it up silently.
+				removeDaemonPID(dir)
+			}
+
+			// Write our PID so the daemon can detect us.
+			if pidErr := writeWorkPID(dir, os.Getpid()); pidErr != nil {
+				return fmt.Errorf("write work PID: %w", pidErr)
+			}
+			defer removeWorkPID(dir)
+		}
+
 		// Git sync check: detect remote changes and uncommitted work before starting.
 		// Skipped in daemon mode — sync is auto-continued if it arises between tasks.
 		var syncInfoMsg string

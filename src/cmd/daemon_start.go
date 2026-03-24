@@ -45,6 +45,19 @@ Use 'maggus stop' to terminate the daemon.`,
 			removeDaemonPID(dir)
 		}
 
+		// Mutual exclusion: prevent daemon from starting while a work run is active.
+		workPID, wpErr := readWorkPID(dir)
+		if wpErr != nil {
+			return fmt.Errorf("check work status: %w", wpErr)
+		}
+		if workPID != 0 {
+			if isProcessRunning(workPID) {
+				return fmt.Errorf("a work run is active (PID %d) — wait for it to finish", workPID)
+			}
+			// Stale PID file — clean it up silently.
+			removeWorkPID(dir)
+		}
+
 		// Generate run ID and create the run directory + daemon.log.
 		runID := generateDaemonRunID()
 		runDir := filepath.Join(dir, ".maggus", "runs", runID)

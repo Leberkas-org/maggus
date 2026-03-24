@@ -89,12 +89,12 @@ This feature addresses four reliability and correctness issues with the daemon a
 **Parallel:** yes — can run alongside TASK-003-001, TASK-003-003
 
 **Acceptance Criteria:**
-- [ ] A new helper `workPIDPath()` in `cmd/daemon.go` (or a new `cmd/workpid.go`) returns the path `.maggus/work.pid`
-- [ ] When `maggus work` starts (in `cmd/work.go` `RunE`), it checks whether `daemon.pid` exists and the daemon process is alive; if so, it exits with a clear error message: `"daemon is running (PID NNN) — stop it first with 'maggus stop'"`
-- [ ] When `maggus work` starts, it writes its own PID to `work.pid`; on exit (normal or error), it removes `work.pid`
-- [ ] When `maggus start` (daemon) is launched, it checks whether `work.pid` exists and the work process is alive; if so, it exits with a clear error: `"a work run is active (PID NNN) — wait for it to finish"`
-- [ ] Stale PID files (process no longer running) are silently removed, not treated as conflicts
-- [ ] `go test ./...` passes
+- [x] A new helper `workPIDPath()` in `cmd/daemon.go` (or a new `cmd/workpid.go`) returns the path `.maggus/work.pid`
+- [x] When `maggus work` starts (in `cmd/work.go` `RunE`), it checks whether `daemon.pid` exists and the daemon process is alive; if so, it exits with a clear error message: `"daemon is running (PID NNN) — stop it first with 'maggus stop'"`
+- [x] When `maggus work` starts, it writes its own PID to `work.pid`; on exit (normal or error), it removes `work.pid`
+- [x] When `maggus start` (daemon) is launched, it checks whether `work.pid` exists and the work process is alive; if so, it exits with a clear error: `"a work run is active (PID NNN) — wait for it to finish"`
+- [x] Stale PID files (process no longer running) are silently removed, not treated as conflicts
+- [x] `go test ./...` passes
 
 ---
 
