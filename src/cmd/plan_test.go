@@ -114,6 +114,7 @@ func TestLaunchInteractive_NotFoundAgent(t *testing.T) {
 
 func TestLaunchInteractive_ReturnsSessionInfo(t *testing.T) {
 	// Use a command that exits immediately to verify SessionInfo is populated.
+	// "go" with no args exits with code 2, which is treated as user-initiated exit.
 	goPath, err := lookPathGo()
 	if err != nil {
 		t.Skip("go not on PATH, skipping")
@@ -122,8 +123,7 @@ func TestLaunchInteractive_ReturnsSessionInfo(t *testing.T) {
 	dir := t.TempDir()
 	before := time.Now()
 
-	// "go version" exits immediately with 0.
-	info, err := launchInteractive(goPath, "version", dir, false, "")
+	info, err := launchInteractive(goPath, "", dir, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

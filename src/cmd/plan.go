@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -76,6 +77,11 @@ type SessionInfo struct {
 // When model is non-empty, --model is passed. Session timing info is returned so callers
 // can extract usage afterward. Snapshotting errors are logged as warnings and do not
 // prevent the session from launching.
+//
+// When prompt is non-empty, a two-step approach is used: the prompt is first executed
+// in print mode (non-interactive) with a fixed session ID, then the session is resumed
+// interactively. This avoids the Claude CLI treating a positional argument as a
+// non-interactive one-shot query.
 func launchInteractive(agentName, prompt, dir string, skipPermissions bool, model string) (*SessionInfo, error) {
 	path, err := exec.LookPath(agentName)
 	if err != nil {
@@ -97,23 +103,6 @@ func launchInteractive(agentName, prompt, dir string, skipPermissions bool, mode
 
 	startTime := time.Now()
 
-	// Build command args.
-	var args []string
-	if skipPermissions {
-		args = append(args, "--dangerously-skip-permissions")
-	}
-	if model != "" {
-		args = append(args, "--model", model)
-	}
-	if prompt != "" {
-		args = append(args, prompt)
-	}
-
-	cmd := exec.Command(path, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
 	// Forward interrupt signals to the child process by ignoring them in
 	// the parent — the terminal delivers SIGINT to the entire process group,
 	// so the agent receives it directly.
@@ -121,33 +110,94 @@ func launchInteractive(agentName, prompt, dir string, skipPermissions bool, mode
 	signal.Notify(sigCh, shutdownSignals...)
 	defer signal.Stop(sigCh)
 
+	// Build common flags shared by both steps.
+	var baseArgs []string
+	if skipPermissions {
+		baseArgs = append(baseArgs, "--dangerously-skip-permissions")
+	}
+	if model != "" {
+		baseArgs = append(baseArgs, "--model", model)
+	}
+
+	if prompt != "" {
+		// Step 1: Execute the skill command non-interactively with a fixed session ID.
+		sessionID := generateSessionUUID()
+
+		printArgs := append([]string{}, baseArgs...)
+		printArgs = append(printArgs, "--session-id", sessionID, "-p", prompt)
+
+		printCmd := exec.Command(path, printArgs...)
+		printCmd.Stdin = os.Stdin
+		printCmd.Stdout = os.Stdout
+		printCmd.Stderr = os.Stderr
+
+		if err := printCmd.Run(); err != nil {
+			if isUserExit(printCmd) {
+				return buildSessionInfo(beforeSnapshot, startTime), nil
+			}
+			return nil, fmt.Errorf("%s print step exited with error: %w", agentName, err)
+		}
+
+		// Step 2: Resume the session interactively.
+		resumeArgs := append([]string{}, baseArgs...)
+		resumeArgs = append(resumeArgs, "--resume", sessionID)
+
+		return runInteractiveCmd(path, resumeArgs, agentName, beforeSnapshot, startTime)
+	}
+
+	// No prompt — plain interactive mode.
+	return runInteractiveCmd(path, baseArgs, agentName, beforeSnapshot, startTime)
+}
+
+// runInteractiveCmd starts an interactive CLI session with the given args and waits for it to finish.
+func runInteractiveCmd(path string, args []string, agentName string, beforeSnapshot map[string]bool, startTime time.Time) (*SessionInfo, error) {
+	cmd := exec.Command(path, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", agentName, err)
 	}
 
 	waitErr := cmd.Wait()
-	endTime := time.Now()
-
-	signal.Stop(sigCh)
-
-	info := &SessionInfo{
-		BeforeSnapshot: beforeSnapshot,
-		StartTime:      startTime,
-		EndTime:        endTime,
-	}
+	info := buildSessionInfo(beforeSnapshot, startTime)
 
 	if waitErr != nil {
-		// User-initiated exits (Ctrl+C or exit code 2) are not errors.
-		if cmd.ProcessState != nil {
-			code := cmd.ProcessState.ExitCode()
-			if code == 130 || code == 2 {
-				return info, nil
-			}
+		if isUserExit(cmd) {
+			return info, nil
 		}
 		return info, fmt.Errorf("%s exited with error: %w", agentName, waitErr)
 	}
 
 	return info, nil
+}
+
+// isUserExit checks whether the command exited due to user-initiated cancellation (Ctrl+C).
+func isUserExit(cmd *exec.Cmd) bool {
+	if cmd.ProcessState != nil {
+		code := cmd.ProcessState.ExitCode()
+		return code == 130 || code == 2
+	}
+	return false
+}
+
+// buildSessionInfo creates a SessionInfo with the current time as the end time.
+func buildSessionInfo(beforeSnapshot map[string]bool, startTime time.Time) *SessionInfo {
+	return &SessionInfo{
+		BeforeSnapshot: beforeSnapshot,
+		StartTime:      startTime,
+		EndTime:        time.Now(),
+	}
+}
+
+// generateSessionUUID generates a random UUID v4 string for session identification.
+func generateSessionUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // pluginInfo represents a single entry from `claude plugin list --json`.
