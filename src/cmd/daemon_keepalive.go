@@ -12,8 +12,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/usage"
 )
 
 // runDaemonLoop runs the daemon work loop with keep-alive behaviour.
@@ -193,6 +195,32 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	})
 	dm.SetOnOutput(func(taskID, text string) {
 		runLogger.Output(taskID, text)
+	})
+	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+		featureRel := tu.FeatureFile
+		if rel, err := filepath.Rel(dir, tu.FeatureFile); err == nil {
+			featureRel = rel
+		}
+		_ = usage.Append(dir, []usage.Record{{
+			RunID:                    runID,
+			TaskID:                   tu.TaskID,
+			TaskTitle:                tu.TaskTitle,
+			FeatureFile:              featureRel,
+			Model:                    wc.modelDisplay,
+			Agent:                    wc.activeAgent.Name(),
+			InputTokens:              tu.InputTokens,
+			OutputTokens:             tu.OutputTokens,
+			CacheCreationInputTokens: tu.CacheCreationInputTokens,
+			CacheReadInputTokens:     tu.CacheReadInputTokens,
+			CostUSD:                  tu.CostUSD,
+			ModelUsage:               tu.ModelUsage,
+			StartTime:                tu.StartTime,
+			EndTime:                  tu.EndTime,
+		}})
+		totalTokens := int64(tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens)
+		if totalTokens > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
+		}
 	})
 
 	var p *tea.Program

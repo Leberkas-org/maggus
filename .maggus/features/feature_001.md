@@ -88,11 +88,11 @@ Streamline the Maggus experience so the daemon is always running in the backgrou
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] When a task completes via the daemon keep-alive loop, token usage (input tokens, output tokens, cost if available) is written to the appropriate `usage_*.jsonl` file under `.maggus/`
-- [ ] The daemon token tracking uses the same `internal/usage` package and file format as the `work` command
-- [ ] Usage is attributed to the same command source identifier that `work` uses
-- [ ] Token counts are sourced from the streaming JSON events parsed by the agent runner (same source as the TUI token counter)
-- [ ] After a daemon-run task completes, the `.maggus/usage_*.jsonl` file contains a new entry for that task
+- [x] When a task completes via the daemon keep-alive loop, token usage (input tokens, output tokens, cost if available) is written to the appropriate `usage_*.jsonl` file under `.maggus/`
+- [x] The daemon token tracking uses the same `internal/usage` package and file format as the `work` command
+- [x] Usage is attributed to the same command source identifier that `work` uses
+- [x] Token counts are sourced from the streaming JSON events parsed by the agent runner (same source as the TUI token counter)
+- [x] After a daemon-run task completes, the `.maggus/usage_*.jsonl` file contains a new entry for that task
 
 ---
 
