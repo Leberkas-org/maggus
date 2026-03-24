@@ -3,13 +3,17 @@ package cmd
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // logPollTickMsg is sent every 200ms to refresh the live log panel.
@@ -96,6 +100,117 @@ func readLastNLogLines(path string, n int) []string {
 		lines = lines[len(lines)-n:]
 	}
 	return lines
+}
+
+// Log line styles — reuse palette from styles package.
+var (
+	logTimestampStyle = lipgloss.NewStyle().Foreground(styles.Muted)
+	logTaskIDStyle    = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	logToolStyle      = lipgloss.NewStyle().Foreground(styles.Accent)
+	logErrorStyle     = lipgloss.NewStyle().Foreground(styles.Error)
+	logInfoStyle      = lipgloss.NewStyle().Foreground(styles.Muted)
+)
+
+// formatLogLine parses a JSONL log line and returns a color-coded string.
+// Non-JSON lines are returned as-is in muted style.
+func formatLogLine(raw string) string {
+	var entry runlog.Entry
+	if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+		// Graceful fallback: render plain text in muted style
+		return logInfoStyle.Render(raw)
+	}
+
+	// Format timestamp as HH:MM:SS (compact, subordinate)
+	ts := entry.Ts
+	if t, err := time.Parse(time.RFC3339, entry.Ts); err == nil {
+		ts = t.Local().Format("15:04:05")
+	}
+	tsStr := logTimestampStyle.Render(ts)
+
+	// Format task ID if present
+	taskID := ""
+	if entry.TaskID != "" {
+		taskID = " " + logTaskIDStyle.Render(entry.TaskID)
+	}
+
+	switch entry.Event {
+	case "tool_use":
+		toolTag := logToolStyle.Render(fmt.Sprintf("[%s]", entry.Tool))
+		desc := entry.Description
+		if desc == "" {
+			desc = entry.Tool
+		}
+		return fmt.Sprintf("%s%s %s %s", tsStr, taskID, toolTag, logInfoStyle.Render(desc))
+
+	case "output":
+		// Output is the most important content — render at full contrast (default).
+		text := entry.Text
+		if len(text) > 200 {
+			text = text[:200] + "…"
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, text)
+
+	case "task_failed":
+		reason := entry.Reason
+		if reason == "" {
+			reason = "unknown error"
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logErrorStyle.Render("FAILED: "+reason))
+
+	case "error":
+		text := entry.Text
+		if text == "" {
+			text = entry.Reason
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logErrorStyle.Render(text))
+
+	case "feature_start":
+		if entry.FeatureID != "" {
+			return fmt.Sprintf("%s %s %s %s", tsStr, logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("started"))
+		}
+		return fmt.Sprintf("%s %s", tsStr, logInfoStyle.Render("feature started"))
+
+	case "feature_complete":
+		if entry.FeatureID != "" {
+			return fmt.Sprintf("%s %s %s %s", tsStr, logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("complete"))
+		}
+		return fmt.Sprintf("%s %s", tsStr, logInfoStyle.Render("feature complete"))
+
+	case "task_start":
+		title := entry.Title
+		if title == "" {
+			title = "started"
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(title))
+
+	case "task_complete":
+		detail := "complete"
+		if entry.Commit != "" {
+			detail = fmt.Sprintf("complete [%s]", entry.Commit)
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(detail))
+
+	case "info":
+		text := entry.Text
+		if text == "" {
+			text = "info"
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(text))
+
+	default:
+		// Unknown event — render the whole line muted with whatever fields are available
+		var parts []string
+		if entry.Text != "" {
+			parts = append(parts, entry.Text)
+		}
+		if entry.Description != "" {
+			parts = append(parts, entry.Description)
+		}
+		if len(parts) == 0 {
+			parts = append(parts, entry.Event)
+		}
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(strings.Join(parts, " ")))
+	}
 }
 
 // parseLogForCurrentState scans log lines from newest to oldest to find the most

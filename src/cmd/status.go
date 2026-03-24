@@ -587,8 +587,8 @@ func (m statusModel) viewLog() string {
 		end := min(m.logScroll+visibleLines, len(m.logLines))
 		start := max(m.logScroll, 0)
 		for _, line := range m.logLines[start:end] {
-			sb.WriteString("\n")
-			sb.WriteString(statusDimStyle.Render(" " + line))
+			sb.WriteString("\n ")
+			sb.WriteString(formatLogLine(line))
 		}
 		if len(m.logLines) > visibleLines {
 			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))
