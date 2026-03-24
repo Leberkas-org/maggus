@@ -44,16 +44,16 @@ When switching between repositories, daemons from previous repositories keep run
 **Parallel:** yes — can run alongside TASK-001-003
 
 **Acceptance Criteria:**
-- [ ] The repos list in `cmd/repos.go` shows a status indicator next to each repo (e.g. `●` running / `○` stopped), using the same color conventions as the menu header
-- [ ] Status is computed by reading `<repo>/.maggus/daemon.pid` and checking whether the process is alive (reuse the existing PID-check logic from `daemon.go`)
-- [ ] The TUI polls daemon status every 500ms so the indicator updates live without user action
-- [ ] Auto-start state is shown per repo (e.g. `[auto]` badge or `[no auto]` muted label)
-- [ ] When a repo is selected/highlighted, the keybind help footer shows the available actions: `s` start/stop daemon · `a` toggle auto-start · `enter` switch to repo
-- [ ] Pressing `s` on a repo starts the daemon if stopped, or stops it gracefully if running (reuse `autoStartDaemon` / `stopDaemonGracefully` logic, targeting the selected repo's directory instead of cwd)
-- [ ] Pressing `a` on a repo toggles `AutoStartDisabled` and saves the global config immediately
-- [ ] Starting/stopping a repo's daemon does not require switching to that repo first
-- [ ] A brief status message (e.g. `"daemon started"` / `"daemon stopped"` / `"auto-start disabled"`) appears at the bottom of the screen for 2 seconds after each action
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] The repos list in `cmd/repos.go` shows a status indicator next to each repo (e.g. `●` running / `○` stopped), using the same color conventions as the menu header
+- [x] Status is computed by reading `<repo>/.maggus/daemon.pid` and checking whether the process is alive (reuse the existing PID-check logic from `daemon.go`)
+- [x] The TUI polls daemon status every 500ms so the indicator updates live without user action
+- [x] Auto-start state is shown per repo (e.g. `[auto]` badge or `[no auto]` muted label)
+- [x] When a repo is selected/highlighted, the keybind help footer shows the available actions: `s` start/stop daemon · `a` toggle auto-start · `enter` switch to repo
+- [x] Pressing `s` on a repo starts the daemon if stopped, or stops it gracefully if running (reuse `autoStartDaemon` / `stopDaemonGracefully` logic, targeting the selected repo's directory instead of cwd)
+- [x] Pressing `a` on a repo toggles `AutoStartDisabled` and saves the global config immediately
+- [x] Starting/stopping a repo's daemon does not require switching to that repo first
+- [x] A brief status message (e.g. `"daemon started"` / `"daemon stopped"` / `"auto-start disabled"`) appears at the bottom of the screen for 2 seconds after each action
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-001-003: Respect auto-start flag in menu auto-start logic
 **Description:** As a user, I want the menu to skip auto-starting the daemon when I've disabled it for the current repo so that opening the menu doesn't override my preference.

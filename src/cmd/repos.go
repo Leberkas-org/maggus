@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,6 +26,27 @@ const (
 	reposStateConfirmInit                   // asking whether to initialize .maggus
 )
 
+// reposDaemonTickMsg is sent every 500ms to refresh daemon status for all repos.
+type reposDaemonTickMsg struct{}
+
+// reposDaemonActionResultMsg carries the result of an async daemon start/stop.
+type reposDaemonActionResultMsg struct {
+	msg string
+	err error
+}
+
+// reposStatusClearMsg is sent after 2 seconds to clear the status message.
+type reposStatusClearMsg struct {
+	id int // only clear if this matches the current timer ID
+}
+
+// pollReposDaemonTick returns a tea.Cmd that fires reposDaemonTickMsg after 500ms.
+func pollReposDaemonTick() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
+		return reposDaemonTickMsg{}
+	})
+}
+
 // reposModel is the bubbletea model for the repository management screen.
 type reposModel struct {
 	repos      []globalconfig.Repository
@@ -37,6 +59,10 @@ type reposModel struct {
 	quitting   bool
 	switched   bool // true if user switched repos (triggers menu reload)
 	statusMsg  string
+	statusID   int // incremented each time statusMsg is set, for timed clearing
+
+	// Per-repo daemon running state, indexed same as repos.
+	daemonRunning []bool
 
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
@@ -56,7 +82,7 @@ func newReposModel() reposModel {
 	cwd, _ := os.Getwd()
 	cwd, _ = filepath.Abs(cwd)
 
-	return reposModel{
+	m := reposModel{
 		repos:      cfg.Repositories,
 		lastOpened: cfg.LastOpened,
 		cwd:        cwd,
@@ -65,12 +91,36 @@ func newReposModel() reposModel {
 		isGitRepo:  isGitRepoCheck,
 		chdir:      os.Chdir,
 	}
+	m.refreshDaemonStatus()
+	return m
+}
+
+// refreshDaemonStatus updates the daemonRunning slice for all repos.
+func (m *reposModel) refreshDaemonStatus() {
+	m.daemonRunning = make([]bool, len(m.repos))
+	for i, repo := range m.repos {
+		pid, _ := readDaemonPID(repo.Path)
+		m.daemonRunning[i] = pid != 0 && isProcessRunning(pid)
+	}
+}
+
+// setStatusMsg sets the status message and schedules a clear after 2 seconds.
+func (m *reposModel) setStatusMsg(msg string) tea.Cmd {
+	m.statusID++
+	m.statusMsg = msg
+	id := m.statusID
+	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
+		return reposStatusClearMsg{id: id}
+	})
 }
 
 func (m reposModel) Init() tea.Cmd {
-	return func() tea.Msg {
-		return claude2xResultMsg{status: claude2x.FetchStatus()}
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			return claude2xResultMsg{status: claude2x.FetchStatus()}
+		},
+		pollReposDaemonTick(),
+	)
 }
 
 func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -94,6 +144,22 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		is2x, _, tickCmd := fetch2xAndUpdate()
 		m.is2x = is2x
 		return m, tickCmd
+	case reposDaemonTickMsg:
+		m.refreshDaemonStatus()
+		return m, pollReposDaemonTick()
+	case reposDaemonActionResultMsg:
+		text := msg.msg
+		if msg.err != nil {
+			text = fmt.Sprintf("%s: %v", msg.msg, msg.err)
+		}
+		cmd := m.setStatusMsg(text)
+		m.refreshDaemonStatus()
+		return m, cmd
+	case reposStatusClearMsg:
+		if msg.id == m.statusID {
+			m.statusMsg = ""
+		}
+		return m, nil
 	case tea.KeyMsg:
 		switch m.state {
 		case reposStateList:
@@ -139,7 +205,7 @@ func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.repos) > 0 {
 			return m.switchToRepo(m.repos[m.cursor].Path)
 		}
-	case "a":
+	case "n":
 		// Add repo via file browser
 		m.state = reposStateBrowsing
 		m.browser = filebrowser.New(m.cwd)
@@ -153,8 +219,75 @@ func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.repos) > 0 {
 			return m.removeRepo()
 		}
+	case "s":
+		// Start or stop daemon for selected repo
+		if len(m.repos) > 0 {
+			return m.toggleDaemon()
+		}
+	case "a":
+		// Toggle auto-start for selected repo
+		if len(m.repos) > 0 {
+			return m.toggleAutoStart()
+		}
 	}
 	return m, nil
+}
+
+// toggleDaemon starts or stops the daemon for the selected repo.
+func (m reposModel) toggleDaemon() (tea.Model, tea.Cmd) {
+	repo := m.repos[m.cursor]
+	running := m.cursor < len(m.daemonRunning) && m.daemonRunning[m.cursor]
+
+	if running {
+		// Stop daemon asynchronously
+		dir := repo.Path
+		return m, func() tea.Msg {
+			err := stopDaemonGracefully(dir)
+			if err != nil {
+				return reposDaemonActionResultMsg{msg: "failed to stop daemon", err: err}
+			}
+			return reposDaemonActionResultMsg{msg: "daemon stopped"}
+		}
+	}
+
+	// Start daemon asynchronously
+	dir := repo.Path
+	return m, func() tea.Msg {
+		err := autoStartDaemon(dir)
+		if err != nil {
+			return reposDaemonActionResultMsg{msg: "failed to start daemon", err: err}
+		}
+		return reposDaemonActionResultMsg{msg: "daemon started"}
+	}
+}
+
+// toggleAutoStart toggles the auto-start preference for the selected repo.
+func (m reposModel) toggleAutoStart() (tea.Model, tea.Cmd) {
+	cfg, err := m.loadConfig()
+	if err != nil {
+		cmd := m.setStatusMsg(fmt.Sprintf("Failed to load config: %v", err))
+		return m, cmd
+	}
+
+	if m.cursor >= len(cfg.Repositories) {
+		return m, nil
+	}
+
+	cfg.Repositories[m.cursor].AutoStartDisabled = !cfg.Repositories[m.cursor].AutoStartDisabled
+	if err := m.saveConfig(cfg); err != nil {
+		cmd := m.setStatusMsg(fmt.Sprintf("Failed to save: %v", err))
+		return m, cmd
+	}
+
+	m.repos = cfg.Repositories
+	var statusText string
+	if cfg.Repositories[m.cursor].IsAutoStartEnabled() {
+		statusText = "auto-start enabled"
+	} else {
+		statusText = "auto-start disabled"
+	}
+	cmd := m.setStatusMsg(statusText)
+	return m, cmd
 }
 
 func (m reposModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -262,6 +395,7 @@ func (m reposModel) addRepo(path string) (tea.Model, tea.Cmd) {
 	m.cursor = len(m.repos) - 1 // move cursor to newly added
 	m.state = reposStateList
 	m.statusMsg = fmt.Sprintf("Added %s", filepath.Base(absPath))
+	m.refreshDaemonStatus()
 	return m, nil
 }
 
@@ -286,6 +420,7 @@ func (m reposModel) removeRepo() (tea.Model, tea.Cmd) {
 		m.cursor = len(m.repos) - 1
 	}
 	m.statusMsg = fmt.Sprintf("Removed %s", filepath.Base(path))
+	m.refreshDaemonStatus()
 	return m, nil
 }
 
@@ -303,9 +438,12 @@ func (m reposModel) View() string {
 func (m reposModel) viewList() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	activeStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	normalStyle := lipgloss.NewStyle()
+	runningStyle := lipgloss.NewStyle().Foreground(styles.Success)
+	stoppedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	autoStyle := lipgloss.NewStyle().Foreground(styles.Success)
+	noAutoStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
 	var b strings.Builder
 
@@ -320,33 +458,43 @@ func (m reposModel) viewList() string {
 	b.WriteString("\n")
 
 	if len(m.repos) == 0 {
-		b.WriteString(mutedStyle.Render("No repositories configured. Press 'a' to add one."))
+		b.WriteString(mutedStyle.Render("No repositories configured. Press 'n' to add one."))
 		b.WriteString("\n")
 	} else {
 		for i, repo := range m.repos {
-			isActive := repo.Path == m.cwd
 			prefix := "  "
 			if i == m.cursor {
 				prefix = "→ "
 			}
 
-			displayPath := repo.Path
 			label := filepath.Base(repo.Path)
 
-			var line string
-			if i == m.cursor {
-				if isActive {
-					line = selectedStyle.Render(prefix+label) + activeStyle.Render(" ●") + mutedStyle.Render("  "+displayPath)
-				} else {
-					line = selectedStyle.Render(prefix+label) + mutedStyle.Render("  "+displayPath)
-				}
+			// Daemon status indicator
+			running := i < len(m.daemonRunning) && m.daemonRunning[i]
+			var indicator string
+			if running {
+				indicator = runningStyle.Render("●")
 			} else {
-				if isActive {
-					line = normalStyle.Render(prefix+label) + activeStyle.Render(" ●") + mutedStyle.Render("  "+displayPath)
-				} else {
-					line = normalStyle.Render(prefix+label) + mutedStyle.Render("  "+displayPath)
-				}
+				indicator = stoppedStyle.Render("○")
 			}
+
+			// Auto-start badge
+			var autoBadge string
+			if repo.IsAutoStartEnabled() {
+				autoBadge = autoStyle.Render("[auto]")
+			} else {
+				autoBadge = noAutoStyle.Render("[no auto]")
+			}
+
+			// Build the line
+			var nameStr string
+			if i == m.cursor {
+				nameStr = selectedStyle.Render(prefix + label)
+			} else {
+				nameStr = normalStyle.Render(prefix + label)
+			}
+
+			line := fmt.Sprintf("%s %s %s  %s", nameStr, indicator, autoBadge, mutedStyle.Render(repo.Path))
 			b.WriteString(line)
 			b.WriteString("\n")
 		}
@@ -355,12 +503,13 @@ func (m reposModel) viewList() string {
 	// Status message
 	if m.statusMsg != "" {
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render(m.statusMsg))
+		statusStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		b.WriteString(statusStyle.Render(m.statusMsg))
 		b.WriteString("\n")
 	}
 
 	content := b.String()
-	footer := styles.StatusBar.Render("↑/↓ navigate · enter switch · a add · d remove · esc back")
+	footer := styles.StatusBar.Render("s start/stop daemon · a toggle auto-start · enter switch · n add · d remove · esc back")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {
