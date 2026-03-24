@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -41,7 +42,8 @@ type statusModel struct {
 	// Feature tab selection
 	selectedFeature int // index into visibleFeatures()
 
-	dir string // working directory for file operations
+	dir       string            // working directory for file operations
+	approvals approval.Approvals // cached approvals; reloaded on reloadFeatures
 
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
@@ -104,8 +106,12 @@ func (m *statusModel) rebuildForSelectedFeature() {
 	m.ScrollOffset = 0
 }
 
-// reloadFeatures reloads all features and bugs from disk and rebuilds the current view.
+// reloadFeatures reloads all features, bugs, and approvals from disk and rebuilds the current view.
 func (m *statusModel) reloadFeatures() {
+	a, err := approval.Load(m.dir)
+	if err == nil {
+		m.approvals = a
+	}
 	features, err := parseFeatures(m.dir)
 	if err != nil {
 		m.rebuildForSelectedFeature()

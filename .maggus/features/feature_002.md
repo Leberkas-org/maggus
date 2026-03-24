@@ -53,13 +53,13 @@ Consolidate feature gating into a single approval system by surfacing approve/un
 **Parallel:** yes — can run alongside TASK-002-001
 
 **Acceptance Criteria:**
-- [ ] `featureInfo` gains an `approved bool` field
-- [ ] `parseFeatures(dir string)` accepts `dir` and loads `approval.Load(dir)` once per call; sets `fi.approved = approval.IsApproved(a, featureIDFromPath(f), false)` for each feature (always uses `approvalRequired=false` — visual display only, not gate logic)
-- [ ] `parseBugs(dir string)` does the same
-- [ ] All call sites of `parseFeatures` and `parseBugs` updated to pass `dir`
-- [ ] `statusModel` has a field `approvals approval.Approvals` (kept for reload; populated in `reloadFeatures`)
-- [ ] `reloadFeatures()` reloads approvals alongside features so the view stays fresh after a toggle
-- [ ] `go test ./...` passes
+- [x] `featureInfo` gains an `approved bool` field
+- [x] `parseFeatures(dir string)` accepts `dir` and loads `approval.Load(dir)` once per call; sets `fi.approved = approval.IsApproved(a, featureIDFromPath(f), false)` for each feature (always uses `approvalRequired=false` — visual display only, not gate logic)
+- [x] `parseBugs(dir string)` does the same
+- [x] All call sites of `parseFeatures` and `parseBugs` updated to pass `dir`
+- [x] `statusModel` has a field `approvals approval.Approvals` (kept for reload; populated in `reloadFeatures`)
+- [x] `reloadFeatures()` reloads approvals alongside features so the view stays fresh after a toggle
+- [x] `go test ./...` passes
 
 ---
 

@@ -19,6 +19,7 @@ type featureInfo struct {
 	completed bool // filename contains _completed
 	ignored   bool // filename contains _ignored
 	isBug     bool // true for bug files (from .maggus/bugs/)
+	approved  bool // from feature_approvals.yml (opt-out: true unless explicitly unapproved)
 }
 
 func (f *featureInfo) doneCount() int {
@@ -99,6 +100,11 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 		return nil, fmt.Errorf("glob features: %w", err)
 	}
 
+	a, err := approval.Load(dir)
+	if err != nil {
+		return nil, fmt.Errorf("load approvals: %w", err)
+	}
+
 	var features []featureInfo
 	for _, f := range files {
 		tasks, err := parser.ParseFile(f)
@@ -111,11 +117,13 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 				tasks[i].Ignored = true
 			}
 		}
+		featureID := featureIDFromPath(f)
 		features = append(features, featureInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
 			ignored:   ignored,
+			approved:  approval.IsApproved(a, featureID, false),
 		})
 	}
 	return features, nil
@@ -131,6 +139,11 @@ func parseBugs(dir string) ([]featureInfo, error) {
 		return nil, fmt.Errorf("glob bugs: %w", err)
 	}
 
+	a, err := approval.Load(dir)
+	if err != nil {
+		return nil, fmt.Errorf("load approvals: %w", err)
+	}
+
 	var bugs []featureInfo
 	for _, f := range files {
 		tasks, err := parser.ParseFile(f)
@@ -143,12 +156,14 @@ func parseBugs(dir string) ([]featureInfo, error) {
 				tasks[i].Ignored = true
 			}
 		}
+		featureID := featureIDFromPath(f)
 		bugs = append(bugs, featureInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
 			ignored:   ignored,
 			isBug:     true,
+			approved:  approval.IsApproved(a, featureID, false),
 		})
 	}
 	return bugs, nil
