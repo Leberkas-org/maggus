@@ -223,13 +223,20 @@ Examples:
 
 			// Create a pipe as a never-blocking stdin substitute so bubbletea
 			// does not quit unexpectedly when it reads EOF from /dev/null.
+			dm := nullTUIModel{}
+			dm.SetOnToolUse(func(taskID, toolType, description string) {
+				runLogger.ToolUse(taskID, toolType, description)
+			})
+			dm.SetOnOutput(func(taskID, text string) {
+				runLogger.Output(taskID, text)
+			})
 			pipeR, pipeW, pipeErr := os.Pipe()
 			if pipeErr == nil {
 				defer pipeW.Close()
 				defer pipeR.Close()
-				p = tea.NewProgram(nullTUIModel{}, tea.WithoutRenderer(), tea.WithInput(pipeR))
+				p = tea.NewProgram(dm, tea.WithoutRenderer(), tea.WithInput(pipeR))
 			} else {
-				p = tea.NewProgram(nullTUIModel{}, tea.WithoutRenderer())
+				p = tea.NewProgram(dm, tea.WithoutRenderer())
 			}
 		} else {
 			twoXStatus := claude2x.FetchStatus()
@@ -260,6 +267,9 @@ Examples:
 			setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
 			m.SetOnToolUse(func(taskID, toolType, description string) {
 				runLogger.ToolUse(taskID, toolType, description)
+			})
+			m.SetOnOutput(func(taskID, text string) {
+				runLogger.Output(taskID, text)
 			})
 			p = tea.NewProgram(m, tea.WithAltScreen())
 			stopFlagAtomic = m.StopFlag()

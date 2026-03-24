@@ -156,6 +156,8 @@ type TUIModel struct {
 
 	// Tool use callback: invoked with (taskID, toolType, description) on each tool event.
 	onToolUse func(taskID, toolType, description string)
+	// Output callback: invoked with (taskID, text) on each agent output event.
+	onOutput func(taskID, text string)
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.
@@ -245,6 +247,12 @@ func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
 // The callback receives the current task ID, tool type, and tool description.
 func (m *TUIModel) SetOnToolUse(fn func(taskID, toolType, description string)) {
 	m.onToolUse = fn
+}
+
+// SetOnOutput sets a callback that is invoked each time an agent output event is received.
+// The callback receives the current task ID and the output text.
+func (m *TUIModel) SetOnOutput(fn func(taskID, text string)) {
+	m.onOutput = fn
 }
 
 // TaskUsages returns the per-task token usage records.

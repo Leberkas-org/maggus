@@ -55,6 +55,9 @@ func (m *TUIModel) handleOutputMsg(msg agent.OutputMsg) {
 	if text != "" {
 		m.output = text
 	}
+	if m.onOutput != nil {
+		m.onOutput(m.taskID, msg.Text)
+	}
 }
 
 // handleToolMsg appends a tool entry and updates scroll state.

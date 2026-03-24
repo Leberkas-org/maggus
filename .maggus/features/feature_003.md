@@ -52,13 +52,13 @@ This feature addresses four reliability and correctness issues with the daemon a
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `TUIModel` exposes a `SetOnOutput(fn func(taskID, text string))` callback, mirroring the existing `SetOnToolUse` pattern
-- [ ] `handleOutputMsg` in `tui_messages.go` invokes the callback when set
-- [ ] `nullTUIModel` in `daemon_tui.go` also stores and invokes an `onOutput` callback (same interface)
-- [ ] In `cmd/work_task.go` (or `cmd/work.go` where the TUI is wired), the callback is set to call `runLog.Output(currentTaskID, text)`
-- [ ] After a normal `maggus work` run, `run.log` contains `[OUTPUT]` lines with agent text
-- [ ] After a daemon run, `run.log` (inside the run directory) also contains `[OUTPUT]` lines
-- [ ] `go test ./...` passes
+- [x] `TUIModel` exposes a `SetOnOutput(fn func(taskID, text string))` callback, mirroring the existing `SetOnToolUse` pattern
+- [x] `handleOutputMsg` in `tui_messages.go` invokes the callback when set
+- [x] `nullTUIModel` in `daemon_tui.go` also stores and invokes an `onOutput` callback (same interface)
+- [x] In `cmd/work_task.go` (or `cmd/work.go` where the TUI is wired), the callback is set to call `runLog.Output(currentTaskID, text)`
+- [x] After a normal `maggus work` run, `run.log` contains `[OUTPUT]` lines with agent text
+- [x] After a daemon run, `run.log` (inside the run directory) also contains `[OUTPUT]` lines
+- [x] `go test ./...` passes
 
 ---
 
