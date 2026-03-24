@@ -47,6 +47,20 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
+	// Guard: refuse to start if the current directory is not a registered repository.
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve absolute path: %w", err)
+	}
+	cfg, err := globalconfig.Load()
+	if err != nil {
+		return fmt.Errorf("load global config: %w", err)
+	}
+	if !cfg.HasRepository(absDir) {
+		cmd.Println("Not in a registered repository. Use 'maggus repos' to add one.")
+		return nil
+	}
+
 	// Ensure .maggus directory exists.
 	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0755); err != nil {
 		return fmt.Errorf("create .maggus dir: %w", err)
