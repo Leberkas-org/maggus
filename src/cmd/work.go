@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
@@ -83,34 +82,38 @@ Examples:
 		}
 
 		dir := wc.dir
+
+		// Daemon mode: delegate to the keep-alive loop which handles
+		// watching for file changes and retrying when no work is found.
+		if daemonRunFlag {
+			return runDaemonLoop(cmd, wc)
+		}
+
 		repoDir := dir
 		workDir := dir
 
 		// Mutual exclusion: prevent work from running while a daemon is active.
-		if !daemonRunFlag {
-			daemonPID, pidErr := readDaemonPID(dir)
-			if pidErr != nil {
-				return fmt.Errorf("check daemon status: %w", pidErr)
+		daemonPID, pidErr := readDaemonPID(dir)
+		if pidErr != nil {
+			return fmt.Errorf("check daemon status: %w", pidErr)
+		}
+		if daemonPID != 0 {
+			if isProcessRunning(daemonPID) {
+				return fmt.Errorf("daemon is running (PID %d) — stop it first with 'maggus stop'", daemonPID)
 			}
-			if daemonPID != 0 {
-				if isProcessRunning(daemonPID) {
-					return fmt.Errorf("daemon is running (PID %d) — stop it first with 'maggus stop'", daemonPID)
-				}
-				// Stale PID file — clean it up silently.
-				removeDaemonPID(dir)
-			}
-
-			// Write our PID so the daemon can detect us.
-			if pidErr := writeWorkPID(dir, os.Getpid()); pidErr != nil {
-				return fmt.Errorf("write work PID: %w", pidErr)
-			}
-			defer removeWorkPID(dir)
+			// Stale PID file — clean it up silently.
+			removeDaemonPID(dir)
 		}
 
+		// Write our PID so the daemon can detect us.
+		if pidErr := writeWorkPID(dir, os.Getpid()); pidErr != nil {
+			return fmt.Errorf("write work PID: %w", pidErr)
+		}
+		defer removeWorkPID(dir)
+
 		// Git sync check: detect remote changes and uncommitted work before starting.
-		// Skipped in daemon mode — sync is auto-continued if it arises between tasks.
 		var syncInfoMsg string
-		if wc.cfg.Git.IsCheckSyncEnabled() && !daemonRunFlag {
+		if wc.cfg.Git.IsCheckSyncEnabled() {
 			var shouldAbort bool
 			var syncErr error
 			syncInfoMsg, shouldAbort, syncErr = checkSync(dir)
@@ -132,12 +135,6 @@ Examples:
 			return nil
 		}
 		runID := setup.runID
-
-		// In daemon mode, use the run ID provided by 'maggus start' so that
-		// the daemon process writes into the same run directory.
-		if daemonRunFlag && daemonRunIDFlag != "" {
-			runID = daemonRunIDFlag
-		}
 
 		// Build feature groups with approval filtering (bugs first, then features).
 		featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
@@ -227,76 +224,43 @@ Examples:
 		}
 		defer func() { _ = runLogger.Close() }()
 
-		// Build the bubbletea program and stop-flag controls.
-		// In daemon mode we use a headless null model (no terminal required).
-		// In normal mode we build the full interactive TUI.
-		var p *tea.Program
-		stopFlagAtomic := &atomic.Bool{}
-		stopAtTaskIDAtomic := &atomic.Value{}
-		var tuiModel *runner.TUIModel // non-nil only in interactive mode
+		// Build the bubbletea program (interactive TUI).
+		twoXStatus := claude2x.FetchStatus()
+		cwd, _ := os.Getwd()
 
-		if daemonRunFlag {
-			// Write this process's PID so 'maggus stop' can find us.
-			if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
-				cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
-			}
-			defer removeDaemonPID(dir)
+		branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+		branchCmd.Dir = dir
+		branchOut, _ := branchCmd.Output()
+		currentBranch := strings.TrimSpace(string(branchOut))
 
-			// Create a pipe as a never-blocking stdin substitute so bubbletea
-			// does not quit unexpectedly when it reads EOF from /dev/null.
-			dm := nullTUIModel{}
-			dm.SetOnToolUse(func(taskID, toolType, description string) {
-				runLogger.ToolUse(taskID, toolType, description)
-			})
-			dm.SetOnOutput(func(taskID, text string) {
-				runLogger.Output(taskID, text)
-			})
-			pipeR, pipeW, pipeErr := os.Pipe()
-			if pipeErr == nil {
-				defer pipeW.Close()
-				defer pipeR.Close()
-				p = tea.NewProgram(dm, tea.WithoutRenderer(), tea.WithInput(pipeR))
-			} else {
-				p = tea.NewProgram(dm, tea.WithoutRenderer())
-			}
-		} else {
-			twoXStatus := claude2x.FetchStatus()
-			cwd, _ := os.Getwd()
-
-			branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-			branchCmd.Dir = dir
-			branchOut, _ := branchCmd.Output()
-			currentBranch := strings.TrimSpace(string(branchOut))
-
-			banner := runner.BannerInfo{
-				Iterations: featureCount,
-				Branch:     currentBranch,
-				RunID:      runID,
-				Agent:      wc.activeAgent.Name(),
-				CWD:        cwd,
-			}
-			if wc.useWorktree {
-				banner.Worktree = workDir
-			}
-			if twoXStatus.Is2x {
-				banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
-			}
-
-			m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
-			m.SetSyncDir(workDir)
-			m.SetWatcher(workDir)
-			setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
-			m.SetOnToolUse(func(taskID, toolType, description string) {
-				runLogger.ToolUse(taskID, toolType, description)
-			})
-			m.SetOnOutput(func(taskID, text string) {
-				runLogger.Output(taskID, text)
-			})
-			p = tea.NewProgram(m, tea.WithAltScreen())
-			stopFlagAtomic = m.StopFlag()
-			stopAtTaskIDAtomic = m.StopAtTaskIDFlag()
-			tuiModel = &m
+		banner := runner.BannerInfo{
+			Iterations: featureCount,
+			Branch:     currentBranch,
+			RunID:      runID,
+			Agent:      wc.activeAgent.Name(),
+			CWD:        cwd,
 		}
+		if wc.useWorktree {
+			banner.Worktree = workDir
+		}
+		if twoXStatus.Is2x {
+			banner.TwoXExpiresIn = twoXStatus.TwoXWindowExpiresIn
+		}
+
+		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
+		m.SetSyncDir(workDir)
+		m.SetWatcher(workDir)
+		setupUsageCallback(&m, dir, runID, wc.modelDisplay, wc.activeAgent.Name())
+		m.SetOnToolUse(func(taskID, toolType, description string) {
+			runLogger.ToolUse(taskID, toolType, description)
+		})
+		m.SetOnOutput(func(taskID, text string) {
+			runLogger.Output(taskID, text)
+		})
+
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		stopFlagAtomic := m.StopFlag()
+		stopAtTaskIDAtomic := m.StopAtTaskIDFlag()
 
 		tc := taskContext{
 			workCtx:       workCtx,
@@ -334,9 +298,7 @@ Examples:
 		})
 
 		_, tuiErr := p.Run()
-		if tuiModel != nil {
-			tuiModel.CloseWatcher()
-		}
+		m.CloseWatcher()
 		if tuiErr != nil {
 			return fmt.Errorf("TUI error: %w", tuiErr)
 		}

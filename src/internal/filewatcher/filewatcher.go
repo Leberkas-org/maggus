@@ -13,8 +13,10 @@ import (
 // UpdateMsg is sent to the bubbletea program when watched files change.
 // HasNewFile is true when at least one fsnotify.Create event was seen during
 // the debounce window; false for pure Write/Remove/Rename bursts.
+// Path contains the name of the last file event that triggered the message.
 type UpdateMsg struct {
 	HasNewFile bool
+	Path       string
 }
 
 // SendFunc is a function that sends a message. In production this is
@@ -129,7 +131,8 @@ func (w *Watcher) loop() {
 
 	var timer *time.Timer
 	var timerC <-chan time.Time
-	var hasCreate bool // true if any Create event seen in the current debounce window
+	var hasCreate bool   // true if any Create event seen in the current debounce window
+	var lastPath string  // path of the last relevant event in the current debounce window
 
 	for {
 		select {
@@ -153,6 +156,7 @@ func (w *Watcher) loop() {
 			if event.Op&fsnotify.Create != 0 {
 				hasCreate = true
 			}
+			lastPath = event.Name
 			// Reset the debounce timer on each relevant event.
 			if timer == nil {
 				timer = time.NewTimer(w.debounce)
@@ -172,10 +176,11 @@ func (w *Watcher) loop() {
 			// Ignore watcher errors — they are non-fatal.
 
 		case <-timerC:
-			w.send(UpdateMsg{HasNewFile: hasCreate})
+			w.send(UpdateMsg{HasNewFile: hasCreate, Path: lastPath})
 			timer = nil
 			timerC = nil
 			hasCreate = false
+			lastPath = ""
 		}
 	}
 }

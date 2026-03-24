@@ -1,0 +1,250 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"sync/atomic"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/runner"
+)
+
+// runDaemonLoop runs the daemon work loop with keep-alive behaviour.
+// When no work is found, it watches for feature/bug file changes and retries.
+// It exits cleanly when the context is cancelled (signal received).
+func runDaemonLoop(cmd printer, wc *workConfig) error {
+	dir := wc.dir
+
+	// Write daemon PID so 'maggus stop' can find this process.
+	if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
+		cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
+	}
+	defer removeDaemonPID(dir)
+
+	// Signal handling — shared across all cycles.
+	sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
+	defer sigStop()
+
+	workCtx, workCancel := context.WithCancel(context.Background())
+	defer workCancel()
+
+	go func() {
+		<-sigCtx.Done()
+		sigStop()
+		workCancel()
+	}()
+
+	// Initialise sync functions (once for the whole daemon lifetime).
+	runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
+
+	runID := daemonRunIDFlag
+	pollInterval := wc.cfg.DaemonPollIntervalDuration()
+
+	// Open structured run log (shared across cycles).
+	runLogger, logErr := runlog.Open(runID, dir)
+	if logErr != nil {
+		cmd.Printf("Warning: could not open run log: %v\n", logErr)
+	}
+	defer func() { _ = runLogger.Close() }()
+
+	for {
+		// Check for signal before each cycle.
+		select {
+		case <-workCtx.Done():
+			return nil
+		default:
+		}
+
+		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx)
+		if err != nil {
+			runLogger.Info(fmt.Sprintf("work cycle error: %v", err))
+		}
+
+		// If work was done, immediately check for more work.
+		if hadWork {
+			continue
+		}
+
+		// No work found — enter wait state.
+		runLogger.Info(fmt.Sprintf("no work found, watching for changes (timeout: %s)", pollInterval))
+
+		wakeReason, wakePath := waitForChanges(dir, pollInterval, workCtx)
+		switch wakeReason {
+		case wakeSignal:
+			return nil
+		case wakeFileChange:
+			runLogger.Info(fmt.Sprintf("file change detected: %s", wakePath))
+		case wakeTimeout:
+			runLogger.Info("poll timeout reached, rechecking")
+		}
+	}
+}
+
+// wakeReason describes why the daemon woke from the wait state.
+type wakeReason int
+
+const (
+	wakeSignal     wakeReason = iota // shutdown signal received
+	wakeFileChange                   // file change detected
+	wakeTimeout                      // poll timeout expired
+)
+
+// waitForChanges blocks until a file change, timeout, or context cancellation.
+// Returns the reason for waking and the path of the changed file (if applicable).
+func waitForChanges(dir string, timeout time.Duration, ctx context.Context) (wakeReason, string) {
+	type fileEvent struct {
+		path string
+	}
+
+	wakeCh := make(chan fileEvent, 1)
+	sendFn := func(msg any) {
+		if m, ok := msg.(filewatcher.UpdateMsg); ok {
+			path := m.Path
+			if path == "" {
+				path = filepath.Join(".maggus", "features")
+			}
+			select {
+			case wakeCh <- fileEvent{path: path}:
+			default:
+			}
+		}
+	}
+
+	fw, fwErr := filewatcher.New(dir, sendFn, 500*time.Millisecond)
+	if fwErr != nil {
+		// If watcher fails, fall back to pure poll.
+		fw = nil
+	}
+	defer func() {
+		if fw != nil {
+			fw.Close()
+		}
+	}()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return wakeSignal, ""
+	case evt := <-wakeCh:
+		return wakeFileChange, evt.path
+	case <-timer.C:
+		return wakeTimeout, ""
+	}
+}
+
+// runOneDaemonCycle runs a single iteration of the daemon work loop.
+// Returns true if work was found and executed, false if no work was available.
+func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+	// Parse tasks and check for work.
+	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0)
+	if err != nil {
+		return false, err
+	}
+	if setup == nil {
+		return false, nil
+	}
+
+	// Build feature groups with approval filtering.
+	featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
+	if fgErr != nil {
+		return false, fmt.Errorf("build feature groups: %w", fgErr)
+	}
+
+	// Remove groups with no workable tasks.
+	var workableGroups []featureGroup
+	for _, g := range featureGroups {
+		if countWorkable(g.tasks) > 0 {
+			workableGroups = append(workableGroups, g)
+		}
+	}
+	featureGroups = workableGroups
+
+	if len(featureGroups) == 0 {
+		return false, nil
+	}
+
+	// Work is available — run it.
+	branchTask := firstWorkableTask(featureGroups)
+	if branchTask == nil {
+		branchTask = setup.next
+	}
+
+	repoDir := dir
+	workDir := dir
+
+	branchMsg, brErr := setupBranch(wc.useWorktree, repoDir, branchTask, runID, wc.cfg.Git)
+	if brErr != nil {
+		return false, fmt.Errorf("setup branch: %w", brErr)
+	}
+
+	// Create tea.Program with nullTUIModel for this cycle.
+	dm := nullTUIModel{}
+	dm.SetOnToolUse(func(taskID, toolType, description string) {
+		runLogger.ToolUse(taskID, toolType, description)
+	})
+	dm.SetOnOutput(func(taskID, text string) {
+		runLogger.Output(taskID, text)
+	})
+
+	var p *tea.Program
+	pipeR, pipeW, pipeErr := os.Pipe()
+	if pipeErr == nil {
+		defer pipeW.Close()
+		defer pipeR.Close()
+		p = tea.NewProgram(dm, tea.WithoutRenderer(), tea.WithInput(pipeR))
+	} else {
+		p = tea.NewProgram(dm, tea.WithoutRenderer())
+	}
+
+	stopFlagAtomic := &atomic.Bool{}
+	stopAtTaskIDAtomic := &atomic.Value{}
+
+	tc := taskContext{
+		workCtx:       workCtx,
+		p:             p,
+		activeAgent:   wc.activeAgent,
+		resolvedModel: wc.resolvedModel,
+		notifier:      wc.notifier,
+		validIncludes: wc.validIncludes,
+		useWorktree:   wc.useWorktree,
+		repoDir:       repoDir,
+		workDir:       workDir,
+		runID:         runID,
+		onComplete:    wc.cfg.OnComplete,
+		logger:        runLogger,
+	}
+
+	runWorkGoroutine(workLoopParams{
+		tc:            tc,
+		tasks:         setup.tasks,
+		featureGroups: featureGroups,
+		count:         0,
+		autoContinue:  wc.cfg.IsAutoContinueEnabled(),
+		runID:         runID,
+		startTime:     setup.startTime,
+		p:             p,
+		stopFlag:      stopFlagAtomic,
+		stopAtTaskID:  stopAtTaskIDAtomic,
+		branchMsg:     branchMsg,
+		activeAgentNm: wc.activeAgent.Name(),
+		startHash:     captureStartHash(workDir),
+		modelDisplay:  wc.modelDisplay,
+		dir:           dir,
+	})
+
+	_, tuiErr := p.Run()
+	if tuiErr != nil {
+		return true, fmt.Errorf("TUI error: %w", tuiErr)
+	}
+
+	return true, nil
+}

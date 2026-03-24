@@ -313,6 +313,42 @@ func TestWatcherCreateEventHasNewFileTrue(t *testing.T) {
 	}
 }
 
+func TestWatcherUpdateMsgIncludesPath(t *testing.T) {
+	baseDir := t.TempDir()
+	featDir := filepath.Join(baseDir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var lastMsg atomic.Value
+	send := func(msg any) { lastMsg.Store(msg) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	file := filepath.Join(featDir, "feature_042.md")
+	if err := os.WriteFile(file, []byte("# Feature 42"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	msg, ok := lastMsg.Load().(UpdateMsg)
+	if !ok {
+		t.Fatal("expected an UpdateMsg to be sent")
+	}
+	if msg.Path == "" {
+		t.Error("expected UpdateMsg.Path to be non-empty")
+	}
+	base := filepath.Base(msg.Path)
+	if base != "feature_042.md" {
+		t.Errorf("expected Path to end with feature_042.md, got %q", msg.Path)
+	}
+}
+
 func TestWatcherCloseNoLeak(t *testing.T) {
 	baseDir := t.TempDir()
 	featDir := filepath.Join(baseDir, ".maggus", "features")

@@ -97,3 +97,8 @@ func (l *Logger) ToolUse(taskID, toolType, description string) {
 func (l *Logger) Output(taskID, text string) {
 	l.log("OUTPUT", fmt.Sprintf("[%s] %s", taskID, text))
 }
+
+// Info logs a general informational message.
+func (l *Logger) Info(msg string) {
+	l.log("INFO", msg)
+}
