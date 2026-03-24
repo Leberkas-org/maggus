@@ -47,11 +47,11 @@ Streamline the Maggus experience so the daemon is always running in the backgrou
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] When the user quits the main menu (q or Ctrl+C) and the daemon is currently running, a confirmation prompt is shown: `Stop daemon? [y/N]`
-- [ ] Default answer is N (daemon keeps running) — pressing Enter without input exits without stopping
-- [ ] Answering y stops the daemon using the existing stop logic before exiting
-- [ ] If the daemon is not running, no prompt is shown and the app exits immediately
-- [ ] The prompt is non-blocking and keyboard-driven (fits within the existing Bubbletea model)
+- [x] When the user quits the main menu (q or Ctrl+C) and the daemon is currently running, a confirmation prompt is shown: `Stop daemon? [y/N]`
+- [x] Default answer is N (daemon keeps running) — pressing Enter without input exits without stopping
+- [x] Answering y stops the daemon using the existing stop logic before exiting
+- [x] If the daemon is not running, no prompt is shown and the app exits immediately
+- [x] The prompt is non-blocking and keyboard-driven (fits within the existing Bubbletea model)
 
 ---
 

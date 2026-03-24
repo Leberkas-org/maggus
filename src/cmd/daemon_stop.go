@@ -76,3 +76,45 @@ force-killed.`,
 func init() {
 	rootCmd.AddCommand(stopCmd)
 }
+
+// stopDaemonGracefully stops the daemon identified by the PID file in dir.
+// It sends a graceful signal, waits up to 10s, then force-kills if needed.
+// Returns nil if the daemon was stopped or was not running.
+func stopDaemonGracefully(dir string) error {
+	pid, err := readDaemonPID(dir)
+	if err != nil {
+		return fmt.Errorf("read daemon PID: %w", err)
+	}
+	if pid == 0 || !isProcessRunning(pid) {
+		removeDaemonPID(dir)
+		return nil
+	}
+
+	if signalErr := sendGracefulSignal(pid); signalErr != nil {
+		// Continue anyway — force-kill will handle it.
+		_ = signalErr
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if !isProcessRunning(pid) {
+			removeDaemonPID(dir)
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if killErr := forceKill(pid); killErr != nil {
+		return fmt.Errorf("force kill daemon: %w", killErr)
+	}
+
+	for range 15 {
+		time.Sleep(200 * time.Millisecond)
+		if !isProcessRunning(pid) {
+			break
+		}
+	}
+
+	removeDaemonPID(dir)
+	return nil
+}

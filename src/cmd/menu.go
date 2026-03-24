@@ -39,6 +39,11 @@ type daemonAutoStartResultMsg struct {
 	err error // nil = started or already running; non-nil = failed (show warning)
 }
 
+// daemonStopResultMsg carries the result of the async daemon stop attempt.
+type daemonStopResultMsg struct {
+	err error
+}
+
 // pollMenuDaemonTick returns a tea.Cmd that fires menuDaemonTickMsg after 500ms.
 func pollMenuDaemonTick() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
@@ -359,6 +364,9 @@ type menuModel struct {
 	daemon            daemonStatus
 	daemonAutoWarning string // non-fatal warning if auto-start failed
 
+	// Stop-daemon confirmation state
+	confirmStopDaemon bool
+
 	// Sub-menu state
 	inSubMenu    bool
 	subCursor    int // cursor within sub-menu (options + Run item)
@@ -462,6 +470,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.daemonAutoWarning = fmt.Sprintf("daemon auto-start failed: %s", msg.err)
 		}
 		return m, nil
+	case daemonStopResultMsg:
+		// Daemon stop finished (success or failure) — exit the program.
+		m.quitting = true
+		return m, tea.Quit
 	case menuDaemonTickMsg:
 		m.daemon = loadDaemonStatus(m.cwd)
 		// Update the daemon toggle menu item label and description.
@@ -568,6 +580,11 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Handle stop-daemon confirmation prompt.
+		if m.confirmStopDaemon {
+			return m.updateConfirmStopDaemon(msg)
+		}
+
 		// Any key press cancels an active auto-work countdown.
 		if m.autoWorkActive {
 			m.autoWorkActive = false
@@ -616,6 +633,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "ctrl+c":
+		if m.daemon.Running {
+			m.confirmStopDaemon = true
+			return m, nil
+		}
 		m.quitting = true
 		return m, tea.Quit
 	case "up":
@@ -643,6 +664,10 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // activateItem handles selecting a menu item (enter or shortcut).
 func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	if item.isExit {
+		if m.daemon.Running {
+			m.confirmStopDaemon = true
+			return m, nil
+		}
 		m.quitting = true
 		return m, tea.Quit
 	}
@@ -765,7 +790,10 @@ func (m menuModel) View() string {
 	summaryLine := formatSummaryLine(m.summary)
 
 	var body, footer string
-	if m.inSubMenu {
+	if m.confirmStopDaemon {
+		body = m.viewConfirmStopDaemon()
+		footer = styles.StatusBar.Render("y: stop daemon · N/enter: keep running")
+	} else if m.inSubMenu {
 		body, footer = m.viewSubMenu()
 	} else {
 		body, footer = m.viewMainMenu()
@@ -873,6 +901,43 @@ func truncateLeft(path string, maxWidth int) string {
 		return path[len(path)-maxWidth:]
 	}
 	return "..." + path[len(path)-(maxWidth-3):]
+}
+
+// updateConfirmStopDaemon handles keys in the "Stop daemon?" confirmation prompt.
+func (m menuModel) updateConfirmStopDaemon(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		// Stop the daemon asynchronously, then quit.
+		cwd := m.cwd
+		return m, func() tea.Msg {
+			_ = stopDaemonGracefully(cwd)
+			return daemonStopResultMsg{}
+		}
+	case "n", "N", "enter", "esc":
+		// Default is N — exit without stopping the daemon.
+		m.quitting = true
+		return m, tea.Quit
+	}
+	// Ignore other keys while the prompt is shown.
+	return m, nil
+}
+
+// viewConfirmStopDaemon renders the "Stop daemon?" confirmation prompt.
+func (m menuModel) viewConfirmStopDaemon() string {
+	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	boldStyle := lipgloss.NewStyle().Bold(true)
+
+	var sb strings.Builder
+	sb.WriteString(warnStyle.Render("Stop daemon?") + " " + mutedStyle.Render("[y/N]"))
+	sb.WriteString("\n\n")
+	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  The daemon is running (PID %d).", m.daemon.PID)))
+	sb.WriteString("\n\n")
+	sb.WriteString(fmt.Sprintf("  %s / %s",
+		boldStyle.Render("y: stop daemon and exit"),
+		mutedStyle.Render("N/enter/esc: exit without stopping"),
+	))
+	return sb.String()
 }
 
 func (m menuModel) viewMainMenu() (string, string) {

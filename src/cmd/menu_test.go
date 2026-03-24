@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/updater"
 )
@@ -858,6 +859,228 @@ func TestMenuUpdate_DaemonTickUpdatesToggleLabel(t *testing.T) {
 			}
 			break
 		}
+	}
+}
+
+func TestQuit_DaemonRunning_ShowsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 1234},
+	}
+
+	// Pressing 'q' when daemon is running should show confirmation, not quit.
+	result, cmd := m.updateMainMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	rm := result.(menuModel)
+	if !rm.confirmStopDaemon {
+		t.Error("expected confirmStopDaemon=true when quitting with daemon running")
+	}
+	if rm.quitting {
+		t.Error("should not be quitting yet — confirmation prompt should be shown first")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd (no tea.Quit yet)")
+	}
+}
+
+func TestQuit_DaemonNotRunning_QuitsImmediately(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: false},
+	}
+
+	result, cmd := m.updateMainMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is not running")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true when daemon not running")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestConfirmStopDaemon_AnswerN_QuitsWithoutStopping(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after answering 'n'")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestConfirmStopDaemon_Enter_QuitsWithoutStopping(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after pressing Enter (default N)")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestConfirmStopDaemon_AnswerY_StopsDaemon(t *testing.T) {
+	dir := t.TempDir()
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+		cwd:               dir,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	rm := result.(menuModel)
+	// Should not quit immediately — daemon stop runs async.
+	if rm.quitting {
+		t.Error("should not be quitting yet — daemon stop is async")
+	}
+	if cmd == nil {
+		t.Error("expected a cmd to stop the daemon asynchronously")
+	}
+}
+
+func TestConfirmStopDaemon_Esc_QuitsWithoutStopping(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyEscape})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after pressing Esc")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestConfirmStopDaemon_OtherKey_Ignored(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	rm := result.(menuModel)
+	if rm.quitting {
+		t.Error("should not quit on unrecognized key")
+	}
+	if !rm.confirmStopDaemon {
+		t.Error("should still be in confirmation state")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for unrecognized key")
+	}
+}
+
+func TestActivateExitItem_DaemonRunning_ShowsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 5678},
+	}
+
+	exitItem := menuItem{isExit: true}
+	result, cmd := m.activateItem(exitItem)
+	rm := result.(menuModel)
+	if !rm.confirmStopDaemon {
+		t.Error("expected confirmStopDaemon=true when activating exit with daemon running")
+	}
+	if rm.quitting {
+		t.Error("should not be quitting yet")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd")
+	}
+}
+
+func TestActivateExitItem_DaemonNotRunning_QuitsImmediately(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: false},
+	}
+
+	exitItem := menuItem{isExit: true}
+	result, cmd := m.activateItem(exitItem)
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is not running")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestViewConfirmStopDaemon_RendersPrompt(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 9876},
+		confirmStopDaemon: true,
+	}
+	view := m.View()
+	if !strings.Contains(view, "Stop daemon?") {
+		t.Error("expected 'Stop daemon?' in confirmation view")
+	}
+	if !strings.Contains(view, "y/N") {
+		t.Error("expected '[y/N]' in confirmation view")
+	}
+	if !strings.Contains(view, "9876") {
+		t.Error("expected daemon PID in confirmation view")
+	}
+}
+
+func TestDaemonStopResultMsg_QuitsProgram(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.Update(daemonStopResultMsg{})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after daemonStopResultMsg")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd after daemon stop completes")
+	}
+}
+
+func TestMenuUpdate_ConfirmStopDaemon_InterceptsKeys(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	// Pressing 'n' should be handled by the confirmation, not the main menu.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after 'n' in confirmation state")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd")
 	}
 }
 
