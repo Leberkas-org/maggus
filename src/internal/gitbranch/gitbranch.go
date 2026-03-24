@@ -2,9 +2,10 @@ package gitbranch
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/leberkas-org/maggus/internal/gitutil"
 )
 
 var taskIDSuffixRe = regexp.MustCompile(`^TASK-(.+)$`)
@@ -63,9 +64,8 @@ func EnsureFeatureBranch(workDir string, taskID string, protectedList []string) 
 }
 
 func currentBranch(dir string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd := gitutil.Command("rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = dir
-	setProcAttr(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git rev-parse: %w", err)
@@ -74,9 +74,8 @@ func currentBranch(dir string) (string, error) {
 }
 
 func branchExists(dir string, branch string) bool {
-	cmd := exec.Command("git", "rev-parse", "--verify", "--quiet", branch)
+	cmd := gitutil.Command("rev-parse", "--verify", "--quiet", branch)
 	cmd.Dir = dir
-	setProcAttr(cmd)
 	return cmd.Run() == nil
 }
 
@@ -87,9 +86,8 @@ func createAndCheckout(dir string, branch string) error {
 	}
 	args = append(args, branch)
 
-	cmd := exec.Command("git", args...)
+	cmd := gitutil.Command(args...)
 	cmd.Dir = dir
-	setProcAttr(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 	}

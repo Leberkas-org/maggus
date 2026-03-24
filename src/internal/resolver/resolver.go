@@ -3,8 +3,9 @@ package resolver
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+
+	"github.com/leberkas-org/maggus/internal/gitutil"
 
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 )
@@ -119,7 +120,7 @@ func selectDir(target, cwd string, cfg globalconfig.GlobalConfig, deps Deps) (Re
 
 // isGitRepo checks if the directory is inside a git work tree.
 func isGitRepo(dir string) bool {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree")
+	cmd := gitutil.Command("-C", dir, "rev-parse", "--is-inside-work-tree")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run() == nil

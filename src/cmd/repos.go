@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/filebrowser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -543,7 +543,7 @@ func (m reposModel) viewConfirmInit() string {
 
 // isGitRepoCheck checks if a directory is inside a git work tree.
 func isGitRepoCheck(dir string) bool {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree")
+	cmd := gitutil.Command("-C", dir, "rev-parse", "--is-inside-work-tree")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run() == nil

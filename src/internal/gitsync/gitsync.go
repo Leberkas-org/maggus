@@ -3,9 +3,10 @@ package gitsync
 import (
 	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/leberkas-org/maggus/internal/gitutil"
 )
 
 // ErrStashPopConflict is returned when `git stash pop` results in merge conflicts.
@@ -40,7 +41,7 @@ type Status struct {
 // Returns an error if the fetch fails (e.g. no network), which callers
 // should treat as a warning rather than a fatal error.
 func FetchRemote(dir string) error {
-	cmd := exec.Command("git", "fetch")
+	cmd := gitutil.Command("fetch")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git fetch: %w: %s", err, strings.TrimSpace(string(out)))
@@ -53,7 +54,7 @@ func FetchRemote(dir string) error {
 // If the HEAD is detached, it returns Status{HasRemote: false} with no error.
 func RemoteStatus(dir string) (Status, error) {
 	// Check if HEAD is detached
-	branchCmd := exec.Command("git", "symbolic-ref", "--short", "HEAD")
+	branchCmd := gitutil.Command("symbolic-ref", "--short", "HEAD")
 	branchCmd.Dir = dir
 	if _, err := branchCmd.Output(); err != nil {
 		// Detached HEAD — no upstream possible
@@ -61,7 +62,7 @@ func RemoteStatus(dir string) (Status, error) {
 	}
 
 	// Get the upstream tracking branch name
-	upstreamCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
+	upstreamCmd := gitutil.Command("rev-parse", "--abbrev-ref", "@{upstream}")
 	upstreamCmd.Dir = dir
 	upstreamOut, err := upstreamCmd.Output()
 	if err != nil {
@@ -71,7 +72,7 @@ func RemoteStatus(dir string) (Status, error) {
 	remoteBranch := strings.TrimSpace(string(upstreamOut))
 
 	// Get ahead/behind counts
-	revListCmd := exec.Command("git", "rev-list", "--count", "--left-right", "HEAD...@{upstream}")
+	revListCmd := gitutil.Command("rev-list", "--count", "--left-right", "HEAD...@{upstream}")
 	revListCmd.Dir = dir
 	revListOut, err := revListCmd.Output()
 	if err != nil {
@@ -102,7 +103,7 @@ func RemoteStatus(dir string) (Status, error) {
 
 // WorkingTreeStatus detects uncommitted local changes using `git status --porcelain`.
 func WorkingTreeStatus(dir string) (WorkTree, error) {
-	cmd := exec.Command("git", "status", "--porcelain")
+	cmd := gitutil.Command("status", "--porcelain")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -145,7 +146,7 @@ func WorkingTreeStatus(dir string) (WorkTree, error) {
 
 // Pull performs a standard `git pull` (fast-forward merge).
 func Pull(dir string) error {
-	cmd := exec.Command("git", "pull")
+	cmd := gitutil.Command("pull")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(out)))
@@ -155,7 +156,7 @@ func Pull(dir string) error {
 
 // PullRebase performs `git pull --rebase`.
 func PullRebase(dir string) error {
-	cmd := exec.Command("git", "pull", "--rebase")
+	cmd := gitutil.Command("pull", "--rebase")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git pull --rebase: %w: %s", err, strings.TrimSpace(string(out)))
@@ -171,13 +172,13 @@ func ForcePull(dir string, confirm bool) error {
 		return ErrForcePullNotConfirmed
 	}
 
-	fetchCmd := exec.Command("git", "fetch", "origin")
+	fetchCmd := gitutil.Command("fetch", "origin")
 	fetchCmd.Dir = dir
 	if out, err := fetchCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git fetch origin: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
-	resetCmd := exec.Command("git", "reset", "--hard", "@{upstream}")
+	resetCmd := gitutil.Command("reset", "--hard", "@{upstream}")
 	resetCmd.Dir = dir
 	if out, err := resetCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git reset --hard @{upstream}: %w: %s", err, strings.TrimSpace(string(out)))
@@ -189,23 +190,23 @@ func ForcePull(dir string, confirm bool) error {
 // StashAndPull stashes local changes, pulls, then pops the stash.
 // Returns *ErrStashPopConflict if stash pop results in merge conflicts.
 func StashAndPull(dir string) error {
-	stashCmd := exec.Command("git", "stash", "push", "-m", "maggus: auto-stash before pull")
+	stashCmd := gitutil.Command("stash", "push", "-m", "maggus: auto-stash before pull")
 	stashCmd.Dir = dir
 	if out, err := stashCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git stash push: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
-	pullCmd := exec.Command("git", "pull")
+	pullCmd := gitutil.Command("pull")
 	pullCmd.Dir = dir
 	if out, err := pullCmd.CombinedOutput(); err != nil {
 		// Pull failed — try to restore the stash
-		popCmd := exec.Command("git", "stash", "pop")
+		popCmd := gitutil.Command("stash", "pop")
 		popCmd.Dir = dir
 		_ = popCmd.Run()
 		return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
-	popCmd := exec.Command("git", "stash", "pop")
+	popCmd := gitutil.Command("stash", "pop")
 	popCmd.Dir = dir
 	popOut, err := popCmd.CombinedOutput()
 	if err != nil {

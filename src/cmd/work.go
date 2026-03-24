@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -228,7 +228,7 @@ Examples:
 		twoXStatus := claude2x.FetchStatus()
 		cwd, _ := os.Getwd()
 
-		branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+		branchCmd := gitutil.Command("rev-parse", "--abbrev-ref", "HEAD")
 		branchCmd.Dir = dir
 		branchOut, _ := branchCmd.Output()
 		currentBranch := strings.TrimSpace(string(branchOut))

@@ -3,11 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitsync"
@@ -144,7 +144,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Stage any feature renames so they are included in the commit.
-	stageFeatures := exec.Command("git", "add", "--", ".maggus/")
+	stageFeatures := gitutil.Command("add", "--", ".maggus/")
 	stageFeatures.Dir = tc.workDir
 	_, _ = stageFeatures.CombinedOutput()
 

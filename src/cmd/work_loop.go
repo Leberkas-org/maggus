@@ -2,14 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"os/exec"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
@@ -517,12 +519,12 @@ func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) gr
 
 // buildSummaryData constructs the summary data for the end-of-run summary screen.
 func buildSummaryData(params workLoopParams, completed int, failedTasks []failedTask, stopReason runner.StopReason, errorDetail string, warnings []string) runner.SummaryData {
-	endHashCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	endHashCmd := gitutil.Command("rev-parse", "--short", "HEAD")
 	endHashCmd.Dir = params.tc.workDir
 	endHashBytes, _ := endHashCmd.Output()
 	endHash := strings.TrimSpace(string(endHashBytes))
 
-	branchNameCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchNameCmd := gitutil.Command("rev-parse", "--abbrev-ref", "HEAD")
 	branchNameCmd.Dir = params.tc.workDir
 	branchNameOut, _ := branchNameCmd.Output()
 	currentBranch := strings.TrimSpace(string(branchNameOut))
@@ -563,9 +565,9 @@ func pushToRemote(p *tea.Program, workDir string, completed int, currentBranch s
 	if completed > 0 {
 		var push *exec.Cmd
 		if currentBranch != "" {
-			push = exec.Command("git", "push", "--set-upstream", "origin", currentBranch)
+			push = gitutil.Command("push", "--set-upstream", "origin", currentBranch)
 		} else {
-			push = exec.Command("git", "push")
+			push = gitutil.Command("push")
 		}
 		push.Dir = workDir
 		if pushOut, pushErr := push.CombinedOutput(); pushErr != nil {
@@ -592,7 +594,7 @@ func captureStartHash(workDir string) string {
 
 // captureShortHash returns the current short HEAD git hash, or empty string on error.
 func captureShortHash(workDir string) string {
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	cmd := gitutil.Command("rev-parse", "--short", "HEAD")
 	cmd.Dir = workDir
 	out, _ := cmd.Output()
 	return strings.TrimSpace(string(out))

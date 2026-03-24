@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/release"
 	"github.com/spf13/cobra"
 )
@@ -137,7 +137,7 @@ func getDiffStat(dir, tag string) string {
 	} else {
 		args = []string{"diff", "--stat", "HEAD"}
 	}
-	cmd := exec.Command("git", args...)
+	cmd := gitutil.Command(args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {

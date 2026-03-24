@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -110,7 +110,7 @@ func syncTickCmd() tea.Cmd {
 
 func (m syncModel) fetchStatus() tea.Msg {
 	// Get current branch
-	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchCmd := gitutil.Command("rev-parse", "--abbrev-ref", "HEAD")
 	branchCmd.Dir = m.dir
 	branchOut, _ := branchCmd.Output()
 	branch := strings.TrimSpace(string(branchOut))

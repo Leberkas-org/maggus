@@ -2,9 +2,10 @@ package release
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/leberkas-org/maggus/internal/gitutil"
 )
 
 // Commit represents a parsed git commit.
@@ -44,7 +45,7 @@ var sectionOrder = []string{
 // FindLastTag runs git describe to find the most recent version tag.
 // Returns empty string if no tags exist.
 func FindLastTag(dir string) (string, error) {
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	cmd := gitutil.Command("describe", "--tags", "--abbrev=0")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -72,7 +73,7 @@ func CommitsSinceTag(dir, tag string) ([]Commit, error) {
 		args = append(args, tag+"..HEAD")
 	}
 
-	cmd := exec.Command("git", args...)
+	cmd := gitutil.Command(args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
