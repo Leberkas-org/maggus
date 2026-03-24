@@ -419,7 +419,7 @@ func TestNewStatusModel(t *testing.T) {
 	}
 
 	t.Run("initializes with correct fields", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-002", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, false, "TASK-002", "plan_1.md", "claude", "/tmp", false)
 		if m.nextTaskID != "TASK-002" {
 			t.Errorf("nextTaskID = %q, want TASK-002", m.nextTaskID)
 		}
@@ -439,14 +439,14 @@ func TestNewStatusModel(t *testing.T) {
 	})
 
 	t.Run("showAll includes complete tasks", func(t *testing.T) {
-		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp", false)
 		if len(m.Tasks) != 2 {
 			t.Errorf("Tasks len = %d, want 2", len(m.Tasks))
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
-		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false)
 		if len(m.Tasks) != 0 {
 			t.Errorf("Tasks len = %d, want 0", len(m.Tasks))
 		}
@@ -539,7 +539,7 @@ func TestEnsureCursorVisible(t *testing.T) {
 }
 
 func TestStatusModel_InitReturnsCmd(t *testing.T) {
-	m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Error("Init() should return a non-nil Cmd for async 2x fetch")
@@ -554,7 +554,7 @@ func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
 	}
 
 	t.Run("2x active sets is2x and BorderColor to Warning", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false)
 		msg := claude2xResultMsg{status: claude2x.Status{Is2x: true, TwoXWindowExpiresIn: "5h"}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
@@ -567,7 +567,7 @@ func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
 	})
 
 	t.Run("2x inactive keeps is2x false and BorderColor Primary", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false)
 		msg := claude2xResultMsg{status: claude2x.Status{Is2x: false}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
@@ -588,7 +588,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	}
 
 	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false)
 		m.is2x = false
 		view := m.View()
 		// Verify the view renders without error and contains expected content
@@ -601,7 +601,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	})
 
 	t.Run("2x view renders without error", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp")
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false)
 		m.is2x = true
 		view := m.View()
 		if !strings.Contains(view, "Status") {
@@ -613,7 +613,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	})
 
 	t.Run("empty features view renders with 2x", func(t *testing.T) {
-		m := newStatusModel(nil, false, "", "", "claude", "/tmp")
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false)
 		m.is2x = true
 		view := m.View()
 		if !strings.Contains(view, "No features found") {
@@ -787,7 +787,7 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 	}
 
 	t.Run("tabs include bugs", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false)
 		visible := m.visibleFeatures()
 		if len(visible) != 2 {
 			t.Fatalf("visible features = %d, want 2", len(visible))
@@ -798,7 +798,7 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 	})
 
 	t.Run("navigation to bug tab", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false)
 		m.selectedFeature = 1
 		m.rebuildForSelectedFeature()
 		if len(m.Tasks) != 1 {
@@ -828,7 +828,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	}
 
 	t.Run("view renders bug tabs", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false)
 		view := m.View()
 		if !strings.Contains(view, "bug_001") {
 			t.Error("view should contain bug tab label")
@@ -839,7 +839,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	})
 
 	t.Run("view shows bug header counts", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false)
 		view := m.View()
 		if !strings.Contains(view, "1 bugs") {
 			t.Error("view header should show bug count")
@@ -847,7 +847,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	})
 
 	t.Run("selected bug tab shows bug tasks", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp")
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false)
 		m.selectedFeature = 1
 		m.rebuildForSelectedFeature()
 		view := m.View()

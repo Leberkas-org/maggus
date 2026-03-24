@@ -56,7 +56,7 @@ type statusModel struct {
 	daemon        daemonStatus
 }
 
-func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string) statusModel {
+func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
@@ -67,6 +67,7 @@ func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFi
 		nextTaskFile:  nextTaskFile,
 		agentName:     agentName,
 		dir:           dir,
+		showLog:       showLog,
 		logAutoScroll: true,
 	}
 	visible := m.visibleFeatures()
@@ -786,6 +787,10 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		showLog, err := cmd.Flags().GetBool("show-log")
+		if err != nil {
+			return err
+		}
 
 		dir, err := os.Getwd()
 		if err != nil {
@@ -827,7 +832,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		// TUI mode: interactive status with detail view
-		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir)
+		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog)
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := prog.Run()
 		if err != nil {
@@ -844,4 +849,5 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
 	statusCmd.Flags().Bool("all", false, "Show completed features in task sections and Features table")
+	statusCmd.Flags().Bool("show-log", false, "Open the live log panel immediately on startup")
 }
