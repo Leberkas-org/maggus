@@ -185,7 +185,7 @@ func TestRunSkillCommand_PromptAssembly(t *testing.T) {
 
 func TestLaunchInteractive_NotFoundAgent(t *testing.T) {
 	// An agent that doesn't exist on PATH should return an error and nil SessionInfo.
-	info, err := launchInteractive("nonexistent-agent-xyz", "hello", t.TempDir())
+	info, err := launchInteractive("nonexistent-agent-xyz", "hello", t.TempDir(), false, "")
 	if err == nil {
 		t.Fatal("expected error for non-existent agent, got nil")
 	}
@@ -208,7 +208,7 @@ func TestLaunchInteractive_ReturnsSessionInfo(t *testing.T) {
 	before := time.Now()
 
 	// "go version" exits immediately with 0.
-	info, err := launchInteractive(goPath, "version", dir)
+	info, err := launchInteractive(goPath, "version", dir, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

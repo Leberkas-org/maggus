@@ -51,15 +51,15 @@ Replace the four separate `prompt`, `plan`, `vision`, and `architecture` command
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `runPrompt` opens the `promptPickerModel` TUI before launching Claude
-- [ ] If result is cancelled, exits cleanly with no error
-- [ ] For "Plain": launches `claude [--dangerously-skip-permissions] [--model ...]` (no skill arg)
-- [ ] For skill options: launches `claude [--dangerously-skip-permissions] [--model ...] "/maggus:skill-name description"` — reuses `launchInteractive` with a new `skipPermissions bool` parameter added to its signature
-- [ ] `--dangerously-skip-permissions` is passed when `SkipPermissions == true`
-- [ ] `ensureMaggusPlugin()` is called before launching any non-plain skill
-- [ ] Usage tracking works for all modes: plain uses `usage_prompt.jsonl`, skill modes use their respective `usage_<skill>.jsonl` filenames
-- [ ] The `--model` CLI flag on `promptCmd` still works
-- [ ] `go build ./...` and `go test ./...` pass
+- [x] `runPrompt` opens the `promptPickerModel` TUI before launching Claude
+- [x] If result is cancelled, exits cleanly with no error
+- [x] For "Plain": launches `claude [--dangerously-skip-permissions] [--model ...]` (no skill arg)
+- [x] For skill options: launches `claude [--dangerously-skip-permissions] [--model ...] "/maggus:skill-name description"` — reuses `launchInteractive` with a new `skipPermissions bool` parameter added to its signature
+- [x] `--dangerously-skip-permissions` is passed when `SkipPermissions == true`
+- [x] `ensureMaggusPlugin()` is called before launching any non-plain skill
+- [x] Usage tracking works for all modes: plain uses `usage_prompt.jsonl`, skill modes use their respective `usage_<skill>.jsonl` filenames
+- [x] The `--model` CLI flag on `promptCmd` still works
+- [x] `go build ./...` and `go test ./...` pass
 
 ### TASK-001-003: Remove old standalone commands and update the menu
 

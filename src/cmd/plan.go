@@ -98,7 +98,7 @@ func runSkillCommand(skill, usageFile string) func(cmd *cobra.Command, args []st
 		resolvedModel := config.ResolveModel(cfg.Model)
 
 		prompt := fmt.Sprintf("%s %s", skill, description)
-		info, err := launchInteractive(agentName, prompt, dir)
+		info, err := launchInteractive(agentName, prompt, dir, false, resolvedModel)
 
 		// Extract usage if a usage file is configured and we have session info.
 		if usageFile != "" && info != nil {
@@ -162,9 +162,11 @@ type SessionInfo struct {
 // launchInteractive launches the given agent CLI interactively with a prefilled prompt.
 // It connects stdin/stdout/stderr directly so the user has full control.
 // The dir parameter is the working directory used to locate the Claude session directory
-// for snapshotting. Session timing info is returned so callers can extract usage afterward.
-// Snapshotting errors are logged as warnings and do not prevent the session from launching.
-func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
+// for snapshotting. When skipPermissions is true, --dangerously-skip-permissions is passed.
+// When model is non-empty, --model is passed. Session timing info is returned so callers
+// can extract usage afterward. Snapshotting errors are logged as warnings and do not
+// prevent the session from launching.
+func launchInteractive(agentName, prompt, dir string, skipPermissions bool, model string) (*SessionInfo, error) {
 	path, err := exec.LookPath(agentName)
 	if err != nil {
 		return nil, fmt.Errorf("%s not found on PATH: %w", agentName, err)
@@ -185,8 +187,19 @@ func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
 
 	startTime := time.Now()
 
-	// Launch interactively: pass prompt as positional arg (not -p).
-	cmd := exec.Command(path, prompt)
+	// Build command args.
+	var args []string
+	if skipPermissions {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if prompt != "" {
+		args = append(args, prompt)
+	}
+
+	cmd := exec.Command(path, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

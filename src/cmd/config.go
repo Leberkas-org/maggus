@@ -126,6 +126,12 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		autoWorkIdx = 2
 	}
 
+	autoApproveValues := []string{"disabled", "enabled"}
+	autoApproveIdx := 0
+	if cfg.ApprovalMode == config.ApprovalModeOptOut {
+		autoApproveIdx = 1
+	}
+
 	autoBranchValues := []string{"on", "off"}
 	autoBranchIdx := 0
 	if !cfg.Git.IsAutoBranchEnabled() {
@@ -184,6 +190,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Model", values: modelValues, current: modelIdx},
 		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
 		{label: "Auto-work", values: autoWorkValues, current: autoWorkIdx},
+		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
 		{label: "Protected branches", display: protectedDisplay},
@@ -292,6 +299,13 @@ func (m configModel) buildConfig() config.Config {
 		cfg.AutoWork = config.AutoWorkDelayed
 	default:
 		cfg.AutoWork = config.AutoWorkDisabled
+	}
+
+	autoApproveRow := m.optionByLabel("Auto-approve")
+	if autoApproveRow.values[autoApproveRow.current] == "enabled" {
+		cfg.ApprovalMode = config.ApprovalModeOptOut
+	} else {
+		cfg.ApprovalMode = config.ApprovalModeOptIn
 	}
 
 	return cfg
