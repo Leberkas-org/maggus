@@ -74,15 +74,15 @@ Add daemon lifecycle management and log attachment directly into the main intera
 **Parallel:** yes — can run alongside TASK-001-002 and TASK-001-004 once TASK-001-001 is merged
 
 **Acceptance Criteria:**
-- [ ] A new menu item is added to `allMenuItems` with shortcut `d`
-- [ ] When daemon is **not** running: item label is `"start daemon"` with description `"Start the work loop as a background daemon"`
-- [ ] When daemon **is** running: item label is `"stop daemon"` with description `"Stop the running daemon gracefully"`
-- [ ] The item label and description update automatically based on `model.daemon.Running` (no restart required)
-- [ ] Selecting "start daemon" launches the daemon using the existing `startCmd` logic (reuse or inline the same approach as `daemon_start.go` — generate a run ID, launch detached process, write PID file)
-- [ ] Selecting "stop daemon" stops the daemon using the existing `stopCmd` logic (reuse `daemon_stop.go` — send graceful signal, wait up to 10s, force-kill if needed)
-- [ ] After start/stop, the next poll tick updates the header status line to reflect the new state
-- [ ] The item is positioned logically in the menu (e.g., after "work", before "status")
-- [ ] `go test ./...` passes
+- [x] A new menu item is added to `allMenuItems` with shortcut `d`
+- [x] When daemon is **not** running: item label is `"start daemon"` with description `"Start the work loop as a background daemon"`
+- [x] When daemon **is** running: item label is `"stop daemon"` with description `"Stop the running daemon gracefully"`
+- [x] The item label and description update automatically based on `model.daemon.Running` (no restart required)
+- [x] Selecting "start daemon" launches the daemon using the existing `startCmd` logic (reuse or inline the same approach as `daemon_start.go` — generate a run ID, launch detached process, write PID file)
+- [x] Selecting "stop daemon" stops the daemon using the existing `stopCmd` logic (reuse `daemon_stop.go` — send graceful signal, wait up to 10s, force-kill if needed)
+- [x] After start/stop, the next poll tick updates the header status line to reflect the new state
+- [x] The item is positioned logically in the menu (e.g., after "work", before "status")
+- [x] `go test ./...` passes
 
 ---
 

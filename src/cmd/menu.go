@@ -123,11 +123,13 @@ type menuItem struct {
 	hideIfInitialized bool
 	separator         bool // render a blank line before this item
 	isExit            bool // quit the menu instead of dispatching a command
+	isDaemonToggle    bool // dynamic start/stop daemon item
 }
 
 var allMenuItems = []menuItem{
 	// Core workflow
 	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
+	{name: "start daemon", desc: "Start the work loop as a background daemon", shortcut: 'd', shortcutLabel: "d", isDaemonToggle: true},
 	{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
 	{name: "repos", desc: "Manage configured repositories", shortcut: 'r', shortcutLabel: "r"},
 	// AI-assisted creation
@@ -440,6 +442,19 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case menuDaemonTickMsg:
 		m.daemon = loadDaemonStatus(m.cwd)
+		// Update the daemon toggle menu item label and description.
+		for i := range m.items {
+			if m.items[i].isDaemonToggle {
+				if m.daemon.Running {
+					m.items[i].name = "stop daemon"
+					m.items[i].desc = "Stop the running daemon gracefully"
+				} else {
+					m.items[i].name = "start daemon"
+					m.items[i].desc = "Start the work loop as a background daemon"
+				}
+				break
+			}
+		}
 		return m, pollMenuDaemonTick()
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
@@ -569,6 +584,14 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	if item.isExit {
 		m.quitting = true
+		return m, tea.Quit
+	}
+	if item.isDaemonToggle {
+		if m.daemon.Running {
+			m.selected = "stop"
+		} else {
+			m.selected = "start"
+		}
 		return m, tea.Quit
 	}
 	if def, ok := m.subMenuDefs[item.name]; ok {
