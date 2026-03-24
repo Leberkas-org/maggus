@@ -1,7 +1,10 @@
 agent: claude
-model: ""
+model: opus
 include: []
 worktree: false
+auto_work: delayed
+approval_mode: ""
+auto_continue: null
 notifications:
     sound: true
     on_task_complete: false

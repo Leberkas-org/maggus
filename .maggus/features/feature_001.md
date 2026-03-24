@@ -35,13 +35,13 @@ Add daemon lifecycle management and log attachment directly into the main intera
 **Parallel:** no — this is the foundation for all other tasks
 
 **Acceptance Criteria:**
-- [ ] A `daemonStatus` field (type `daemonStatus` from `status_runlog.go`) is added to `menuModel` in `menu.go`
-- [ ] A `menuDaemonTickMsg` message type is defined (mirrors the pattern in `status_runlog.go`)
-- [ ] A `pollMenuDaemonTick()` command fires every 500ms and returns `menuDaemonTickMsg`
-- [ ] The tick is started in `Init()` and re-queued in `Update()` on each `menuDaemonTickMsg`
-- [ ] On each tick, `loadDaemonStatus(dir)` is called and the result stored in `model.daemon`
-- [ ] No visual changes yet — this task is data plumbing only
-- [ ] `go test ./...` passes (no regressions)
+- [x] A `daemonStatus` field (type `daemonStatus` from `status_runlog.go`) is added to `menuModel` in `menu.go`
+- [x] A `menuDaemonTickMsg` message type is defined (mirrors the pattern in `status_runlog.go`)
+- [x] A `pollMenuDaemonTick()` command fires every 500ms and returns `menuDaemonTickMsg`
+- [x] The tick is started in `Init()` and re-queued in `Update()` on each `menuDaemonTickMsg`
+- [x] On each tick, `loadDaemonStatus(dir)` is called and the result stored in `model.daemon`
+- [x] No visual changes yet — this task is data plumbing only
+- [x] `go test ./...` passes (no regressions)
 
 ---
 

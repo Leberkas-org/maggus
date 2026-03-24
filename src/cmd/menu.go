@@ -31,6 +31,16 @@ type hideShortcutsMsg struct {
 	timerID int // only hide if this matches the current timer ID
 }
 
+// menuDaemonTickMsg is sent every 500ms to refresh the daemon status in the menu.
+type menuDaemonTickMsg struct{}
+
+// pollMenuDaemonTick returns a tea.Cmd that fires menuDaemonTickMsg after 500ms.
+func pollMenuDaemonTick() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
+		return menuDaemonTickMsg{}
+	})
+}
+
 // autoWorkTickMsg is sent every second while the delayed auto-work countdown is active.
 type autoWorkTickMsg struct {
 	id int // countdown ID; stale ticks (from a previous countdown) are ignored
@@ -318,6 +328,9 @@ type menuModel struct {
 	watcher   *filewatcher.Watcher
 	watcherCh chan bool
 
+	// Daemon state
+	daemon daemonStatus
+
 	// Sub-menu state
 	inSubMenu    bool
 	subCursor    int // cursor within sub-menu (options + Run item)
@@ -388,6 +401,7 @@ func (m menuModel) Init() tea.Cmd {
 			return updateCheckResultMsg{banner: startupUpdateCheck()}
 		},
 		listenForWatcherUpdate(m.watcherCh),
+		pollMenuDaemonTick(),
 	)
 }
 
@@ -412,6 +426,9 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
 		return m, nil
+	case menuDaemonTickMsg:
+		m.daemon = loadDaemonStatus(m.cwd)
+		return m, pollMenuDaemonTick()
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
 		// Re-read config so changes made in the config TUI take effect immediately.
