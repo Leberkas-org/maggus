@@ -250,10 +250,10 @@ func (m reposModel) toggleDaemon() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Start daemon asynchronously
+	// Start daemon asynchronously (bypass auto-start preference — this is a manual action)
 	dir := repo.Path
 	return m, func() tea.Msg {
-		err := autoStartDaemon(dir)
+		err := startDaemon(dir)
 		if err != nil {
 			return reposDaemonActionResultMsg{msg: "failed to start daemon", err: err}
 		}
