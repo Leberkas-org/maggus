@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/spf13/cobra"
 )
 
@@ -114,6 +115,19 @@ func init() {
 // running. Returns an error only when the daemon was not running and the launch
 // failed (callers may display a non-fatal warning).
 func autoStartDaemon(dir string) error {
+	// Check per-repo auto-start preference from global config.
+	if cfg, err := globalconfig.Load(); err == nil {
+		absDir, _ := filepath.Abs(dir)
+		for _, repo := range cfg.Repositories {
+			if repo.Path == absDir {
+				if !repo.IsAutoStartEnabled() {
+					return nil
+				}
+				break
+			}
+		}
+	}
+
 	// Ensure .maggus directory exists.
 	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0755); err != nil {
 		return fmt.Errorf("create .maggus dir: %w", err)
