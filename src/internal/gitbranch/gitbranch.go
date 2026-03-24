@@ -65,6 +65,7 @@ func EnsureFeatureBranch(workDir string, taskID string, protectedList []string) 
 func currentBranch(dir string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = dir
+	setProcAttr(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git rev-parse: %w", err)
@@ -75,6 +76,7 @@ func currentBranch(dir string) (string, error) {
 func branchExists(dir string, branch string) bool {
 	cmd := exec.Command("git", "rev-parse", "--verify", "--quiet", branch)
 	cmd.Dir = dir
+	setProcAttr(cmd)
 	return cmd.Run() == nil
 }
 
@@ -87,6 +89,7 @@ func createAndCheckout(dir string, branch string) error {
 
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	setProcAttr(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 	}

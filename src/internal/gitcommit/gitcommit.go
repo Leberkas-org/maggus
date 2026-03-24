@@ -47,10 +47,12 @@ func CommitIteration(workDir, fallbackMsg string) (Result, error) {
 		for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md", ".maggus/RELEASE_NOTES.md"} {
 			unstage := exec.Command("git", "reset", "HEAD", "--", pattern)
 			unstage.Dir = workDir
+			setProcAttr(unstage)
 			unstage.CombinedOutput() // ignore errors (files may not be staged)
 		}
 		cmd := exec.Command("git", "commit", "-m", fallbackMsg)
 		cmd.Dir = workDir
+		setProcAttr(cmd)
 		out, commitErr := cmd.CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
 		if commitErr != nil {
@@ -76,12 +78,14 @@ func CommitIteration(workDir, fallbackMsg string) (Result, error) {
 	for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md", ".maggus/RELEASE_NOTES.md"} {
 		unstage := exec.Command("git", "reset", "HEAD", "--", pattern)
 		unstage.Dir = workDir
+		setProcAttr(unstage)
 		unstage.CombinedOutput() // ignore errors (files may not be staged)
 	}
 
 	// Run git commit
 	cmd := exec.Command("git", "commit", "-F", commitFile)
 	cmd.Dir = workDir
+	setProcAttr(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		outStr := strings.TrimSpace(string(out))
