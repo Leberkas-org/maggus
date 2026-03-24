@@ -33,13 +33,13 @@ type skillOption struct {
 }
 
 var defaultSkills = []skillOption{
-	{label: "Plain"},
-	{label: "Plan"},
-	{label: "Vision"},
-	{label: "Architecture"},
-	{label: "Bug report"},
-	{label: "Bryan: plan"},
-	{label: "Bryan: bug report"},
+	{label: "open console"},
+	{label: "/maggus-plan"},
+	{label: "/maggus-vision"},
+	{label: "/maggus-architecture"},
+	{label: "/maggus-bugreport"},
+	{label: "/bryan-plan"},
+	{label: "/bryan-bugreport"},
 }
 
 type promptPickerModel struct {

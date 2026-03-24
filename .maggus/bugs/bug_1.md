@@ -83,9 +83,9 @@ var skillMappings = map[string]skillMapping{
 **Description:** As a user, I want selecting any skill in the picker to actually launch without a crash so I can use the prompt command at all.
 
 **Acceptance Criteria:**
-- [ ] `skillMappings` in `src/cmd/prompt.go` uses keys that match the labels in `defaultSkills` (`"open console"`, `"/maggus-plan"`, `"/maggus-vision"`, `"/maggus-architecture"`, `"/maggus-bugreport"`, `"/bryan-plan"`, `"/bryan-bugreport"`)
-- [ ] Selecting any skill in the picker no longer returns `"unknown skill: ..."` error
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `skillMappings` in `src/cmd/prompt.go` uses keys that match the labels in `defaultSkills` (`"open console"`, `"/maggus-plan"`, `"/maggus-vision"`, `"/maggus-architecture"`, `"/maggus-bugreport"`, `"/bryan-plan"`, `"/bryan-bugreport"`)
+- [x] Selecting any skill in the picker no longer returns `"unknown skill: ..."` error
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### BUG-001-003: Add group separators to the skill picker list
 
