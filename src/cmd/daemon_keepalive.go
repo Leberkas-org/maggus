@@ -29,6 +29,7 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
 	}
 	defer removeDaemonPID(dir)
+	defer removeDaemonStopFile(dir)
 
 	// Signal handling — shared across all cycles.
 	sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -41,6 +42,27 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		<-sigCtx.Done()
 		sigStop()
 		workCancel()
+	}()
+
+	// Watch for stop signal file (used on Windows where OS signals cannot
+	// reach a detached daemon process; harmless no-op on Unix).
+	removeDaemonStopFile(dir) // clean up leftover from previous run
+	go func() {
+		stopFile := daemonStopFilePath(dir)
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-workCtx.Done():
+				return
+			case <-ticker.C:
+				if _, err := os.Stat(stopFile); err == nil {
+					os.Remove(stopFile)
+					workCancel()
+					return
+				}
+			}
+		}
 	}()
 
 	// Initialise sync functions (once for the whole daemon lifetime).

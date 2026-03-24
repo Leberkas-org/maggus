@@ -8,7 +8,7 @@ import (
 )
 
 // sendGracefulSignal on Unix sends SIGTERM to the process.
-func sendGracefulSignal(pid int) error {
+func sendGracefulSignal(pid int, _ string) error {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err

@@ -38,7 +38,7 @@ force-killed.`,
 		cmd.Printf("Stopping daemon (PID %d)...\n", pid)
 
 		// Send graceful shutdown signal.
-		if signalErr := sendGracefulSignal(pid); signalErr != nil {
+		if signalErr := sendGracefulSignal(pid, dir); signalErr != nil {
 			cmd.Printf("Warning: could not send graceful signal: %v\n", signalErr)
 		}
 
@@ -90,7 +90,7 @@ func stopDaemonGracefully(dir string) error {
 		return nil
 	}
 
-	if signalErr := sendGracefulSignal(pid); signalErr != nil {
+	if signalErr := sendGracefulSignal(pid, dir); signalErr != nil {
 		// Continue anyway — force-kill will handle it.
 		_ = signalErr
 	}

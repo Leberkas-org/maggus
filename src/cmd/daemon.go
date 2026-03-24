@@ -55,6 +55,16 @@ func removeDaemonPID(dir string) {
 	_ = os.Remove(daemonPIDPath(dir))
 }
 
+// daemonStopFilePath returns the path to the daemon stop signal file.
+func daemonStopFilePath(dir string) string {
+	return filepath.Join(dir, ".maggus", "daemon.stop")
+}
+
+// removeDaemonStopFile removes the stop signal file if it exists.
+func removeDaemonStopFile(dir string) {
+	_ = os.Remove(daemonStopFilePath(dir))
+}
+
 // generateDaemonRunID returns a timestamp-based run ID for the daemon session.
 func generateDaemonRunID() string {
 	return time.Now().Format("20060102-150405")
