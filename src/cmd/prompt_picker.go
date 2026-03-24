@@ -29,15 +29,18 @@ const (
 
 // skillOption represents a selectable skill in the picker.
 type skillOption struct {
-	label string
+	label     string
+	separator bool // true for non-selectable group separator rows
 }
 
 var defaultSkills = []skillOption{
 	{label: "open console"},
+	{separator: true, label: "maggus"},
 	{label: "/maggus-plan"},
 	{label: "/maggus-vision"},
 	{label: "/maggus-architecture"},
 	{label: "/maggus-bugreport"},
+	{separator: true, label: "bryan"},
 	{label: "/bryan-plan"},
 	{label: "/bryan-bugreport"},
 }
@@ -119,6 +122,7 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusSkillList {
 				if m.skillCursor > 0 {
 					m.skillCursor--
+					m.skipSeparatorUp()
 				}
 			} else if m.focus == focusDescription {
 				// handled above
@@ -135,6 +139,7 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusSkillList {
 				if m.skillCursor < len(m.skills)-1 {
 					m.skillCursor++
+					m.skipSeparatorDown()
 				} else {
 					// Down past the list moves focus.
 					if m.isPlainSelected() {
@@ -221,6 +226,20 @@ func (m promptPickerModel) isPlainSelected() bool {
 	return m.skillCursor == 0
 }
 
+// skipSeparatorUp moves the cursor up, skipping any separator rows.
+func (m *promptPickerModel) skipSeparatorUp() {
+	for m.skillCursor > 0 && m.skills[m.skillCursor].separator {
+		m.skillCursor--
+	}
+}
+
+// skipSeparatorDown moves the cursor down, skipping any separator rows.
+func (m *promptPickerModel) skipSeparatorDown() {
+	for m.skillCursor < len(m.skills)-1 && m.skills[m.skillCursor].separator {
+		m.skillCursor++
+	}
+}
+
 func (m promptPickerModel) View() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
@@ -236,7 +255,13 @@ func (m promptPickerModel) View() string {
 	sb.WriteString("\n\n")
 
 	// Skill list.
+	separatorStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	for i, skill := range m.skills {
+		if skill.separator {
+			sep := fmt.Sprintf("  ─── %s ───", skill.label)
+			fmt.Fprintf(&sb, "  %s\n", separatorStyle.Render(sep))
+			continue
+		}
 		if m.focus == focusSkillList && i == m.skillCursor {
 			fmt.Fprintf(&sb, "  %s %s\n",
 				cursorStyle.Render("->"),
