@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -37,5 +38,33 @@ func TestRootCmd_RunE_IsSet(t *testing.T) {
 	// Verify that RunE is set on the root command (required for menu/fallback behavior).
 	if rootCmd.RunE == nil {
 		t.Error("expected rootCmd.RunE to be set")
+	}
+}
+
+func TestShouldSkipResolver(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"start skips resolver", []string{"maggus", "start"}, true},
+		{"stop skips resolver", []string{"maggus", "stop"}, true},
+		{"start --all skips resolver", []string{"maggus", "start", "--all"}, true},
+		{"stop --all skips resolver", []string{"maggus", "stop", "--all"}, true},
+		{"work does not skip", []string{"maggus", "work"}, false},
+		{"list does not skip", []string{"maggus", "list"}, false},
+		{"status does not skip", []string{"maggus", "status"}, false},
+		{"no args does not skip", []string{"maggus"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origArgs := os.Args
+			defer func() { os.Args = origArgs }()
+			os.Args = tt.args
+			if got := shouldSkipResolver(); got != tt.want {
+				t.Errorf("shouldSkipResolver() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

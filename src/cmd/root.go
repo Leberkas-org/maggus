@@ -123,12 +123,30 @@ func promptYesNo(question string) bool {
 	return answer == "y" || answer == "yes"
 }
 
+// shouldSkipResolver returns true for subcommands that must operate on the
+// literal current directory (e.g. start, stop) rather than the resolved
+// repository. This prevents the resolver from silently changing to
+// last_opened and making per-directory guards ineffective.
+func shouldSkipResolver() bool {
+	if len(os.Args) < 2 {
+		return false
+	}
+	switch os.Args[1] {
+	case "start", "stop":
+		return true
+	}
+	return false
+}
+
 func Execute() {
 	// Detect and cache available CLI tools on startup.
 	caps = capabilities.Detect()
 
 	// Resolve working directory based on global repository config.
-	resolveWorkingDirectory()
+	// Skip resolution for commands that should operate on the literal cwd.
+	if !shouldSkipResolver() {
+		resolveWorkingDirectory()
+	}
 
 	// Register skill commands only when claude is available.
 	if caps.HasClaude {
