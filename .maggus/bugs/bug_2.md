@@ -43,10 +43,10 @@ The correct fix is to introduce a shared `internal/gitutil` package that exposes
 **Description:** As a developer, I want a single `gitutil.Command(args...)` function that centralizes the `CREATE_NO_WINDOW` flag so no git subprocess causes a console flash on Windows.
 
 **Acceptance Criteria:**
-- [ ] `src/internal/gitutil/gitutil.go` exposes `func Command(args ...string) *exec.Cmd` that calls `exec.Command("git", args...)` and applies `setProcAttr`
-- [ ] `src/internal/gitutil/procattr_windows.go` sets `CREATE_NO_WINDOW` (0x08000000) on `SysProcAttr.CreationFlags`
-- [ ] `src/internal/gitutil/procattr_other.go` is a no-op
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `src/internal/gitutil/gitutil.go` exposes `func Command(args ...string) *exec.Cmd` that calls `exec.Command("git", args...)` and applies `setProcAttr`
+- [x] `src/internal/gitutil/procattr_windows.go` sets `CREATE_NO_WINDOW` (0x08000000) on `SysProcAttr.CreationFlags`
+- [x] `src/internal/gitutil/procattr_other.go` is a no-op
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### BUG-002-002: Migrate all remaining git exec.Command calls to gitutil.Command
 
