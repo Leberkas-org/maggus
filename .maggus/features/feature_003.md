@@ -72,11 +72,11 @@ This feature addresses four reliability and correctness issues with the daemon a
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] A new file `src/internal/agent/procattr_windows.go` (or the existing runner equivalent) adds `CREATE_NO_WINDOW (0x08000000)` to `SysProcAttr.CreationFlags` when building the `exec.Cmd` for the claude subprocess on Windows
-- [ ] A corresponding `procattr_other.go` provides a no-op / empty `SysProcAttr` for non-Windows platforms so the build stays cross-platform
-- [ ] No console window appears on Windows when running `maggus work` or the daemon
-- [ ] `go build ./...` succeeds on Windows (CreationFlags field exists in syscall package)
-- [ ] `go test ./...` passes
+- [x] A new file `src/internal/agent/procattr_windows.go` (or the existing runner equivalent) adds `CREATE_NO_WINDOW (0x08000000)` to `SysProcAttr.CreationFlags` when building the `exec.Cmd` for the claude subprocess on Windows
+- [x] A corresponding `procattr_other.go` provides a no-op / empty `SysProcAttr` for non-Windows platforms so the build stays cross-platform
+- [x] No console window appears on Windows when running `maggus work` or the daemon
+- [x] `go build ./...` succeeds on Windows (CreationFlags field exists in syscall package)
+- [x] `go test ./...` passes
 
 ---
 
