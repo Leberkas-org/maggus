@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
 // logPollTickMsg is sent every 200ms to refresh the live log panel.
@@ -98,23 +99,18 @@ func readLastNLogLines(path string, n int) []string {
 }
 
 // parseLogForCurrentState scans log lines from newest to oldest to find the most
-// recently started feature and task (without requiring a matching complete entry).
+// recently started feature and task. Parses JSONL entries; non-JSON lines are silently skipped.
 func parseLogForCurrentState(lines []string) (feature, task string) {
 	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
-		if feature == "" {
-			if _, rest, ok := strings.Cut(line, "[INFO] Feature "); ok {
-				if name, found := strings.CutSuffix(rest, " started"); found {
-					feature = name
-				}
-			}
+		var entry runlog.Entry
+		if err := json.Unmarshal([]byte(lines[i]), &entry); err != nil {
+			continue // skip non-JSON lines gracefully
 		}
-		if task == "" {
-			if _, rest, ok := strings.Cut(line, "[INFO] Task "); ok {
-				if name, _, found := strings.Cut(rest, " started:"); found {
-					task = name
-				}
-			}
+		if feature == "" && entry.Event == "feature_start" && entry.FeatureID != "" {
+			feature = entry.FeatureID
+		}
+		if task == "" && entry.Event == "task_start" && entry.TaskID != "" {
+			task = entry.TaskID
 		}
 		if feature != "" && task != "" {
 			break

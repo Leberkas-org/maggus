@@ -2,6 +2,7 @@ package runlog_test
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -47,7 +48,7 @@ func TestClose_NilLogger(t *testing.T) {
 	}
 }
 
-func readLogLines(t *testing.T, dir, runID string) []string {
+func readLogEntries(t *testing.T, dir, runID string) []runlog.Entry {
 	t.Helper()
 	logPath := filepath.Join(dir, ".maggus", "runs", runID, "run.log")
 	f, err := os.Open(logPath)
@@ -56,35 +57,24 @@ func readLogLines(t *testing.T, dir, runID string) []string {
 	}
 	defer f.Close()
 
-	var lines []string
+	var entries []runlog.Entry
 	scanner := bufio.NewScanner(f)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	return lines
-}
-
-func assertLineContains(t *testing.T, lines []string, want string) {
-	t.Helper()
-	for _, l := range lines {
-		if strings.Contains(l, want) {
-			return
+		var e runlog.Entry
+		if err := json.Unmarshal(scanner.Bytes(), &e); err != nil {
+			t.Fatalf("unmarshal JSONL line: %v\nline: %s", err, scanner.Text())
 		}
+		entries = append(entries, e)
 	}
-	t.Errorf("no line containing %q in:\n%s", want, strings.Join(lines, "\n"))
+	return entries
 }
 
-func assertLineHasTimestamp(t *testing.T, line string) {
+func assertEntryTimestamp(t *testing.T, e runlog.Entry) {
 	t.Helper()
-	// RFC3339 timestamp should be the first token; verify it parses.
-	fields := strings.SplitN(line, " ", 2)
-	if len(fields) < 2 {
-		t.Errorf("line has no space-separated timestamp: %q", line)
-		return
-	}
-	_, err := time.Parse(time.RFC3339, fields[0])
-	if err != nil {
-		t.Errorf("first field %q is not RFC3339: %v", fields[0], err)
+	if _, err := time.Parse(time.RFC3339, e.Ts); err != nil {
+		t.Errorf("ts %q is not RFC3339: %v", e.Ts, err)
 	}
 }
 
@@ -95,13 +85,21 @@ func TestFeatureStart(t *testing.T) {
 
 	l.FeatureStart("feature_001")
 
-	lines := readLogLines(t, dir, "run1")
-	if len(lines) == 0 {
-		t.Fatal("no lines written")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	assertLineContains(t, lines, "[INFO]")
-	assertLineContains(t, lines, "Feature feature_001 started")
-	assertLineHasTimestamp(t, lines[0])
+	e := entries[0]
+	assertEntryTimestamp(t, e)
+	if e.Level != "info" {
+		t.Errorf("level = %q, want info", e.Level)
+	}
+	if e.Event != "feature_start" {
+		t.Errorf("event = %q, want feature_start", e.Event)
+	}
+	if e.FeatureID != "feature_001" {
+		t.Errorf("feature_id = %q, want feature_001", e.FeatureID)
+	}
 }
 
 func TestFeatureComplete(t *testing.T) {
@@ -111,8 +109,16 @@ func TestFeatureComplete(t *testing.T) {
 
 	l.FeatureComplete("feature_001")
 
-	lines := readLogLines(t, dir, "run1")
-	assertLineContains(t, lines, "Feature feature_001 complete")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Event != "feature_complete" {
+		t.Errorf("event = %q, want feature_complete", entries[0].Event)
+	}
+	if entries[0].FeatureID != "feature_001" {
+		t.Errorf("feature_id = %q, want feature_001", entries[0].FeatureID)
+	}
 }
 
 func TestTaskStart(t *testing.T) {
@@ -122,8 +128,20 @@ func TestTaskStart(t *testing.T) {
 
 	l.TaskStart("TASK-001-001", "Do something")
 
-	lines := readLogLines(t, dir, "run1")
-	assertLineContains(t, lines, "Task TASK-001-001 started: Do something")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Event != "task_start" {
+		t.Errorf("event = %q, want task_start", e.Event)
+	}
+	if e.TaskID != "TASK-001-001" {
+		t.Errorf("task_id = %q, want TASK-001-001", e.TaskID)
+	}
+	if e.Title != "Do something" {
+		t.Errorf("title = %q, want Do something", e.Title)
+	}
 }
 
 func TestTaskComplete(t *testing.T) {
@@ -133,8 +151,17 @@ func TestTaskComplete(t *testing.T) {
 
 	l.TaskComplete("TASK-001-001", "abc1234")
 
-	lines := readLogLines(t, dir, "run1")
-	assertLineContains(t, lines, "Task TASK-001-001 complete (commit abc1234)")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Event != "task_complete" {
+		t.Errorf("event = %q, want task_complete", e.Event)
+	}
+	if e.Commit != "abc1234" {
+		t.Errorf("commit = %q, want abc1234", e.Commit)
+	}
 }
 
 func TestTaskFailed(t *testing.T) {
@@ -144,9 +171,20 @@ func TestTaskFailed(t *testing.T) {
 
 	l.TaskFailed("TASK-001-001", "agent error")
 
-	lines := readLogLines(t, dir, "run1")
-	assertLineContains(t, lines, "[ERROR]")
-	assertLineContains(t, lines, "Task TASK-001-001 failed: agent error")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Level != "error" {
+		t.Errorf("level = %q, want error", e.Level)
+	}
+	if e.Event != "task_failed" {
+		t.Errorf("event = %q, want task_failed", e.Event)
+	}
+	if e.Reason != "agent error" {
+		t.Errorf("reason = %q, want agent error", e.Reason)
+	}
 }
 
 func TestToolUse(t *testing.T) {
@@ -156,8 +194,20 @@ func TestToolUse(t *testing.T) {
 
 	l.ToolUse("TASK-001-001", "Read", "src/main.go")
 
-	lines := readLogLines(t, dir, "run1")
-	assertLineContains(t, lines, "Task TASK-001-001 tool: [Read] src/main.go")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Event != "tool_use" {
+		t.Errorf("event = %q, want tool_use", e.Event)
+	}
+	if e.Tool != "Read" {
+		t.Errorf("tool = %q, want Read", e.Tool)
+	}
+	if e.Description != "src/main.go" {
+		t.Errorf("description = %q, want src/main.go", e.Description)
+	}
 }
 
 func TestMultipleEventsOrdered(t *testing.T) {
@@ -171,21 +221,21 @@ func TestMultipleEventsOrdered(t *testing.T) {
 	l.TaskComplete("TASK-001-001", "deadbeef")
 	l.FeatureComplete("feature_001")
 
-	lines := readLogLines(t, dir, "run1")
-	if len(lines) != 5 {
-		t.Fatalf("expected 5 log lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 5 {
+		t.Fatalf("expected 5 entries, got %d", len(entries))
 	}
 
-	expected := []string{
-		"Feature feature_001 started",
-		"Task TASK-001-001 started",
-		"Task TASK-001-001 tool: [Bash]",
-		"Task TASK-001-001 complete",
-		"Feature feature_001 complete",
+	expectedEvents := []string{
+		"feature_start",
+		"task_start",
+		"tool_use",
+		"task_complete",
+		"feature_complete",
 	}
-	for i, want := range expected {
-		if !strings.Contains(lines[i], want) {
-			t.Errorf("line[%d] %q does not contain %q", i, lines[i], want)
+	for i, want := range expectedEvents {
+		if entries[i].Event != want {
+			t.Errorf("entry[%d].event = %q, want %q", i, entries[i].Event, want)
 		}
 	}
 }
@@ -197,13 +247,24 @@ func TestOutput(t *testing.T) {
 
 	l.Output("TASK-003-001", "Hello from the agent")
 
-	lines := readLogLines(t, dir, "run1")
-	if len(lines) == 0 {
-		t.Fatal("no lines written")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	assertLineHasTimestamp(t, lines[0])
-	assertLineContains(t, lines, "[OUTPUT]")
-	assertLineContains(t, lines, "[TASK-003-001] Hello from the agent")
+	e := entries[0]
+	assertEntryTimestamp(t, e)
+	if e.Level != "output" {
+		t.Errorf("level = %q, want output", e.Level)
+	}
+	if e.Event != "output" {
+		t.Errorf("event = %q, want output", e.Event)
+	}
+	if e.TaskID != "TASK-003-001" {
+		t.Errorf("task_id = %q, want TASK-003-001", e.TaskID)
+	}
+	if e.Text != "Hello from the agent" {
+		t.Errorf("text = %q, want Hello from the agent", e.Text)
+	}
 }
 
 func TestOutput_LongText(t *testing.T) {
@@ -214,12 +275,35 @@ func TestOutput_LongText(t *testing.T) {
 	longText := strings.Repeat("x", 10000)
 	l.Output("TASK-001-001", longText)
 
-	lines := readLogLines(t, dir, "run1")
-	if len(lines) == 0 {
-		t.Fatal("no lines written")
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
-	if !strings.Contains(lines[0], longText) {
+	if entries[0].Text != longText {
 		t.Error("long output text was truncated")
+	}
+}
+
+func TestInfo(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir)
+	defer l.Close()
+
+	l.Info("something happened")
+
+	entries := readLogEntries(t, dir, "run1")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Level != "info" {
+		t.Errorf("level = %q, want info", e.Level)
+	}
+	if e.Event != "info" {
+		t.Errorf("event = %q, want info", e.Event)
+	}
+	if e.Text != "something happened" {
+		t.Errorf("text = %q, want something happened", e.Text)
 	}
 }
 
@@ -233,6 +317,7 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	l.TaskFailed("x", "reason")
 	l.ToolUse("x", "Read", "file")
 	l.Output("x", "text")
+	l.Info("msg")
 	_ = l.Close()
 }
 
@@ -279,4 +364,32 @@ func TestClose_Idempotent(t *testing.T) {
 		t.Fatalf("first Close: %v", err)
 	}
 	// Second close should not panic but may return an error (file already closed).
+}
+
+func TestJSONLFormat(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir)
+	defer l.Close()
+
+	l.TaskStart("TASK-001-001", "Do something")
+
+	// Read raw line and verify it's valid JSON
+	logPath := filepath.Join(dir, ".maggus", "runs", "run1", "run.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read run.log: %v", err)
+	}
+	line := strings.TrimSpace(string(data))
+	if !json.Valid([]byte(line)) {
+		t.Fatalf("line is not valid JSON: %s", line)
+	}
+
+	// Verify omitempty works — fields not set should be absent
+	var raw map[string]any
+	json.Unmarshal([]byte(line), &raw)
+	for _, absent := range []string{"feature_id", "commit", "tool", "description", "text", "reason"} {
+		if _, ok := raw[absent]; ok {
+			t.Errorf("field %q should be omitted but is present", absent)
+		}
+	}
 }

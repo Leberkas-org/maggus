@@ -64,18 +64,18 @@ Streamline the Maggus experience so the daemon is always running in the backgrou
 **Parallel:** yes — can run alongside 001, 002, 004
 
 **Acceptance Criteria:**
-- [ ] `internal/runlog/runlog.go` emits one JSON object per line (JSONL) instead of plain text
-- [ ] Each entry has at minimum: `ts` (RFC3339), `level` (`info`/`output`/`error`), `event` (e.g. `feature_start`, `task_start`, `task_complete`, `task_failed`, `tool_use`, `output`, `info`), plus event-specific fields (e.g. `feature_id`, `task_id`, `title`, `commit`, `tool`, `description`, `text`)
-- [ ] Example entries:
+- [x] `internal/runlog/runlog.go` emits one JSON object per line (JSONL) instead of plain text
+- [x] Each entry has at minimum: `ts` (RFC3339), `level` (`info`/`output`/`error`), `event` (e.g. `feature_start`, `task_start`, `task_complete`, `task_failed`, `tool_use`, `output`, `info`), plus event-specific fields (e.g. `feature_id`, `task_id`, `title`, `commit`, `tool`, `description`, `text`)
+- [x] Example entries:
   ```jsonl
   {"ts":"2026-03-24T13:00:00Z","level":"info","event":"task_start","task_id":"TASK-001-001","title":"Do something"}
   {"ts":"2026-03-24T13:00:05Z","level":"info","event":"tool_use","task_id":"TASK-001-001","tool":"Read","description":"Read config.go"}
   {"ts":"2026-03-24T13:00:10Z","level":"output","event":"output","task_id":"TASK-001-001","text":"Agent output here"}
   {"ts":"2026-03-24T13:00:12Z","level":"info","event":"task_complete","task_id":"TASK-001-001","commit":"abc1234"}
   ```
-- [ ] All existing call sites (`FeatureStart`, `TaskStart`, `ToolUse`, `Output`, etc.) continue to work with the same method signatures — only the output format changes
-- [ ] `status_runlog.go` (`parseLogForCurrentState`, `readLastNLogLines`) is updated to parse JSONL instead of plain text; non-JSON lines are silently skipped to handle mixed-format files gracefully
-- [ ] `go test ./...` passes
+- [x] All existing call sites (`FeatureStart`, `TaskStart`, `ToolUse`, `Output`, etc.) continue to work with the same method signatures — only the output format changes
+- [x] `status_runlog.go` (`parseLogForCurrentState`, `readLastNLogLines`) is updated to parse JSONL instead of plain text; non-JSON lines are silently skipped to handle mixed-format files gracefully
+- [x] `go test ./...` passes
 
 ---
 

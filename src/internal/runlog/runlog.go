@@ -1,6 +1,7 @@
 package runlog
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,21 @@ type Logger struct {
 	w     *os.File
 	runID string
 	dir   string
+}
+
+// Entry represents a single JSONL log entry written to run.log.
+type Entry struct {
+	Ts          string `json:"ts"`
+	Level       string `json:"level"`
+	Event       string `json:"event"`
+	FeatureID   string `json:"feature_id,omitempty"`
+	TaskID      string `json:"task_id,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Commit      string `json:"commit,omitempty"`
+	Tool        string `json:"tool,omitempty"`
+	Description string `json:"description,omitempty"`
+	Text        string `json:"text,omitempty"`
+	Reason      string `json:"reason,omitempty"`
 }
 
 // Open creates or opens the run log at .maggus/runs/<runID>/run.log.
@@ -54,51 +70,56 @@ func (l *Logger) OpenDaemonLog() (io.WriteCloser, error) {
 	return f, nil
 }
 
-// log writes a single timestamped line to run.log.
-func (l *Logger) log(level, msg string) {
+// emit writes a single JSONL entry to run.log.
+func (l *Logger) emit(entry Entry) {
 	if l == nil || l.w == nil {
 		return
 	}
-	ts := time.Now().UTC().Format(time.RFC3339)
-	fmt.Fprintf(l.w, "%s [%s] %s\n", ts, level, msg)
+	entry.Ts = time.Now().UTC().Format(time.RFC3339)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	l.w.Write(data)
+	l.w.Write([]byte("\n"))
 }
 
 // FeatureStart logs the start of a feature.
 func (l *Logger) FeatureStart(featureID string) {
-	l.log("INFO", fmt.Sprintf("Feature %s started", featureID))
+	l.emit(Entry{Level: "info", Event: "feature_start", FeatureID: featureID})
 }
 
 // FeatureComplete logs the completion of a feature.
 func (l *Logger) FeatureComplete(featureID string) {
-	l.log("INFO", fmt.Sprintf("Feature %s complete", featureID))
+	l.emit(Entry{Level: "info", Event: "feature_complete", FeatureID: featureID})
 }
 
 // TaskStart logs the start of a task.
 func (l *Logger) TaskStart(taskID, title string) {
-	l.log("INFO", fmt.Sprintf("Task %s started: %s", taskID, title))
+	l.emit(Entry{Level: "info", Event: "task_start", TaskID: taskID, Title: title})
 }
 
 // TaskComplete logs successful task completion with the resulting commit hash.
 func (l *Logger) TaskComplete(taskID, commitHash string) {
-	l.log("INFO", fmt.Sprintf("Task %s complete (commit %s)", taskID, commitHash))
+	l.emit(Entry{Level: "info", Event: "task_complete", TaskID: taskID, Commit: commitHash})
 }
 
 // TaskFailed logs a task failure with a reason.
 func (l *Logger) TaskFailed(taskID, reason string) {
-	l.log("ERROR", fmt.Sprintf("Task %s failed: %s", taskID, reason))
+	l.emit(Entry{Level: "error", Event: "task_failed", TaskID: taskID, Reason: reason})
 }
 
 // ToolUse logs a tool use event from the agent.
 func (l *Logger) ToolUse(taskID, toolType, description string) {
-	l.log("INFO", fmt.Sprintf("Task %s tool: [%s] %s", taskID, toolType, description))
+	l.emit(Entry{Level: "info", Event: "tool_use", TaskID: taskID, Tool: toolType, Description: description})
 }
 
 // Output logs agent output text for a task. The text is written as-is with no truncation.
 func (l *Logger) Output(taskID, text string) {
-	l.log("OUTPUT", fmt.Sprintf("[%s] %s", taskID, text))
+	l.emit(Entry{Level: "output", Event: "output", TaskID: taskID, Text: text})
 }
 
 // Info logs a general informational message.
 func (l *Logger) Info(msg string) {
-	l.log("INFO", msg)
+	l.emit(Entry{Level: "info", Event: "info", Text: msg})
 }
