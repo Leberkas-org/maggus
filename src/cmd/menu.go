@@ -838,18 +838,27 @@ func truncateLeft(path string, maxWidth int) string {
 
 // updateConfirmStopDaemon handles keys in the "Stop daemon?" confirmation prompt.
 func (m menuModel) updateConfirmStopDaemon(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "Y":
-		// Stop the daemon asynchronously, then quit.
-		cwd := m.cwd
-		return m, func() tea.Msg {
-			_ = stopDaemonGracefully(cwd)
-			return daemonStopResultMsg{}
-		}
-	case "n", "N", "enter", "esc":
+	switch msg.Type {
+	case tea.KeyEnter, tea.KeyEscape:
 		// Default is N — exit without stopping the daemon.
 		m.quitting = true
 		return m, tea.Quit
+	case tea.KeyRunes:
+		if len(msg.Runes) == 1 {
+			switch msg.Runes[0] {
+			case 'y', 'Y':
+				// Stop the daemon asynchronously, then quit.
+				cwd := m.cwd
+				return m, func() tea.Msg {
+					_ = stopDaemonGracefully(cwd)
+					return daemonStopResultMsg{}
+				}
+			case 'n', 'N':
+				// Exit without stopping the daemon.
+				m.quitting = true
+				return m, tea.Quit
+			}
+		}
 	}
 	// Ignore other keys while the prompt is shown.
 	return m, nil
