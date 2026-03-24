@@ -139,10 +139,7 @@ type menuItem struct {
 
 var allMenuItems = []menuItem{
 	// Core workflow
-	{name: "work", desc: "Work through all tasks in the feature", shortcut: 'w', shortcutLabel: "w"},
-	{name: "start daemon", desc: "Start the work loop as a background daemon", shortcut: 'd', shortcutLabel: "d", isDaemonToggle: true},
-	{name: "attach", desc: "Watch daemon output (live log)", shortcut: 'l', shortcutLabel: "l", isDaemonOnly: true},
-	{name: "status", desc: "Show a compact summary of feature progress", shortcut: 's', shortcutLabel: "s"},
+	{name: "status", desc: "Live log & feature management", shortcut: 's', shortcutLabel: "s"},
 	{name: "repos", desc: "Manage configured repositories", shortcut: 'r', shortcutLabel: "r"},
 	// AI-assisted creation
 	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, separator: true, shortcut: 'o', shortcutLabel: "o"},
@@ -476,57 +473,6 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case menuDaemonTickMsg:
 		m.daemon = loadDaemonStatus(m.cwd)
-		// Update the daemon toggle menu item label and description.
-		toggleIdx := -1
-		for i := range m.items {
-			if m.items[i].isDaemonToggle {
-				toggleIdx = i
-				if m.daemon.Running {
-					m.items[i].name = "stop daemon"
-					m.items[i].desc = "Stop the running daemon gracefully"
-				} else {
-					m.items[i].name = "start daemon"
-					m.items[i].desc = "Start the work loop as a background daemon"
-				}
-				break
-			}
-		}
-		// Add or remove the attach item based on daemon state.
-		hasAttach := false
-		for _, item := range m.items {
-			if item.isDaemonOnly {
-				hasAttach = true
-				break
-			}
-		}
-		if m.daemon.Running && !hasAttach && toggleIdx >= 0 {
-			// Find the attach item from allMenuItems.
-			for _, item := range allMenuItems {
-				if item.isDaemonOnly {
-					// Insert after the daemon toggle.
-					insertIdx := toggleIdx + 1
-					m.items = append(m.items[:insertIdx], append([]menuItem{item}, m.items[insertIdx:]...)...)
-					// Adjust cursor if it was at or after the insertion point.
-					if m.cursor >= insertIdx {
-						m.cursor++
-					}
-					break
-				}
-			}
-		} else if !m.daemon.Running && hasAttach {
-			for i := range m.items {
-				if m.items[i].isDaemonOnly {
-					// Remove the attach item.
-					if m.cursor > i {
-						m.cursor--
-					} else if m.cursor == i && m.cursor >= len(m.items)-1 {
-						m.cursor = len(m.items) - 2
-					}
-					m.items = append(m.items[:i], m.items[i+1:]...)
-					break
-				}
-			}
-		}
 		return m, pollMenuDaemonTick()
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
@@ -671,19 +617,6 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	}
-	if item.isDaemonToggle {
-		if m.daemon.Running {
-			m.selected = "stop"
-		} else {
-			m.selected = "start"
-		}
-		return m, tea.Quit
-	}
-	if item.isDaemonOnly {
-		m.selected = "status"
-		m.args = []string{"--show-log"}
-		return m, tea.Quit
-	}
 	if def, ok := m.subMenuDefs[item.name]; ok {
 		// Deep copy the sub-menu def so each entry resets
 		copied := subMenuDef{options: make([]subMenuOption, len(def.options))}
@@ -701,8 +634,8 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	}
 	// No sub-menu — launch directly
 	m.selected = item.name
-	if item.name == "work" {
-		m.args = []string{"--count", "999"}
+	if item.name == "status" {
+		m.args = []string{"--show-log"}
 	}
 	return m, tea.Quit
 }

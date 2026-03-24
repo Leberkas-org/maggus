@@ -119,11 +119,6 @@ func TestActiveMenuItems_AlwaysIncludesExit(t *testing.T) {
 func TestBuildSubMenus(t *testing.T) {
 	subs := buildSubMenus()
 
-	// "work" should NOT have a sub-menu.
-	if _, ok := subs["work"]; ok {
-		t.Error("expected no sub-menu definition for 'work'")
-	}
-
 	// "worktree" should have 1 option.
 	wtDef, ok := subs["worktree"]
 	if !ok {
@@ -752,113 +747,35 @@ func TestMenuView_DaemonNotRunningRendered(t *testing.T) {
 	}
 }
 
-func TestAllMenuItems_DaemonToggleExists(t *testing.T) {
-	var found bool
-	for _, item := range allMenuItems {
-		if item.isDaemonToggle {
-			found = true
-			if item.shortcut != 'd' {
-				t.Errorf("daemon toggle shortcut: got %q, want 'd'", string(item.shortcut))
-			}
+func TestActivateItem_StatusFromMenu_PassesShowLog(t *testing.T) {
+	m := menuModel{
+		items: activeMenuItems(),
+	}
+
+	var statusItem menuItem
+	for _, item := range m.items {
+		if item.name == "status" {
+			statusItem = item
 			break
+		}
+	}
+
+	result, cmd := m.activateItem(statusItem)
+	rm := result.(menuModel)
+	if rm.selected != "status" {
+		t.Errorf("expected selected='status', got %q", rm.selected)
+	}
+	found := false
+	for _, arg := range rm.args {
+		if arg == "--show-log" {
+			found = true
 		}
 	}
 	if !found {
-		t.Error("expected a daemon toggle menu item in allMenuItems")
-	}
-}
-
-func TestAllMenuItems_DaemonTogglePosition(t *testing.T) {
-	var workIdx, daemonIdx, statusIdx int
-	for i, item := range allMenuItems {
-		switch {
-		case item.name == "work":
-			workIdx = i
-		case item.isDaemonToggle:
-			daemonIdx = i
-		case item.name == "status":
-			statusIdx = i
-		}
-	}
-	if daemonIdx <= workIdx {
-		t.Errorf("daemon toggle (idx %d) should come after work (idx %d)", daemonIdx, workIdx)
-	}
-	if daemonIdx >= statusIdx {
-		t.Errorf("daemon toggle (idx %d) should come before status (idx %d)", daemonIdx, statusIdx)
-	}
-}
-
-func TestActivateItem_DaemonToggle_StartWhenNotRunning(t *testing.T) {
-	m := menuModel{
-		items:  activeMenuItems(),
-		daemon: daemonStatus{Running: false},
-	}
-
-	var toggleItem menuItem
-	for _, item := range m.items {
-		if item.isDaemonToggle {
-			toggleItem = item
-			break
-		}
-	}
-
-	result, cmd := m.activateItem(toggleItem)
-	rm := result.(menuModel)
-	if rm.selected != "start" {
-		t.Errorf("expected selected='start' when daemon not running, got %q", rm.selected)
+		t.Error("expected --show-log in args when status activated from menu")
 	}
 	if cmd == nil {
 		t.Error("expected tea.Quit cmd")
-	}
-}
-
-func TestActivateItem_DaemonToggle_StopWhenRunning(t *testing.T) {
-	m := menuModel{
-		items:  activeMenuItems(),
-		daemon: daemonStatus{Running: true, PID: 12345},
-	}
-
-	var toggleItem menuItem
-	for _, item := range m.items {
-		if item.isDaemonToggle {
-			toggleItem = item
-			break
-		}
-	}
-
-	result, cmd := m.activateItem(toggleItem)
-	rm := result.(menuModel)
-	if rm.selected != "stop" {
-		t.Errorf("expected selected='stop' when daemon running, got %q", rm.selected)
-	}
-	if cmd == nil {
-		t.Error("expected tea.Quit cmd")
-	}
-}
-
-func TestMenuUpdate_DaemonTickUpdatesToggleLabel(t *testing.T) {
-	dir := t.TempDir()
-
-	m := menuModel{
-		items:  activeMenuItems(),
-		cwd:    dir,
-		daemon: daemonStatus{Running: false},
-	}
-
-	// Simulate a daemon tick where daemon is not running (no PID file)
-	updated, _ := m.Update(menuDaemonTickMsg{})
-	um := updated.(menuModel)
-
-	for _, item := range um.items {
-		if item.isDaemonToggle {
-			if item.name != "start daemon" {
-				t.Errorf("expected name='start daemon' when not running, got %q", item.name)
-			}
-			if item.desc != "Start the work loop as a background daemon" {
-				t.Errorf("unexpected desc when not running: %q", item.desc)
-			}
-			break
-		}
 	}
 }
 

@@ -106,14 +106,14 @@ Streamline the Maggus experience so the daemon is always running in the backgrou
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] The existing "status", "work", and "start daemon" menu entries are replaced by a single entry (name: "status") that opens the unified screen
-- [ ] **Default view:** Full-screen live log panel showing the last N lines of the current run's JSONL log, auto-scrolling as new entries arrive, with 200ms polling
-- [ ] **Toggle:** Pressing Tab (or a labeled key shown in the footer) switches to the feature/bug management view (equivalent to current status tabs: Features / Bugs, task list, detail pane)
-- [ ] Pressing Tab again switches back to the log view
-- [ ] A one-line daemon status bar is always visible at the top: shows daemon PID + current task (or "idle" / "stopped")
-- [ ] The screen renders correctly at typical terminal widths (80–220 cols)
-- [ ] Ctrl+C / q exits the screen and returns to the main menu (does not stop the daemon)
-- [ ] The existing standalone `status` command (CLI: `maggus status`) still works and behaves as before (no regression)
+- [x] The existing "status", "work", and "start daemon" menu entries are replaced by a single entry (name: "status") that opens the unified screen
+- [x] **Default view:** Full-screen live log panel showing the last N lines of the current run's JSONL log, auto-scrolling as new entries arrive, with 200ms polling
+- [x] **Toggle:** Pressing Tab (or a labeled key shown in the footer) switches to the feature/bug management view (equivalent to current status tabs: Features / Bugs, task list, detail pane)
+- [x] Pressing Tab again switches back to the log view
+- [x] A one-line daemon status bar is always visible at the top: shows daemon PID + current task (or "idle" / "stopped")
+- [x] The screen renders correctly at typical terminal widths (80–220 cols)
+- [x] Ctrl+C / q exits the screen and returns to the main menu (does not stop the daemon)
+- [x] The existing standalone `status` command (CLI: `maggus status`) still works and behaves as before (no regression)
 
 ---
 

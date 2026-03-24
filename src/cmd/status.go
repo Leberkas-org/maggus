@@ -264,7 +264,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
-		case "l", "L":
+		case "tab":
 			m.showLog = false
 			return m, nil
 		case "j", "down":
@@ -300,12 +300,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.syncDetailSuffix()
 
 	switch msg.String() {
-	case "l", "L":
+	case "tab":
 		m.showLog = true
 		m.logAutoScroll = true
 		m.logScroll = m.maxLogScroll()
 		return m, nil
-	case "tab", "right":
+	case "right":
 		visible := m.visibleFeatures()
 		if len(visible) > 1 {
 			m.selectedFeature = (m.selectedFeature + 1) % len(visible)
@@ -600,7 +600,7 @@ func (m statusModel) viewLog() string {
 		}
 	}
 
-	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · l: task list · q/esc: exit")
+	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · tab: features · q/esc: exit")
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {
 		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
@@ -768,7 +768,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
+	footer := styles.StatusBar.Render("←/→: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · tab: live log · q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {
