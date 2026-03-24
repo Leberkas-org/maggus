@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -60,7 +62,38 @@ func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.
 	return selectable
 }
 
+// migrateIgnoredFiles renames any *_ignored.md files in .maggus/<subdir>/ to their
+// plain .md equivalents and marks them as unapproved in feature_approvals.yml.
+// If the target .md already exists, the rename is skipped but unapprove is still called.
+// This is idempotent: once renamed, the _ignored.md file no longer exists and the glob finds nothing.
+func migrateIgnoredFiles(dir, subdir string) error {
+	pattern := filepath.Join(dir, ".maggus", subdir, "*_ignored.md")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("glob ignored files in %s: %w", subdir, err)
+	}
+	for _, f := range files {
+		newName := strings.TrimSuffix(f, "_ignored.md") + ".md"
+		if _, statErr := os.Stat(newName); statErr != nil {
+			// Target does not exist — safe to rename
+			if err := os.Rename(f, newName); err != nil {
+				return fmt.Errorf("rename %s: %w", f, err)
+			}
+		}
+		// Mark as unapproved regardless of whether rename happened
+		featureID := featureIDFromPath(f)
+		if err := approval.Unapprove(dir, featureID); err != nil {
+			return fmt.Errorf("unapprove %s: %w", featureID, err)
+		}
+	}
+	return nil
+}
+
 func parseFeatures(dir string) ([]featureInfo, error) {
+	if err := migrateIgnoredFiles(dir, "features"); err != nil {
+		return nil, err
+	}
+
 	files, err := parser.GlobFeatureFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob features: %w", err)
@@ -89,6 +122,10 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 }
 
 func parseBugs(dir string) ([]featureInfo, error) {
+	if err := migrateIgnoredFiles(dir, "bugs"); err != nil {
+		return nil, err
+	}
+
 	files, err := parser.GlobBugFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob bugs: %w", err)
