@@ -301,6 +301,18 @@ func formatSummaryLine(s featureSummary) string {
 	return strings.Join(parts, mutedStyle.Render(" · "))
 }
 
+// formatDaemonStatusLine returns a styled one-line string showing daemon state.
+// When running: "● daemon running (PID 12345)" in cyan.
+// When not running: "○ daemon not running" in dim/muted.
+func formatDaemonStatusLine(d daemonStatus) string {
+	if d.Running {
+		cyanStyle := lipgloss.NewStyle().Foreground(styles.Primary)
+		return cyanStyle.Render(fmt.Sprintf("● daemon running (PID %d)", d.PID))
+	}
+	dimStyle := lipgloss.NewStyle().Faint(true)
+	return dimStyle.Render("○ daemon not running")
+}
+
 // menuModel is the bubbletea model for the interactive main menu.
 type menuModel struct {
 	items           []menuItem
@@ -690,6 +702,9 @@ func (m menuModel) View() string {
 		}
 		header += "\n" + centerLine(cwdStyle.Render(cwdDisplay), contentW)
 	}
+
+	// Daemon status line
+	header += "\n" + centerLine(formatDaemonStatusLine(m.daemon), contentW)
 
 	// Show 2x remaining time below the summary when active
 	if m.is2x && m.twoXExpiresIn != "" {

@@ -701,6 +701,56 @@ func TestMenuView_SummaryNoFeaturesOrBugs(t *testing.T) {
 	}
 }
 
+func TestFormatDaemonStatusLine_Running(t *testing.T) {
+	d := daemonStatus{Running: true, PID: 12345}
+	line := formatDaemonStatusLine(d)
+	if !strings.Contains(line, "daemon running") {
+		t.Errorf("expected 'daemon running' in line, got %q", line)
+	}
+	if !strings.Contains(line, "12345") {
+		t.Errorf("expected PID 12345 in line, got %q", line)
+	}
+	if !strings.Contains(line, "●") {
+		t.Errorf("expected filled circle ● in line, got %q", line)
+	}
+}
+
+func TestFormatDaemonStatusLine_NotRunning(t *testing.T) {
+	d := daemonStatus{Running: false}
+	line := formatDaemonStatusLine(d)
+	if !strings.Contains(line, "daemon not running") {
+		t.Errorf("expected 'daemon not running' in line, got %q", line)
+	}
+	if !strings.Contains(line, "○") {
+		t.Errorf("expected empty circle ○ in line, got %q", line)
+	}
+}
+
+func TestMenuView_DaemonStatusLineRendered(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 9999},
+	}
+	view := m.View()
+	if !strings.Contains(view, "daemon running") {
+		t.Error("expected daemon status line in menu View()")
+	}
+	if !strings.Contains(view, "9999") {
+		t.Error("expected PID in menu View()")
+	}
+}
+
+func TestMenuView_DaemonNotRunningRendered(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: false},
+	}
+	view := m.View()
+	if !strings.Contains(view, "daemon not running") {
+		t.Error("expected 'daemon not running' in menu View()")
+	}
+}
+
 func TestMenuUpdate_FeatureSummaryUpdateMsg(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

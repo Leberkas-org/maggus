@@ -55,12 +55,12 @@ Add daemon lifecycle management and log attachment directly into the main intera
 **Parallel:** yes — can run alongside TASK-001-003 and TASK-001-004 once TASK-001-001 is merged
 
 **Acceptance Criteria:**
-- [ ] The menu `View()` renders a daemon status line above (or below) the existing feature summary header
-- [ ] When running: shows `● daemon running (PID 12345)` styled in cyan (match the style used in `status.go`)
-- [ ] When not running: shows `○ daemon not running` styled in a muted/dim color
-- [ ] The status line updates automatically as daemon state changes (driven by the poll from TASK-001-001)
-- [ ] Layout does not break at narrow terminal widths (clips gracefully)
-- [ ] `go test ./...` passes
+- [x] The menu `View()` renders a daemon status line above (or below) the existing feature summary header
+- [x] When running: shows `● daemon running (PID 12345)` styled in cyan (match the style used in `status.go`)
+- [x] When not running: shows `○ daemon not running` styled in a muted/dim color
+- [x] The status line updates automatically as daemon state changes (driven by the poll from TASK-001-001)
+- [x] Layout does not break at narrow terminal widths (clips gracefully)
+- [x] `go test ./...` passes
 
 ---
 
