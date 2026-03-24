@@ -190,6 +190,39 @@ func TestMultipleEventsOrdered(t *testing.T) {
 	}
 }
 
+func TestOutput(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir)
+	defer l.Close()
+
+	l.Output("TASK-003-001", "Hello from the agent")
+
+	lines := readLogLines(t, dir, "run1")
+	if len(lines) == 0 {
+		t.Fatal("no lines written")
+	}
+	assertLineHasTimestamp(t, lines[0])
+	assertLineContains(t, lines, "[OUTPUT]")
+	assertLineContains(t, lines, "[TASK-003-001] Hello from the agent")
+}
+
+func TestOutput_LongText(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir)
+	defer l.Close()
+
+	longText := strings.Repeat("x", 10000)
+	l.Output("TASK-001-001", longText)
+
+	lines := readLogLines(t, dir, "run1")
+	if len(lines) == 0 {
+		t.Fatal("no lines written")
+	}
+	if !strings.Contains(lines[0], longText) {
+		t.Error("long output text was truncated")
+	}
+}
+
 func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	var l *runlog.Logger
 	// None of these should panic.
@@ -199,6 +232,7 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	l.TaskComplete("x", "hash")
 	l.TaskFailed("x", "reason")
 	l.ToolUse("x", "Read", "file")
+	l.Output("x", "text")
 	_ = l.Close()
 }
 

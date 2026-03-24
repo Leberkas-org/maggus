@@ -92,3 +92,8 @@ func (l *Logger) TaskFailed(taskID, reason string) {
 func (l *Logger) ToolUse(taskID, toolType, description string) {
 	l.log("INFO", fmt.Sprintf("Task %s tool: [%s] %s", taskID, toolType, description))
 }
+
+// Output logs agent output text for a task. The text is written as-is with no truncation.
+func (l *Logger) Output(taskID, text string) {
+	l.log("OUTPUT", fmt.Sprintf("[%s] %s", taskID, text))
+}
