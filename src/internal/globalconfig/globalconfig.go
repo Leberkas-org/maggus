@@ -419,7 +419,14 @@ func ShouldCheckUpdate(state UpdateState, now time.Time) bool {
 
 // Repository represents a single configured repository entry.
 type Repository struct {
-	Path string `yaml:"path"`
+	Path               string `yaml:"path"`
+	AutoStartDisabled  bool   `yaml:"auto_start_disabled,omitempty"`
+}
+
+// IsAutoStartEnabled returns true when auto-start is enabled for this repository.
+// The zero value of AutoStartDisabled is false, so auto-start is enabled by default.
+func (r Repository) IsAutoStartEnabled() bool {
+	return !r.AutoStartDisabled
 }
 
 // GlobalConfig holds the global Maggus configuration stored at ~/.maggus/repositories.yml.

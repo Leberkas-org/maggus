@@ -154,6 +154,86 @@ func TestSetLastOpened(t *testing.T) {
 	}
 }
 
+func TestRepository_IsAutoStartEnabled(t *testing.T) {
+	// Default (zero value) → auto-start enabled
+	r := Repository{Path: "/repo"}
+	if !r.IsAutoStartEnabled() {
+		t.Fatal("expected auto-start enabled by default")
+	}
+
+	// Explicitly disabled
+	r.AutoStartDisabled = true
+	if r.IsAutoStartEnabled() {
+		t.Fatal("expected auto-start disabled when AutoStartDisabled is true")
+	}
+}
+
+func TestAutoStartDisabled_OmittedFromYAML(t *testing.T) {
+	// When AutoStartDisabled is false (default), it should be omitted from YAML
+	path := filepath.Join(t.TempDir(), "repos.yml")
+	cfg := GlobalConfig{
+		Repositories: []Repository{
+			{Path: "/repo/default"},
+			{Path: "/repo/disabled", AutoStartDisabled: true},
+		},
+	}
+
+	if err := SaveTo(cfg, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// Reload and verify
+	loaded, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(loaded.Repositories) != 2 {
+		t.Fatalf("expected 2 repos, got %d", len(loaded.Repositories))
+	}
+	if loaded.Repositories[0].AutoStartDisabled {
+		t.Fatal("expected default repo to have auto-start enabled")
+	}
+	if !loaded.Repositories[1].AutoStartDisabled {
+		t.Fatal("expected disabled repo to have auto-start disabled")
+	}
+
+	// Verify the YAML content: default repo should not contain auto_start_disabled
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	content := string(data)
+	// The first repo entry should not have auto_start_disabled at all
+	// The second repo entry should have auto_start_disabled: true
+	var raw []map[string]interface{}
+	if err := yaml.Unmarshal(data, &struct {
+		Repos *[]map[string]interface{} `yaml:"repositories"`
+	}{Repos: &raw}); err != nil {
+		t.Fatalf("parse raw: %v", err)
+	}
+	if _, ok := raw[0]["auto_start_disabled"]; ok {
+		t.Fatalf("default repo should omit auto_start_disabled, got yaml: %s", content)
+	}
+}
+
+func TestLoadFrom_WithoutAutoStartField(t *testing.T) {
+	// Simulate an existing repositories.yml without the auto_start_disabled field
+	path := filepath.Join(t.TempDir(), "repos.yml")
+	legacy := "repositories:\n  - path: /repo/old\n"
+	os.WriteFile(path, []byte(legacy), 0o644)
+
+	loaded, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(loaded.Repositories) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(loaded.Repositories))
+	}
+	if !loaded.Repositories[0].IsAutoStartEnabled() {
+		t.Fatal("existing repo without field should have auto-start enabled")
+	}
+}
+
 func TestHasRepository(t *testing.T) {
 	cfg := GlobalConfig{
 		Repositories: []Repository{
