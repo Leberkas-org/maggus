@@ -34,6 +34,11 @@ type hideShortcutsMsg struct {
 // menuDaemonTickMsg is sent every 500ms to refresh the daemon status in the menu.
 type menuDaemonTickMsg struct{}
 
+// daemonAutoStartResultMsg carries the result of the silent daemon auto-start attempt.
+type daemonAutoStartResultMsg struct {
+	err error // nil = started or already running; non-nil = failed (show warning)
+}
+
 // pollMenuDaemonTick returns a tea.Cmd that fires menuDaemonTickMsg after 500ms.
 func pollMenuDaemonTick() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
@@ -351,7 +356,8 @@ type menuModel struct {
 	watcherCh chan bool
 
 	// Daemon state
-	daemon daemonStatus
+	daemon            daemonStatus
+	daemonAutoWarning string // non-fatal warning if auto-start failed
 
 	// Sub-menu state
 	inSubMenu    bool
@@ -422,6 +428,9 @@ func (m menuModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return updateCheckResultMsg{banner: startupUpdateCheck()}
 		},
+		func() tea.Msg {
+			return daemonAutoStartResultMsg{err: autoStartDaemon(m.cwd)}
+		},
 		listenForWatcherUpdate(m.watcherCh),
 		pollMenuDaemonTick(),
 	)
@@ -447,6 +456,11 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd
 	case updateCheckResultMsg:
 		m.updateBanner = msg.banner
+		return m, nil
+	case daemonAutoStartResultMsg:
+		if msg.err != nil {
+			m.daemonAutoWarning = fmt.Sprintf("daemon auto-start failed: %s", msg.err)
+		}
 		return m, nil
 	case menuDaemonTickMsg:
 		m.daemon = loadDaemonStatus(m.cwd)
@@ -791,6 +805,12 @@ func (m menuModel) View() string {
 	if m.updateBanner != "" {
 		updateStyle := lipgloss.NewStyle().Foreground(styles.Success).Bold(true)
 		header += "\n" + centerLine(updateStyle.Render(m.updateBanner), contentW)
+	}
+
+	// Show daemon auto-start warning (non-fatal)
+	if m.daemonAutoWarning != "" {
+		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		header += "\n" + centerLine(warnStyle.Render(m.daemonAutoWarning), contentW)
 	}
 
 	// Show auto-work countdown when active

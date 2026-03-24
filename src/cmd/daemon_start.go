@@ -108,3 +108,74 @@ func init() {
 	startCmd.Flags().StringVar(&startAgentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
 	rootCmd.AddCommand(startCmd)
 }
+
+// autoStartDaemon silently starts the daemon if it is not already running and
+// no work run is active. Returns nil on success or if the daemon is already
+// running. Returns an error only when the daemon was not running and the launch
+// failed (callers may display a non-fatal warning).
+func autoStartDaemon(dir string) error {
+	// Ensure .maggus directory exists.
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0755); err != nil {
+		return fmt.Errorf("create .maggus dir: %w", err)
+	}
+
+	// Already running — nothing to do.
+	existingPID, err := readDaemonPID(dir)
+	if err != nil {
+		return fmt.Errorf("check daemon status: %w", err)
+	}
+	if existingPID != 0 && isProcessRunning(existingPID) {
+		return nil
+	}
+	// Stale PID file — clean it up.
+	if existingPID != 0 {
+		removeDaemonPID(dir)
+	}
+
+	// Mutual exclusion: don't start if a work run is active.
+	workPID, wpErr := readWorkPID(dir)
+	if wpErr != nil {
+		return fmt.Errorf("check work status: %w", wpErr)
+	}
+	if workPID != 0 {
+		if isProcessRunning(workPID) {
+			return nil // work is active — silently skip
+		}
+		removeWorkPID(dir)
+	}
+
+	// Generate run ID and create the run directory + daemon.log.
+	runID := generateDaemonRunID()
+	runDir := filepath.Join(dir, ".maggus", "runs", runID)
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		return fmt.Errorf("create run directory: %w", err)
+	}
+	daemonLogPath := daemonLogPathFor(dir, runID)
+	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("create daemon log: %w", err)
+	}
+	defer logFile.Close()
+
+	// Locate the current executable.
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("get executable path: %w", err)
+	}
+
+	// Build daemon args — no model/agent flags (use config defaults).
+	daemonArgs := []string{"work", "--daemon-run", "--daemon-run-id=" + runID}
+
+	// Launch the daemon process (platform-specific detach).
+	pid, err := launchDaemon(exe, daemonArgs, logFile, dir)
+	if err != nil {
+		return fmt.Errorf("launch daemon: %w", err)
+	}
+
+	// Write PID file.
+	if err := writeDaemonPID(dir, pid); err != nil {
+		return fmt.Errorf("write daemon PID: %w", err)
+	}
+
+	return nil
+}
