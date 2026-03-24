@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -248,6 +247,9 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "alt+i" {
 		return m.handleIgnoreTask(true)
 	}
+	if msg.String() == "alt+p" {
+		return m.handleApproveToggle()
+	}
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
 	case taskListQuit, taskListRun:
@@ -336,7 +338,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "alt+i":
 		return m.handleIgnoreTask(false)
 	case "alt+p":
-		return m.handleIgnoreFeature()
+		return m.handleApproveToggle()
 	}
 
 	// Delegate to component for shared navigation
@@ -396,7 +398,7 @@ func (m statusModel) handleIgnoreTask(inDetail bool) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m statusModel) handleIgnoreFeature() (tea.Model, tea.Cmd) {
+func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 	m.statusNote = ""
 	visible := m.visibleFeatures()
 	if m.selectedFeature >= len(visible) {
@@ -404,42 +406,27 @@ func (m statusModel) handleIgnoreFeature() (tea.Model, tea.Cmd) {
 	}
 	f := visible[m.selectedFeature]
 	if f.completed {
+		m.statusNote = "cannot approve a completed feature"
 		return m, nil
 	}
-	subdir := "features"
-	if f.isBug {
-		subdir = "bugs"
-	}
-	fullPath := filepath.Join(m.dir, ".maggus", subdir, f.filename)
-	var newPath string
-	if f.ignored {
-		newPath = strings.TrimSuffix(fullPath, "_ignored.md") + ".md"
+	featureID := featureIDFromPath(f.filename)
+	var err error
+	if f.approved {
+		err = approval.Unapprove(m.dir, featureID)
+		if err == nil {
+			m.statusNote = "feature unapproved"
+		}
 	} else {
-		newPath = strings.TrimSuffix(fullPath, ".md") + "_ignored.md"
+		err = approval.Approve(m.dir, featureID)
+		if err == nil {
+			m.statusNote = "feature approved"
+		}
 	}
-	if err := os.Rename(fullPath, newPath); err != nil {
+	if err != nil {
 		m.statusNote = "error: " + err.Error()
 		return m, nil
 	}
-	newBase := filepath.Base(newPath)
-	features, err := parseFeatures(m.dir)
-	if err == nil {
-		bugs, bugErr := parseBugs(m.dir)
-		if bugErr == nil {
-			features = append(features, bugs...)
-		}
-		m.features = features
-		m.nextTaskID, m.nextTaskFile = findNextTask(features)
-	}
-	newVisible := m.visibleFeatures()
-	m.selectedFeature = 0
-	for i, vf := range newVisible {
-		if vf.filename == newBase {
-			m.selectedFeature = i
-			break
-		}
-	}
-	m.rebuildForSelectedFeature()
+	m.reloadFeatures()
 	return m, nil
 }
 
@@ -832,7 +819,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: ignore/unignore feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {

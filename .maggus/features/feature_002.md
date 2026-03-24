@@ -92,14 +92,14 @@ Consolidate feature gating into a single approval system by surfacing approve/un
 **Parallel:** yes — can run alongside TASK-002-003 once TASK-002-002 is merged
 
 **Acceptance Criteria:**
-- [ ] `handleIgnoreFeature()` is replaced by `handleApproveToggle()` in `status.go`
-- [ ] `handleApproveToggle()` calls `approval.Unapprove(m.dir, featureID)` when feature is currently approved, and `approval.Approve(m.dir, featureID)` when currently unapproved
-- [ ] After the toggle, `reloadFeatures()` is called so tab bar and task list reflect the new state immediately
-- [ ] `statusNote` is set to `"feature approved"` or `"feature unapproved"` after a successful toggle
-- [ ] `statusNote` is set to `"cannot approve a completed feature"` if triggered on a completed feature (no-op)
-- [ ] Footer hint updated: replace `alt+p: ignore/unignore feature` with `alt+p: approve/unapprove feature`
-- [ ] The `alt+p` key also works in the detail view (if currently handled there — mirror the existing `alt+i` in detail pattern)
-- [ ] `go test ./...` passes
+- [x] `handleIgnoreFeature()` is replaced by `handleApproveToggle()` in `status.go`
+- [x] `handleApproveToggle()` calls `approval.Unapprove(m.dir, featureID)` when feature is currently approved, and `approval.Approve(m.dir, featureID)` when currently unapproved
+- [x] After the toggle, `reloadFeatures()` is called so tab bar and task list reflect the new state immediately
+- [x] `statusNote` is set to `"feature approved"` or `"feature unapproved"` after a successful toggle
+- [x] `statusNote` is set to `"cannot approve a completed feature"` if triggered on a completed feature (no-op)
+- [x] Footer hint updated: replace `alt+p: ignore/unignore feature` with `alt+p: approve/unapprove feature`
+- [x] The `alt+p` key also works in the detail view (if currently handled there — mirror the existing `alt+i` in detail pattern)
+- [x] `go test ./...` passes
 
 ---
 
