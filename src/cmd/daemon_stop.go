@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/globalconfig"
@@ -36,6 +37,20 @@ func stopCurrentDaemon(cmd *cobra.Command) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	// Guard: refuse to stop if the current directory is not a registered repository.
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve absolute path: %w", err)
+	}
+	cfg, err := globalconfig.Load()
+	if err != nil {
+		return fmt.Errorf("load global config: %w", err)
+	}
+	if !cfg.HasRepository(absDir) {
+		cmd.Println("Not in a registered repository. Use 'maggus repos' to add one.")
+		return nil
 	}
 
 	pid, err := readDaemonPID(dir)
