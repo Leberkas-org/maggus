@@ -246,7 +246,10 @@ func loadFeatureSummary() featureSummary {
 
 	var s featureSummary
 
-	features, err := parseFeatures(dir)
+	cfg, cfgErr := config.Load(dir)
+	approvalRequired := cfgErr == nil && cfg.IsApprovalRequired()
+
+	features, err := parseFeatures(dir, approvalRequired)
 	if err == nil {
 		s.features = len(features)
 		for _, f := range features {
@@ -261,7 +264,7 @@ func loadFeatureSummary() featureSummary {
 		}
 	}
 
-	bugs, err := parseBugs(dir)
+	bugs, err := parseBugs(dir, approvalRequired)
 	if err == nil {
 		s.bugs = len(bugs)
 		for _, b := range bugs {

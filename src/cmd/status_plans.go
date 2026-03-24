@@ -61,7 +61,7 @@ func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.
 	return selectable
 }
 
-func parseFeatures(dir string) ([]featureInfo, error) {
+func parseFeatures(dir string, approvalRequired bool) ([]featureInfo, error) {
 	files, err := parser.GlobFeatureFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob features: %w", err)
@@ -83,13 +83,13 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
-			approved:  approval.IsApproved(a, featureID, false),
+			approved:  approval.IsApproved(a, featureID, approvalRequired),
 		})
 	}
 	return features, nil
 }
 
-func parseBugs(dir string) ([]featureInfo, error) {
+func parseBugs(dir string, approvalRequired bool) ([]featureInfo, error) {
 	files, err := parser.GlobBugFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob bugs: %w", err)
@@ -112,7 +112,7 @@ func parseBugs(dir string) ([]featureInfo, error) {
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
 			isBug:     true,
-			approved:  approval.IsApproved(a, featureID, false),
+			approved:  approval.IsApproved(a, featureID, approvalRequired),
 		})
 	}
 	return bugs, nil

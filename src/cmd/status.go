@@ -43,6 +43,8 @@ type statusModel struct {
 	dir       string            // working directory for file operations
 	approvals approval.Approvals // cached approvals; reloaded on reloadFeatures
 
+	approvalRequired bool // from config; used when reloading features
+
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
 	// Temporary status note (e.g. "feature approved")
@@ -56,7 +58,7 @@ type statusModel struct {
 	daemon        daemonStatus
 }
 
-func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool) statusModel {
+func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
@@ -68,7 +70,8 @@ func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFi
 		agentName:     agentName,
 		dir:           dir,
 		showLog:       showLog,
-		logAutoScroll: true,
+		approvalRequired: approvalRequired,
+		logAutoScroll:    true,
 	}
 	visible := m.visibleFeatures()
 	if len(visible) > 0 {
@@ -111,12 +114,12 @@ func (m *statusModel) reloadFeatures() {
 	if err == nil {
 		m.approvals = a
 	}
-	features, err := parseFeatures(m.dir)
+	features, err := parseFeatures(m.dir, m.approvalRequired)
 	if err != nil {
 		m.rebuildForSelectedFeature()
 		return
 	}
-	bugs, err := parseBugs(m.dir)
+	bugs, err := parseBugs(m.dir, m.approvalRequired)
 	if err == nil {
 		features = append(features, bugs...)
 	}
@@ -321,9 +324,9 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "alt+a":
 		m.showAll = !m.showAll
-		features, err := parseFeatures(m.dir)
+		features, err := parseFeatures(m.dir, m.approvalRequired)
 		if err == nil {
-			bugs, bugErr := parseBugs(m.dir)
+			bugs, bugErr := parseBugs(m.dir, m.approvalRequired)
 			if bugErr == nil {
 				features = append(features, bugs...)
 			}
@@ -802,12 +805,13 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 		agentName := cfg.Agent
+		approvalRequired := cfg.IsApprovalRequired()
 
-		features, err := parseFeatures(dir)
+		features, err := parseFeatures(dir, approvalRequired)
 		if err != nil {
 			return err
 		}
-		bugs, bugErr := parseBugs(dir)
+		bugs, bugErr := parseBugs(dir, approvalRequired)
 		if bugErr != nil {
 			return bugErr
 		}
@@ -832,7 +836,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		// TUI mode: interactive status with detail view
-		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog)
+		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired)
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := prog.Run()
 		if err != nil {
