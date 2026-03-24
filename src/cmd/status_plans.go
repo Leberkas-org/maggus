@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -17,7 +16,6 @@ type featureInfo struct {
 	filename  string
 	tasks     []parser.Task
 	completed bool // filename contains _completed
-	ignored   bool // filename contains _ignored
 	isBug     bool // true for bug files (from .maggus/bugs/)
 	approved  bool // from feature_approvals.yml (opt-out: true unless explicitly unapproved)
 }
@@ -63,38 +61,7 @@ func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.
 	return selectable
 }
 
-// migrateIgnoredFiles renames any *_ignored.md files in .maggus/<subdir>/ to their
-// plain .md equivalents and marks them as unapproved in feature_approvals.yml.
-// If the target .md already exists, the rename is skipped but unapprove is still called.
-// This is idempotent: once renamed, the _ignored.md file no longer exists and the glob finds nothing.
-func migrateIgnoredFiles(dir, subdir string) error {
-	pattern := filepath.Join(dir, ".maggus", subdir, "*_ignored.md")
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		return fmt.Errorf("glob ignored files in %s: %w", subdir, err)
-	}
-	for _, f := range files {
-		newName := strings.TrimSuffix(f, "_ignored.md") + ".md"
-		if _, statErr := os.Stat(newName); statErr != nil {
-			// Target does not exist — safe to rename
-			if err := os.Rename(f, newName); err != nil {
-				return fmt.Errorf("rename %s: %w", f, err)
-			}
-		}
-		// Mark as unapproved regardless of whether rename happened
-		featureID := featureIDFromPath(f)
-		if err := approval.Unapprove(dir, featureID); err != nil {
-			return fmt.Errorf("unapprove %s: %w", featureID, err)
-		}
-	}
-	return nil
-}
-
 func parseFeatures(dir string) ([]featureInfo, error) {
-	if err := migrateIgnoredFiles(dir, "features"); err != nil {
-		return nil, err
-	}
-
 	files, err := parser.GlobFeatureFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob features: %w", err)
@@ -111,18 +78,11 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
-		ignored := parser.IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		featureID := featureIDFromPath(f)
 		features = append(features, featureInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
-			ignored:   ignored,
 			approved:  approval.IsApproved(a, featureID, false),
 		})
 	}
@@ -130,10 +90,6 @@ func parseFeatures(dir string) ([]featureInfo, error) {
 }
 
 func parseBugs(dir string) ([]featureInfo, error) {
-	if err := migrateIgnoredFiles(dir, "bugs"); err != nil {
-		return nil, err
-	}
-
 	files, err := parser.GlobBugFiles(dir, true)
 	if err != nil {
 		return nil, fmt.Errorf("glob bugs: %w", err)
@@ -150,18 +106,11 @@ func parseBugs(dir string) ([]featureInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
-		ignored := parser.IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		featureID := featureIDFromPath(f)
 		bugs = append(bugs, featureInfo{
 			filename:  filepath.Base(f),
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
-			ignored:   ignored,
 			isBug:     true,
 			approved:  approval.IsApproved(a, featureID, false),
 		})
@@ -243,10 +192,7 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 		for _, t := range f.tasks {
 			var icon, prefix string
 
-			if t.Ignored {
-				icon = "[~]"
-				prefix = "  "
-			} else if t.IsComplete() {
+			if t.IsComplete() {
 				icon = "[x]"
 				prefix = "  "
 			} else if t.IsBlocked() {

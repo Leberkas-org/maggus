@@ -18,7 +18,6 @@ import (
 func featureIDFromPath(path string) string {
 	base := filepath.Base(path)
 	base = strings.TrimSuffix(base, ".md")
-	base = strings.TrimSuffix(base, "_ignored")
 	base = strings.TrimSuffix(base, "_completed")
 	return base
 }
@@ -36,7 +35,7 @@ func listActiveFeatureIDs(dir string) ([]string, error) {
 	return ids, nil
 }
 
-// featureExists returns true if a feature with the given ID exists (active or ignored, not completed).
+// featureExists returns true if a feature with the given ID exists (active, not completed).
 func featureExists(dir, featureID string) (bool, error) {
 	ids, err := listActiveFeatureIDs(dir)
 	if err != nil {

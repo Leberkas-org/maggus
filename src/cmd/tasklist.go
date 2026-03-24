@@ -210,7 +210,7 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 }
 
 // updateDetail handles keys in the detail view.
-// Returns taskListUnhandled for keys the parent should handle (e.g. alt+i in status).
+// Returns taskListUnhandled for keys the parent should handle.
 func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	// Handle action picker mode
 	if c.Detail.showActionPicker {

@@ -13,3 +13,5 @@ docs/.vitepress/dist
 docs/.vitepress/cache
 docs/node_modules
 .maggus/runs
+.maggus/feature_approvals.yml
+.maggus/daemon.pid

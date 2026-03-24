@@ -117,28 +117,14 @@ func findInitialTask(cmd interface{ Println(...interface{}) }, tasks []parser.Ta
 
 	next := parser.FindNextIncomplete(tasks)
 	if next == nil {
-		hasIgnored, hasBlocked := false, false
+		hasBlocked := false
 		for i := range tasks {
-			if !tasks[i].IsComplete() {
-				if tasks[i].Ignored {
-					hasIgnored = true
-				}
-				if tasks[i].IsBlocked() {
-					hasBlocked = true
-				}
+			if !tasks[i].IsComplete() && tasks[i].IsBlocked() {
+				hasBlocked = true
 			}
 		}
-		if hasIgnored || hasBlocked {
-			msg := "No workable tasks — remaining tasks are"
-			switch {
-			case hasBlocked && hasIgnored:
-				msg += " blocked or ignored."
-			case hasIgnored:
-				msg += " ignored."
-			default:
-				msg += " blocked."
-			}
-			cmd.Println(msg)
+		if hasBlocked {
+			cmd.Println("No workable tasks — remaining tasks are blocked.")
 		} else {
 			cmd.Println("All tasks are complete! Nothing to do.")
 		}
@@ -160,7 +146,7 @@ func capCount(tasks []parser.Task, count int) int {
 	return count
 }
 
-// countWorkable returns the number of workable (incomplete + not blocked + not ignored) tasks.
+// countWorkable returns the number of workable (incomplete + not blocked) tasks.
 func countWorkable(tasks []parser.Task) int {
 	n := 0
 	for i := range tasks {
@@ -205,11 +191,6 @@ func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, 
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
-		if parser.IsIgnoredFile(f) {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		id := strings.TrimSuffix(filepath.Base(f), ".md")
 		if !approval.IsApproved(approvals, id, approvalRequired) {
 			continue
@@ -227,11 +208,6 @@ func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, 
 		tasks, err := parser.ParseFile(f)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
-		}
-		if parser.IsIgnoredFile(f) {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
 		}
 		id := strings.TrimSuffix(filepath.Base(f), ".md")
 		if !approval.IsApproved(approvals, id, approvalRequired) {
@@ -365,20 +341,6 @@ func runWorkGoroutine(params workLoopParams) {
 
 		groups := params.featureGroups
 		featureTotal := len(groups)
-
-		// Log ignored tasks from all groups upfront.
-		var ignoredCount int64
-		for _, g := range groups {
-			for i := range g.tasks {
-				if !g.tasks[i].IsComplete() && g.tasks[i].Ignored {
-					params.p.Send(runner.InfoMsg{Text: fmt.Sprintf("Skipping %s: ignored", g.tasks[i].ID)})
-					ignoredCount++
-				}
-			}
-		}
-		if ignoredCount > 0 {
-			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksSkipped: ignoredCount})
-		}
 
 		if featureTotal == 0 {
 			params.p.Send(runner.InfoMsg{Text: "No approved features available."})

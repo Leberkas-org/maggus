@@ -139,13 +139,9 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 	// Status
 	var statusText string
 	var statusStyle lipgloss.Style
-	ignoredStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 	if t.IsComplete() {
 		statusText = "Complete"
 		statusStyle = successStyle
-	} else if t.Ignored {
-		statusText = "Ignored"
-		statusStyle = ignoredStyle
 	} else if t.IsBlocked() {
 		statusText = "Blocked"
 		statusStyle = warningStyle
@@ -289,6 +285,6 @@ func detailFooter(ds *detailState, scrollable bool) string {
 	}
 	parts = append(parts, "pgup/pgdn: prev/next task")
 	parts = append(parts, "tab: manage blocked")
-	parts = append(parts, "alt+i: ignore/unignore · alt+r: run · alt+bksp: delete · esc: back · q: exit")
+	parts = append(parts, "alt+r: run · alt+bksp: delete · esc: back · q: exit")
 	return styles.StatusBar.Render(strings.Join(parts, " · "))
 }

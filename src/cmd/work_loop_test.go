@@ -381,14 +381,13 @@ func TestInitIteration_EmptyNoBugsNoFeatures(t *testing.T) {
 	}
 }
 
-// TestCountWorkable verifies countWorkable returns only workable (incomplete, not blocked, not ignored) tasks.
+// TestCountWorkable verifies countWorkable returns only workable (incomplete, not blocked) tasks.
 func TestCountWorkable(t *testing.T) {
 	tasks := []parser.Task{
 		{ID: "BUG-001-001", Title: "Fix", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
 		{ID: "BUG-001-002", Title: "Fixed", Criteria: []parser.Criterion{{Text: "B", Checked: true}}},                             // complete
 		{ID: "TASK-001-001", Title: "Add", Criteria: []parser.Criterion{{Text: "C", Checked: false}}},                             // workable
 		{ID: "TASK-001-002", Title: "Block", Criteria: []parser.Criterion{{Text: "BLOCKED: dep", Checked: false, Blocked: true}}}, // blocked
-		{ID: "TASK-001-003", Title: "Ign", Criteria: []parser.Criterion{{Text: "D", Checked: false}}, Ignored: true},              // ignored
 	}
 
 	got := countWorkable(tasks)

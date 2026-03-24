@@ -20,12 +20,11 @@ const statusHeaderLines = 11 // title + daemon line + blank + tab bar (~2) + sep
 
 // Lipgloss styles for the status command.
 var (
-	statusGreenStyle   = lipgloss.NewStyle().Foreground(styles.Success)
-	statusCyanStyle    = lipgloss.NewStyle().Foreground(styles.Primary)
-	statusRedStyle     = lipgloss.NewStyle().Foreground(styles.Error)
-	statusDimStyle     = lipgloss.NewStyle().Faint(true)
-	statusDimGreen     = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
-	statusIgnoredStyle = lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
+	statusGreenStyle = lipgloss.NewStyle().Foreground(styles.Success)
+	statusCyanStyle  = lipgloss.NewStyle().Foreground(styles.Primary)
+	statusRedStyle   = lipgloss.NewStyle().Foreground(styles.Error)
+	statusDimStyle   = lipgloss.NewStyle().Faint(true)
+	statusDimGreen   = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
 )
 
 // statusModel is the bubbletea model for the interactive status TUI.
@@ -46,7 +45,7 @@ type statusModel struct {
 
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
-	// Temporary status note (e.g. "feature is already ignored")
+	// Temporary status note (e.g. "feature approved")
 	statusNote string
 
 	// Live log panel
@@ -244,9 +243,6 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
-	if msg.String() == "alt+i" {
-		return m.handleIgnoreTask(true)
-	}
 	if msg.String() == "alt+p" {
 		return m.handleApproveToggle()
 	}
@@ -293,8 +289,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Clear status note on any key except alt+i/alt+p
-	if msg.String() != "alt+i" && msg.String() != "alt+p" {
+	// Clear status note on any key except alt+p
+	if msg.String() != "alt+p" {
 		m.statusNote = ""
 	}
 	m.syncDetailSuffix()
@@ -335,8 +331,6 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
 		m.rebuildForSelectedFeature()
 		return m, nil
-	case "alt+i":
-		return m.handleIgnoreTask(false)
 	case "alt+p":
 		return m.handleApproveToggle()
 	}
@@ -350,52 +344,6 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.reloadFeatures()
 	}
 	return m, cmd
-}
-
-func (m statusModel) handleIgnoreTask(inDetail bool) (tea.Model, tea.Cmd) {
-	if len(m.Tasks) == 0 {
-		return m, nil
-	}
-	t := m.Tasks[m.Cursor]
-	if t.IsComplete() {
-		m.statusNote = "cannot ignore a completed task"
-		if inDetail {
-			m.syncDetailSuffix()
-			m.taskListComponent.refreshDetailViewport()
-		}
-		return m, nil
-	}
-	m.statusNote = ""
-	visible := m.visibleFeatures()
-	if m.selectedFeature < len(visible) && visible[m.selectedFeature].ignored {
-		m.statusNote = "feature is already ignored"
-	}
-	if err := rewriteTaskHeading(t.SourceFile, t.ID, t.Ignored); err != nil {
-		m.statusNote = "error: " + err.Error()
-		if inDetail {
-			m.syncDetailSuffix()
-			m.taskListComponent.refreshDetailViewport()
-		}
-		return m, nil
-	}
-	cursorTaskID := t.ID
-	m.reloadFeatures()
-	for i, st := range m.Tasks {
-		if st.ID == cursorTaskID {
-			m.Cursor = i
-			break
-		}
-	}
-	m.ensureCursorVisible()
-	if inDetail {
-		if updated := reloadTask(m.Tasks[m.Cursor].SourceFile, m.Tasks[m.Cursor].ID); updated != nil {
-			m.Tasks[m.Cursor] = *updated
-		}
-		m.Detail.exitCriteriaMode()
-		m.syncDetailSuffix()
-		m.taskListComponent.refreshDetailViewport()
-	}
-	return m, nil
 }
 
 func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
@@ -747,10 +695,7 @@ func (m statusModel) viewStatus() string {
 			var icon string
 			var style lipgloss.Style
 
-			if t.Ignored {
-				icon = "~"
-				style = statusIgnoredStyle
-			} else if t.IsComplete() {
+			if t.IsComplete() {
 				icon = "✓"
 				if p.completed {
 					style = statusDimGreen
@@ -809,7 +754,7 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 
-	// Status note (e.g. "feature is already ignored")
+	// Status note (e.g. "feature approved")
 	if m.statusNote != "" {
 		sb.WriteString("\n")
 		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
@@ -819,7 +764,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+i: ignore/unignore · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
+	footer := styles.StatusBar.Render("tab/shift+tab: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · l: live log · q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {

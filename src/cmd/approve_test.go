@@ -1,13 +1,25 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/spf13/cobra"
 )
+
+// newTestCmd creates a cobra.Command with captured stdout/stderr for testing.
+func newTestCmd(t *testing.T) (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
+	t.Helper()
+	cmd := &cobra.Command{}
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	return cmd, &stdout, &stderr
+}
 
 // setupApproveDir creates a temp dir with .maggus/features/ for approve/unapprove tests.
 func setupApproveDir(t *testing.T) string {

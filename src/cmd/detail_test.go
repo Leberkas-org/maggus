@@ -469,23 +469,6 @@ func TestRenderDetailContent_BlockedTask(t *testing.T) {
 	}
 }
 
-func TestRenderDetailContent_IgnoredTask(t *testing.T) {
-	task := parser.Task{
-		ID:         "TASK-004",
-		Title:      "Ignored task",
-		SourceFile: "/plan_1.md",
-		Ignored:    true,
-		Criteria: []parser.Criterion{
-			{Text: "criterion"},
-		},
-	}
-
-	content := renderDetailContent(task, nil)
-	if !strings.Contains(content, "Ignored") {
-		t.Error("ignored task should show Ignored status")
-	}
-}
-
 func TestRenderDetailContent_NoDescription(t *testing.T) {
 	task := parser.Task{
 		ID:         "TASK-005",
