@@ -143,9 +143,6 @@ var allMenuItems = []menuItem{
 	{name: "repos", desc: "Manage configured repositories", shortcut: 'r', shortcutLabel: "r"},
 	// AI-assisted creation
 	{name: "prompt", desc: "Launch interactive Claude session with usage tracking", requiresClaude: true, separator: true, shortcut: 'o', shortcutLabel: "o"},
-	{name: "vision", desc: "Create or improve VISION.md", requiresClaude: true, shortcut: 'v', shortcutLabel: "v"},
-	{name: "architecture", desc: "Create or improve ARCHITECTURE.md", requiresClaude: true, shortcut: 'a', shortcutLabel: "a"},
-	{name: "plan", desc: "Create an implementation plan", requiresClaude: true, shortcut: 'p', shortcutLabel: "p"},
 	// Project management
 	{name: "release", desc: "Generate RELEASE.md with changelog", separator: true, shortcut: 'z', shortcutLabel: "z"},
 	{name: "clean", desc: "Remove completed features and finished runs", shortcut: 'n', shortcutLabel: "n"},

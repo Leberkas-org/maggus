@@ -7,13 +7,10 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/session"
 	"github.com/leberkas-org/maggus/internal/usage"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -21,93 +18,6 @@ const (
 	maggusMarketplace    = "maggus"
 	maggusMarketplaceURL = "https://github.com/Leberkas-org/maggus-skills.git"
 )
-
-var planCmd = &cobra.Command{
-	Use:   "plan [description...]",
-	Short: "Open an interactive AI session to create an implementation plan",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-plan skill pre-filled. You provide the feature description and the
-AI walks you through clarifying questions before generating the plan.
-
-Examples:
-  maggus plan Add OAuth2 authentication with Google provider
-  maggus plan "Refactor the parser to support nested tasks"`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-plan", "usage_plan.jsonl"),
-}
-
-var visionCmd = &cobra.Command{
-	Use:   "vision [description...]",
-	Short: "Open an interactive AI session to create or improve VISION.md",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-vision skill pre-filled. You provide context about your project and the
-AI guides you through creating or refining a VISION.md.
-
-Examples:
-  maggus vision A CLI tool for orchestrating AI agents
-  maggus vision "Improve the vision for our e-commerce platform"`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-vision", "usage_vision.jsonl"),
-}
-
-var architectureCmd = &cobra.Command{
-	Use:   "architecture [description...]",
-	Short: "Open an interactive AI session to create or improve ARCHITECTURE.md",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-architecture skill pre-filled. You provide context about your project
-and the AI guides you through creating or refining an ARCHITECTURE.md.
-
-Examples:
-  maggus architecture A Go CLI with plugin system and streaming output
-  maggus architecture "Review and improve our current architecture"`,
-	Aliases: []string{"arch"},
-	Args:    cobra.MinimumNArgs(1),
-	RunE:    runSkillCommand("/maggus-architecture", "usage_architecture.jsonl"),
-}
-
-// runSkillCommand returns a cobra RunE that launches the configured agent
-// interactively with the given skill and the user's description as prompt.
-// If usageFile is non-empty, token usage is extracted from the session and
-// appended to .maggus/<usageFile> after the session ends.
-func runSkillCommand(skill, usageFile string) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		description := strings.Join(args, " ")
-
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working directory: %w", err)
-		}
-
-		cfg, err := config.Load(dir)
-		if err != nil {
-			return fmt.Errorf("load config: %w", err)
-		}
-
-		agentName := cfg.Agent
-		if agentName == "" {
-			agentName = "claude"
-		}
-
-		// Ensure the maggus plugin is installed and enabled in Claude Code.
-		if agentName == "claude" {
-			if err := ensureMaggusPlugin(); err != nil {
-				return err
-			}
-		}
-
-		resolvedModel := config.ResolveModel(cfg.Model)
-
-		prompt := fmt.Sprintf("%s %s", skill, description)
-		info, err := launchInteractive(agentName, prompt, dir, false, resolvedModel)
-
-		// Extract usage if a usage file is configured and we have session info.
-		if usageFile != "" && info != nil {
-			extractSkillUsage(dir, resolvedModel, agentName, usageFile, info)
-		}
-
-		return err
-	}
-}
 
 // extractSkillUsage detects the session file created during an interactive skill session,
 // extracts token usage, and appends a record to the specified usage file.

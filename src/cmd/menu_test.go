@@ -24,15 +24,13 @@ func TestActiveMenuItems_WithClaude(t *testing.T) {
 
 	items := activeMenuItems()
 
-	// Should include requiresClaude items (vision, architecture, plan).
+	// Should include requiresClaude items (prompt).
 	found := map[string]bool{}
 	for _, item := range items {
 		found[item.name] = true
 	}
-	for _, name := range []string{"vision", "architecture", "plan"} {
-		if !found[name] {
-			t.Errorf("expected %q to be present when HasClaude=true", name)
-		}
+	if !found["prompt"] {
+		t.Error("expected \"prompt\" to be present when HasClaude=true")
 	}
 	// Should include init when not initialized.
 	if !found["init"] {

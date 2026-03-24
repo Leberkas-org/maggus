@@ -150,9 +150,6 @@ func Execute() {
 
 	// Register skill commands only when claude is available.
 	if caps.HasClaude {
-		rootCmd.AddCommand(planCmd)
-		rootCmd.AddCommand(visionCmd)
-		rootCmd.AddCommand(architectureCmd)
 		rootCmd.AddCommand(promptCmd)
 	}
 
