@@ -26,6 +26,16 @@ func logPollTick() tea.Cmd {
 	})
 }
 
+// spinnerTickMsg drives the animated spinner in the rich live view.
+type spinnerTickMsg struct{}
+
+// spinnerTick returns a tea.Cmd that fires spinnerTickMsg after 80ms.
+func spinnerTick() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(_ time.Time) tea.Msg {
+		return spinnerTickMsg{}
+	})
+}
+
 // daemonStatus holds the current daemon state for display in the status header and log panel.
 type daemonStatus struct {
 	PID            int

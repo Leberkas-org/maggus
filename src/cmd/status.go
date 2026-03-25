@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -11,12 +12,16 @@ import (
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 
 	"github.com/spf13/cobra"
 )
 
 const statusHeaderLines = 11 // title + daemon line + blank + tab bar (~2) + separator + blank + progress + blank + tasks header + separator
+
+var statusSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // Lipgloss styles for the status command.
 var (
@@ -25,6 +30,8 @@ var (
 	statusRedStyle   = lipgloss.NewStyle().Foreground(styles.Error)
 	statusDimStyle   = lipgloss.NewStyle().Faint(true)
 	statusDimGreen   = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
+	statusBoldStyle  = lipgloss.NewStyle().Bold(true)
+	statusBlueStyle  = lipgloss.NewStyle().Foreground(styles.Accent)
 )
 
 // statusModel is the bubbletea model for the interactive status TUI.
@@ -56,6 +63,10 @@ type statusModel struct {
 	logScroll     int
 	logAutoScroll bool
 	daemon        daemonStatus
+
+	// Rich live view from state.json
+	snapshot     *runlog.StateSnapshot // nil when no snapshot available
+	spinnerFrame int
 }
 
 func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
@@ -145,6 +156,7 @@ func (m statusModel) Init() tea.Cmd {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
 		},
 		logPollTick(),
+		spinnerTick(),
 	)
 }
 
@@ -167,8 +179,25 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.BorderColor = styles.ThemeColor(m.is2x)
 		return m, tickCmd
 
+	case spinnerTickMsg:
+		if m.daemon.Running && m.snapshot != nil {
+			m.spinnerFrame = (m.spinnerFrame + 1) % len(statusSpinnerFrames)
+			return m, spinnerTick()
+		}
+		// Keep ticking even when idle so the spinner starts immediately when daemon resumes.
+		return m, spinnerTick()
+
 	case logPollTickMsg:
 		m.daemon = loadDaemonStatus(m.dir)
+		if m.daemon.Running && m.daemon.RunID != "" {
+			snap, err := runlog.ReadSnapshot(m.dir, m.daemon.RunID)
+			if err == nil {
+				m.snapshot = snap
+			}
+			// else: keep previous snapshot or nil
+		} else if !m.daemon.Running {
+			m.snapshot = nil
+		}
 		if m.daemon.LogPath != "" {
 			newLines := readLastNLogLines(m.daemon.LogPath, 50)
 			m.applyLogLines(newLines)
@@ -211,13 +240,42 @@ func (m *statusModel) applyLogLines(newLines []string) {
 }
 
 // maxLogScroll returns the maximum valid scroll offset for the log panel.
+// When a snapshot is available, scrolling operates on tool entries.
 func (m *statusModel) maxLogScroll() int {
-	visible := m.visibleTaskLines()
-	max := len(m.logLines) - visible
+	visible := m.logVisibleLines()
+	count := m.logItemCount()
+	max := count - visible
 	if max < 0 {
 		max = 0
 	}
 	return max
+}
+
+// logItemCount returns the number of scrollable items in the log panel.
+func (m *statusModel) logItemCount() int {
+	if m.snapshot != nil && m.daemon.Running {
+		return len(m.snapshot.ToolEntries)
+	}
+	return len(m.logLines)
+}
+
+// logVisibleLines returns the number of visible lines available for the scrollable
+// area in the log panel. In rich mode, this accounts for the fixed header/footer zones.
+func (m *statusModel) logVisibleLines() int {
+	total := m.visibleTaskLines()
+	if m.snapshot != nil && m.daemon.Running {
+		// Rich view uses fixed lines: status + output + separator (top) = 3
+		// Bottom zone: separator + model + tokens + cost + elapsed = 5
+		// Log title + separator = 2, plus scroll indicator = 1
+		// Total fixed overhead within the log area = ~11
+		overhead := 11
+		avail := total - overhead
+		if avail < 3 {
+			avail = 3
+		}
+		return avail
+	}
+	return total
 }
 
 func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -524,6 +582,9 @@ func (m statusModel) renderDaemonStatusLine() string {
 }
 
 // viewLog renders the live log panel, replacing the task list content area.
+// When the daemon is running and a state.json snapshot exists, it renders a rich
+// TUI with spinner, tool list, and token stats. Otherwise it falls back to the
+// plain JSONL log reader.
 func (m statusModel) viewLog() string {
 	var sb strings.Builder
 
@@ -570,7 +631,25 @@ func (m statusModel) viewLog() string {
 		sb.WriteString("\n")
 	}
 
-	// Log panel title
+	// Decide: rich snapshot view or plain log fallback
+	if m.snapshot != nil && m.daemon.Running {
+		sb.WriteString(m.renderSnapshotPanel())
+	} else {
+		sb.WriteString(m.renderPlainLogPanel())
+	}
+
+	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · tab: features · q/esc: exit")
+	borderColor := styles.ThemeColor(m.is2x)
+	if m.Width > 0 && m.Height > 0 {
+		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
+	}
+	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
+}
+
+// renderPlainLogPanel renders the original plain JSONL log view.
+func (m statusModel) renderPlainLogPanel() string {
+	var sb strings.Builder
+
 	sb.WriteString("\n")
 	logTitle := styles.Title.Render(" Live Log")
 	if m.daemon.LogPath != "" {
@@ -602,12 +681,179 @@ func (m statusModel) viewLog() string {
 		}
 	}
 
-	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · tab: features · q/esc: exit")
-	borderColor := styles.ThemeColor(m.is2x)
-	if m.Width > 0 && m.Height > 0 {
-		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
+	return sb.String()
+}
+
+// renderSnapshotPanel renders the rich live TUI from a state.json snapshot,
+// matching the layout of renderProgressTab in the work TUI.
+func (m statusModel) renderSnapshotPanel() string {
+	snap := m.snapshot
+	var sb strings.Builder
+
+	contentWidth := m.Width - 11
+	if contentWidth < 20 {
+		contentWidth = 20
 	}
-	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
+
+	// ── Top zone (fixed): spinner + status, task ID + title ──
+	sb.WriteString("\n")
+	spinnerStr := statusCyanStyle.Render(statusSpinnerFrames[m.spinnerFrame])
+	sColor := lipgloss.NewStyle().Foreground(styles.Warning)
+	switch snap.Status {
+	case "Done":
+		sColor = statusGreenStyle
+		spinnerStr = statusGreenStyle.Render("✓")
+	case "Failed":
+		sColor = statusRedStyle
+		spinnerStr = statusRedStyle.Render("✗")
+	case "Interrupted":
+		sColor = statusRedStyle
+		spinnerStr = statusRedStyle.Render("⊘")
+	}
+	sb.WriteString(fmt.Sprintf(" %s %s  %s\n", spinnerStr, statusBoldStyle.Render("Status:"), sColor.Render(snap.Status)))
+
+	if snap.TaskID != "" {
+		sb.WriteString(fmt.Sprintf("   %s  %s: %s\n", statusBoldStyle.Render("Task:"), statusCyanStyle.Render(snap.TaskID), snap.TaskTitle))
+	}
+	sb.WriteString(" " + styles.Separator(42) + "\n")
+
+	// ── Middle zone (scrollable tool list) ──
+	available := m.logVisibleLines()
+	totalTools := len(snap.ToolEntries)
+
+	if totalTools == 0 {
+		sb.WriteString(statusDimStyle.Render("  No tool invocations yet.") + "\n")
+		for i := 1; i < available; i++ {
+			sb.WriteString("\n")
+		}
+	} else {
+		toolLines := make([]string, totalTools)
+		for i, entry := range snap.ToolEntries {
+			ts := entry.Timestamp
+			if t, err := time.Parse(time.RFC3339, entry.Timestamp); err == nil {
+				ts = t.Local().Format("15:04:05")
+			}
+			icon := entry.Icon
+			if icon == "" {
+				icon = "▶️"
+			}
+			desc := styles.Truncate(entry.Description, contentWidth-2)
+			toolLines[i] = fmt.Sprintf("  %s %s: %s  %s",
+				icon,
+				statusCyanStyle.Render(entry.Type),
+				statusBlueStyle.Render(desc),
+				statusDimStyle.Render(ts))
+		}
+
+		offset := m.logScroll
+		maxOffset := totalTools - available
+		if maxOffset < 0 {
+			maxOffset = 0
+		}
+		if offset > maxOffset {
+			offset = maxOffset
+		}
+		if offset < 0 {
+			offset = 0
+		}
+
+		if totalTools > available {
+			end := offset + available
+			if end > totalTools {
+				end = totalTools
+			}
+			indicator := statusDimStyle.Render(fmt.Sprintf("[%d-%d of %d]", offset+1, end, totalTools))
+			if m.logAutoScroll {
+				indicator += statusDimStyle.Render(" (auto)")
+			}
+			sb.WriteString(indicator + "\n")
+			viewH := available - 1
+			if viewH < 1 {
+				viewH = 1
+			}
+			end = offset + viewH
+			if end > totalTools {
+				end = totalTools
+			}
+			for _, line := range toolLines[offset:end] {
+				sb.WriteString(line + "\n")
+			}
+			rendered := end - offset
+			for i := rendered; i < viewH; i++ {
+				sb.WriteString("\n")
+			}
+		} else {
+			for _, line := range toolLines {
+				sb.WriteString(line + "\n")
+			}
+			for i := totalTools; i < available; i++ {
+				sb.WriteString("\n")
+			}
+		}
+	}
+
+	// ── Bottom zone (fixed): model, tokens, cost, elapsed ──
+	sb.WriteString(" " + styles.Separator(42) + "\n")
+
+	sb.WriteString(fmt.Sprintf("  %s   %s\n", statusBoldStyle.Render("Model:"), statusDimStyle.Render(m.snapshotModelSummary())))
+
+	// Tokens
+	totalIn := snap.TokenInput
+	if totalIn > 0 || snap.TokenOutput > 0 {
+		tokenStr := fmt.Sprintf("%s in / %s out",
+			runner.FormatTokens(totalIn), runner.FormatTokens(snap.TokenOutput))
+		sb.WriteString(fmt.Sprintf("  %s  %s\n", statusBoldStyle.Render("Tokens:"), statusDimStyle.Render(tokenStr)))
+
+		// Per-model breakdown
+		if len(snap.ModelBreakdown) > 0 {
+			sb.WriteString("          " + statusDimStyle.Render(m.formatSnapshotModelTokens()) + "\n")
+		}
+
+		costStr := "N/A"
+		if snap.TokenCost > 0 {
+			costStr = runner.FormatCost(snap.TokenCost)
+		}
+		sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Cost:"), statusDimStyle.Render(costStr)))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s  %s\n", statusBoldStyle.Render("Tokens:"), statusDimStyle.Render("N/A")))
+		sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Cost:"), statusDimStyle.Render("N/A")))
+	}
+
+	// Elapsed since snapshot update
+	if snap.UpdatedAt != "" {
+		if t, err := time.Parse(time.RFC3339, snap.UpdatedAt); err == nil {
+			elapsed := time.Since(t).Truncate(time.Second)
+			sb.WriteString(fmt.Sprintf("  %s %s\n", statusBoldStyle.Render("Updated:"), statusDimStyle.Render(elapsed.String()+" ago")))
+		}
+	}
+
+	return sb.String()
+}
+
+// snapshotModelSummary returns a summary of models from the snapshot breakdown.
+func (m statusModel) snapshotModelSummary() string {
+	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
+		return "-"
+	}
+	names := make([]string, 0, len(m.snapshot.ModelBreakdown))
+	for name := range m.snapshot.ModelBreakdown {
+		names = append(names, name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// formatSnapshotModelTokens formats per-model token breakdown from the snapshot.
+func (m statusModel) formatSnapshotModelTokens() string {
+	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
+		return ""
+	}
+	var parts []string
+	for name, usage := range m.snapshot.ModelBreakdown {
+		totalIn := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
+		parts = append(parts, fmt.Sprintf("%s: %s in / %s out",
+			name, runner.FormatTokens(totalIn), runner.FormatTokens(usage.OutputTokens)))
+	}
+	return strings.Join(parts, "  ·  ")
 }
 
 func (m statusModel) viewStatus() string {
