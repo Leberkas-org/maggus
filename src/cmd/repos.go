@@ -179,21 +179,9 @@ func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case "up", "k":
-		if len(m.repos) > 0 {
-			if m.cursor > 0 {
-				m.cursor--
-			} else {
-				m.cursor = len(m.repos) - 1
-			}
-		}
+		m.cursor = styles.CursorUp(m.cursor, len(m.repos))
 	case "down", "j":
-		if len(m.repos) > 0 {
-			if m.cursor < len(m.repos)-1 {
-				m.cursor++
-			} else {
-				m.cursor = 0
-			}
-		}
+		m.cursor = styles.CursorDown(m.cursor, len(m.repos))
 	case "home":
 		m.cursor = 0
 	case "end":

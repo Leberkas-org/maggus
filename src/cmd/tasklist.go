@@ -169,24 +169,12 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 		}
 		return nil, taskListNone
 	case "up", "k":
-		if len(c.Tasks) > 0 {
-			if c.Cursor > 0 {
-				c.Cursor--
-			} else {
-				c.Cursor = len(c.Tasks) - 1
-			}
-			c.ensureCursorVisible()
-		}
+		c.Cursor = styles.CursorUp(c.Cursor, len(c.Tasks))
+		c.ensureCursorVisible()
 		return nil, taskListNone
 	case "down", "j":
-		if len(c.Tasks) > 0 {
-			if c.Cursor < len(c.Tasks)-1 {
-				c.Cursor++
-			} else {
-				c.Cursor = 0
-			}
-			c.ensureCursorVisible()
-		}
+		c.Cursor = styles.CursorDown(c.Cursor, len(c.Tasks))
+		c.ensureCursorVisible()
 		return nil, taskListNone
 	case "home":
 		c.Cursor = 0
@@ -287,15 +275,11 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	switch msg.String() {
 	case "up", "k":
-		if c.Detail.criteriaCursor > 0 {
-			c.Detail.criteriaCursor--
-			c.refreshDetailViewport()
-		}
+		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor-1, len(c.Detail.blockedIndices))
+		c.refreshDetailViewport()
 	case "down", "j":
-		if c.Detail.criteriaCursor < len(c.Detail.blockedIndices)-1 {
-			c.Detail.criteriaCursor++
-			c.refreshDetailViewport()
-		}
+		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor+1, len(c.Detail.blockedIndices))
+		c.refreshDetailViewport()
 	case "enter":
 		c.Detail.showActionPicker = true
 		c.Detail.actionCursor = 0
@@ -317,15 +301,11 @@ func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskLis
 func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	switch msg.String() {
 	case "up", "k":
-		if c.Detail.actionCursor > 0 {
-			c.Detail.actionCursor--
-			c.refreshDetailViewport()
-		}
+		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor-1, len(criteriaActions))
+		c.refreshDetailViewport()
 	case "down", "j":
-		if c.Detail.actionCursor < len(criteriaActions)-1 {
-			c.Detail.actionCursor++
-			c.refreshDetailViewport()
-		}
+		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor+1, len(criteriaActions))
+		c.refreshDetailViewport()
 	case "enter":
 		action := criteriaActions[c.Detail.actionCursor]
 		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action)

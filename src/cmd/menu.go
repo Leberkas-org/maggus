@@ -543,17 +543,9 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case "up":
-		if m.cursor > 0 {
-			m.cursor--
-		} else {
-			m.cursor = len(m.items) - 1
-		}
+		m.cursor = styles.CursorUp(m.cursor, len(m.items))
 	case "down":
-		if m.cursor < len(m.items)-1 {
-			m.cursor++
-		} else {
-			m.cursor = 0
-		}
+		m.cursor = styles.CursorDown(m.cursor, len(m.items))
 	case "home":
 		m.cursor = 0
 	case "end":
@@ -610,17 +602,9 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case "up", "k":
-		if m.subCursor > 0 {
-			m.subCursor--
-		} else {
-			m.subCursor = itemCount - 1
-		}
+		m.subCursor = styles.CursorUp(m.subCursor, itemCount)
 	case "down", "j":
-		if m.subCursor < itemCount-1 {
-			m.subCursor++
-		} else {
-			m.subCursor = 0
-		}
+		m.subCursor = styles.CursorDown(m.subCursor, itemCount)
 	case "home":
 		m.subCursor = 0
 	case "end":

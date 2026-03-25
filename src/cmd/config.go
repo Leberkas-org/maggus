@@ -372,8 +372,8 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.tabFocused {
 				m.tabFocused = false
 				m.cursor = 0
-			} else if m.cursor < itemCount-1 {
-				m.cursor++
+			} else {
+				m.cursor = styles.ClampCursor(m.cursor+1, itemCount)
 			}
 		case "left", "h":
 			if m.tabFocused {

@@ -265,14 +265,10 @@ func (m syncModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case syncStateMenu:
 		switch msg.Type {
 		case tea.KeyUp:
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			m.cursor = styles.ClampCursor(m.cursor-1, len(m.options))
 			return m, nil
 		case tea.KeyDown:
-			if m.cursor < len(m.options)-1 {
-				m.cursor++
-			}
+			m.cursor = styles.ClampCursor(m.cursor+1, len(m.options))
 			return m, nil
 		case tea.KeyEnter:
 			return m.selectOption()
@@ -286,13 +282,9 @@ func (m syncModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.result = syncResult{action: syncAbort}
 				return m, tea.Quit
 			case 'k':
-				if m.cursor > 0 {
-					m.cursor--
-				}
+				m.cursor = styles.ClampCursor(m.cursor-1, len(m.options))
 			case 'j':
-				if m.cursor < len(m.options)-1 {
-					m.cursor++
-				}
+				m.cursor = styles.ClampCursor(m.cursor+1, len(m.options))
 			}
 		}
 	}

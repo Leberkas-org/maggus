@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -258,13 +259,9 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
+			m.cursor = styles.ClampCursor(m.cursor-1, len(m.items))
 		case "down", "j":
-			if m.cursor < len(m.items)-1 {
-				m.cursor++
-			}
+			m.cursor = styles.ClampCursor(m.cursor+1, len(m.items))
 		case "enter", " ":
 			m.selected = m.items[m.cursor]
 			m.done = true

@@ -490,17 +490,14 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "right":
 		visible := m.visibleFeatures()
 		if len(visible) > 1 {
-			m.selectedFeature = (m.selectedFeature + 1) % len(visible)
+			m.selectedFeature = styles.CursorDown(m.selectedFeature, len(visible))
 			m.rebuildForSelectedFeature()
 		}
 		return m, nil
 	case "shift+tab", "left":
 		visible := m.visibleFeatures()
 		if len(visible) > 1 {
-			m.selectedFeature--
-			if m.selectedFeature < 0 {
-				m.selectedFeature = len(visible) - 1
-			}
+			m.selectedFeature = styles.CursorUp(m.selectedFeature, len(visible))
 			m.rebuildForSelectedFeature()
 		}
 		return m, nil
