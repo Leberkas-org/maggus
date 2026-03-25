@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
-	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
@@ -56,6 +58,9 @@ type taskContext struct {
 	onComplete    config.OnCompleteConfig
 	logger        *runlog.Logger // structured run log; nil-safe
 
+	// Discord Rich Presence (nil when disabled).
+	presence *discord.Presence
+
 	// Feature-centric context (set per-group by runWorkGoroutine).
 	featureSourceFile string // scope parsedTasks to this source file for progress calculation
 	featureCurrent    int    // 1-based index of current feature (for TUI display)
@@ -93,6 +98,16 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 
 	// Signal iteration start to the TUI.
 	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal)
+
+	// Update Discord Rich Presence with current task info.
+	if tc.presence != nil {
+		tc.presence.Update(discord.PresenceState{
+			TaskID:       next.ID,
+			TaskTitle:    next.Title,
+			FeatureTitle: parser.ParseFileTitle(next.SourceFile),
+			StartTime:    time.Now(),
+		})
+	}
 
 	// Build and run the prompt.
 	opts := prompt.Options{

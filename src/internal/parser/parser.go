@@ -59,6 +59,28 @@ func (t *Task) IsWorkable() bool {
 	return !t.IsComplete() && !t.IsBlocked()
 }
 
+// featureTitleRe matches the top-level heading in feature/bug files, e.g.
+// "# Feature 001: Discord Rich Presence Integration" or "# Bug 001: Title".
+var featureTitleRe = regexp.MustCompile(`^#\s+(?:Feature|Bug)\s+\d+:\s+(.+)$`)
+
+// ParseFileTitle extracts the title from the top-level heading of a feature or bug file.
+// Returns empty string if no matching heading is found.
+func ParseFileTitle(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if m := featureTitleRe.FindStringSubmatch(scanner.Text()); m != nil {
+			return strings.TrimSpace(m[1])
+		}
+	}
+	return ""
+}
+
 // ParseFile parses a single feature markdown file and returns all tasks found in it.
 func ParseFile(path string) ([]Task, error) {
 	f, err := os.Open(path)

@@ -149,6 +149,12 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		protectedDisplay = protectedDisplay[:37] + "..."
 	}
 
+	discordPresenceValues := []string{"on", "off"}
+	discordPresenceIdx := 1
+	if cfg.DiscordPresence {
+		discordPresenceIdx = 0
+	}
+
 	soundValues := []string{"on", "off"}
 	soundIdx := 1
 	if cfg.Notifications.Sound {
@@ -193,6 +199,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
+		{label: "Discord presence", values: discordPresenceValues, current: discordPresenceIdx},
 		{label: "Protected branches", display: protectedDisplay},
 		{label: "Sound", values: soundValues, current: soundIdx},
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
@@ -256,6 +263,8 @@ func (m configModel) buildConfig() config.Config {
 	if model != "(default)" {
 		cfg.Model = model
 	}
+
+	cfg.DiscordPresence = m.optionByLabel("Discord presence").values[m.optionByLabel("Discord presence").current] == "on"
 
 	cfg.Notifications.Sound = m.optionByLabel("Sound").values[m.optionByLabel("Sound").current] == "on"
 

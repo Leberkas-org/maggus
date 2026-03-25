@@ -86,15 +86,15 @@ This uses Discord's local IPC protocol (no bot, no network auth) and is opt-in v
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] When `discord_presence: true` in config, a `discord.Presence` is created and connected at work loop start
-- [ ] On `IterationStartMsg`: presence updates with feature title + task ID + task title
-- [ ] Details line format: "Feature Title — TASK-NNN-XXX: Task Title"
-- [ ] State line: "Running Maggus"
-- [ ] On work loop exit (normal completion, Ctrl+C, or error): presence is cleared via `Close()`
-- [ ] When `discord_presence` is false or missing: no Discord code is initialized at all
-- [ ] When Discord is not running: no errors shown, maggus works exactly as before
-- [ ] Presence shows elapsed time (Discord "elapsed" timestamp from iteration start)
-- [ ] `go vet ./...` passes
+- [x] When `discord_presence: true` in config, a `discord.Presence` is created and connected at work loop start
+- [x] On `IterationStartMsg`: presence updates with feature title + task ID + task title
+- [x] Details line format: "Feature Title — TASK-NNN-XXX: Task Title"
+- [x] State line: "Running Maggus"
+- [x] On work loop exit (normal completion, Ctrl+C, or error): presence is cleared via `Close()`
+- [x] When `discord_presence` is false or missing: no Discord code is initialized at all
+- [x] When Discord is not running: no errors shown, maggus works exactly as before
+- [x] Presence shows elapsed time (Discord "elapsed" timestamp from iteration start)
+- [x] `go vet ./...` passes
 
 ### TASK-001-005: End-to-end testing and polish
 **Description:** As a developer, I want to verify the full integration works correctly so that we can ship with confidence.

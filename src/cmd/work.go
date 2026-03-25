@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/claude2x"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
@@ -224,6 +225,18 @@ Examples:
 		}
 		defer func() { _ = runLogger.Close() }()
 
+		// Initialise Discord Rich Presence if enabled.
+		var presence *discord.Presence
+		if wc.cfg.DiscordPresence {
+			presence = &discord.Presence{}
+			_ = presence.Connect()
+		}
+		defer func() {
+			if presence != nil {
+				_ = presence.Close()
+			}
+		}()
+
 		// Build the bubbletea program (interactive TUI).
 		twoXStatus := claude2x.FetchStatus()
 		cwd, _ := os.Getwd()
@@ -275,6 +288,7 @@ Examples:
 			runID:         runID,
 			onComplete:    wc.cfg.OnComplete,
 			logger:        runLogger,
+			presence:      presence,
 		}
 
 		runWorkGoroutine(workLoopParams{
