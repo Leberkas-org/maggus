@@ -89,13 +89,10 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build the prompt string: for skills it's "/skill-name description".
+	// Build the prompt string: just the skill name.
 	var prompt string
 	if mapping.skill != "" {
 		prompt = mapping.skill
-		if result.Description != "" {
-			prompt += " " + result.Description
-		}
 	}
 
 	info, err := launchInteractive(agentName, prompt, dir, result.SkipPermissions, resolvedModel)
