@@ -51,11 +51,6 @@ func pollMenuDaemonTick() tea.Cmd {
 	})
 }
 
-// autoWorkTickMsg is sent every second while the delayed auto-work countdown is active.
-type autoWorkTickMsg struct {
-	id int // countdown ID; stale ticks (from a previous countdown) are ignored
-}
-
 // loadSettings is injectable for testing.
 var loadSettings = func() (globalconfig.Settings, error) {
 	return globalconfig.LoadSettings()
@@ -347,12 +342,6 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
-	// Auto-work state
-	autoWork            string // "disabled" | "enabled" | "delayed" — cached from config
-	autoWorkActive      bool   // true while the delayed countdown is running
-	autoWorkCountdown   int    // seconds remaining (5 → 0)
-	autoWorkCountdownID int    // monotonic counter to discard stale tick messages
-
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
 	watcherCh chan bool
@@ -374,11 +363,6 @@ type menuModel struct {
 func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
 
-	autoWork := config.AutoWorkDisabled
-	if cfg, err := config.Load(cwd); err == nil {
-		autoWork = cfg.AutoWork
-	}
-
 	ch := make(chan bool, 1)
 	w, _ := filewatcher.New(cwd, func(msg any) {
 		hasNew := false
@@ -395,19 +379,10 @@ func newMenuModel(summary featureSummary) menuModel {
 		items:       activeMenuItems(),
 		summary:     summary,
 		cwd:         cwd,
-		autoWork:    autoWork,
 		subMenuDefs: buildSubMenus(),
 		watcher:     w,
 		watcherCh:   ch,
 	}
-}
-
-// autoWorkTick returns a Cmd that fires an autoWorkTickMsg after one second.
-// The id parameter is used to discard ticks from superseded countdowns.
-func autoWorkTick(id int) tea.Cmd {
-	return tea.Tick(time.Second, func(_ time.Time) tea.Msg {
-		return autoWorkTickMsg{id: id}
-	})
 }
 
 // listenForWatcherUpdate returns a Cmd that blocks until the watcher channel
@@ -476,47 +451,14 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, pollMenuDaemonTick()
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
-		// Re-read config so changes made in the config TUI take effect immediately.
-		if cwd, err := os.Getwd(); err == nil {
-			if cfg, err := config.Load(cwd); err == nil {
-				m.autoWork = cfg.AutoWork
-			}
-		}
-		// Only trigger auto-work when a new file was created; pure Write/Remove/Rename
-		// events refresh the summary display but must not dispatch work.
+		// When a new file was created and there are workable tasks, dispatch work immediately.
 		workable := m.summary.workable + m.summary.bugWorkable
 		if msg.HasNewFile && workable > 0 {
-			switch m.autoWork {
-			case config.AutoWorkEnabled:
-				m.selected = "work"
-				m.args = []string{"--count", "0"}
-				return m, tea.Quit
-			case config.AutoWorkDelayed:
-				if !m.autoWorkActive {
-					m.autoWorkActive = true
-					m.autoWorkCountdown = 5
-					m.autoWorkCountdownID++
-					return m, tea.Batch(
-						listenForWatcherUpdate(m.watcherCh),
-						autoWorkTick(m.autoWorkCountdownID),
-					)
-				}
-			}
-		}
-		return m, listenForWatcherUpdate(m.watcherCh)
-
-	case autoWorkTickMsg:
-		if !m.autoWorkActive || msg.id != m.autoWorkCountdownID {
-			return m, nil
-		}
-		m.autoWorkCountdown--
-		if m.autoWorkCountdown <= 0 {
-			m.autoWorkActive = false
 			m.selected = "work"
 			m.args = []string{"--count", "0"}
 			return m, tea.Quit
 		}
-		return m, autoWorkTick(m.autoWorkCountdownID)
+		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case hideShortcutsMsg:
 		// Only hide if this timer is still the latest one
@@ -529,18 +471,6 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle stop-daemon confirmation prompt.
 		if m.confirmStopDaemon {
 			return m.updateConfirmStopDaemon(msg)
-		}
-
-		// Any key press cancels an active auto-work countdown.
-		if m.autoWorkActive {
-			m.autoWorkActive = false
-			m.autoWorkCountdown = 0
-			m.autoWorkCountdownID++
-			if msg.String() == "ctrl+c" {
-				m.quitting = true
-				return m, tea.Quit
-			}
-			return m, nil
 		}
 
 		if msg.Alt {
@@ -772,13 +702,6 @@ func (m menuModel) View() string {
 	if m.daemonAutoWarning != "" {
 		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 		header += "\n" + centerLine(warnStyle.Render(m.daemonAutoWarning), contentW)
-	}
-
-	// Show auto-work countdown when active
-	if m.autoWorkActive {
-		countdownStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
-		countdownLine := countdownStyle.Render(fmt.Sprintf("Auto-work starting in %ds… press any key to cancel", m.autoWorkCountdown))
-		header += "\n" + centerLine(countdownLine, contentW)
 	}
 
 	content := header + "\n\n" + body

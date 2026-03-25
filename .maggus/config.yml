@@ -2,7 +2,6 @@ agent: claude
 model: opus
 include: []
 worktree: false
-auto_work: delayed
 approval_mode: opt-in
 auto_continue: null
 notifications:
@@ -20,4 +19,8 @@ git:
 on_complete:
     feature: delete
     bug: delete
-discord_presence: true
+hooks:
+    on_feature_complete: []
+    on_bug_complete: []
+    on_task_complete: []
+discord_presence: false

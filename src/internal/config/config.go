@@ -126,13 +126,6 @@ func (o OnCompleteConfig) BugAction() string {
 	return "rename"
 }
 
-// AutoWork values control when maggus automatically starts working from the main menu.
-const (
-	AutoWorkDisabled = "disabled" // Default: no automatic work dispatch.
-	AutoWorkEnabled  = "enabled"  // Dispatch work immediately when workable tasks appear.
-	AutoWorkDelayed  = "delayed"  // Show a 5-second countdown before dispatching.
-)
-
 // ApprovalMode values control whether features require explicit approval before maggus works on them.
 const (
 	ApprovalModeOptIn  = "opt-in"  // Default: features must be explicitly approved.
@@ -145,7 +138,6 @@ type Config struct {
 	Model              string              `yaml:"model"`
 	Include            []string            `yaml:"include"`
 	Worktree           bool                `yaml:"worktree"`
-	AutoWork           string              `yaml:"auto_work"`
 	ApprovalMode       string              `yaml:"approval_mode"`
 	AutoContinue  *bool               `yaml:"auto_continue"`
 	Notifications NotificationsConfig `yaml:"notifications"`
@@ -188,10 +180,6 @@ func Load(dir string) (Config, error) {
 
 	if cfg.Agent == "" {
 		cfg.Agent = "claude"
-	}
-
-	if cfg.AutoWork == "" {
-		cfg.AutoWork = AutoWorkDisabled
 	}
 
 	if cfg.ApprovalMode == "" {

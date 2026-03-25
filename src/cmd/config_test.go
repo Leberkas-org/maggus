@@ -53,8 +53,8 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
-	if len(opts) != 15 {
-		t.Fatalf("expected 15 option rows, got %d", len(opts))
+	if len(opts) != 14 {
+		t.Fatalf("expected 14 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
@@ -75,52 +75,44 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 		t.Errorf("worktree current = %d, want 1 (off)", opts[2].current)
 	}
 
-	// Auto-work defaults to disabled (index 0)
-	if opts[3].label != "Auto-work" {
-		t.Errorf("opts[3].label = %q, want Auto-work", opts[3].label)
-	}
-	if opts[3].current != 0 {
-		t.Errorf("auto-work current = %d, want 0 (disabled)", opts[3].current)
-	}
-
 	// Auto-approve defaults to disabled (index 0)
-	if opts[4].current != 0 {
-		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[4].current)
+	if opts[3].current != 0 {
+		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[3].current)
 	}
 
 	// Auto-branch defaults to on (index 0)
-	if opts[5].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[5].current)
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 
 	// Check sync defaults to on (index 0)
-	if opts[6].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[6].current)
+	if opts[5].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
 	}
 
 	// Discord presence defaults to off (index 1)
-	if opts[7].current != 1 {
-		t.Errorf("discord-presence current = %d, want 1 (off)", opts[7].current)
+	if opts[6].current != 1 {
+		t.Errorf("discord-presence current = %d, want 1 (off)", opts[6].current)
 	}
 
 	// Sound defaults to off (index 1)
-	if opts[8].current != 1 {
-		t.Errorf("sound current = %d, want 1 (off)", opts[8].current)
+	if opts[7].current != 1 {
+		t.Errorf("sound current = %d, want 1 (off)", opts[7].current)
 	}
 
 	// Notification sub-options default to on (index 0) when nil
-	for i := 9; i <= 11; i++ {
+	for i := 8; i <= 10; i++ {
 		if opts[i].current != 0 {
 			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
 	}
 
 	// On-complete defaults to rename (index 0)
-	if opts[12].label != "  Feature" || opts[12].current != 0 {
-		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[12].label, opts[12].current)
+	if opts[11].label != "  Feature" || opts[11].current != 0 {
+		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[11].label, opts[11].current)
 	}
-	if opts[13].label != "  Bug" || opts[13].current != 0 {
-		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[13].label, opts[13].current)
+	if opts[12].label != "  Bug" || opts[12].current != 0 {
+		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[12].label, opts[12].current)
 	}
 
 	if m.cursor != 0 {
@@ -156,31 +148,27 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 	if opts[2].current != 0 {
 		t.Errorf("worktree current = %d, want 0 (on)", opts[2].current)
 	}
-	// Auto-work defaults to disabled (index 0) — not set in config
-	if opts[3].current != 0 {
-		t.Errorf("auto-work current = %d, want 0 (disabled)", opts[3].current)
-	}
 	// Auto-approve defaults to disabled (index 0) — not set in config
-	if opts[4].current != 0 {
-		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[4].current)
+	if opts[3].current != 0 {
+		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[3].current)
 	}
 	// Auto-branch defaults to on (index 0) — not set in config
-	if opts[5].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[5].current)
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 	// Check sync defaults to on (index 0) — not set in config
-	if opts[6].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[6].current)
+	if opts[5].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
 	}
 	// Discord presence defaults to off (index 1) — not set in config
-	if opts[7].current != 1 {
-		t.Errorf("discord-presence current = %d, want 1 (off)", opts[7].current)
+	if opts[6].current != 1 {
+		t.Errorf("discord-presence current = %d, want 1 (off)", opts[6].current)
 	}
-	if opts[8].current != 0 {
-		t.Errorf("sound current = %d, want 0 (on)", opts[8].current)
+	if opts[7].current != 0 {
+		t.Errorf("sound current = %d, want 0 (on)", opts[7].current)
 	}
 	// All notification sub-options set to false → off (index 1)
-	for i := 9; i <= 11; i++ {
+	for i := 8; i <= 10; i++ {
 		if opts[i].current != 1 {
 			t.Errorf("opts[%d].current = %d, want 1 (off)", i, opts[i].current)
 		}
@@ -453,7 +441,6 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 		"Agent",
 		"Model",
 		"Worktree",
-		"Auto-work",
 		"Auto-approve",
 		"Auto-branch",
 		"Check sync",
