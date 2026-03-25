@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -242,4 +243,70 @@ func parseLogForCurrentState(lines []string) (feature, task string) {
 		}
 	}
 	return feature, task
+}
+
+// renderDaemonStatusLine returns a one-line string showing daemon state and
+// current feature/task progress (for use in the status header).
+func (m statusModel) renderDaemonStatusLine() string {
+	if m.daemon.Running {
+		indicator := statusCyanStyle.Render("●")
+		line := fmt.Sprintf(" %s daemon running (PID %d)", indicator, m.daemon.PID)
+		if m.daemon.CurrentFeature != "" {
+			line += statusDimStyle.Render(" · " + m.daemon.CurrentFeature)
+		}
+		if m.daemon.CurrentTask != "" {
+			line += statusDimStyle.Render(" · " + m.daemon.CurrentTask)
+		}
+		return line
+	}
+	if m.daemon.RunID != "" {
+		return statusDimStyle.Render(fmt.Sprintf(" ○ daemon not running · last run: %s", m.daemon.RunID))
+	}
+	return statusDimStyle.Render(" ○ daemon not running")
+}
+
+// formatHumanDuration formats a duration as human-friendly text (e.g. "5m 32s", "1h 12m 5s").
+func formatHumanDuration(d time.Duration) string {
+	d = d.Truncate(time.Second)
+	if d < time.Second {
+		return "0s"
+	}
+
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	case m > 0:
+		return fmt.Sprintf("%dm %ds", m, s)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
+}
+
+// formatSnapshotModelTokens formats per-model token breakdown from the snapshot.
+// Returns multi-line output with one line per model, indented to align under "Tokens:".
+func (m statusModel) formatSnapshotModelTokens() string {
+	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
+		return ""
+	}
+	// Sort model names for stable output
+	names := make([]string, 0, len(m.snapshot.ModelBreakdown))
+	for name := range m.snapshot.ModelBreakdown {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var sb strings.Builder
+	for _, name := range names {
+		usage := m.snapshot.ModelBreakdown[name]
+		totalIn := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
+		costStr := runner.FormatCost(usage.CostUSD)
+		line := fmt.Sprintf("  %s: %s in / %s out (%s)",
+			name, runner.FormatTokens(totalIn), runner.FormatTokens(usage.OutputTokens), costStr)
+		sb.WriteString("  " + statusDimStyle.Render(line) + "\n")
+	}
+	return sb.String()
 }

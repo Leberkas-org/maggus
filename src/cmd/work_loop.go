@@ -12,13 +12,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/config"
-	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/usage"
-	"github.com/leberkas-org/maggus/internal/worktree"
 )
 
 // iterationSetup holds everything needed to start the work loop TUI.
@@ -569,29 +567,6 @@ func captureShortHash(workDir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// setupBranch handles worktree creation or feature branch creation.
-// Returns the branch message (non-worktree mode) or empty string.
-func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, runID string, gitCfg config.GitConfig) (string, error) {
-	if useWorktree {
-		cleanStaleWorktrees(repoDir)
-		branchName := gitbranch.BranchName(nextTask.ID)
-		wtPath := filepath.Join(repoDir, ".maggus-work", runID)
-		if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
-			return "", fmt.Errorf("create worktree: %w", err)
-		}
-		return "", nil
-	}
-
-	if !gitCfg.IsAutoBranchEnabled() {
-		return "Auto-branch disabled, staying on current branch", nil
-	}
-
-	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID, gitCfg.ProtectedBranchList())
-	if err != nil {
-		return "", fmt.Errorf("ensure feature branch: %w", err)
-	}
-	return msg, nil
-}
 
 // isTaskAtOrPastTarget returns true if lastCompletedTaskID appears at or after
 // targetID in the task list ordering. This handles the case where the target

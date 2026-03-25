@@ -3,14 +3,18 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitignore"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
+	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -150,4 +154,28 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 		useWorktree:     useWorktree,
 		hostFingerprint: hostFingerprint,
 	}, nil
+}
+
+// setupBranch handles worktree creation or feature branch creation.
+// Returns the branch message (non-worktree mode) or empty string.
+func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, runID string, gitCfg config.GitConfig) (string, error) {
+	if useWorktree {
+		cleanStaleWorktrees(repoDir)
+		branchName := gitbranch.BranchName(nextTask.ID)
+		wtPath := filepath.Join(repoDir, ".maggus-work", runID)
+		if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
+			return "", fmt.Errorf("create worktree: %w", err)
+		}
+		return "", nil
+	}
+
+	if !gitCfg.IsAutoBranchEnabled() {
+		return "Auto-branch disabled, staying on current branch", nil
+	}
+
+	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID, gitCfg.ProtectedBranchList())
+	if err != nil {
+		return "", fmt.Errorf("ensure feature branch: %w", err)
+	}
+	return msg, nil
 }

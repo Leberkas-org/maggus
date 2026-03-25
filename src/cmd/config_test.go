@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,6 +50,10 @@ func TestIndexOf(t *testing.T) {
 }
 
 func TestNewConfigModel_Defaults(t *testing.T) {
+	orig := loadGlobalSettings
+	loadGlobalSettings = func() (globalconfig.Settings, error) { return globalconfig.Settings{}, nil }
+	t.Cleanup(func() { loadGlobalSettings = orig })
+
 	cfg := config.Config{Agent: "claude"}
 	m := newConfigModel(cfg, "")
 
@@ -124,6 +129,10 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 }
 
 func TestNewConfigModel_CustomValues(t *testing.T) {
+	orig := loadGlobalSettings
+	loadGlobalSettings = func() (globalconfig.Settings, error) { return globalconfig.Settings{}, nil }
+	t.Cleanup(func() { loadGlobalSettings = orig })
+
 	f := false
 	cfg := config.Config{
 		Agent:    "opencode",
