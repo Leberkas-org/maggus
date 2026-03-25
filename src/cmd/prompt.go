@@ -31,27 +31,18 @@ func init() {
 type skillMapping struct {
 	skill     string // e.g. "/maggus-plan"; empty for Plain
 	usageFile string // e.g. "usage_plan.jsonl"
-}
-
-// skillVerbMapping maps picker labels to Discord presence verbs.
-var skillVerbMapping = map[string]string{
-	"open console":         "Consulting",
-	"/maggus-plan":         "Planning",
-	"/maggus-vision":       "Visioning",
-	"/maggus-architecture": "Architecting",
-	"/maggus-bugreport":    "Reporting Bug",
-	"/bryan-plan":          "Planning",
-	"/bryan-bugreport":     "Reporting Bug",
+	title     string
+	detail    string
 }
 
 var skillMappings = map[string]skillMapping{
-	"open console":         {skill: "", usageFile: "usage_prompt.jsonl"},
-	"/maggus-plan":         {skill: "/maggus-plan", usageFile: "usage_plan.jsonl"},
-	"/maggus-vision":       {skill: "/maggus-vision", usageFile: "usage_vision.jsonl"},
-	"/maggus-architecture": {skill: "/maggus-architecture", usageFile: "usage_architecture.jsonl"},
-	"/maggus-bugreport":    {skill: "/maggus-bugreport", usageFile: "usage_bugreport.jsonl"},
-	"/bryan-plan":          {skill: "/bryan-plan", usageFile: "usage_bryan_plan.jsonl"},
-	"/bryan-bugreport":     {skill: "/bryan-bugreport", usageFile: "usage_bryan_bugreport.jsonl"},
+	"open console":         {skill: "", usageFile: "usage_prompt.jsonl", title: "Consulting AI", detail: "Manual Prompting"},
+	"/maggus-plan":         {skill: "/maggus-plan", usageFile: "usage_plan.jsonl", title: "Planning", detail: "Manual Prompting"},
+	"/maggus-vision":       {skill: "/maggus-vision", usageFile: "usage_vision.jsonl", title: "Defining a vision", detail: "Manual Prompting"},
+	"/maggus-architecture": {skill: "/maggus-architecture", usageFile: "usage_architecture.jsonl", title: "Architecture", detail: "Manual Prompting"},
+	"/maggus-bugreport":    {skill: "/maggus-bugreport", usageFile: "usage_bugreport.jsonl", title: "Creating bug ticket", detail: "Manual Prompting"},
+	"/bryan-plan":          {skill: "/bryan-plan", usageFile: "usage_bryan_plan.jsonl", title: "Planning with bryan", detail: "Manual Prompting"},
+	"/bryan-bugreport":     {skill: "/bryan-bugreport", usageFile: "usage_bryan_bugreport.jsonl", title: "Reporting bug to bryan", detail: "Manual Prompting"},
 }
 
 func runPrompt(cmd *cobra.Command, args []string) error {
@@ -108,14 +99,11 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 
 	// Update presence with the selected skill's verb.
 	if presence != nil {
-		verb := skillVerbMapping[result.Skill]
-		details := result.Skill
-		if result.Skill == "open console" {
-			details = "Open Console"
-		}
+		verb := skillMappings[result.Skill]
+
 		_ = presence.Update(discord.PresenceState{
-			FeatureTitle: details,
-			Verb:         verb,
+			FeatureTitle: verb.title,
+			Verb:         verb.detail,
 			StartTime:    time.Now(),
 		})
 	}
