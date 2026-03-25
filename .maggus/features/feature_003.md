@@ -22,15 +22,15 @@ After features 001 and 002 reduce duplication, split the remaining large files b
 **Parallel:** yes — can run alongside TASK-003-002
 
 **Acceptance Criteria:**
-- [ ] `cmd/status_model.go`: `statusModel` struct, `newStatusModel()`, `visibleFeatures()`, `rebuildForSelectedFeature()`, `reloadFeatures()`, `syncDetailSuffix()` (~100 lines)
-- [ ] `cmd/status_update.go`: `Init()`, `Update()`, `updateList()`, `updateStatusDetail()`, confirm handlers, `applyLogLines()`, scroll helpers (~250 lines)
-- [ ] `cmd/status_view.go`: `View()`, `viewStatus()`, `viewLog()`, `viewEmpty()`, render helpers, tab bar, daemon status line (~500 lines)
-- [ ] `cmd/status_cmd.go`: cobra command definition, `init()`, `renderStatusPlain()` (~100 lines)
-- [ ] `status_plans.go` content merged into `status_model.go` (will be tiny after feature 002)
-- [ ] Original `status.go` is deleted
-- [ ] `go build ./cmd/...` succeeds
-- [ ] `go test ./cmd/ -run TestStatus` passes
-- [ ] `go vet ./...` passes
+- [x] `cmd/status_model.go`: `statusModel` struct, `newStatusModel()`, `visibleFeatures()`, `rebuildForSelectedFeature()`, `reloadFeatures()`, `syncDetailSuffix()` (~100 lines)
+- [x] `cmd/status_update.go`: `Init()`, `Update()`, `updateList()`, `updateStatusDetail()`, confirm handlers, `applyLogLines()`, scroll helpers (~250 lines)
+- [x] `cmd/status_view.go`: `View()`, `viewStatus()`, `viewLog()`, `viewEmpty()`, render helpers, tab bar, daemon status line (~500 lines)
+- [x] `cmd/status_cmd.go`: cobra command definition, `init()`, `renderStatusPlain()` (~100 lines)
+- [x] `status_plans.go` content merged into `status_model.go` (will be tiny after feature 002)
+- [x] Original `status.go` is deleted
+- [x] `go build ./cmd/...` succeeds
+- [x] `go test ./cmd/ -run TestStatus` passes
+- [x] `go vet ./...` passes
 
 ### TASK-003-002: Split menu.go into focused files
 **Description:** As a developer, I want `menu.go` split by responsibility so that each file is focused and navigable.
