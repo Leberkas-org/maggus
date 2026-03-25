@@ -48,6 +48,7 @@ type Task struct {
 	ID          string
 	Title       string
 	Description string
+	Model       string
 	Criteria    []Criterion
 	SourceFile  string
 }
@@ -153,6 +154,13 @@ func ParseFile(path string) ([]Task, error) {
 			if text != "" {
 				current.Description = text
 			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Model:**") {
+			inDescription = false
+			value := strings.TrimPrefix(line, "**Model:**")
+			current.Model = strings.TrimSpace(value)
 			continue
 		}
 

@@ -988,3 +988,81 @@ func TestParseMaggusID_FileNotFound(t *testing.T) {
 		t.Errorf("ParseMaggusID = %q, want empty string for missing file", got)
 	}
 }
+
+func TestParseFile_ModelField(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   string
+		wantModel string
+	}{
+		{
+			name: "model present",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with model
+**Description:** A task.
+**Model:** opus
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "opus",
+		},
+		{
+			name: "model absent",
+			content: `# Feature 001: Test
+
+### TASK-001: Task without model
+**Description:** A task.
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "",
+		},
+		{
+			name: "model with whitespace",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with whitespace model
+**Description:** A task.
+**Model:**    sonnet
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "sonnet",
+		},
+		{
+			name: "model with full ID",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with full model ID
+**Description:** A task.
+**Model:** claude-opus-4-6
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "claude-opus-4-6",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTempFeature(t, dir, "feature_001.md", tt.content)
+
+			tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+			if err != nil {
+				t.Fatalf("ParseFile error: %v", err)
+			}
+			if len(tasks) != 1 {
+				t.Fatalf("expected 1 task, got %d", len(tasks))
+			}
+			if tasks[0].Model != tt.wantModel {
+				t.Errorf("Model = %q, want %q", tasks[0].Model, tt.wantModel)
+			}
+		})
+	}
+}
