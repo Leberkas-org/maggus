@@ -12,6 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
@@ -68,6 +69,10 @@ type statusModel struct {
 	// Rich live view from state.json
 	snapshot     *runlog.StateSnapshot // nil when no snapshot available
 	spinnerFrame int
+
+	// File watcher for live feature reload
+	watcher   *filewatcher.Watcher
+	watcherCh <-chan bool
 }
 
 func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
@@ -158,6 +163,7 @@ func (m statusModel) Init() tea.Cmd {
 		},
 		logPollTick(),
 		spinnerTick(),
+		listenForWatcherUpdate(m.watcherCh),
 	)
 }
 
@@ -206,6 +212,35 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logLines = nil
 		}
 		return m, logPollTick()
+
+	case featureSummaryUpdateMsg:
+		// Preserve selected feature, cursor, and scroll across reload
+		visible := m.visibleFeatures()
+		var selectedFilename string
+		if m.selectedFeature < len(visible) {
+			selectedFilename = visible[m.selectedFeature].filename
+		}
+		prevCursor := m.Cursor
+		prevScroll := m.ScrollOffset
+		m.reloadFeatures()
+		// Restore selection by filename
+		if selectedFilename != "" {
+			for i, f := range m.visibleFeatures() {
+				if f.filename == selectedFilename {
+					m.selectedFeature = i
+					m.Tasks = buildSelectableTasksForFeature(f, m.showAll)
+					// Clamp cursor and scroll to new bounds
+					if prevCursor < len(m.Tasks) {
+						m.Cursor = prevCursor
+					} else if len(m.Tasks) > 0 {
+						m.Cursor = len(m.Tasks) - 1
+					}
+					m.ScrollOffset = prevScroll
+					break
+				}
+			}
+		}
+		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case tea.KeyMsg:
 		if m.ConfirmDelete {
@@ -1113,9 +1148,26 @@ var statusCmd = &cobra.Command{
 		}
 
 		// TUI mode: interactive status with detail view
+		watcherCh := make(chan bool, 1)
+		w, _ := filewatcher.New(dir, func(msg any) {
+			hasNew := false
+			if u, ok := msg.(filewatcher.UpdateMsg); ok {
+				hasNew = u.HasNewFile
+			}
+			select {
+			case watcherCh <- hasNew:
+			default: // don't block if channel already has a pending update
+			}
+		}, 300*time.Millisecond)
+
 		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired)
+		m.watcherCh = watcherCh
+		m.watcher = w
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := prog.Run()
+		if w != nil {
+			w.Close()
+		}
 		if err != nil {
 			return err
 		}
