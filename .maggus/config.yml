@@ -2,6 +2,7 @@ agent: claude
 model: opus
 include: []
 worktree: false
+auto_work: disabled
 approval_mode: opt-in
 auto_continue: null
 notifications:
@@ -23,4 +24,4 @@ hooks:
     on_feature_complete: []
     on_bug_complete: []
     on_task_complete: []
-discord_presence: false
+discord_presence: true
