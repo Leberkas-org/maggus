@@ -877,6 +877,127 @@ func TestFirstWorkableTask_Empty(t *testing.T) {
 	}
 }
 
+// TestBuildApprovedFeatureGroups_UUIDApprovalKey verifies that when a feature file
+// has a maggus-id UUID, the approval check uses the UUID as key, not the filename.
+func TestBuildApprovedFeatureGroups_UUIDApprovalKey(t *testing.T) {
+	dir := setupCleanDir(t)
+	// Feature with UUID.
+	uuidContent := "<!-- maggus-id: aaa0bbb0-cccc-dddd-eeee-fff000111222 -->\n" + incompleteTaskContent("TASK-001-001", "Add feature")
+	writeFeatureFile(t, dir, "feature_001.md", uuidContent)
+	// Approve by UUID, not filename.
+	writeApprovals(t, dir, "aaa0bbb0-cccc-dddd-eeee-fff000111222")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+	if groups[0].id != "feature_001" {
+		t.Errorf("expected display id 'feature_001', got %q", groups[0].id)
+	}
+	if groups[0].maggusID != "aaa0bbb0-cccc-dddd-eeee-fff000111222" {
+		t.Errorf("expected maggusID 'aaa0bbb0-cccc-dddd-eeee-fff000111222', got %q", groups[0].maggusID)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_UUIDFallbackToFilename verifies that when a
+// feature file has no maggus-id, the filename-based ID is used for approval.
+func TestBuildApprovedFeatureGroups_UUIDFallbackToFilename(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	writeApprovals(t, dir, "feature_001")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+	if groups[0].maggusID != "" {
+		t.Errorf("expected empty maggusID, got %q", groups[0].maggusID)
+	}
+}
+
+// TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename verifies that approving
+// by filename does NOT work when the file has a UUID (the UUID takes precedence).
+func TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename(t *testing.T) {
+	dir := setupCleanDir(t)
+	uuidContent := "<!-- maggus-id: aaa0bbb0-cccc-dddd-eeee-fff000111222 -->\n" + incompleteTaskContent("TASK-001-001", "Add feature")
+	writeFeatureFile(t, dir, "feature_001.md", uuidContent)
+	// Approve by filename — should NOT match because the UUID takes precedence.
+	writeApprovals(t, dir, "feature_001")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("expected 0 groups (filename approval should not match UUID file), got %d", len(groups))
+	}
+}
+
+// TestBuildApprovedFeatureGroups_PruneStaleEntries verifies that stale entries
+// are removed from feature_approvals.yml after building groups.
+func TestBuildApprovedFeatureGroups_PruneStaleEntries(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	// Write approvals with a stale entry.
+	a := approval.Approvals{
+		"feature_001": true,
+		"stale_entry": true,
+	}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
+	_, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Reload approvals and verify stale entry was pruned.
+	after, err := approval.Load(dir)
+	if err != nil {
+		t.Fatalf("load approvals: %v", err)
+	}
+	if _, ok := after["stale_entry"]; ok {
+		t.Errorf("expected stale_entry to be pruned")
+	}
+	if _, ok := after["feature_001"]; !ok {
+		t.Errorf("expected feature_001 to be kept")
+	}
+}
+
+// TestBuildApprovedFeatureGroups_BugUUIDApproval verifies UUID-based approval for bug files.
+func TestBuildApprovedFeatureGroups_BugUUIDApproval(t *testing.T) {
+	dir := setupCleanDir(t)
+	uuidContent := "<!-- maggus-id: b0b0b0b0-1111-2222-3333-444444444444 -->\n" + incompleteBugContent("BUG-001-001", "Fix crash")
+	writeBugFile(t, dir, "bug_001.md", uuidContent)
+	writeApprovals(t, dir, "b0b0b0b0-1111-2222-3333-444444444444")
+
+	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+	if groups[0].maggusID != "b0b0b0b0-1111-2222-3333-444444444444" {
+		t.Errorf("expected maggusID 'b0b0b0b0-1111-2222-3333-444444444444', got %q", groups[0].maggusID)
+	}
+	if !groups[0].isBug {
+		t.Error("expected isBug=true")
+	}
+}
+
 // TestBuildApprovedFeatureGroups_CompletedFileExcluded verifies that _completed.md
 // files are not included in the group list.
 func TestBuildApprovedFeatureGroups_CompletedFileExcluded(t *testing.T) {

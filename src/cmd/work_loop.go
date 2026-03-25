@@ -161,10 +161,19 @@ func countWorkable(tasks []parser.Task) int {
 
 // featureGroup represents a single source file (feature or bug) and all tasks within it.
 type featureGroup struct {
-	id    string        // base filename without extension (e.g. "feature_001", "bug_001")
-	file  string        // full path to the source file
-	tasks []parser.Task // all tasks from this file (may include complete/blocked)
-	isBug bool
+	id       string        // base filename without extension (e.g. "feature_001", "bug_001")
+	maggusID string        // UUID from <!-- maggus-id: ... --> comment; empty if absent
+	file     string        // full path to the source file
+	tasks    []parser.Task // all tasks from this file (may include complete/blocked)
+	isBug    bool
+}
+
+// approvalKey returns the maggusID if set, otherwise falls back to the filename-based id.
+func (g *featureGroup) approvalKey() string {
+	if g.maggusID != "" {
+		return g.maggusID
+	}
+	return g.id
 }
 
 // buildApprovedFeatureGroups parses bug and feature files, groups them by source file,
@@ -184,6 +193,7 @@ func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, 
 	}
 
 	var groups []featureGroup
+	var allKnownIDs []string
 
 	for _, f := range bugFiles {
 		if _, err := parser.MigrateLegacyBugIDs(f); err != nil {
@@ -194,10 +204,16 @@ func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, 
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		id := strings.TrimSuffix(filepath.Base(f), ".md")
-		if !approval.IsApproved(approvals, id, approvalRequired) {
+		maggusID := parser.ParseMaggusID(f)
+		approvalKey := maggusID
+		if approvalKey == "" {
+			approvalKey = id
+		}
+		allKnownIDs = append(allKnownIDs, approvalKey)
+		if !approval.IsApproved(approvals, approvalKey, approvalRequired) {
 			continue
 		}
-		groups = append(groups, featureGroup{id: id, file: f, tasks: tasks, isBug: true})
+		groups = append(groups, featureGroup{id: id, maggusID: maggusID, file: f, tasks: tasks, isBug: true})
 	}
 
 	// Feature groups next.
@@ -212,10 +228,21 @@ func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, 
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		id := strings.TrimSuffix(filepath.Base(f), ".md")
-		if !approval.IsApproved(approvals, id, approvalRequired) {
+		maggusID := parser.ParseMaggusID(f)
+		approvalKey := maggusID
+		if approvalKey == "" {
+			approvalKey = id
+		}
+		allKnownIDs = append(allKnownIDs, approvalKey)
+		if !approval.IsApproved(approvals, approvalKey, approvalRequired) {
 			continue
 		}
-		groups = append(groups, featureGroup{id: id, file: f, tasks: tasks, isBug: false})
+		groups = append(groups, featureGroup{id: id, maggusID: maggusID, file: f, tasks: tasks, isBug: false})
+	}
+
+	// Prune stale entries from feature_approvals.yml.
+	if err := approval.Prune(dir, allKnownIDs); err != nil {
+		return nil, fmt.Errorf("prune approvals: %w", err)
 	}
 
 	return groups, nil

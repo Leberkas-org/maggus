@@ -94,13 +94,13 @@ This feature migrates the approval system to use that UUID as the key, and adds 
 **Parallel:** yes — can run alongside TASK-003-003 and TASK-003-005
 
 **Acceptance Criteria:**
-- [ ] `featureGroup` in `src/cmd/work_loop.go` gains a `maggusID string` field
-- [ ] `buildApprovedFeatureGroups` calls `parser.ParseMaggusID(f)` for each bug and feature file
-- [ ] Approval check uses `maggusID` as the key; falls back to the filename-based ID if empty
-- [ ] After building all groups, calls `approval.Prune` with the set of all known IDs (UUIDs + fallbacks) to remove stale entries
-- [ ] The `featureGroup.id` field is unchanged — it remains the filename-based label used for display and logging
-- [ ] Existing work loop tests pass; no regressions in task dispatch or feature filtering
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `featureGroup` in `src/cmd/work_loop.go` gains a `maggusID string` field
+- [x] `buildApprovedFeatureGroups` calls `parser.ParseMaggusID(f)` for each bug and feature file
+- [x] Approval check uses `maggusID` as the key; falls back to the filename-based ID if empty
+- [x] After building all groups, calls `approval.Prune` with the set of all known IDs (UUIDs + fallbacks) to remove stale entries
+- [x] The `featureGroup.id` field is unchanged — it remains the filename-based label used for display and logging
+- [x] Existing work loop tests pass; no regressions in task dispatch or feature filtering
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-003-005: Update `approve.go` CLI commands to use UUID
 
