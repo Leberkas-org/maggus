@@ -76,6 +76,39 @@ func Unapprove(dir, featureID string) error {
 	return Save(dir, a)
 }
 
+// Prune removes entries from feature_approvals.yml whose key is not in knownIDs.
+// If knownIDs is empty, the function is a no-op to prevent accidentally wiping the file.
+// If no entries are removed, the file is not rewritten.
+func Prune(dir string, knownIDs []string) error {
+	if len(knownIDs) == 0 {
+		return nil
+	}
+
+	a, err := Load(dir)
+	if err != nil {
+		return err
+	}
+
+	known := make(map[string]struct{}, len(knownIDs))
+	for _, id := range knownIDs {
+		known[id] = struct{}{}
+	}
+
+	removed := 0
+	for key := range a {
+		if _, ok := known[key]; !ok {
+			delete(a, key)
+			removed++
+		}
+	}
+
+	if removed == 0 {
+		return nil
+	}
+
+	return Save(dir, a)
+}
+
 // IsApproved reports whether the given feature is approved for execution.
 //
 // When approvalRequired is true (opt-in mode), a feature must have been explicitly

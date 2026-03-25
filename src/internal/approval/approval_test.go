@@ -123,6 +123,126 @@ func TestUnapprove(t *testing.T) {
 	}
 }
 
+func TestPrune_RemovesStaleEntries(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up approvals with some stale entries
+	a := approval.Approvals{"uuid-1": true, "uuid-2": false, "uuid-stale": true}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prune with only uuid-1 and uuid-2 as known
+	if err := approval.Prune(dir, []string{"uuid-1", "uuid-2"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := loaded["uuid-stale"]; ok {
+		t.Error("expected uuid-stale to be pruned")
+	}
+	if !loaded["uuid-1"] {
+		t.Error("expected uuid-1 to remain approved")
+	}
+	if loaded["uuid-2"] {
+		t.Error("expected uuid-2 to remain unapproved (false)")
+	}
+	if len(loaded) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(loaded))
+	}
+}
+
+func TestPrune_NoOpWhenAllKnown(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := approval.Approvals{"uuid-1": true, "uuid-2": false}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get file mod time before prune
+	path := filepath.Join(maggusDir, "feature_approvals.yml")
+	infoBefore, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Prune with all IDs known — should not rewrite file
+	if err := approval.Prune(dir, []string{"uuid-1", "uuid-2"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	infoAfter, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !infoBefore.ModTime().Equal(infoAfter.ModTime()) {
+		t.Error("expected file to not be rewritten when nothing was pruned")
+	}
+}
+
+func TestPrune_EmptyKnownIDsIsNoOp(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := approval.Approvals{"uuid-1": true, "uuid-2": true}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prune with empty knownIDs — should not remove anything
+	if err := approval.Prune(dir, []string{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 2 {
+		t.Errorf("expected 2 entries preserved, got %d", len(loaded))
+	}
+}
+
+func TestPrune_NilKnownIDsIsNoOp(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := approval.Approvals{"uuid-1": true}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := approval.Prune(dir, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 1 {
+		t.Errorf("expected 1 entry preserved, got %d", len(loaded))
+	}
+}
+
 func TestIsApproved_OptIn(t *testing.T) {
 	tests := []struct {
 		name      string

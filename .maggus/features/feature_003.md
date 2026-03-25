@@ -57,12 +57,12 @@ This feature migrates the approval system to use that UUID as the key, and adds 
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `approval.Prune(dir string, knownIDs []string) error` is added to `src/internal/approval/approval.go`
-- [ ] It loads the current approvals, removes all entries whose key is not in `knownIDs`, and saves the result
-- [ ] If `knownIDs` is empty, the function is a no-op (does not wipe the file)
-- [ ] If no entries are removed (file is already clean), the file is not rewritten unnecessarily
-- [ ] Unit tests cover: pruning stale entries, no-op when all entries are known, empty knownIDs guard
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `approval.Prune(dir string, knownIDs []string) error` is added to `src/internal/approval/approval.go`
+- [x] It loads the current approvals, removes all entries whose key is not in `knownIDs`, and saves the result
+- [x] If `knownIDs` is empty, the function is a no-op (does not wipe the file)
+- [x] If no entries are removed (file is already clean), the file is not rewritten unnecessarily
+- [x] Unit tests cover: pruning stale entries, no-op when all entries are known, empty knownIDs guard
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-003-003: Update `featureInfo`, `parseFeatures`, `parseBugs`, and `handleApproveToggle`
 
