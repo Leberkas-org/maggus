@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -70,7 +69,7 @@ type SessionInfo struct {
 	EndTime        time.Time
 }
 
-// launchInteractive launches the given agent CLI interactively with a prefilled prompt.
+// launchInteractive launches the given agent CLI interactively with an optional initial prompt.
 // It connects stdin/stdout/stderr directly so the user has full control.
 // The dir parameter is the working directory used to locate the Claude session directory
 // for snapshotting. When skipPermissions is true, --dangerously-skip-permissions is passed.
@@ -78,10 +77,8 @@ type SessionInfo struct {
 // can extract usage afterward. Snapshotting errors are logged as warnings and do not
 // prevent the session from launching.
 //
-// When prompt is non-empty, a two-step approach is used: the prompt is first executed
-// in print mode (non-interactive) with a fixed session ID, then the session is resumed
-// interactively. This avoids the Claude CLI treating a positional argument as a
-// non-interactive one-shot query.
+// When prompt is non-empty, it is passed as a positional argument to the Claude CLI,
+// which starts an interactive session with the prompt as the initial message.
 func launchInteractive(agentName, prompt, dir string, skipPermissions bool, model string) (*SessionInfo, error) {
 	path, err := exec.LookPath(agentName)
 	if err != nil {
@@ -110,43 +107,18 @@ func launchInteractive(agentName, prompt, dir string, skipPermissions bool, mode
 	signal.Notify(sigCh, shutdownSignals...)
 	defer signal.Stop(sigCh)
 
-	// Build common flags shared by both steps.
-	var baseArgs []string
+	var args []string
 	if skipPermissions {
-		baseArgs = append(baseArgs, "--dangerously-skip-permissions")
+		args = append(args, "--dangerously-skip-permissions")
 	}
 	if model != "" {
-		baseArgs = append(baseArgs, "--model", model)
+		args = append(args, "--model", model)
 	}
-
 	if prompt != "" {
-		// Step 1: Execute the skill command non-interactively with a fixed session ID.
-		sessionID := generateSessionUUID()
-
-		printArgs := append([]string{}, baseArgs...)
-		printArgs = append(printArgs, "--session-id", sessionID, "-p", prompt)
-
-		printCmd := exec.Command(path, printArgs...)
-		printCmd.Stdin = os.Stdin
-		printCmd.Stdout = os.Stdout
-		printCmd.Stderr = os.Stderr
-
-		if err := printCmd.Run(); err != nil {
-			if isUserExit(printCmd) {
-				return buildSessionInfo(beforeSnapshot, startTime), nil
-			}
-			return nil, fmt.Errorf("%s print step exited with error: %w", agentName, err)
-		}
-
-		// Step 2: Resume the session interactively.
-		resumeArgs := append([]string{}, baseArgs...)
-		resumeArgs = append(resumeArgs, "--resume", sessionID)
-
-		return runInteractiveCmd(path, resumeArgs, agentName, beforeSnapshot, startTime)
+		args = append(args, prompt)
 	}
 
-	// No prompt — plain interactive mode.
-	return runInteractiveCmd(path, baseArgs, agentName, beforeSnapshot, startTime)
+	return runInteractiveCmd(path, args, agentName, beforeSnapshot, startTime)
 }
 
 // runInteractiveCmd starts an interactive CLI session with the given args and waits for it to finish.
@@ -191,14 +163,6 @@ func buildSessionInfo(beforeSnapshot map[string]bool, startTime time.Time) *Sess
 	}
 }
 
-// generateSessionUUID generates a random UUID v4 string for session identification.
-func generateSessionUUID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40 // version 4
-	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-}
 
 // pluginInfo represents a single entry from `claude plugin list --json`.
 type pluginInfo struct {

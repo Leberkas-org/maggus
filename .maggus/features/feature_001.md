@@ -45,16 +45,16 @@ This feature removes the Description field entirely and switches to a single-ste
 **Parallel:** yes — can run alongside TASK-001-001
 
 **Acceptance Criteria:**
-- [ ] `launchInteractive()` in `plan.go` no longer runs a non-interactive `-p` step followed by `--resume`
-- [ ] When a skill prompt is provided, Claude is launched interactively in a single command that passes the skill as the initial message
-- [ ] The approach uses `--initial-prompt` or pipes the skill command as initial input — whichever Claude CLI supports for interactive mode
-- [ ] `generateSessionUUID()` is removed if no longer needed
-- [ ] Plain mode ("open console") still works as before (no prompt passed)
-- [ ] `ensureMaggusPlugin()` is still called before launching skill sessions
-- [ ] Usage extraction (`extractSkillUsage`) still works after the session ends
-- [ ] Signal handling (Ctrl+C forwarding) still works correctly
-- [ ] `go build ./...` succeeds
-- [ ] `go vet ./...` passes
+- [x] `launchInteractive()` in `plan.go` no longer runs a non-interactive `-p` step followed by `--resume`
+- [x] When a skill prompt is provided, Claude is launched interactively in a single command that passes the skill as the initial message
+- [x] The approach uses `--initial-prompt` or pipes the skill command as initial input — whichever Claude CLI supports for interactive mode
+- [x] `generateSessionUUID()` is removed if no longer needed
+- [x] Plain mode ("open console") still works as before (no prompt passed)
+- [x] `ensureMaggusPlugin()` is still called before launching skill sessions
+- [x] Usage extraction (`extractSkillUsage`) still works after the session ends
+- [x] Signal handling (Ctrl+C forwarding) still works correctly
+- [x] `go build ./...` succeeds
+- [x] `go vet ./...` passes
 
 ### TASK-001-003: Integration Testing & Cleanup
 **Description:** As a developer, I want to verify the full flow works end-to-end and remove any dead code left over from the previous tasks.
