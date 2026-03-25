@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/hooks"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
@@ -56,6 +58,7 @@ type taskContext struct {
 	workDir       string
 	runID         string
 	onComplete    config.OnCompleteConfig
+	hooks         config.HooksConfig
 	logger        *runlog.Logger // structured run log; nil-safe
 
 	// Discord Rich Presence (nil when disabled).
@@ -149,14 +152,30 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Rename or delete fully completed feature and bug files before committing.
-	featuresCompleted, _ := parser.MarkCompletedFeatures(tc.workDir, tc.onComplete.FeatureAction())
-	bugsCompleted, _ := parser.MarkCompletedBugs(tc.workDir, tc.onComplete.BugAction())
-	if featuresCompleted > 0 || bugsCompleted > 0 {
+	// When hooks are configured, snapshot file metadata before the mark operation
+	// since the files may be renamed or deleted.
+	featureAction := tc.onComplete.FeatureAction()
+	bugAction := tc.onComplete.BugAction()
+	var featureSnapshots, bugSnapshots []completionSnapshot
+	if len(tc.hooks.OnFeatureComplete) > 0 {
+		featureSnapshots = snapshotForHooks(tc.workDir, true)
+	}
+	if len(tc.hooks.OnBugComplete) > 0 {
+		bugSnapshots = snapshotForHooks(tc.workDir, false)
+	}
+
+	completedFeatures, _ := parser.MarkCompletedFeatures(tc.workDir, featureAction)
+	completedBugs, _ := parser.MarkCompletedBugs(tc.workDir, bugAction)
+	if len(completedFeatures) > 0 || len(completedBugs) > 0 {
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{
-			FeaturesCompleted: int64(featuresCompleted),
-			BugsCompleted:     int64(bugsCompleted),
+			FeaturesCompleted: int64(len(completedFeatures)),
+			BugsCompleted:     int64(len(completedBugs)),
 		})
 	}
+
+	// Fire lifecycle hooks for completed features/bugs (after file action, before git add).
+	fireCompletionHooks(tc, completedFeatures, featureSnapshots, featureAction, "feature_complete", tc.hooks.OnFeatureComplete)
+	fireCompletionHooks(tc, completedBugs, bugSnapshots, bugAction, "bug_complete", tc.hooks.OnBugComplete)
 
 	// Stage any feature renames so they are included in the commit.
 	stageFeatures := gitutil.Command("add", "--", ".maggus/")
@@ -343,5 +362,90 @@ func betweenTaskSync(ctx context.Context, workDir string, p *tea.Program) *syncB
 		return nil
 	case <-ctx.Done():
 		return &syncBreak{stopReason: runner.StopReasonInterrupted}
+	}
+}
+
+// completionSnapshot holds pre-mark metadata for a file that may be completed.
+// Captured before MarkCompleted renames/deletes the file so hook payloads can
+// be built after the file action.
+type completionSnapshot struct {
+	path     string
+	basename string
+	maggusID string
+	title    string
+	tasks    []hooks.TaskInfo
+}
+
+// snapshotForHooks pre-reads metadata from files that are candidates for completion.
+// Only called when hooks are configured, so there is zero overhead otherwise.
+// isFeature selects feature vs bug file globbing.
+func snapshotForHooks(workDir string, isFeature bool) []completionSnapshot {
+	var files []string
+	if isFeature {
+		files, _ = parser.GlobFeatureFiles(workDir, false)
+	} else {
+		files, _ = parser.GlobBugFiles(workDir, false)
+	}
+
+	snapshots := make([]completionSnapshot, 0, len(files))
+	for _, f := range files {
+		tasks, err := parser.ParseFile(f)
+		if err != nil || len(tasks) == 0 {
+			continue
+		}
+		allComplete := true
+		for _, t := range tasks {
+			if !t.IsComplete() || t.IsBlocked() {
+				allComplete = false
+				break
+			}
+		}
+		if !allComplete {
+			continue
+		}
+		taskInfos := make([]hooks.TaskInfo, len(tasks))
+		for i, t := range tasks {
+			taskInfos[i] = hooks.TaskInfo{ID: t.ID, Title: t.Title}
+		}
+		snapshots = append(snapshots, completionSnapshot{
+			path:     f,
+			basename: filepath.Base(f),
+			maggusID: parser.ParseMaggusID(f),
+			title:    parser.ParseFileTitle(f),
+			tasks:    taskInfos,
+		})
+	}
+	return snapshots
+}
+
+// fireCompletionHooks fires hooks for each completed file, using pre-captured snapshots.
+// completedPaths are the original paths returned by MarkCompleted*; snapshots hold the
+// metadata captured before the file was renamed/deleted.
+func fireCompletionHooks(tc taskContext, completedPaths []string, snapshots []completionSnapshot, action, eventType string, commands []config.HookEntry) {
+	if len(commands) == 0 || len(completedPaths) == 0 {
+		return
+	}
+
+	// Index snapshots by original path for O(1) lookup.
+	byPath := make(map[string]*completionSnapshot, len(snapshots))
+	for i := range snapshots {
+		byPath[snapshots[i].path] = &snapshots[i]
+	}
+
+	for _, p := range completedPaths {
+		snap, ok := byPath[p]
+		if !ok {
+			continue
+		}
+		event := hooks.Event{
+			Type:      eventType,
+			File:      snap.basename,
+			MaggusID:  snap.maggusID,
+			Title:     snap.title,
+			Action:    action,
+			Tasks:     snap.tasks,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		}
+		hooks.Run(commands, event, tc.workDir, log.Default())
 	}
 }

@@ -288,6 +288,7 @@ Examples:
 			workDir:       workDir,
 			runID:         runID,
 			onComplete:    wc.cfg.OnComplete,
+			hooks:         wc.cfg.Hooks,
 			logger:        runLogger,
 			presence:      presence,
 		}

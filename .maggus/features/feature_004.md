@@ -94,14 +94,14 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
 **Parallel:** yes — can run alongside TASK-004-004
 
 **Acceptance Criteria:**
-- [ ] `taskContext` gains a `hooks config.HooksConfig` field, populated from the loaded config in the work loop setup
-- [ ] After `parser.MarkCompletedFeatures` returns count > 0 in `runTask`, each completed feature file triggers `hooks.Run` with `config.Hooks.OnFeatureComplete` and an `Event` of type `"feature_complete"`
-- [ ] The event payload includes: file basename, maggus-id (via `parser.ParseMaggusID`), feature title (via `parser.ParseFileTitle`), the action taken ("rename" or "delete"), and the list of task IDs/titles from the feature
-- [ ] Same logic for `parser.MarkCompletedBugs` with `config.Hooks.OnBugComplete` and event type `"bug_complete"`
-- [ ] `MarkCompletedFeatures` and `MarkCompletedBugs` are updated (or wrapped) to return the list of completed file paths (not just a count), so that hook payloads can be built per file
-- [ ] Hooks run after the file action (rename/delete) but before `git add` staging
-- [ ] When no hooks are configured, there is zero overhead (no allocations, no function calls beyond the empty-slice check)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `taskContext` gains a `hooks config.HooksConfig` field, populated from the loaded config in the work loop setup
+- [x] After `parser.MarkCompletedFeatures` returns count > 0 in `runTask`, each completed feature file triggers `hooks.Run` with `config.Hooks.OnFeatureComplete` and an `Event` of type `"feature_complete"`
+- [x] The event payload includes: file basename, maggus-id (via `parser.ParseMaggusID`), feature title (via `parser.ParseFileTitle`), the action taken ("rename" or "delete"), and the list of task IDs/titles from the feature
+- [x] Same logic for `parser.MarkCompletedBugs` with `config.Hooks.OnBugComplete` and event type `"bug_complete"`
+- [x] `MarkCompletedFeatures` and `MarkCompletedBugs` are updated (or wrapped) to return the list of completed file paths (not just a count), so that hook payloads can be built per file
+- [x] Hooks run after the file action (rename/delete) but before `git add` staging
+- [x] When no hooks are configured, there is zero overhead (no allocations, no function calls beyond the empty-slice check)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-004-004: Wire task completion hooks into work_task.go
 **Description:** As a developer, I want the work loop to fire `on_task_complete` hooks after a task is successfully committed, so that users can track individual task completions.

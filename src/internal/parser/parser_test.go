@@ -305,8 +305,17 @@ func TestMarkCompletedFeatures(t *testing.T) {
 - [ ] Not done
 `)
 
-	if _, err := MarkCompletedFeatures(dir, ""); err != nil {
+	completed, err := MarkCompletedFeatures(dir, "")
+	if err != nil {
 		t.Fatalf("MarkCompletedFeatures error: %v", err)
+	}
+
+	// Should return exactly the completed file's original path.
+	if len(completed) != 1 {
+		t.Fatalf("expected 1 completed path, got %d", len(completed))
+	}
+	if filepath.Base(completed[0]) != "feature_001.md" {
+		t.Errorf("expected feature_001.md, got %s", filepath.Base(completed[0]))
 	}
 
 	// feature_001 should have been renamed
@@ -630,8 +639,17 @@ func TestMarkCompletedBugs(t *testing.T) {
 - [ ] Not fixed
 `)
 
-	if _, err := MarkCompletedBugs(dir, ""); err != nil {
+	completed, err := MarkCompletedBugs(dir, "")
+	if err != nil {
 		t.Fatalf("MarkCompletedBugs error: %v", err)
+	}
+
+	// Should return exactly the completed file's original path.
+	if len(completed) != 1 {
+		t.Fatalf("expected 1 completed path, got %d", len(completed))
+	}
+	if filepath.Base(completed[0]) != "bug_001.md" {
+		t.Errorf("expected bug_001.md, got %s", filepath.Base(completed[0]))
 	}
 
 	// bug_001 should be renamed

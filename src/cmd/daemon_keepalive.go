@@ -273,6 +273,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		workDir:       workDir,
 		runID:         runID,
 		onComplete:    wc.cfg.OnComplete,
+		hooks:         wc.cfg.Hooks,
 		logger:        runLogger,
 	}
 
