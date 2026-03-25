@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -59,6 +60,10 @@ type statusModel struct {
 
 	// Temporary status note (e.g. "feature approved")
 	statusNote string
+
+	// Feature-level delete confirmation
+	confirmDeleteFeature bool
+	deleteFeatureErr     string
 
 	// Live log panel
 	showLog       bool
@@ -253,6 +258,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case tea.KeyMsg:
+		if m.confirmDeleteFeature {
+			return m.updateStatusConfirmDeleteFeature(msg)
+		}
 		if m.ConfirmDelete {
 			return m.updateStatusConfirmDelete(msg)
 		}
@@ -350,6 +358,52 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 	return m, nil
 }
 
+// featureFilePath reconstructs the full path to a feature/bug file from its base name.
+func (m statusModel) featureFilePath(f featureInfo) string {
+	subdir := "features"
+	if f.isBug {
+		subdir = "bugs"
+	}
+	return filepath.Join(m.dir, ".maggus", subdir, f.filename)
+}
+
+func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y", "enter":
+		visible := m.visibleFeatures()
+		if m.selectedFeature >= len(visible) {
+			m.confirmDeleteFeature = false
+			return m, nil
+		}
+		f := visible[m.selectedFeature]
+		fullPath := m.featureFilePath(f)
+		if err := os.Remove(fullPath); err != nil {
+			m.deleteFeatureErr = err.Error()
+			m.confirmDeleteFeature = false
+			return m, nil
+		}
+		m.confirmDeleteFeature = false
+		m.reloadFeatures()
+		// Clamp selectedFeature to valid range
+		newVisible := m.visibleFeatures()
+		if m.selectedFeature >= len(newVisible) {
+			m.selectedFeature = len(newVisible) - 1
+		}
+		if m.selectedFeature < 0 {
+			m.selectedFeature = 0
+		}
+		m.rebuildForSelectedFeature()
+		if len(newVisible) == 0 {
+			return m, tea.Quit
+		}
+		return m, nil
+	case "n", "N", "esc", "ctrl+c":
+		m.confirmDeleteFeature = false
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
@@ -401,6 +455,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logScroll = 0
 			return m, nil
 		}
+		return m, nil
+	}
+
+	// Clear deleteFeatureErr on any key press
+	if m.deleteFeatureErr != "" {
+		m.deleteFeatureErr = ""
 		return m, nil
 	}
 
@@ -460,6 +520,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "alt+p":
 		return m.handleApproveToggle()
+	case "alt+d":
+		visible := m.visibleFeatures()
+		if len(visible) > 0 && m.selectedFeature < len(visible) && !m.ConfirmDelete {
+			m.confirmDeleteFeature = true
+		}
+		return m, nil
 	}
 
 	// Delegate to component for shared navigation
@@ -509,6 +575,9 @@ func (m statusModel) View() string {
 	if len(m.features) == 0 {
 		return m.viewEmpty()
 	}
+	if m.confirmDeleteFeature {
+		return m.viewConfirmDeleteFeature()
+	}
 	if v := m.taskListComponent.View(); v != "" {
 		return v
 	}
@@ -516,6 +585,32 @@ func (m statusModel) View() string {
 		return m.viewLog()
 	}
 	return m.viewStatus()
+}
+
+// viewConfirmDeleteFeature renders the feature-level delete confirmation dialog.
+func (m statusModel) viewConfirmDeleteFeature() string {
+	visible := m.visibleFeatures()
+	if m.selectedFeature >= len(visible) {
+		return ""
+	}
+	f := visible[m.selectedFeature]
+
+	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("Delete %s?", f.filename)))
+	sb.WriteString("\n\n")
+	sb.WriteString("  This will permanently delete the file from disk.\n\n")
+	sb.WriteString(fmt.Sprintf("  %s / %s",
+		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
+		mutedStyle.Render("n/esc: cancel")))
+
+	bc := m.effectiveBorderColor()
+	if m.Width > 0 && m.Height > 0 {
+		return styles.FullScreenColor(sb.String(), "", m.Width, m.Height, bc)
+	}
+	return styles.Box.BorderForeground(bc).Render(sb.String()) + "\n"
 }
 
 func (m statusModel) viewEmpty() string {
@@ -1096,8 +1191,11 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 
-	// Status note (e.g. "feature approved")
-	if m.statusNote != "" {
+	// Status note (e.g. "feature approved") or delete error
+	if m.deleteFeatureErr != "" {
+		sb.WriteString("\n")
+		sb.WriteString(statusRedStyle.Render("  Error: " + m.deleteFeatureErr))
+	} else if m.statusNote != "" {
 		sb.WriteString("\n")
 		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
 	}
@@ -1106,7 +1204,7 @@ func (m statusModel) viewStatus() string {
 	if m.showAll {
 		toggleHint = "alt+a: hide completed"
 	}
-	footer := styles.StatusBar.Render("←/→: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+r: run · alt+bksp: delete · tab: live log · q/esc: exit")
+	footer := styles.StatusBar.Render("←/→: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+d: delete feature · alt+r: run · alt+bksp: delete · tab: live log · q/esc: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.Width > 0 && m.Height > 0 {
