@@ -572,7 +572,7 @@ func (m TUIModel) renderTaskTab(w int) string {
 func (m TUIModel) renderView() string {
 	taskElapsed := time.Since(m.startTime).Truncate(time.Second)
 	runElapsed := time.Since(m.runStartTime).Truncate(time.Second)
-	innerW, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
 
 	spinner := cyanStyle.Render(spinnerFrames[m.frame])
 	sColor := statusStyle
@@ -665,7 +665,7 @@ func (m TUIModel) renderView() string {
 			}
 
 		case 1: // Detail (tool log)
-			b.WriteString(m.renderDetailPanel(innerW, innerH-8))
+			b.WriteString(m.renderDetailPanel(innerW, m.detailAvailableHeight()))
 
 		case 2: // Task
 			b.WriteString(m.renderTaskTab(innerW))
