@@ -127,7 +127,8 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 
 	tc.logger.TaskStart(next.ID, next.Title)
 	builtPrompt := prompt.Build(next, opts)
-	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, tc.resolvedModel, tc.p); err != nil {
+	model := resolveTaskModel(next.Model, tc.resolvedModel)
+	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.p); err != nil {
 		releaseLock(lock, tc.useWorktree)
 		if tc.workCtx.Err() != nil {
 			return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
@@ -509,6 +510,16 @@ func computeTaskProgress(tasks []parser.Task, sourceFile string) (completed, tot
 		}
 	}
 	return completed, total
+}
+
+// resolveTaskModel returns the model to use for a task. If the task specifies a
+// per-task model override, it is resolved through config.ResolveModel (supporting
+// aliases like "opus" → "claude-opus-4-6"). Otherwise the default model is returned.
+func resolveTaskModel(taskModel, defaultModel string) string {
+	if taskModel != "" {
+		return config.ResolveModel(taskModel)
+	}
+	return defaultModel
 }
 
 // verbForTask returns the Discord presence verb based on the task's source file path.

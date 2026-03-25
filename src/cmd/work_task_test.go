@@ -121,6 +121,61 @@ func TestComputeTaskProgress(t *testing.T) {
 	})
 }
 
+func TestResolveTaskModel(t *testing.T) {
+	tests := []struct {
+		name         string
+		taskModel    string
+		defaultModel string
+		want         string
+	}{
+		{
+			name:         "no override uses default",
+			taskModel:    "",
+			defaultModel: "claude-sonnet-4-6",
+			want:         "claude-sonnet-4-6",
+		},
+		{
+			name:         "task model alias resolved",
+			taskModel:    "opus",
+			defaultModel: "claude-sonnet-4-6",
+			want:         "claude-opus-4-6",
+		},
+		{
+			name:         "task model full ID passed through",
+			taskModel:    "claude-haiku-4-5-20251001",
+			defaultModel: "claude-sonnet-4-6",
+			want:         "claude-haiku-4-5-20251001",
+		},
+		{
+			name:         "haiku alias resolved",
+			taskModel:    "haiku",
+			defaultModel: "claude-opus-4-6",
+			want:         "claude-haiku-4-5-20251001",
+		},
+		{
+			name:         "sonnet alias resolved",
+			taskModel:    "sonnet",
+			defaultModel: "claude-opus-4-6",
+			want:         "claude-sonnet-4-6",
+		},
+		{
+			name:         "provider/model format passed through",
+			taskModel:    "anthropic/claude-opus-4-6",
+			defaultModel: "claude-sonnet-4-6",
+			want:         "anthropic/claude-opus-4-6",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveTaskModel(tt.taskModel, tt.defaultModel)
+			if got != tt.want {
+				t.Errorf("resolveTaskModel(%q, %q) = %q, want %q", tt.taskModel, tt.defaultModel, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVerbForTask(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -40,12 +40,12 @@ Currently, Maggus uses a single model for all tasks in a run — configured via 
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] In `cmd/work_task.go`, before calling `agent.Run()`, check if the current task has a non-empty `Model` field
-- [ ] If set, resolve it through `config.ResolveModel()` (supporting aliases and full IDs)
-- [ ] Pass the resolved per-task model to `agent.Run()` instead of `tc.resolvedModel`
-- [ ] If not set, behavior is unchanged — uses `tc.resolvedModel` as before
-- [ ] Unit tests cover: task with model override, task without model override, alias resolution
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] In `cmd/work_task.go`, before calling `agent.Run()`, check if the current task has a non-empty `Model` field
+- [x] If set, resolve it through `config.ResolveModel()` (supporting aliases and full IDs)
+- [x] Pass the resolved per-task model to `agent.Run()` instead of `tc.resolvedModel`
+- [x] If not set, behavior is unchanged — uses `tc.resolvedModel` as before
+- [x] Unit tests cover: task with model override, task without model override, alias resolution
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-001-003: Show active model in TUI
 **Description:** As a user watching maggus work, I want to see which model is being used for each task so that I can confirm per-task overrides are in effect.
