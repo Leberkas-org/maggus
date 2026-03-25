@@ -141,6 +141,7 @@ type Config struct {
 	Notifications      NotificationsConfig `yaml:"notifications"`
 	Git                GitConfig           `yaml:"git"`
 	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
+	DiscordPresence    bool                `yaml:"discord_presence"`
 }
 
 // DefaultDaemonPollInterval is the fallback poll interval when no value is configured.

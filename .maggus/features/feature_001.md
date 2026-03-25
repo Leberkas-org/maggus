@@ -50,11 +50,11 @@ This uses Discord's local IPC protocol (no bot, no network auth) and is opt-in v
 **Parallel:** yes — can run alongside TASK-001-001
 
 **Acceptance Criteria:**
-- [ ] `internal/config` struct has a `DiscordPresence bool` field (yaml: `discord_presence`)
-- [ ] Defaults to `false` (off by default)
-- [ ] Parsing correctly reads `discord_presence: true` from config.yml
-- [ ] Unit tests cover: missing key (defaults false), explicit true, explicit false
-- [ ] `go vet ./...` passes
+- [x] `internal/config` struct has a `DiscordPresence bool` field (yaml: `discord_presence`)
+- [x] Defaults to `false` (off by default)
+- [x] Parsing correctly reads `discord_presence: true` from config.yml
+- [x] Unit tests cover: missing key (defaults false), explicit true, explicit false
+- [x] `go vet ./...` passes
 
 ### TASK-001-003: Implement `internal/discord` Rich Presence package
 **Description:** As a developer, I want a `discord` package that manages Discord Rich Presence via direct IPC so that other parts of Maggus can update the presence state without external dependencies.
