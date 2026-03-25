@@ -73,13 +73,13 @@ Enhance the Discord Rich Presence integration to show more contextual informatio
 **Parallel:** yes — can run alongside TASK-005-002, TASK-005-004
 
 **Acceptance Criteria:**
-- [ ] In `cmd/work_task.go`, the `presence.Update()` call determines the verb based on the task's `SourceFile` path:
+- [x] In `cmd/work_task.go`, the `presence.Update()` call determines the verb based on the task's `SourceFile` path:
   - If path contains `/bugs/` or `\bugs\` → verb is `"Fixing"`
   - Otherwise → verb is `"Working"`
-- [ ] The verb detection logic is a simple helper function (e.g. `verbForTask(sourceFile string) string`) with unit tests
-- [ ] Existing Discord presence update in `runTask()` passes the correct verb
-- [ ] Menu idle presence uses verb `"Idle"` or remains as-is (no verb needed for menu — keep current behavior)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The verb detection logic is a simple helper function (e.g. `verbForTask(sourceFile string) string`) with unit tests
+- [x] Existing Discord presence update in `runTask()` passes the correct verb
+- [x] Menu idle presence uses verb `"Idle"` or remains as-is (no verb needed for menu — keep current behavior)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-005-004: Add progress tracking to Discord presence during work
 **Description:** As a user, I want to see task completion progress in my Discord status (e.g. "Working — 3/7 tasks (43%)") so I can glance at Discord and know how far along the current feature is.

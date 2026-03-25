@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -109,6 +110,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 			TaskTitle:    next.Title,
 			FeatureTitle: parser.ParseFileTitle(next.SourceFile),
 			StartTime:    time.Now(),
+			Verb:         verbForTask(next.SourceFile),
 		})
 	}
 
@@ -462,4 +464,13 @@ func fireCompletionHooks(tc taskContext, completedPaths []string, snapshots []co
 		}
 		hooks.Run(commands, event, tc.workDir, log.Default())
 	}
+}
+
+// verbForTask returns the Discord presence verb based on the task's source file path.
+// Bug files (containing /bugs/ or \bugs\) get "Fixing"; everything else gets "Working".
+func verbForTask(sourceFile string) string {
+	if strings.Contains(sourceFile, "/bugs/") || strings.Contains(sourceFile, `\bugs\`) {
+		return "Fixing"
+	}
+	return "Working"
 }
