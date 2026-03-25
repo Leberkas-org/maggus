@@ -41,14 +41,14 @@ After features 001 and 002 reduce duplication, split the remaining large files b
 **Parallel:** yes — can run alongside TASK-003-001
 
 **Acceptance Criteria:**
-- [ ] `cmd/menu_model.go`: `menuModel` struct, `menuItem`, sub-menu types, `allMenuItems`, `activeMenuItems()`, `loadFeatureSummary()` (~200 lines)
-- [ ] `cmd/menu_update.go`: `Init()`, `Update()`, `updateMainMenu()`, `updateSubMenu()`, `updateConfirmStopDaemon()`, message types (~300 lines)
-- [ ] `cmd/menu_view.go`: `View()`, `viewMainMenu()`, `viewSubMenu()`, render helpers (~350 lines)
-- [ ] `cmd/menu_cmd.go`: cobra command, `init()`, `isInitialized()` (~50 lines)
-- [ ] Original `menu.go` is deleted
-- [ ] `go build ./cmd/...` succeeds
-- [ ] `go test ./cmd/ -run TestMenu` passes
-- [ ] `go vet ./...` passes
+- [x] `cmd/menu_model.go`: `menuModel` struct, `menuItem`, sub-menu types, `allMenuItems`, `activeMenuItems()`, `loadFeatureSummary()` (~200 lines)
+- [x] `cmd/menu_update.go`: `Init()`, `Update()`, `updateMainMenu()`, `updateSubMenu()`, `updateConfirmStopDaemon()`, message types (~300 lines)
+- [x] `cmd/menu_view.go`: `View()`, `viewMainMenu()`, `viewSubMenu()`, render helpers (~350 lines)
+- [x] `cmd/menu_cmd.go`: cobra command, `init()`, `isInitialized()` (~50 lines)
+- [x] Original `menu.go` is deleted
+- [x] `go build ./cmd/...` succeeds
+- [x] `go test ./cmd/ -run TestMenu` passes
+- [x] `go vet ./...` passes
 
 ### TASK-003-003: Final verification and cleanup
 **Description:** As a developer, I want to verify the full test suite passes and no regressions were introduced across all three features.
