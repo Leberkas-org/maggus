@@ -19,7 +19,7 @@ import (
 //
 // TODO: Replace with the actual Application ID once the Discord Application is created.
 // See docs/discord-setup.md for setup instructions.
-const ApplicationID = "REPLACE_WITH_ACTUAL_APPLICATION_ID"
+const ApplicationID = "1029849597473996810"
 
 // AssetKeyLargeImage is the Rich Presence asset key for the Maggus logo.
 const AssetKeyLargeImage = "maggus_logo"
