@@ -237,6 +237,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	dm := nullTUIModel{
 		snapshotDir:   dir,
 		snapshotRunID: runID,
+		runStartedAt:  setup.startTime,
 	}
 	dm.SetOnToolUse(func(taskID, toolType, description string) {
 		runLogger.ToolUse(taskID, toolType, description)

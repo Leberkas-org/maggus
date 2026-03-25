@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/agent"
@@ -123,6 +124,49 @@ func TestReadSnapshot_ReturnsErrorWhenMissing(t *testing.T) {
 	_, err := ReadSnapshot(dir, "nonexistent-run")
 	if err == nil {
 		t.Error("expected error when reading missing snapshot")
+	}
+}
+
+func TestWriteSnapshot_TimestampsPresent(t *testing.T) {
+	dir := t.TempDir()
+	runID := "test-run-timestamps"
+
+	snap := StateSnapshot{
+		TaskID:        "TASK-006",
+		Status:        "Working",
+		RunStartedAt:  "2026-01-01T00:00:00Z",
+		TaskStartedAt: "2026-01-01T00:05:00Z",
+	}
+
+	if err := WriteSnapshot(dir, runID, snap); err != nil {
+		t.Fatalf("WriteSnapshot failed: %v", err)
+	}
+
+	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("state.json not found: %v", err)
+	}
+
+	// Verify both timestamps are present in raw JSON.
+	raw := string(data)
+	if !strings.Contains(raw, `"run_started_at"`) {
+		t.Error("run_started_at not found in serialized JSON")
+	}
+	if !strings.Contains(raw, `"task_started_at"`) {
+		t.Error("task_started_at not found in serialized JSON")
+	}
+
+	// Verify round-trip via struct.
+	var parsed StateSnapshot
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if parsed.RunStartedAt != "2026-01-01T00:00:00Z" {
+		t.Errorf("RunStartedAt = %q, want %q", parsed.RunStartedAt, "2026-01-01T00:00:00Z")
+	}
+	if parsed.TaskStartedAt != "2026-01-01T00:05:00Z" {
+		t.Errorf("TaskStartedAt = %q, want %q", parsed.TaskStartedAt, "2026-01-01T00:05:00Z")
 	}
 }
 

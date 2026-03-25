@@ -22,12 +22,12 @@ The status view's "Updated" line currently shows time since the last snapshot wr
 **Parallel:** yes — can run alongside TASK-006-002
 
 **Acceptance Criteria:**
-- [ ] `StateSnapshot` struct has new fields `RunStartedAt string` and `TaskStartedAt string` (RFC3339)
-- [ ] `nullTUIModel.writeSnapshot()` populates both fields from existing `startTime` (task) and a new `runStartedAt` field
-- [ ] `nullTUIModel` gets a `runStartedAt time.Time` field, set when the model is created (passed from `workLoopParams.startTime`)
-- [ ] `taskStartedAt` is set from `m.startTime` which is already reset on each `IterationStartMsg`
-- [ ] Existing snapshot tests updated; new test verifies both timestamps are present in serialized JSON
-- [ ] `go vet ./...` passes
+- [x] `StateSnapshot` struct has new fields `RunStartedAt string` and `TaskStartedAt string` (RFC3339)
+- [x] `nullTUIModel.writeSnapshot()` populates both fields from existing `startTime` (task) and a new `runStartedAt` field
+- [x] `nullTUIModel` gets a `runStartedAt time.Time` field, set when the model is created (passed from `workLoopParams.startTime`)
+- [x] `taskStartedAt` is set from `m.startTime` which is already reset on each `IterationStartMsg`
+- [x] Existing snapshot tests updated; new test verifies both timestamps are present in serialized JSON
+- [x] `go vet ./...` passes
 
 ### TASK-006-002: Reformat per-model token breakdown to one model per line
 **Description:** As a user, I want each model's token usage on its own line so I can read them without horizontal overflow.

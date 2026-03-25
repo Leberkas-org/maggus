@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
 )
 
@@ -158,5 +162,53 @@ func TestNullTUIModel_StartTimeSet(t *testing.T) {
 	}
 	if captured.EndTime.Before(captured.StartTime) {
 		t.Error("EndTime is before StartTime")
+	}
+}
+
+func TestNullTUIModel_SnapshotContainsTimestamps(t *testing.T) {
+	dir := t.TempDir()
+	runID := "test-snap-ts"
+	runStart := time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	dm := nullTUIModel{
+		snapshotDir:   dir,
+		snapshotRunID: runID,
+		runStartedAt:  runStart,
+	}
+
+	// Start an iteration — sets startTime (task start).
+	updated, _ := dm.Update(runner.IterationStartMsg{
+		TaskID:    "TASK-006-001",
+		TaskTitle: "Add timestamps",
+	})
+	dm = updated.(nullTUIModel)
+
+	// Read the snapshot written by IterationStartMsg.
+	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("state.json not found: %v", err)
+	}
+
+	var snap runlog.StateSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if snap.RunStartedAt != "2026-01-15T10:00:00Z" {
+		t.Errorf("RunStartedAt = %q, want %q", snap.RunStartedAt, "2026-01-15T10:00:00Z")
+	}
+	if snap.TaskStartedAt == "" {
+		t.Error("TaskStartedAt should not be empty")
+	}
+
+	// TaskStartedAt should be parseable as RFC3339.
+	taskTime, err := time.Parse(time.RFC3339, snap.TaskStartedAt)
+	if err != nil {
+		t.Fatalf("TaskStartedAt is not valid RFC3339: %v", err)
+	}
+	// It should be recent (set by IterationStartMsg handler).
+	if time.Since(taskTime) > 5*time.Second {
+		t.Error("TaskStartedAt seems too old")
 	}
 }

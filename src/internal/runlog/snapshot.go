@@ -31,6 +31,8 @@ type StateSnapshot struct {
 	TokenCost      float64                     `json:"token_cost"`
 	ModelBreakdown map[string]agent.ModelTokens `json:"model_breakdown"`
 	Commits        []string                    `json:"commits"`
+	RunStartedAt   string                      `json:"run_started_at,omitempty"`
+	TaskStartedAt  string                      `json:"task_started_at,omitempty"`
 	UpdatedAt      string                      `json:"updated_at"`
 }
 

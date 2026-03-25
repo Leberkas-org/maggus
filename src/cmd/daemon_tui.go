@@ -23,6 +23,7 @@ type nullTUIModel struct {
 	taskTitle       string
 	taskFeatureFile string
 	startTime       time.Time
+	runStartedAt    time.Time
 	status          string
 	onToolUse       func(taskID, toolType, description string)
 	onOutput        func(taskID, text string)
@@ -145,6 +146,8 @@ func (m *nullTUIModel) writeSnapshot() {
 		TokenCost:      m.iterCost,
 		ModelBreakdown: m.iterModelUsage,
 		Commits:        m.commits,
+		RunStartedAt:   m.runStartedAt.UTC().Format(time.RFC3339),
+		TaskStartedAt:  m.startTime.UTC().Format(time.RFC3339),
 	}
 	// Best-effort write; errors are not fatal for the daemon.
 	_ = runlog.WriteSnapshot(m.snapshotDir, m.snapshotRunID, snap)
