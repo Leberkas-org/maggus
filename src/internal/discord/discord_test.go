@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"net"
 	"testing"
 	"time"
 )
@@ -219,6 +220,84 @@ func TestSetActivitySerializesToJSON(t *testing.T) {
 	}
 	if decoded.Args.Activity.Assets == nil || decoded.Args.Activity.Assets.LargeImage != "maggus_logo" {
 		t.Error("expected maggus_logo in assets")
+	}
+}
+
+// fakeConn is a net.Conn backed by a bytes.Buffer for capturing writes.
+// Reads return a canned IPC response so readMessage succeeds.
+type fakeConn struct {
+	written bytes.Buffer
+	readBuf bytes.Buffer
+}
+
+func newFakeConn() *fakeConn {
+	fc := &fakeConn{}
+	// Pre-fill a valid IPC response so the readMessage in Close() succeeds.
+	_ = writeMessage(&fc.readBuf, opFrame, map[string]string{"cmd": "SET_ACTIVITY"})
+	return fc
+}
+
+func (f *fakeConn) Read(b []byte) (int, error)  { return f.readBuf.Read(b) }
+func (f *fakeConn) Write(b []byte) (int, error)  { return f.written.Write(b) }
+func (f *fakeConn) Close() error                 { return nil }
+func (f *fakeConn) LocalAddr() net.Addr          { return nil }
+func (f *fakeConn) RemoteAddr() net.Addr         { return nil }
+func (f *fakeConn) SetDeadline(time.Time) error  { return nil }
+func (f *fakeConn) SetReadDeadline(time.Time) error { return nil }
+func (f *fakeConn) SetWriteDeadline(time.Time) error { return nil }
+
+func TestPresenceCloseWritesClearAndOpClose(t *testing.T) {
+	fc := newFakeConn()
+	p := &Presence{
+		conn:      fc,
+		connected: true,
+	}
+
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+
+	// Parse the frames written to the connection.
+	data := fc.written.Bytes()
+	if len(data) < 8 {
+		t.Fatalf("expected at least one frame, got %d bytes", len(data))
+	}
+
+	// First frame: opFrame with clear-activity payload.
+	op1 := binary.LittleEndian.Uint32(data[0:4])
+	len1 := binary.LittleEndian.Uint32(data[4:8])
+	if op1 != opFrame {
+		t.Errorf("first frame opcode = %d, want %d (opFrame)", op1, opFrame)
+	}
+
+	// Verify the clear-activity payload has nil activity.
+	var payload1 activityPayload
+	if err := json.Unmarshal(data[8:8+len1], &payload1); err != nil {
+		t.Fatalf("unmarshal first frame: %v", err)
+	}
+	if payload1.Cmd != "SET_ACTIVITY" {
+		t.Errorf("first frame cmd = %q, want SET_ACTIVITY", payload1.Cmd)
+	}
+	if payload1.Args.Activity != nil {
+		t.Errorf("first frame activity should be nil (clear), got %+v", payload1.Args.Activity)
+	}
+
+	// Second frame: opClose.
+	remaining := data[8+len1:]
+	if len(remaining) < 8 {
+		t.Fatalf("expected second frame, only %d bytes remaining", len(remaining))
+	}
+	op2 := binary.LittleEndian.Uint32(remaining[0:4])
+	if op2 != opClose {
+		t.Errorf("second frame opcode = %d, want %d (opClose)", op2, opClose)
+	}
+
+	// Verify Presence state is cleaned up.
+	if p.connected {
+		t.Error("expected connected=false after Close()")
+	}
+	if p.conn != nil {
+		t.Error("expected conn=nil after Close()")
 	}
 }
 

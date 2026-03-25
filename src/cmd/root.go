@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
+	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
@@ -53,7 +56,27 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 
+	// Initialise Discord Rich Presence for the menu if enabled.
+	var presence *discord.Presence
+	cwd, _ := os.Getwd()
+	if cfg, err := config.Load(cwd); err == nil && cfg.DiscordPresence {
+		presence = &discord.Presence{}
+		_ = presence.Connect()
+	}
+	defer func() {
+		if presence != nil {
+			_ = presence.Close()
+		}
+	}()
+
 	for {
+		// Show idle presence while in the main menu.
+		if presence != nil {
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: "In Main Menu",
+				StartTime:    time.Now(),
+			})
+		}
 		m := newMenuModel(loadFeatureSummary())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := p.Run()

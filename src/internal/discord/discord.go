@@ -114,10 +114,19 @@ func (p *Presence) Close() error {
 		return nil
 	}
 
-	// Best-effort: clear activity before closing.
+	// Best-effort: clear activity and send opClose before closing.
+	// Errors are ignored — we always close the connection regardless.
 	if !p.disconnected {
 		payload := buildClearActivityPayload(os.Getpid())
-		_ = writeMessage(p.conn, opFrame, payload)
+		if err := writeMessage(p.conn, opFrame, payload); err == nil {
+			// Read the response to keep the protocol in sync (same pattern as Update).
+			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+			_, _, _ = readMessage(p.conn)
+			p.conn.SetReadDeadline(time.Time{})
+		}
+
+		// Signal graceful disconnect via opClose.
+		_ = writeMessage(p.conn, opClose, map[string]string{})
 	}
 
 	err := p.conn.Close()
