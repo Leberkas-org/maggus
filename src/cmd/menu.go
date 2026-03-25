@@ -14,6 +14,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
+	xterm "golang.org/x/term"
 )
 
 // claude2xResultMsg carries the result of the async 2x status fetch.
@@ -369,6 +370,10 @@ type menuModel struct {
 func newMenuModel(summary featureSummary, firstLaunch bool) menuModel {
 	cwd, _ := os.Getwd()
 
+	// Query actual terminal dimensions before the first render so View() always
+	// uses FullScreenColor and never falls back to the Box fallback path.
+	termW, termH, _ := xterm.GetSize(int(os.Stdout.Fd()))
+
 	ch := make(chan bool, 1)
 	w, _ := filewatcher.New(cwd, func(msg any) {
 		hasNew := false
@@ -389,6 +394,8 @@ func newMenuModel(summary featureSummary, firstLaunch bool) menuModel {
 		subMenuDefs:  buildSubMenus(),
 		watcher:      w,
 		watcherCh:    ch,
+		width:        termW,
+		height:       termH,
 	}
 }
 
