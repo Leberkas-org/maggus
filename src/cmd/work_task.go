@@ -22,7 +22,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/sesslock"
 	"github.com/leberkas-org/maggus/internal/tasklock"
 )
 
@@ -105,8 +104,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal)
 
 	// Update Discord Rich Presence with current task info and progress.
-	// Skip if an interactive session (prompt command) is controlling presence.
-	if tc.presence != nil && !sesslock.IsActive(tc.repoDir) {
+	if tc.presence != nil {
 		completed, total := computeTaskProgress(tasks, next.SourceFile)
 		tc.presence.Update(discord.PresenceState{
 			TaskID:          next.ID,
@@ -237,8 +235,7 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 		result.committed = true
 
 		// Update Discord presence with incremented progress (task now counts as done).
-		// Skip if an interactive session (prompt command) is controlling presence.
-		if tc.presence != nil && !sesslock.IsActive(tc.repoDir) {
+		if tc.presence != nil {
 			completed, total := computeTaskProgress(parsedTasks, task.SourceFile)
 			tc.presence.Update(discord.PresenceState{
 				TaskID:          task.ID,

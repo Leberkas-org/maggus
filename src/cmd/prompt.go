@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/sesslock"
 	"github.com/spf13/cobra"
 )
 
@@ -90,14 +89,6 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	if !ok {
 		return fmt.Errorf("unknown skill: %s", result.Skill)
 	}
-
-	// Acquire interactive session lock so the daemon pauses presence updates.
-	slock, slockErr := sesslock.Acquire(dir)
-	if slockErr != nil {
-		// Non-fatal — log and continue without the lock.
-		fmt.Fprintf(os.Stderr, "Warning: could not acquire session lock: %v\n", slockErr)
-	}
-	defer slock.Release()
 
 	// Initialise Discord Rich Presence if enabled.
 	var presence *discord.Presence
