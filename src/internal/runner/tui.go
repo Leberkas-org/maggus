@@ -139,6 +139,11 @@ type TUIModel struct {
 	cancelFunc         func()          // called on Ctrl+C to cancel the context
 	quitting           bool
 
+	// Active run time tracking (excludes idle gaps between tasks)
+	activeRunDuration time.Duration // accumulated active time from completed tasks
+	taskActiveStart   time.Time     // when the current task began (zero if no task active)
+	taskActive        bool          // true while a task is actively running
+
 	// Sync check state (between-task remote sync)
 	sync syncState
 
@@ -273,6 +278,16 @@ func (m TUIModel) StopAtTaskIDFlag() *atomic.Value {
 	return m.stopAtTaskIDFlag
 }
 
+// ActiveRunElapsed returns the total active run time, which is the accumulated
+// duration from completed tasks plus the current task's in-progress time (if active).
+func (m TUIModel) ActiveRunElapsed() time.Duration {
+	d := m.activeRunDuration
+	if m.taskActive {
+		d += time.Since(m.taskActiveStart)
+	}
+	return d
+}
+
 func (m TUIModel) Init() tea.Cmd {
 	cmds := []tea.Cmd{tickCmd()}
 	if m.banner.TwoXExpiresIn != "" {
@@ -346,6 +361,11 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case agent.StatusMsg:
 		m.status = msg.Status
+		// On task completion, accumulate active time
+		if m.taskActive && (msg.Status == "Done" || msg.Status == "Failed" || msg.Status == "Interrupted") {
+			m.activeRunDuration += time.Since(m.taskActiveStart)
+			m.taskActive = false
+		}
 
 	case agent.OutputMsg:
 		m.handleOutputMsg(msg)

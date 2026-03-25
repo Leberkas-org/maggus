@@ -12,6 +12,11 @@ import (
 
 // handleIterationStart resets per-iteration state when a new task begins.
 func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
+	// Accumulate active time from the previous task (if one was active)
+	if m.taskActive {
+		m.activeRunDuration += time.Since(m.taskActiveStart)
+		m.taskActive = false
+	}
 	m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskFeatureFile, m.startTime)
 	m.currentIter = msg.Current
 	// In feature mode, reset the task counter when entering a new feature.
@@ -44,6 +49,9 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.detailAutoScroll = true
 	m.detailTotalLines = 0
 	m.startTime = time.Now()
+	// Mark the new task as actively running
+	m.taskActiveStart = time.Now()
+	m.taskActive = true
 }
 
 // handleOutputMsg updates the last-line output display.

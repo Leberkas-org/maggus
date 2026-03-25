@@ -46,13 +46,13 @@ Enhance the `maggus work` TUI run view with three improvements: fix a height cal
 **Parallel:** yes -- can run alongside TASK-002-001
 
 **Acceptance Criteria:**
-- [ ] `TUIModel` has new fields to track active run time: an accumulated `activeRunDuration` (time.Duration) and a `taskActiveStart` (time.Time) that records when the current task began
-- [ ] On `IterationStartMsg`: `taskActiveStart` is set to `time.Now()`; if a previous task was active, its elapsed time is added to `activeRunDuration`
-- [ ] On task completion (when status becomes "Done" or "Failed" or "Interrupted"): the current task's elapsed time is added to `activeRunDuration`
-- [ ] A method `ActiveRunElapsed() time.Duration` returns `activeRunDuration` plus the current task's in-progress time (if a task is active)
-- [ ] The existing `runStartTime` field and wall-clock `runElapsed` remain available (not removed) for reference
-- [ ] Unit tests verify: active elapsed increases only during task execution, idle gaps are excluded, multiple task transitions accumulate correctly
-- [ ] `go vet ./...` passes
+- [x] `TUIModel` has new fields to track active run time: an accumulated `activeRunDuration` (time.Duration) and a `taskActiveStart` (time.Time) that records when the current task began
+- [x] On `IterationStartMsg`: `taskActiveStart` is set to `time.Now()`; if a previous task was active, its elapsed time is added to `activeRunDuration`
+- [x] On task completion (when status becomes "Done" or "Failed" or "Interrupted"): the current task's elapsed time is added to `activeRunDuration`
+- [x] A method `ActiveRunElapsed() time.Duration` returns `activeRunDuration` plus the current task's in-progress time (if a task is active)
+- [x] The existing `runStartTime` field and wall-clock `runElapsed` remain available (not removed) for reference
+- [x] Unit tests verify: active elapsed increases only during task execution, idle gaps are excluded, multiple task transitions accumulate correctly
+- [x] `go vet ./...` passes
 
 ### TASK-002-003: Refactor Progress tab to 3-zone layout
 **Description:** As a user, I want the Progress tab to show a fixed top zone (status, task info, output), a scrollable middle zone (compact tool list), and a fixed bottom zone (stats including per-model tokens and average time per task) so that I can see all key information at a glance while scrolling through tool usage.
