@@ -3,6 +3,7 @@
 package discord
 
 import (
+	"encoding/json"
 	"net"
 	"os"
 	"path/filepath"
@@ -65,4 +66,14 @@ func findSocket() string {
 	}
 
 	return "/tmp/discord-ipc-0" // last resort fallback
+}
+
+// readMessageWithTimeout reads an IPC message with a bounded timeout.
+// On Unix, net.Conn supports SetReadDeadline natively, so this uses
+// the standard deadline mechanism.
+func readMessageWithTimeout(conn net.Conn, timeout time.Duration) (uint32, json.RawMessage, error) {
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	op, data, err := readMessage(conn)
+	conn.SetReadDeadline(time.Time{})
+	return op, data, err
 }

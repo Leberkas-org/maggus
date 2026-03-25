@@ -489,6 +489,60 @@ func TestProgressPercentageRounding(t *testing.T) {
 	}
 }
 
+// blockingConn is a net.Conn whose Read blocks until Close is called.
+type blockingConn struct {
+	closed chan struct{}
+}
+
+func newBlockingConn() *blockingConn {
+	return &blockingConn{closed: make(chan struct{})}
+}
+
+func (b *blockingConn) Read([]byte) (int, error) {
+	<-b.closed
+	return 0, net.ErrClosed
+}
+
+func (b *blockingConn) Write(p []byte) (int, error)     { return len(p), nil }
+func (b *blockingConn) Close() error                     { close(b.closed); return nil }
+func (b *blockingConn) LocalAddr() net.Addr              { return nil }
+func (b *blockingConn) RemoteAddr() net.Addr             { return nil }
+func (b *blockingConn) SetDeadline(time.Time) error      { return nil }
+func (b *blockingConn) SetReadDeadline(time.Time) error  { return nil }
+func (b *blockingConn) SetWriteDeadline(time.Time) error { return nil }
+
+func TestReadMessageWithTimeoutSuccess(t *testing.T) {
+	// Write a valid message to a fakeConn and verify it's read within timeout.
+	fc := newFakeConn()
+	op, data, err := readMessageWithTimeout(fc, 5*time.Second)
+	if err != nil {
+		t.Fatalf("readMessageWithTimeout: %v", err)
+	}
+	if op != opFrame {
+		t.Errorf("opcode = %d, want %d", op, opFrame)
+	}
+	if data == nil {
+		t.Error("expected non-nil data")
+	}
+}
+
+func TestReadMessageWithTimeoutExpires(t *testing.T) {
+	bc := newBlockingConn()
+	start := time.Now()
+	_, _, err := readMessageWithTimeout(bc, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error on timeout, got nil")
+	}
+	if elapsed < 80*time.Millisecond {
+		t.Errorf("returned too quickly: %v", elapsed)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("took too long: %v (timeout not working)", elapsed)
+	}
+}
+
 func TestFormatDetailsBackwardCompatWithNewFields(t *testing.T) {
 	// Verify FormatDetails ignores Verb and Progress fields entirely.
 	tests := []struct {

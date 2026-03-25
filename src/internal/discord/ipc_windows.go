@@ -1,6 +1,8 @@
 package discord
 
 import (
+	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -36,3 +38,28 @@ type pipeAddr struct{}
 
 func (pipeAddr) Network() string { return "pipe" }
 func (pipeAddr) String() string  { return `\\.\pipe\discord-ipc-0` }
+
+// readMessageWithTimeout reads an IPC message with a bounded timeout.
+// On Windows, os.File.SetReadDeadline is not supported for named pipes,
+// so this uses a goroutine with time.After to enforce the deadline.
+// On timeout, the connection is closed to unblock the reading goroutine.
+func readMessageWithTimeout(conn net.Conn, timeout time.Duration) (uint32, json.RawMessage, error) {
+	type result struct {
+		opcode uint32
+		data   json.RawMessage
+		err    error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		op, data, err := readMessage(conn)
+		ch <- result{op, data, err}
+	}()
+	select {
+	case res := <-ch:
+		return res.opcode, res.data, res.err
+	case <-time.After(timeout):
+		conn.Close()
+		<-ch // wait for goroutine to exit
+		return 0, nil, fmt.Errorf("discord: read timed out after %s", timeout)
+	}
+}

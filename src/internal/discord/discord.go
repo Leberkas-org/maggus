@@ -67,9 +67,7 @@ func (p *Presence) Connect() error {
 	}
 
 	// Read handshake response (with timeout).
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, _, err = readMessage(conn)
-	conn.SetReadDeadline(time.Time{})
+	_, _, err = readMessageWithTimeout(conn, 5*time.Second)
 	if err != nil {
 		conn.Close()
 		return nil // Treat response failure as "Discord not available".
@@ -97,9 +95,7 @@ func (p *Presence) Update(state PresenceState) error {
 	}
 
 	// Read the response to keep the protocol in sync.
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, _, err := readMessage(p.conn)
-	p.conn.SetReadDeadline(time.Time{})
+	_, _, err := readMessageWithTimeout(p.conn, 5*time.Second)
 	if err != nil {
 		p.handleDisconnect()
 	}
@@ -123,9 +119,7 @@ func (p *Presence) Close() error {
 		payload := buildClearActivityPayload(os.Getpid())
 		if err := writeMessage(p.conn, opFrame, payload); err == nil {
 			// Read the response to keep the protocol in sync (same pattern as Update).
-			p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			_, _, _ = readMessage(p.conn)
-			p.conn.SetReadDeadline(time.Time{})
+			_, _, _ = readMessageWithTimeout(p.conn, 5*time.Second)
 		}
 
 		// Signal graceful disconnect via opClose.
