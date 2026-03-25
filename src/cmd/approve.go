@@ -22,31 +22,44 @@ func featureIDFromPath(path string) string {
 	return base
 }
 
-// listActiveFeatureIDs returns the IDs of all active (non-completed) feature files in dir.
-func listActiveFeatureIDs(dir string) ([]string, error) {
+// featureEntry pairs a human-readable display name with the UUID-based approval key.
+type featureEntry struct {
+	displayName string // filename without extension, e.g. "feature_003"
+	approvalKey string // maggus-id UUID, or displayName as fallback
+}
+
+// listActiveFeatures returns entries for all active (non-completed) feature files in dir.
+// Each entry contains the display name and the UUID-based approval key (with filename fallback).
+func listActiveFeatures(dir string) ([]featureEntry, error) {
 	files, err := parser.GlobFeatureFiles(dir, false)
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, 0, len(files))
+	entries := make([]featureEntry, 0, len(files))
 	for _, f := range files {
-		ids = append(ids, featureIDFromPath(f))
+		name := featureIDFromPath(f)
+		key := parser.ParseMaggusID(f)
+		if key == "" {
+			key = name
+		}
+		entries = append(entries, featureEntry{displayName: name, approvalKey: key})
 	}
-	return ids, nil
+	return entries, nil
 }
 
-// featureExists returns true if a feature with the given ID exists (active, not completed).
-func featureExists(dir, featureID string) (bool, error) {
-	ids, err := listActiveFeatureIDs(dir)
+// resolveFeature finds a feature entry by display name (filename) and returns it.
+// Returns the entry and true if found, or zero value and false otherwise.
+func resolveFeature(dir, featureID string) (featureEntry, bool, error) {
+	entries, err := listActiveFeatures(dir)
 	if err != nil {
-		return false, err
+		return featureEntry{}, false, err
 	}
-	for _, id := range ids {
-		if id == featureID {
-			return true, nil
+	for _, e := range entries {
+		if e.displayName == featureID {
+			return e, true, nil
 		}
 	}
-	return false, nil
+	return featureEntry{}, false, nil
 }
 
 var approveCmd = &cobra.Command{
@@ -68,11 +81,11 @@ var approveCmd = &cobra.Command{
 }
 
 func runApprove(cmd *cobra.Command, dir, featureID string) error {
-	exists, err := featureExists(dir, featureID)
+	entry, found, err := resolveFeature(dir, featureID)
 	if err != nil {
 		return err
 	}
-	if !exists {
+	if !found {
 		cmd.PrintErrln(fmt.Sprintf("Error: feature %s not found", featureID))
 		return fmt.Errorf("feature %s not found", featureID)
 	}
@@ -81,12 +94,12 @@ func runApprove(cmd *cobra.Command, dir, featureID string) error {
 	if err != nil {
 		return err
 	}
-	if a[featureID] {
+	if a[entry.approvalKey] {
 		cmd.Println(fmt.Sprintf("Feature %s is already approved", featureID))
 		return nil
 	}
 
-	if err := approval.Approve(dir, featureID); err != nil {
+	if err := approval.Approve(dir, entry.approvalKey); err != nil {
 		return err
 	}
 	cmd.Println(fmt.Sprintf("Approved feature %s", featureID))
@@ -95,7 +108,7 @@ func runApprove(cmd *cobra.Command, dir, featureID string) error {
 
 // runApproveInteractive shows an interactive picker of unapproved features.
 func runApproveInteractive(cmd *cobra.Command, dir string) error {
-	ids, err := listActiveFeatureIDs(dir)
+	entries, err := listActiveFeatures(dir)
 	if err != nil {
 		return err
 	}
@@ -106,10 +119,10 @@ func runApproveInteractive(cmd *cobra.Command, dir string) error {
 	}
 
 	// Filter to only unapproved features
-	var unapproved []string
-	for _, id := range ids {
-		if !a[id] {
-			unapproved = append(unapproved, id)
+	var unapproved []featureEntry
+	for _, e := range entries {
+		if !a[e.approvalKey] {
+			unapproved = append(unapproved, e)
 		}
 	}
 
@@ -118,7 +131,12 @@ func runApproveInteractive(cmd *cobra.Command, dir string) error {
 		return nil
 	}
 
-	selected, ok, err := runFeaturePicker("Select a feature to approve:", unapproved)
+	displayNames := make([]string, len(unapproved))
+	for i, e := range unapproved {
+		displayNames[i] = e.displayName
+	}
+
+	selected, ok, err := runFeaturePicker("Select a feature to approve:", displayNames)
 	if err != nil {
 		return err
 	}
@@ -148,11 +166,11 @@ var unapproveCmd = &cobra.Command{
 }
 
 func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
-	exists, err := featureExists(dir, featureID)
+	entry, found, err := resolveFeature(dir, featureID)
 	if err != nil {
 		return err
 	}
-	if !exists {
+	if !found {
 		cmd.PrintErrln(fmt.Sprintf("Error: feature %s not found", featureID))
 		return fmt.Errorf("feature %s not found", featureID)
 	}
@@ -161,12 +179,12 @@ func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
 	if err != nil {
 		return err
 	}
-	if !a[featureID] {
+	if !a[entry.approvalKey] {
 		cmd.Println(fmt.Sprintf("Feature %s is not approved", featureID))
 		return nil
 	}
 
-	if err := approval.Unapprove(dir, featureID); err != nil {
+	if err := approval.Unapprove(dir, entry.approvalKey); err != nil {
 		return err
 	}
 	cmd.Println(fmt.Sprintf("Unapproved feature %s", featureID))
@@ -175,7 +193,7 @@ func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
 
 // runUnapproveInteractive shows an interactive picker of approved features.
 func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
-	ids, err := listActiveFeatureIDs(dir)
+	entries, err := listActiveFeatures(dir)
 	if err != nil {
 		return err
 	}
@@ -186,10 +204,10 @@ func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
 	}
 
 	// Filter to only approved features
-	var approved []string
-	for _, id := range ids {
-		if a[id] {
-			approved = append(approved, id)
+	var approved []featureEntry
+	for _, e := range entries {
+		if a[e.approvalKey] {
+			approved = append(approved, e)
 		}
 	}
 
@@ -198,7 +216,12 @@ func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
 		return nil
 	}
 
-	selected, ok, err := runFeaturePicker("Select a feature to unapprove:", approved)
+	displayNames := make([]string, len(approved))
+	for i, e := range approved {
+		displayNames[i] = e.displayName
+	}
+
+	selected, ok, err := runFeaturePicker("Select a feature to unapprove:", displayNames)
 	if err != nil {
 		return err
 	}

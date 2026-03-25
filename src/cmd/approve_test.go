@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,31 +32,38 @@ func setupApproveDir(t *testing.T) string {
 	return dir
 }
 
-// writeApproveFeature writes a minimal feature file into .maggus/features/.
-func writeApproveFeature(t *testing.T, dir, filename string) {
+// writeApproveFeature writes a minimal feature file with a maggus-id into .maggus/features/.
+func writeApproveFeature(t *testing.T, dir, filename, maggusID string) {
 	t.Helper()
-	content := "# Feature\n\n### TASK-001-001: Sample\n- [ ] Do something\n"
+	var content string
+	if maggusID != "" {
+		content = fmt.Sprintf("<!-- maggus-id: %s -->\n# Feature\n\n### TASK-001-001: Sample\n- [ ] Do something\n", maggusID)
+	} else {
+		content = "# Feature\n\n### TASK-001-001: Sample\n- [ ] Do something\n"
+	}
 	if err := os.WriteFile(filepath.Join(dir, ".maggus", "features", filename), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
+const testUUID = "d2062a56-007c-47cd-8e7b-ba3d2e361689"
+
 func TestRunApprove_ApprovesByID(t *testing.T) {
 	dir := setupApproveDir(t)
-	writeApproveFeature(t, dir, "feature_001.md")
+	writeApproveFeature(t, dir, "feature_001.md", testUUID)
 
 	cmd, stdout, _ := newTestCmd(t)
 	if err := runApprove(cmd, dir, "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Approval should be persisted
+	// Approval should be persisted under the UUID key
 	a, err := approval.Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !a["feature_001"] {
-		t.Error("expected feature_001 to be approved")
+	if !a[testUUID] {
+		t.Error("expected UUID key to be approved in feature_approvals.yml")
 	}
 	if !strings.Contains(stdout.String(), "Approved") {
 		t.Errorf("expected confirmation message, got: %s", stdout.String())
@@ -64,8 +72,8 @@ func TestRunApprove_ApprovesByID(t *testing.T) {
 
 func TestRunApprove_AlreadyApproved(t *testing.T) {
 	dir := setupApproveDir(t)
-	writeApproveFeature(t, dir, "feature_001.md")
-	if err := approval.Approve(dir, "feature_001"); err != nil {
+	writeApproveFeature(t, dir, "feature_001.md", testUUID)
+	if err := approval.Approve(dir, testUUID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,10 +99,31 @@ func TestRunApprove_FeatureNotFound(t *testing.T) {
 	}
 }
 
+func TestRunApprove_FallbackToFilename(t *testing.T) {
+	dir := setupApproveDir(t)
+	writeApproveFeature(t, dir, "feature_001.md", "") // no maggus-id
+
+	cmd, stdout, _ := newTestCmd(t)
+	if err := runApprove(cmd, dir, "feature_001"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a["feature_001"] {
+		t.Error("expected filename fallback key to be approved")
+	}
+	if !strings.Contains(stdout.String(), "Approved") {
+		t.Errorf("expected confirmation message, got: %s", stdout.String())
+	}
+}
+
 func TestRunUnapprove_UnapprovesID(t *testing.T) {
 	dir := setupApproveDir(t)
-	writeApproveFeature(t, dir, "feature_001.md")
-	if err := approval.Approve(dir, "feature_001"); err != nil {
+	writeApproveFeature(t, dir, "feature_001.md", testUUID)
+	if err := approval.Approve(dir, testUUID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,8 +136,8 @@ func TestRunUnapprove_UnapprovesID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a["feature_001"] {
-		t.Error("expected feature_001 to be unapproved")
+	if a[testUUID] {
+		t.Error("expected UUID key to be unapproved")
 	}
 	if !strings.Contains(stdout.String(), "Unapproved") {
 		t.Errorf("expected confirmation message, got: %s", stdout.String())
@@ -117,7 +146,7 @@ func TestRunUnapprove_UnapprovesID(t *testing.T) {
 
 func TestRunUnapprove_NotApproved(t *testing.T) {
 	dir := setupApproveDir(t)
-	writeApproveFeature(t, dir, "feature_001.md")
+	writeApproveFeature(t, dir, "feature_001.md", testUUID)
 
 	cmd, stdout, _ := newTestCmd(t)
 	if err := runUnapprove(cmd, dir, "feature_001"); err != nil {
