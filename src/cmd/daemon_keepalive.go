@@ -77,6 +77,17 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 	}
 	defer func() { _ = runLogger.Close() }()
 
+	// Create filesystem watcher once and reuse across all wait cycles.
+	fw, fwErr := filewatcher.New(dir, nil, 500*time.Millisecond)
+	if fwErr != nil {
+		cmd.Printf("Warning: could not create file watcher: %v\n", fwErr)
+	}
+	defer func() {
+		if fw != nil {
+			fw.Close()
+		}
+	}()
+
 	for {
 		// Check for signal before each cycle.
 		select {
@@ -98,7 +109,7 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		// No work found — enter wait state.
 		runLogger.Info("no work found, watching for changes")
 
-		wakeReason, wakePath := waitForChanges(dir, workCtx)
+		wakeReason, wakePath := waitForChanges(fw, workCtx)
 		switch wakeReason {
 		case wakeSignal:
 			return nil
@@ -117,14 +128,21 @@ const (
 )
 
 // waitForChanges blocks until a file change or context cancellation.
+// It uses the provided filewatcher (which may be nil if creation failed).
 // Returns the reason for waking and the path of the changed file (if applicable).
-func waitForChanges(dir string, ctx context.Context) (wakeReason, string) {
+func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, string) {
+	if fw == nil {
+		// No watcher available — block on context only.
+		<-ctx.Done()
+		return wakeSignal, ""
+	}
+
 	type fileEvent struct {
 		path string
 	}
 
 	wakeCh := make(chan fileEvent, 1)
-	sendFn := func(msg any) {
+	fw.SetSend(func(msg any) {
 		if m, ok := msg.(filewatcher.UpdateMsg); ok {
 			path := m.Path
 			if path == "" {
@@ -135,18 +153,8 @@ func waitForChanges(dir string, ctx context.Context) (wakeReason, string) {
 			default:
 			}
 		}
-	}
-
-	fw, fwErr := filewatcher.New(dir, sendFn, 500*time.Millisecond)
-	if fwErr != nil {
-		// If watcher fails, log and block on context only.
-		fw = nil
-	}
-	defer func() {
-		if fw != nil {
-			fw.Close()
-		}
-	}()
+	})
+	defer fw.SetSend(nil)
 
 	select {
 	case <-ctx.Done():

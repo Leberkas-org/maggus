@@ -28,6 +28,7 @@ type SendFunc func(msg any)
 // and sending UpdateMsg via the provided send function.
 type Watcher struct {
 	fsw      *fsnotify.Watcher
+	mu       sync.Mutex
 	send     SendFunc
 	debounce time.Duration
 	done     chan struct{}
@@ -70,6 +71,14 @@ func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error
 	go w.loop()
 
 	return w, nil
+}
+
+// SetSend replaces the send function used by the watcher's event loop.
+// This is safe to call while the watcher is running.
+func (w *Watcher) SetSend(send SendFunc) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.send = send
 }
 
 // Close stops the watcher and waits for the goroutine to exit.
@@ -176,7 +185,12 @@ func (w *Watcher) loop() {
 			// Ignore watcher errors — they are non-fatal.
 
 		case <-timerC:
-			w.send(UpdateMsg{HasNewFile: hasCreate, Path: lastPath})
+			w.mu.Lock()
+			send := w.send
+			w.mu.Unlock()
+			if send != nil {
+				send(UpdateMsg{HasNewFile: hasCreate, Path: lastPath})
+			}
 			timer = nil
 			timerC = nil
 			hasCreate = false
