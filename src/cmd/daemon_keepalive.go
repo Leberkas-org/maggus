@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
@@ -65,6 +66,18 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		}
 	}()
 
+	// Initialise Discord Rich Presence if enabled.
+	var presence *discord.Presence
+	if wc.cfg.DiscordPresence {
+		presence = &discord.Presence{}
+		_ = presence.Connect()
+	}
+	defer func() {
+		if presence != nil {
+			_ = presence.Close()
+		}
+	}()
+
 	// Initialise sync functions (once for the whole daemon lifetime).
 	runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
 
@@ -97,7 +110,7 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		default:
 		}
 
-		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx)
+		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx, presence)
 		if err != nil {
 			runLogger.Info(fmt.Sprintf("work cycle error: %v", err))
 		}
@@ -109,6 +122,14 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 
 		// No work found — enter wait state.
 		runLogger.Info("no work found, watching for changes")
+
+		// Show idle presence while waiting for file changes.
+		if presence != nil {
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: "Watching for changes",
+				StartTime:    time.Now(),
+			})
+		}
 
 		wakeReason, wakePath := waitForChanges(fw, workCtx)
 		switch wakeReason {
@@ -167,7 +188,7 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, s
 
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
-func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context, presence *discord.Presence) (bool, error) {
 	// Parse tasks and check for work.
 	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0)
 	if err != nil {
@@ -275,6 +296,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		onComplete:    wc.cfg.OnComplete,
 		hooks:         wc.cfg.Hooks,
 		logger:        runLogger,
+		presence:      presence,
 	}
 
 	runWorkGoroutine(workLoopParams{
