@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/sesslock"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -124,7 +125,8 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		runLogger.Info("no work found, watching for changes")
 
 		// Show idle presence while waiting for file changes.
-		if presence != nil {
+		// Skip if an interactive session (prompt command) is controlling presence.
+		if presence != nil && !sesslock.IsActive(dir) {
 			_ = presence.Update(discord.PresenceState{
 				FeatureTitle: "Watching for changes",
 				StartTime:    time.Now(),
