@@ -144,7 +144,6 @@ type Config struct {
 	Git                GitConfig           `yaml:"git"`
 	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
 	Hooks              HooksConfig         `yaml:"hooks"`
-	DiscordPresence    bool                `yaml:"discord_presence"`
 }
 
 // IsApprovalRequired returns true when approval_mode is opt-in (the default).

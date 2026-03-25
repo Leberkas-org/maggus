@@ -73,7 +73,8 @@ func (m Metrics) add(delta Metrics) Metrics {
 
 // Settings holds the global Maggus settings stored at ~/.maggus/config.yml.
 type Settings struct {
-	AutoUpdate AutoUpdateMode `yaml:"auto_update,omitempty"`
+	AutoUpdate      AutoUpdateMode `yaml:"auto_update,omitempty"`
+	DiscordPresence bool           `yaml:"discord_presence,omitempty"`
 }
 
 // DefaultSettings returns settings with default values.

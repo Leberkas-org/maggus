@@ -363,6 +363,62 @@ func TestSaveAndLoadSettings(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsFrom_DiscordPresenceMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+	os.WriteFile(path, []byte("auto_update: notify\n"), 0o644)
+
+	s, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.DiscordPresence {
+		t.Error("expected DiscordPresence to default to false when key is absent")
+	}
+}
+
+func TestLoadSettingsFrom_DiscordPresenceTrue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+	os.WriteFile(path, []byte("discord_presence: true\n"), 0o644)
+
+	s, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !s.DiscordPresence {
+		t.Error("expected DiscordPresence to be true")
+	}
+}
+
+func TestLoadSettingsFrom_DiscordPresenceFalse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+	os.WriteFile(path, []byte("discord_presence: false\n"), 0o644)
+
+	s, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.DiscordPresence {
+		t.Error("expected DiscordPresence to be false")
+	}
+}
+
+func TestSaveAndLoadSettings_DiscordPresence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+
+	s := Settings{AutoUpdate: AutoUpdateAuto, DiscordPresence: true}
+	if err := SaveSettingsTo(s, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadSettingsFrom(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !loaded.DiscordPresence {
+		t.Fatal("expected DiscordPresence to round-trip as true")
+	}
+}
+
 // --- UpdateState tests ---
 
 func TestLoadUpdateStateFrom_NonExistent(t *testing.T) {

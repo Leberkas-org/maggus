@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/discord"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/spf13/cobra"
 )
 
@@ -93,7 +94,8 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	// Use shared presence from root menu if available; otherwise create our own.
 	presence := sharedPresence
 	ownPresence := false
-	if presence == nil && cfg.DiscordPresence {
+	gs, _ := globalconfig.LoadSettings()
+	if presence == nil && gs.DiscordPresence {
 		presence = &discord.Presence{}
 		_ = presence.Connect()
 		ownPresence = true

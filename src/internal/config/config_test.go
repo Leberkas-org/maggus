@@ -721,69 +721,6 @@ model: sonnet
 	}
 }
 
-func TestLoad_DiscordPresenceMissing(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	content := `model: sonnet
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.DiscordPresence {
-		t.Error("expected DiscordPresence to default to false when key is absent")
-	}
-}
-
-func TestLoad_DiscordPresenceTrue(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	content := `discord_presence: true
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if !cfg.DiscordPresence {
-		t.Error("expected DiscordPresence to be true")
-	}
-}
-
-func TestLoad_DiscordPresenceFalse(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	content := `discord_presence: false
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.DiscordPresence {
-		t.Error("expected DiscordPresence to be false")
-	}
-}
-
 func TestLoad_HooksFullConfig(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

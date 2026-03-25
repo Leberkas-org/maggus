@@ -229,7 +229,7 @@ Examples:
 		// Use shared presence from root menu if available; otherwise create our own.
 		presence := sharedPresence
 		ownPresence := false
-		if presence == nil && wc.cfg.DiscordPresence {
+		if presence == nil && wc.globalSettings.DiscordPresence {
 			presence = &discord.Presence{}
 			_ = presence.Connect()
 			ownPresence = true

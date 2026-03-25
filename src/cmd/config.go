@@ -140,12 +140,6 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		protectedDisplay = protectedDisplay[:37] + "..."
 	}
 
-	discordPresenceValues := []string{"on", "off"}
-	discordPresenceIdx := 1
-	if cfg.DiscordPresence {
-		discordPresenceIdx = 0
-	}
-
 	soundValues := []string{"on", "off"}
 	soundIdx := 1
 	if cfg.Notifications.Sound {
@@ -174,12 +168,17 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	featureActionIdx := indexOf(onCompleteValues, cfg.OnComplete.FeatureAction())
 	bugActionIdx := indexOf(onCompleteValues, cfg.OnComplete.BugAction())
 
-	// Load global auto-update setting
+	// Load global settings
 	autoUpdateValues := []string{"off", "notify", "auto"}
 	autoUpdateIdx := 1 // default: notify
+	discordPresenceValues := []string{"on", "off"}
+	discordPresenceIdx := 1
 	globalSettings, err := loadGlobalSettings()
 	if err == nil {
 		autoUpdateIdx = indexOf(autoUpdateValues, string(globalSettings.AutoUpdate))
+		if globalSettings.DiscordPresence {
+			discordPresenceIdx = 0
+		}
 	}
 
 	projectRows := []configRow{
@@ -189,7 +188,6 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
-		{label: "Discord presence", values: discordPresenceValues, current: discordPresenceIdx},
 		{label: "Protected branches", display: protectedDisplay},
 		{label: "Sound", values: soundValues, current: soundIdx},
 		{label: "  On task complete", values: taskCompleteValues, current: taskCompleteIdx},
@@ -202,6 +200,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	globalRows := []configRow{
+		{label: "Discord presence", values: discordPresenceValues, current: discordPresenceIdx},
 		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx},
 		{label: "Save global config", action: configActionSaveGlobal, isSave: true},
 		{label: "Edit global file in editor", action: configActionEditGlobal},
@@ -253,8 +252,6 @@ func (m configModel) buildConfig() config.Config {
 	if model != "(default)" {
 		cfg.Model = model
 	}
-
-	cfg.DiscordPresence = m.optionByLabel("Discord presence").values[m.optionByLabel("Discord presence").current] == "on"
 
 	cfg.Notifications.Sound = m.optionByLabel("Sound").values[m.optionByLabel("Sound").current] == "on"
 
@@ -308,6 +305,7 @@ func (m configModel) saveGlobalConfig() error {
 		settings = globalconfig.DefaultSettings()
 	}
 	settings.AutoUpdate = mode
+	settings.DiscordPresence = m.optionByLabel("Discord presence").values[m.optionByLabel("Discord presence").current] == "on"
 	return saveGlobalSettings(settings)
 }
 

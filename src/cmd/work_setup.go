@@ -9,6 +9,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
 	"github.com/leberkas-org/maggus/internal/gitignore"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,7 @@ type workConfig struct {
 	count           int
 	dir             string
 	cfg             config.Config
+	globalSettings  globalconfig.Settings
 	validIncludes   []string
 	includeWarnings []string
 	activeAgent     agent.Agent
@@ -132,10 +134,13 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 		modelDisplay = "default"
 	}
 
+	globalSettings, _ := globalconfig.LoadSettings()
+
 	return &workConfig{
 		count:           count,
 		dir:             dir,
 		cfg:             cfg,
+		globalSettings:  globalSettings,
 		validIncludes:   validIncludes,
 		includeWarnings: includeWarnings,
 		activeAgent:     activeAgent,

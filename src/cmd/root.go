@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
-	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/resolver"
@@ -65,8 +64,7 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	// Connect in the background so the TUI renders instantly.
 	var presence *discord.Presence
 	var presenceReady <-chan struct{}
-	cwd, _ := os.Getwd()
-	if cfg, err := config.Load(cwd); err == nil && cfg.DiscordPresence {
+	if gs, err := globalconfig.LoadSettings(); err == nil && gs.DiscordPresence {
 		presence = &discord.Presence{}
 		ch := make(chan struct{})
 		presenceReady = ch
