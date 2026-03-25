@@ -753,7 +753,11 @@ func (m TUIModel) renderProgressTab(w int) string {
 		extrasStr = "-"
 	}
 
-	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+	modelDisplay := m.model
+	if m.modelIsOverride {
+		modelDisplay = m.model + " (task override)"
+	}
+	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(modelDisplay)))
 	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
 
 	// Commits count

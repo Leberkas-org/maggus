@@ -343,6 +343,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		RemainingTasks:  remaining,
 		FeatureCurrent:  featureCurrent,
 		FeatureTotal:    featureTotal,
+		TaskModel:       task.Model,
 	})
 }
 

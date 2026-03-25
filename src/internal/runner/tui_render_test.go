@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,86 @@ func TestFormatHHMMSS(t *testing.T) {
 				t.Errorf("formatHHMMSS(%v) = %q, want %q", tt.duration, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestModelDisplayInProgressTab(t *testing.T) {
+	tests := []struct {
+		name           string
+		defaultModel   string
+		taskModel      string // sent via IterationStartMsg.TaskModel
+		wantContains   string
+		wantNoContains string
+	}{
+		{
+			name:           "no override shows default model",
+			defaultModel:   "claude-sonnet-4-6",
+			taskModel:      "",
+			wantContains:   "claude-sonnet-4-6",
+			wantNoContains: "task override",
+		},
+		{
+			name:         "task override shows override indicator",
+			defaultModel: "claude-sonnet-4-6",
+			taskModel:    "opus",
+			wantContains: "opus (task override)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewTUIModel(tt.defaultModel, "1.0.0", "", nil, BannerInfo{})
+			m.width = 120
+			m.height = 40
+
+			// Simulate iteration start with optional task model
+			m.handleIterationStart(IterationStartMsg{
+				Current:   1,
+				Total:     1,
+				TaskID:    "TASK-001",
+				TaskTitle: "Test task",
+				TaskModel: tt.taskModel,
+			})
+
+			output := m.renderProgressTab(100)
+
+			if !strings.Contains(output, tt.wantContains) {
+				t.Errorf("renderProgressTab() should contain %q, got:\n%s", tt.wantContains, output)
+			}
+			if tt.wantNoContains != "" && strings.Contains(output, tt.wantNoContains) {
+				t.Errorf("renderProgressTab() should NOT contain %q, got:\n%s", tt.wantNoContains, output)
+			}
+		})
+	}
+}
+
+func TestModelResetsBetweenIterations(t *testing.T) {
+	m := NewTUIModel("claude-sonnet-4-6", "1.0.0", "", nil, BannerInfo{})
+	m.width = 120
+	m.height = 40
+
+	// First iteration: task override
+	m.handleIterationStart(IterationStartMsg{
+		Current:   1,
+		Total:     2,
+		TaskID:    "TASK-001",
+		TaskTitle: "Override task",
+		TaskModel: "opus",
+	})
+	if m.model != "opus" || !m.modelIsOverride {
+		t.Errorf("after override: model=%q, isOverride=%v; want opus, true", m.model, m.modelIsOverride)
+	}
+
+	// Second iteration: no override
+	m.handleIterationStart(IterationStartMsg{
+		Current:   2,
+		Total:     2,
+		TaskID:    "TASK-002",
+		TaskTitle: "Default task",
+		TaskModel: "",
+	})
+	if m.model != "claude-sonnet-4-6" || m.modelIsOverride {
+		t.Errorf("after default: model=%q, isOverride=%v; want claude-sonnet-4-6, false", m.model, m.modelIsOverride)
 	}
 }
 

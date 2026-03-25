@@ -61,6 +61,7 @@ type IterationStartMsg struct {
 	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
 	FeatureCurrent  int             // 1-based index of current feature (0 if not feature-centric)
 	FeatureTotal    int             // total number of features being processed
+	TaskModel       string          // per-task model override (empty = use default)
 }
 
 // tickMsg is sent by the spinner ticker.
@@ -116,6 +117,8 @@ type TUIModel struct {
 	output             string
 	extras             string
 	model              string
+	defaultModel       string // the globally configured model (never changes)
+	modelIsOverride    bool   // true when model was set by a per-task override
 	toolCount          int
 	skills             []string
 	mcps               []string
@@ -237,6 +240,7 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		status:           "Waiting...",
 		output:           "-",
 		model:            model,
+		defaultModel:     model,
 		startTime:        now,
 		runStartTime:     now,
 		width:            120,

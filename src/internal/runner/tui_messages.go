@@ -37,6 +37,14 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 		m.featureTotal = msg.FeatureTotal
 		m.featureMode = true
 	}
+	// Update model display: per-task override or default.
+	if msg.TaskModel != "" {
+		m.model = msg.TaskModel
+		m.modelIsOverride = true
+	} else {
+		m.model = m.defaultModel
+		m.modelIsOverride = false
+	}
 	// Reset per-iteration state
 	m.status = "Starting..."
 	m.output = "-"
