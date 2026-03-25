@@ -12,6 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -69,6 +70,9 @@ type statusModel struct {
 	// Rich live view from state.json
 	snapshot     *runlog.StateSnapshot // nil when no snapshot available
 	spinnerFrame int
+
+	// Discord Rich Presence (nil when not configured)
+	presence *discord.Presence
 
 	// File watcher for live feature reload
 	watcher   *filewatcher.Watcher
@@ -157,6 +161,12 @@ func (m *statusModel) syncDetailSuffix() {
 }
 
 func (m statusModel) Init() tea.Cmd {
+	if m.presence != nil {
+		_ = m.presence.Update(discord.PresenceState{
+			FeatureTitle: "Viewing Status",
+			StartTime:    time.Now(),
+		})
+	}
 	return tea.Batch(
 		func() tea.Msg {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
@@ -361,6 +371,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "tab":
 			m.showLog = false
+			if m.presence != nil {
+				_ = m.presence.Update(discord.PresenceState{
+					FeatureTitle: "Viewing Status",
+					StartTime:    time.Now(),
+				})
+			}
 			return m, nil
 		case "j", "down":
 			m.logAutoScroll = false
@@ -399,6 +415,17 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showLog = true
 		m.logAutoScroll = true
 		m.logScroll = m.maxLogScroll()
+		if m.presence != nil {
+			details := m.daemon.CurrentTask
+			if details == "" {
+				details = "No active task"
+			}
+			_ = m.presence.Update(discord.PresenceState{
+				FeatureTitle: details,
+				Verb:         "Looking at output",
+				StartTime:    time.Now(),
+			})
+		}
 		return m, nil
 	case "right":
 		visible := m.visibleFeatures()
@@ -1161,6 +1188,7 @@ var statusCmd = &cobra.Command{
 		}, 300*time.Millisecond)
 
 		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired)
+		m.presence = sharedPresence
 		m.watcherCh = watcherCh
 		m.watcher = w
 		prog := tea.NewProgram(m, tea.WithAltScreen())
