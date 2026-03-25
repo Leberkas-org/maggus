@@ -394,3 +394,147 @@ func TestBuildActivityWithVerbAndProgress(t *testing.T) {
 		t.Errorf("State = %q, want %q", a.State, want)
 	}
 }
+
+func TestBuildActivityAllVerbProgressCombinations(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     PresenceState
+		wantState string
+	}{
+		{
+			name:      "empty verb no progress falls back",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test"},
+			wantState: "Running Maggus",
+		},
+		{
+			name:      "verb only no progress",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test", Verb: "Consulting"},
+			wantState: "Consulting",
+		},
+		{
+			name:      "verb with zero progress",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test", Verb: "Fixing", ProgressCurrent: 0, ProgressTotal: 5},
+			wantState: "Fixing — 0/5 tasks (0%)",
+		},
+		{
+			name:      "verb with partial progress",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test", Verb: "Working", ProgressCurrent: 3, ProgressTotal: 7},
+			wantState: "Working — 3/7 tasks (42%)",
+		},
+		{
+			name:      "verb with full progress",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test", Verb: "Working", ProgressCurrent: 7, ProgressTotal: 7},
+			wantState: "Working — 7/7 tasks (100%)",
+		},
+		{
+			name:      "empty verb with progress falls back",
+			state:     PresenceState{TaskID: "TASK-001", TaskTitle: "Test", ProgressCurrent: 2, ProgressTotal: 4},
+			wantState: "Running Maggus — 2/4 tasks (50%)",
+		},
+		{
+			name:      "planning verb no progress",
+			state:     PresenceState{FeatureTitle: "/maggus-plan", Verb: "Planning"},
+			wantState: "Planning",
+		},
+		{
+			name:      "reporting bug verb no progress",
+			state:     PresenceState{FeatureTitle: "/maggus-bugreport", Verb: "Reporting Bug"},
+			wantState: "Reporting Bug",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := buildActivity(tt.state)
+			if a.State != tt.wantState {
+				t.Errorf("buildActivity().State = %q, want %q", a.State, tt.wantState)
+			}
+			// Always has assets
+			if a.Assets == nil || a.Assets.LargeImage != AssetKeyLargeImage {
+				t.Errorf("expected maggus_logo asset, got %+v", a.Assets)
+			}
+		})
+	}
+}
+
+func TestProgressPercentageRounding(t *testing.T) {
+	tests := []struct {
+		name    string
+		current int
+		total   int
+		want    string
+	}{
+		{name: "0 percent", current: 0, total: 5, want: "Working — 0/5 tasks (0%)"},
+		{name: "14.28 rounds to 14", current: 1, total: 7, want: "Working — 1/7 tasks (14%)"},
+		{name: "28.57 rounds to 28", current: 2, total: 7, want: "Working — 2/7 tasks (28%)"},
+		{name: "33.33 rounds to 33", current: 1, total: 3, want: "Working — 1/3 tasks (33%)"},
+		{name: "50 percent exact", current: 1, total: 2, want: "Working — 1/2 tasks (50%)"},
+		{name: "66.66 rounds to 66", current: 2, total: 3, want: "Working — 2/3 tasks (66%)"},
+		{name: "100 percent", current: 7, total: 7, want: "Working — 7/7 tasks (100%)"},
+		{name: "0/0 no progress shown", current: 0, total: 0, want: "Working"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := PresenceState{
+				Verb:            "Working",
+				ProgressCurrent: tt.current,
+				ProgressTotal:   tt.total,
+			}
+			got := formatState(state)
+			if got != tt.want {
+				t.Errorf("formatState() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatDetailsBackwardCompatWithNewFields(t *testing.T) {
+	// Verify FormatDetails ignores Verb and Progress fields entirely.
+	tests := []struct {
+		name  string
+		state PresenceState
+		want  string
+	}{
+		{
+			name: "new fields do not affect full state",
+			state: PresenceState{
+				TaskID: "TASK-003-002", TaskTitle: "Add login page",
+				FeatureTitle: "User Auth", Verb: "Working",
+				ProgressCurrent: 3, ProgressTotal: 7,
+			},
+			want: "User Auth — TASK-003-002: Add login page",
+		},
+		{
+			name: "new fields do not affect task only",
+			state: PresenceState{
+				TaskID: "TASK-001-001", TaskTitle: "Setup",
+				Verb: "Fixing", ProgressCurrent: 1, ProgressTotal: 1,
+			},
+			want: "TASK-001-001: Setup",
+		},
+		{
+			name: "new fields do not affect feature only",
+			state: PresenceState{
+				FeatureTitle: "User Auth", Verb: "Planning",
+			},
+			want: "User Auth",
+		},
+		{
+			name: "new fields do not affect empty state",
+			state: PresenceState{
+				Verb: "Consulting", ProgressCurrent: 0, ProgressTotal: 0,
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatDetails(tt.state)
+			if got != tt.want {
+				t.Errorf("FormatDetails() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
