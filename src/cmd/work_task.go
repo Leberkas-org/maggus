@@ -103,14 +103,17 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	// Signal iteration start to the TUI.
 	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal)
 
-	// Update Discord Rich Presence with current task info.
+	// Update Discord Rich Presence with current task info and progress.
 	if tc.presence != nil {
+		completed, total := computeTaskProgress(tasks, next.SourceFile)
 		tc.presence.Update(discord.PresenceState{
-			TaskID:       next.ID,
-			TaskTitle:    next.Title,
-			FeatureTitle: parser.ParseFileTitle(next.SourceFile),
-			StartTime:    time.Now(),
-			Verb:         verbForTask(next.SourceFile),
+			TaskID:          next.ID,
+			TaskTitle:       next.Title,
+			FeatureTitle:    parser.ParseFileTitle(next.SourceFile),
+			StartTime:       time.Now(),
+			Verb:            verbForTask(next.SourceFile),
+			ProgressCurrent: completed,
+			ProgressTotal:   total,
 		})
 	}
 
@@ -230,6 +233,20 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 		tc.p.Send(runner.CommitMsg{Message: commitResult.Message})
 		tc.notifier.PlayTaskComplete()
 		result.committed = true
+
+		// Update Discord presence with incremented progress (task now counts as done).
+		if tc.presence != nil {
+			completed, total := computeTaskProgress(parsedTasks, task.SourceFile)
+			tc.presence.Update(discord.PresenceState{
+				TaskID:          task.ID,
+				TaskTitle:       task.Title,
+				FeatureTitle:    parser.ParseFileTitle(task.SourceFile),
+				StartTime:       time.Now(),
+				Verb:            verbForTask(task.SourceFile),
+				ProgressCurrent: completed,
+				ProgressTotal:   total,
+			})
+		}
 
 		// Fire task completion hooks (zero overhead when unconfigured).
 		if len(tc.hooks.OnTaskComplete) > 0 {
@@ -464,6 +481,34 @@ func fireCompletionHooks(tc taskContext, completedPaths []string, snapshots []co
 		}
 		hooks.Run(commands, event, tc.workDir, log.Default())
 	}
+}
+
+// computeTaskProgress counts completed and total tasks scoped to the given source file.
+// When taskFlag is set (single-task mode), it returns progress scoped to that one task only.
+func computeTaskProgress(tasks []parser.Task, sourceFile string) (completed, total int) {
+	if taskFlag != "" {
+		// Single-task mode: progress is 0/1 or 1/1.
+		for i := range tasks {
+			if tasks[i].ID == taskFlag {
+				if tasks[i].IsComplete() {
+					return 1, 1
+				}
+				return 0, 1
+			}
+		}
+		return 0, 1
+	}
+
+	for i := range tasks {
+		if tasks[i].SourceFile != sourceFile {
+			continue
+		}
+		total++
+		if tasks[i].IsComplete() {
+			completed++
+		}
+	}
+	return completed, total
 }
 
 // verbForTask returns the Discord presence verb based on the task's source file path.

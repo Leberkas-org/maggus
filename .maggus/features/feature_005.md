@@ -90,13 +90,13 @@ Enhance the Discord Rich Presence integration to show more contextual informatio
 **Parallel:** yes — can run alongside TASK-005-002, TASK-005-003
 
 **Acceptance Criteria:**
-- [ ] When `presence.Update()` is called in `runTask()`, it includes `ProgressCurrent` and `ProgressTotal` computed from the task list scoped to the current feature/bug file
-- [ ] Progress counts completed tasks vs total tasks in the same source file (using `task.IsComplete()` from the parser)
-- [ ] The progress is calculated at the start of each task iteration (before the agent runs), showing how many tasks are already done
-- [ ] After a task completes and the commit succeeds, presence is updated again with incremented progress (the just-completed task now counts as done)
-- [ ] When `--task` flag targets a single task (no broader feature context), progress shows 0/1 or 1/1
-- [ ] Edge case: if all tasks are complete after the final iteration, progress shows e.g. "7/7 tasks (100%)"
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When `presence.Update()` is called in `runTask()`, it includes `ProgressCurrent` and `ProgressTotal` computed from the task list scoped to the current feature/bug file
+- [x] Progress counts completed tasks vs total tasks in the same source file (using `task.IsComplete()` from the parser)
+- [x] The progress is calculated at the start of each task iteration (before the agent runs), showing how many tasks are already done
+- [x] After a task completes and the commit succeeds, presence is updated again with incremented progress (the just-completed task now counts as done)
+- [x] When `--task` flag targets a single task (no broader feature context), progress shows 0/1 or 1/1
+- [x] Edge case: if all tasks are complete after the final iteration, progress shows e.g. "7/7 tasks (100%)"
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-005-005: Integration tests for enhanced Discord presence
 **Description:** As a developer, I want integration tests that verify the enhanced presence updates are sent correctly across prompt and work modes so we catch regressions.
