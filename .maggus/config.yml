@@ -1,8 +1,7 @@
 agent: claude
-model: opus
+model: sonnet
 include: []
 worktree: false
-auto_work: disabled
 approval_mode: opt-in
 auto_continue: null
 notifications:

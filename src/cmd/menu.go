@@ -346,6 +346,8 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
+	firstLaunch bool // true only on the very first menu open; prevents auto-dispatch on re-entry after work
+
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
 	watcherCh chan bool
@@ -364,7 +366,7 @@ type menuModel struct {
 	activeSubDef *subMenuDef // pointer to the active sub-menu definition (with live option state)
 }
 
-func newMenuModel(summary featureSummary) menuModel {
+func newMenuModel(summary featureSummary, firstLaunch bool) menuModel {
 	cwd, _ := os.Getwd()
 
 	ch := make(chan bool, 1)
@@ -380,12 +382,13 @@ func newMenuModel(summary featureSummary) menuModel {
 	}, 300*time.Millisecond)
 
 	return menuModel{
-		items:       activeMenuItems(),
-		summary:     summary,
-		cwd:         cwd,
-		subMenuDefs: buildSubMenus(),
-		watcher:     w,
-		watcherCh:   ch,
+		items:        activeMenuItems(),
+		summary:      summary,
+		cwd:          cwd,
+		firstLaunch:  firstLaunch,
+		subMenuDefs:  buildSubMenus(),
+		watcher:      w,
+		watcherCh:    ch,
 	}
 }
 
@@ -418,8 +421,9 @@ func (m menuModel) Init() tea.Cmd {
 		listenForWatcherUpdate(m.watcherCh),
 		pollMenuDaemonTick(),
 	}
-	// If workable tasks already exist at launch, auto-dispatch work.
-	if m.summary.workable+m.summary.bugWorkable > 0 {
+	// If workable tasks already exist on the very first launch, auto-dispatch work.
+	// Guard on firstLaunch so re-entry after a work run shows the menu normally.
+	if m.firstLaunch && m.summary.workable+m.summary.bugWorkable > 0 {
 		cmds = append(cmds, func() tea.Msg {
 			return startupAutoWorkMsg{}
 		})

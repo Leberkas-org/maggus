@@ -89,6 +89,7 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	firstLaunch := true
 	for {
 		// Show idle presence while in the main menu.
 		if presence != nil {
@@ -103,7 +104,8 @@ func runMenu(cmd *cobra.Command, args []string) error {
 				// send the initial update once connected.
 			}
 		}
-		m := newMenuModel(loadFeatureSummary())
+		m := newMenuModel(loadFeatureSummary(), firstLaunch)
+		firstLaunch = false
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := p.Run()
 
