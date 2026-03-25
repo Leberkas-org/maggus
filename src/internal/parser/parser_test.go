@@ -919,3 +919,54 @@ func TestParseFile_BugTaskIDs(t *testing.T) {
 		t.Errorf("task 1 ID = %q, want BUG-001-002", tasks[1].ID)
 	}
 }
+
+func TestParseMaggusID_ValidUUID(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	os.WriteFile(path, []byte("<!-- maggus-id: d2062a56-007c-47cd-8e7b-ba3d2e361689 -->\n# Feature 001: Test\n"), 0o644)
+
+	got := ParseMaggusID(path)
+	if got != "d2062a56-007c-47cd-8e7b-ba3d2e361689" {
+		t.Errorf("ParseMaggusID = %q, want d2062a56-007c-47cd-8e7b-ba3d2e361689", got)
+	}
+}
+
+func TestParseMaggusID_MissingComment(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	os.WriteFile(path, []byte("# Feature 001: No UUID\n\nSome content.\n"), 0o644)
+
+	got := ParseMaggusID(path)
+	if got != "" {
+		t.Errorf("ParseMaggusID = %q, want empty string", got)
+	}
+}
+
+func TestParseMaggusID_WrongFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	os.WriteFile(path, []byte("<!-- wrong-key: d2062a56-007c-47cd-8e7b-ba3d2e361689 -->\n"), 0o644)
+
+	got := ParseMaggusID(path)
+	if got != "" {
+		t.Errorf("ParseMaggusID = %q, want empty string for wrong format", got)
+	}
+}
+
+func TestParseMaggusID_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.md")
+	os.WriteFile(path, []byte(""), 0o644)
+
+	got := ParseMaggusID(path)
+	if got != "" {
+		t.Errorf("ParseMaggusID = %q, want empty string for empty file", got)
+	}
+}
+
+func TestParseMaggusID_FileNotFound(t *testing.T) {
+	got := ParseMaggusID("/nonexistent/path/feature_001.md")
+	if got != "" {
+		t.Errorf("ParseMaggusID = %q, want empty string for missing file", got)
+	}
+}

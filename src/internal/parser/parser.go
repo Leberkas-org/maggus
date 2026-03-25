@@ -13,6 +13,31 @@ import (
 
 var taskHeadingRe = regexp.MustCompile(`^###\s+((?:TASK|BUG)-[\w-]+?):\s+(.+)$`)
 
+// maggusIDRe matches the first-line HTML comment containing a maggus-id UUID.
+var maggusIDRe = regexp.MustCompile(`^<!--\s*maggus-id:\s*([0-9a-fA-F-]+)\s*-->$`)
+
+// ParseMaggusID reads only the first line of the file at path and extracts the
+// maggus-id UUID from an HTML comment of the form <!-- maggus-id: <uuid> -->.
+// Returns the UUID string on match, or "" if the file cannot be read or the
+// first line does not match the expected pattern.
+func ParseMaggusID(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if !scanner.Scan() {
+		return ""
+	}
+	line := strings.TrimSpace(scanner.Text())
+	if m := maggusIDRe.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
 type Criterion struct {
 	Text    string
 	Checked bool
