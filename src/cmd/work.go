@@ -61,8 +61,9 @@ func resetWorkFlags() {
 }
 
 var workCmd = &cobra.Command{
-	Use:   "work [count]",
-	Short: "Work on the next N approved features from the feature files",
+	Use:    "work [count]",
+	Short:  "Work on the next N approved features from the feature files",
+	Hidden: true,
 	Long: `Reads feature files and works through all approved features one at a time.
 Each feature's tasks are completed before moving to the next. Use --count or a
 positional argument to limit the number of features worked. By default, one
