@@ -8,14 +8,40 @@ import (
 	"time"
 )
 
+// ipcConnectTimeout is the maximum time to wait for the named pipe open.
+// Matches the spirit of the Unix implementation's 5-second DialTimeout,
+// but shorter since OpenFile on a local pipe should be near-instant.
+const ipcConnectTimeout = 3 * time.Second
+
 // connectIPC connects to Discord's named pipe on Windows.
-// Returns nil, nil if Discord is not running (pipe not found).
+// Returns nil, nil if Discord is not running (pipe not found) or unresponsive.
 func connectIPC() (net.Conn, error) {
-	f, err := os.OpenFile(`\\.\pipe\discord-ipc-0`, os.O_RDWR, 0)
-	if err != nil {
-		return nil, nil // Discord not running — silent
+	type result struct {
+		f   *os.File
+		err error
 	}
-	return &pipeConn{f: f}, nil
+	ch := make(chan result, 1)
+	go func() {
+		f, err := os.OpenFile(`\\.\pipe\discord-ipc-0`, os.O_RDWR, 0)
+		ch <- result{f, err}
+	}()
+
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			return nil, nil // Discord not running — silent
+		}
+		return &pipeConn{f: res.f}, nil
+	case <-time.After(ipcConnectTimeout):
+		// OpenFile is stuck — Discord is unresponsive. The goroutine will
+		// eventually return when the OS unblocks; close the handle then.
+		go func() {
+			if res := <-ch; res.err == nil {
+				res.f.Close()
+			}
+		}()
+		return nil, nil // Discord not available — silent
+	}
 }
 
 // pipeConn wraps an *os.File to satisfy net.Conn for Windows named pipes.
