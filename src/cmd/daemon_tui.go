@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
 )
 
@@ -15,14 +16,23 @@ import (
 // work goroutine is never left waiting for user input.
 // It also tracks token usage via UsageMsg/ModelUsageMsg and flushes
 // a usage record when a task boundary is reached (IterationStartMsg or QuitMsg).
+// Additionally, it writes a state.json snapshot on each significant event
+// so the status view can render a rich live TUI.
 type nullTUIModel struct {
 	taskID          string
 	taskTitle       string
 	taskFeatureFile string
 	startTime       time.Time
+	status          string
 	onToolUse       func(taskID, toolType, description string)
 	onOutput        func(taskID, text string)
 	onTaskUsage     func(runner.TaskUsage)
+
+	// Snapshot state — written to state.json on each event.
+	snapshotDir   string // project root directory
+	snapshotRunID string // run ID for the snapshot path
+	toolEntries   []runlog.SnapshotToolEntry
+	commits       []string
 
 	// Token accumulation for current iteration.
 	iterInput         int
@@ -70,12 +80,23 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskTitle = msg.TaskTitle
 		m.taskFeatureFile = msg.FeatureFile
 		m.startTime = time.Now()
+		m.status = "Starting"
+		m.toolEntries = nil
+		m.commits = nil
+		m.writeSnapshot()
+	case runner.CommitMsg:
+		m.commits = append(m.commits, msg.Message)
+		m.writeSnapshot()
+	case agent.StatusMsg:
+		m.status = msg.Status
+		m.writeSnapshot()
 	case agent.UsageMsg:
 		m.iterInput += msg.InputTokens
 		m.iterOutput += msg.OutputTokens
 		m.iterCacheCreation += msg.CacheCreationInputTokens
 		m.iterCacheRead += msg.CacheReadInputTokens
 		m.iterCost += msg.CostUSD
+		m.writeSnapshot()
 	case agent.ModelUsageMsg:
 		if m.iterModelUsage == nil {
 			m.iterModelUsage = make(map[string]agent.ModelTokens)
@@ -90,15 +111,43 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.iterModelUsage[name] = existing
 		}
 	case agent.ToolMsg:
+		m.toolEntries = append(m.toolEntries, runlog.SnapshotToolEntry{
+			Type:        msg.Type,
+			Icon:        toolIconForSnapshot(msg.Type),
+			Description: msg.Description,
+			Timestamp:   msg.Timestamp.UTC().Format(time.RFC3339),
+		})
 		if m.onToolUse != nil {
 			m.onToolUse(m.taskID, msg.Type, msg.Description)
 		}
+		m.writeSnapshot()
 	case agent.OutputMsg:
 		if m.onOutput != nil {
 			m.onOutput(m.taskID, strings.TrimSpace(msg.Text))
 		}
 	}
 	return m, nil
+}
+
+// writeSnapshot writes the current state to state.json.
+func (m *nullTUIModel) writeSnapshot() {
+	if m.snapshotDir == "" || m.snapshotRunID == "" {
+		return
+	}
+	snap := runlog.StateSnapshot{
+		TaskID:         m.taskID,
+		TaskTitle:      m.taskTitle,
+		FeatureFile:    m.taskFeatureFile,
+		Status:         m.status,
+		ToolEntries:    m.toolEntries,
+		TokenInput:     m.iterInput,
+		TokenOutput:    m.iterOutput,
+		TokenCost:      m.iterCost,
+		ModelBreakdown: m.iterModelUsage,
+		Commits:        m.commits,
+	}
+	// Best-effort write; errors are not fatal for the daemon.
+	_ = runlog.WriteSnapshot(m.snapshotDir, m.snapshotRunID, snap)
 }
 
 // flushUsage saves accumulated token usage for the current task and resets counters.
@@ -131,3 +180,30 @@ func (m *nullTUIModel) flushUsage() {
 }
 
 func (m nullTUIModel) View() string { return "" }
+
+// toolIconForSnapshot maps tool types to display icons for the state snapshot.
+func toolIconForSnapshot(toolType string) string {
+	switch toolType {
+	case "Read":
+		return "📖"
+	case "Edit":
+		return "✏️"
+	case "Write":
+		return "📝"
+	case "Bash":
+		return "⚡"
+	case "Glob":
+		return "🔍"
+	case "Grep":
+		return "🔎"
+	case "Skill":
+		return "🎯"
+	case "Agent":
+		return "🤖"
+	default:
+		if strings.HasPrefix(toolType, "mcp__") {
+			return "🔌"
+		}
+		return "▶️"
+	}
+}

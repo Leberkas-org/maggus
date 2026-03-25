@@ -76,6 +76,7 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		cmd.Printf("Warning: could not open run log: %v\n", logErr)
 	}
 	defer func() { _ = runLogger.Close() }()
+	defer runlog.RemoveSnapshot(dir, runID)
 
 	// Create filesystem watcher once and reuse across all wait cycles.
 	fw, fwErr := filewatcher.New(dir, nil, 500*time.Millisecond)
@@ -210,7 +211,10 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	}
 
 	// Create tea.Program with nullTUIModel for this cycle.
-	dm := nullTUIModel{}
+	dm := nullTUIModel{
+		snapshotDir:   dir,
+		snapshotRunID: runID,
+	}
 	dm.SetOnToolUse(func(taskID, toolType, description string) {
 		runLogger.ToolUse(taskID, toolType, description)
 	})
