@@ -23,16 +23,16 @@ Replace three parallel implementations of feature/bug file loading (`featureInfo
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] New file `src/internal/parser/plan.go` with `Plan` struct containing: `ID`, `MaggusID`, `File`, `Tasks`, `IsBug`, `Completed`
-- [ ] `Plan.ApprovalKey()` returns `MaggusID` if set, otherwise `ID`
-- [ ] `Plan.DoneCount()` returns count of completed tasks
-- [ ] `Plan.BlockedCount()` returns count of incomplete+blocked tasks
-- [ ] `LoadPlans(dir string, includeCompleted bool) ([]Plan, error)` loads all feature and bug files, bugs first
-- [ ] `LoadPlans` correctly handles `_completed` suffix detection
-- [ ] `LoadPlans` calls `MigrateLegacyBugIDs` for bug files (matching current `work_loop.go` behavior)
-- [ ] New file `src/internal/parser/plan_test.go` with tests for all methods and edge cases
-- [ ] `go test ./internal/parser/` passes
-- [ ] Approval status is NOT stored on `Plan` (callers look it up separately)
+- [x] New file `src/internal/parser/plan.go` with `Plan` struct containing: `ID`, `MaggusID`, `File`, `Tasks`, `IsBug`, `Completed`
+- [x] `Plan.ApprovalKey()` returns `MaggusID` if set, otherwise `ID`
+- [x] `Plan.DoneCount()` returns count of completed tasks
+- [x] `Plan.BlockedCount()` returns count of incomplete+blocked tasks
+- [x] `LoadPlans(dir string, includeCompleted bool) ([]Plan, error)` loads all feature and bug files, bugs first
+- [x] `LoadPlans` correctly handles `_completed` suffix detection
+- [x] `LoadPlans` calls `MigrateLegacyBugIDs` for bug files (matching current `work_loop.go` behavior)
+- [x] New file `src/internal/parser/plan_test.go` with tests for all methods and edge cases
+- [x] `go test ./internal/parser/` passes
+- [x] Approval status is NOT stored on `Plan` (callers look it up separately)
 
 ### TASK-002-002: Migrate all consumers to parser.Plan
 **Description:** As a developer, I want all feature/bug file consumers to use `parser.Plan` so that the duplicated structs and load functions can be deleted.
