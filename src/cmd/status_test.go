@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -11,40 +10,37 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-func TestFeatureInfo_ApprovalKey(t *testing.T) {
-	t.Run("uses maggusID when set", func(t *testing.T) {
-		f := &featureInfo{filename: "feature_001.md", maggusID: "abc-123"}
-		if got := f.approvalKey(); got != "abc-123" {
-			t.Errorf("approvalKey() = %q, want %q", got, "abc-123")
+func TestPlan_ApprovalKey(t *testing.T) {
+	t.Run("uses MaggusID when set", func(t *testing.T) {
+		p := &parser.Plan{ID: "feature_001", MaggusID: "abc-123"}
+		if got := p.ApprovalKey(); got != "abc-123" {
+			t.Errorf("ApprovalKey() = %q, want %q", got, "abc-123")
 		}
 	})
 
-	t.Run("falls back to featureIDFromPath when maggusID empty", func(t *testing.T) {
-		f := &featureInfo{filename: "feature_001.md"}
-		want := featureIDFromPath("feature_001.md")
-		if got := f.approvalKey(); got != want {
-			t.Errorf("approvalKey() = %q, want %q", got, want)
+	t.Run("falls back to ID when MaggusID empty", func(t *testing.T) {
+		p := &parser.Plan{ID: "feature_001"}
+		if got := p.ApprovalKey(); got != "feature_001" {
+			t.Errorf("ApprovalKey() = %q, want %q", got, "feature_001")
 		}
 	})
 }
 
 func TestPruneStaleApprovals(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := dir + "/.maggus"
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	dir := setupApproveDir(t)
 
 	// Write an approvals file with a stale entry
-	data := "stale-uuid: true\nactive-uuid: true\n"
-	if err := os.WriteFile(maggusDir+"/feature_approvals.yml", []byte(data), 0o644); err != nil {
+	if err := approval.Save(dir, approval.Approvals{
+		"stale-uuid":  true,
+		"active-uuid": true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
-	features := []featureInfo{
-		{filename: "feature_001.md", maggusID: "active-uuid"},
+	plans := []parser.Plan{
+		{ID: "feature_001", MaggusID: "active-uuid", File: "feature_001.md"},
 	}
-	pruneStaleApprovals(dir, features)
+	pruneStaleApprovals(dir, plans)
 
 	a, err := approval.Load(dir)
 	if err != nil {
@@ -59,23 +55,21 @@ func TestPruneStaleApprovals(t *testing.T) {
 }
 
 func TestPruneStaleApprovals_FallbackKey(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := dir + "/.maggus"
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+	dir := setupApproveDir(t)
+
+	// Feature without MaggusID uses ID-based key
+	fallbackKey := "feature_002"
+	if err := approval.Save(dir, approval.Approvals{
+		fallbackKey: true,
+		"old-entry": false,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
-	// Feature without maggusID uses filename-based key
-	fallbackKey := featureIDFromPath("feature_002.md")
-	data := fallbackKey + ": true\nold-entry: false\n"
-	if err := os.WriteFile(maggusDir+"/feature_approvals.yml", []byte(data), 0o644); err != nil {
-		t.Fatal(err)
+	plans := []parser.Plan{
+		{ID: "feature_002", File: "feature_002.md"}, // no MaggusID
 	}
-
-	features := []featureInfo{
-		{filename: "feature_002.md"}, // no maggusID
-	}
-	pruneStaleApprovals(dir, features)
+	pruneStaleApprovals(dir, plans)
 
 	a, err := approval.Load(dir)
 	if err != nil {
@@ -89,7 +83,7 @@ func TestPruneStaleApprovals_FallbackKey(t *testing.T) {
 	}
 }
 
-func TestFeatureInfo_DoneCount(t *testing.T) {
+func TestPlan_DoneCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -135,16 +129,16 @@ func TestFeatureInfo_DoneCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &featureInfo{tasks: tt.tasks}
-			got := p.doneCount()
+			p := &parser.Plan{Tasks: tt.tasks}
+			got := p.DoneCount()
 			if got != tt.want {
-				t.Errorf("doneCount() = %d, want %d", got, tt.want)
+				t.Errorf("DoneCount() = %d, want %d", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestFeatureInfo_BlockedCount(t *testing.T) {
+func TestPlan_BlockedCount(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []parser.Task
@@ -182,18 +176,18 @@ func TestFeatureInfo_BlockedCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &featureInfo{tasks: tt.tasks}
-			got := p.blockedCount()
+			p := &parser.Plan{Tasks: tt.tasks}
+			got := p.BlockedCount()
 			if got != tt.want {
-				t.Errorf("blockedCount() = %d, want %d", got, tt.want)
+				t.Errorf("BlockedCount() = %d, want %d", got, tt.want)
 			}
 		})
 	}
 }
 
 func TestBuildSelectableTasksForFeature(t *testing.T) {
-	feature := featureInfo{
-		tasks: []parser.Task{
+	plan := parser.Plan{
+		Tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
 			{ID: "TASK-003", Criteria: []parser.Criterion{{Checked: true}}},
@@ -201,7 +195,7 @@ func TestBuildSelectableTasksForFeature(t *testing.T) {
 	}
 
 	t.Run("showAll false excludes complete", func(t *testing.T) {
-		got := buildSelectableTasksForFeature(feature, false)
+		got := buildSelectableTasksForFeature(plan, false)
 		if len(got) != 1 {
 			t.Fatalf("len = %d, want 1", len(got))
 		}
@@ -211,14 +205,14 @@ func TestBuildSelectableTasksForFeature(t *testing.T) {
 	})
 
 	t.Run("showAll true includes all", func(t *testing.T) {
-		got := buildSelectableTasksForFeature(feature, true)
+		got := buildSelectableTasksForFeature(plan, true)
 		if len(got) != 3 {
 			t.Fatalf("len = %d, want 3", len(got))
 		}
 	})
 
 	t.Run("empty feature", func(t *testing.T) {
-		got := buildSelectableTasksForFeature(featureInfo{}, false)
+		got := buildSelectableTasksForFeature(parser.Plan{}, false)
 		if len(got) != 0 {
 			t.Errorf("len = %d, want 0", len(got))
 		}
@@ -226,10 +220,10 @@ func TestBuildSelectableTasksForFeature(t *testing.T) {
 }
 
 func TestVisibleFeatures(t *testing.T) {
-	plans := []featureInfo{
-		{filename: "plan_1.md", completed: false},
-		{filename: "plan_2_completed.md", completed: true},
-		{filename: "plan_3.md", completed: false},
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md"},
+		{ID: "plan_2", File: "plan_2_completed.md", Completed: true},
+		{ID: "plan_3", File: "plan_3.md"},
 	}
 
 	t.Run("showAll false hides completed", func(t *testing.T) {
@@ -238,8 +232,8 @@ func TestVisibleFeatures(t *testing.T) {
 		if len(got) != 2 {
 			t.Fatalf("len = %d, want 2", len(got))
 		}
-		if got[0].filename != "plan_1.md" || got[1].filename != "plan_3.md" {
-			t.Errorf("got %s, %s", got[0].filename, got[1].filename)
+		if got[0].File != "plan_1.md" || got[1].File != "plan_3.md" {
+			t.Errorf("got %s, %s", got[0].File, got[1].File)
 		}
 	})
 
@@ -262,11 +256,11 @@ func TestVisibleFeatures(t *testing.T) {
 
 func TestFindNextTask(t *testing.T) {
 	t.Run("finds first incomplete task", func(t *testing.T) {
-		plans := []featureInfo{
+		plans := []parser.Plan{
 			{
-				filename:  "plan_1.md",
-				completed: false,
-				tasks: []parser.Task{
+				ID:   "plan_1",
+				File: "plan_1.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: true}}},
 					{ID: "TASK-002", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
@@ -282,18 +276,19 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("skips completed plans", func(t *testing.T) {
-		plans := []featureInfo{
+		plans := []parser.Plan{
 			{
-				filename:  "plan_1_completed.md",
-				completed: true,
-				tasks: []parser.Task{
+				ID:        "plan_1",
+				File:      "plan_1_completed.md",
+				Completed: true,
+				Tasks: []parser.Task{
 					{ID: "TASK-001", SourceFile: "plan_1_completed.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 			{
-				filename:  "plan_2.md",
-				completed: false,
-				tasks: []parser.Task{
+				ID:   "plan_2",
+				File: "plan_2.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-010", SourceFile: "plan_2.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
@@ -305,11 +300,11 @@ func TestFindNextTask(t *testing.T) {
 	})
 
 	t.Run("all complete returns empty", func(t *testing.T) {
-		plans := []featureInfo{
+		plans := []parser.Plan{
 			{
-				filename:  "plan_1.md",
-				completed: false,
-				tasks: []parser.Task{
+				ID:   "plan_1",
+				File: "plan_1.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 				},
 			},
@@ -330,11 +325,11 @@ func TestFindNextTask(t *testing.T) {
 
 func TestRenderStatusPlain(t *testing.T) {
 	t.Run("basic output", func(t *testing.T) {
-		plans := []featureInfo{
+		plans := []parser.Plan{
 			{
-				filename:  "plan_1.md",
-				completed: false,
-				tasks: []parser.Task{
+				ID:   "plan_1",
+				File: "plan_1.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001", Title: "First task", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: true}}},
 					{ID: "TASK-002", Title: "Second task", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: false}}},
 					{ID: "TASK-003", Title: "Blocked task", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Text: "BLOCKED: dep", Blocked: true}}},
@@ -342,14 +337,12 @@ func TestRenderStatusPlain(t *testing.T) {
 			},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, plans, false, "TASK-002", "plan_1.md", "claude")
+		renderStatusPlain(&sb, plans, false, "TASK-002", "plan_1.md", "claude", nil, false)
 		out := sb.String()
 
-		// Header
 		if !strings.Contains(out, "1 features (1 active), 3 tasks total") {
 			t.Error("missing header summary")
 		}
-		// Summary line
 		if !strings.Contains(out, "1/3 tasks complete") {
 			t.Error("missing completion count")
 		}
@@ -359,11 +352,9 @@ func TestRenderStatusPlain(t *testing.T) {
 		if !strings.Contains(out, "1 blocked") {
 			t.Error("missing blocked count")
 		}
-		// Agent
 		if !strings.Contains(out, "Agent: claude") {
 			t.Error("missing agent name")
 		}
-		// Task list
 		if !strings.Contains(out, "[x]  TASK-001: First task") {
 			t.Error("missing completed task")
 		}
@@ -376,7 +367,6 @@ func TestRenderStatusPlain(t *testing.T) {
 		if !strings.Contains(out, "BLOCKED: dep") {
 			t.Error("missing blocked reason")
 		}
-		// Features table
 		if !strings.Contains(out, "Features") {
 			t.Error("missing Features section")
 		}
@@ -386,16 +376,16 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan hidden when showAll false", func(t *testing.T) {
-		plans := []featureInfo{
-			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
+		plans := []parser.Plan{
+			{ID: "plan_1", File: "plan_1_completed.md", Completed: true, Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
-			{filename: "plan_2.md", completed: false, tasks: []parser.Task{
+			{ID: "plan_2", File: "plan_2.md", Tasks: []parser.Task{
 				{ID: "TASK-010", Title: "Active", SourceFile: "plan_2.md", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, plans, false, "TASK-010", "plan_2.md", "claude")
+		renderStatusPlain(&sb, plans, false, "TASK-010", "plan_2.md", "claude", nil, false)
 		out := sb.String()
 
 		if strings.Contains(out, "plan_1_completed.md") {
@@ -407,13 +397,13 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("completed plan shown when showAll true", func(t *testing.T) {
-		plans := []featureInfo{
-			{filename: "plan_1_completed.md", completed: true, tasks: []parser.Task{
+		plans := []parser.Plan{
+			{ID: "plan_1", File: "plan_1_completed.md", Completed: true, Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, plans, true, "", "", "claude")
+		renderStatusPlain(&sb, plans, true, "", "", "claude", nil, false)
 		out := sb.String()
 
 		if !strings.Contains(out, "plan_1_completed.md") {
@@ -425,13 +415,14 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("unapproved plan shown with marker", func(t *testing.T) {
-		plans := []featureInfo{
-			{filename: "plan_1.md", approved: false, tasks: []parser.Task{
+		plans := []parser.Plan{
+			{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
 				{ID: "TASK-001", Title: "Unapproved task", SourceFile: "plan_1.md", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
 		}
+		// opt-in mode with no approvals = unapproved
 		var sb strings.Builder
-		renderStatusPlain(&sb, plans, false, "", "", "claude")
+		renderStatusPlain(&sb, plans, false, "", "", "claude", nil, true)
 		out := sb.String()
 
 		if !strings.Contains(out, "[✗]") {
@@ -447,7 +438,7 @@ func TestRenderStatusPlain(t *testing.T) {
 
 	t.Run("empty plans", func(t *testing.T) {
 		var sb strings.Builder
-		renderStatusPlain(&sb, nil, false, "", "", "claude")
+		renderStatusPlain(&sb, nil, false, "", "", "claude", nil, false)
 		out := sb.String()
 
 		if !strings.Contains(out, "0 features (0 active), 0 tasks total") {
@@ -456,23 +447,23 @@ func TestRenderStatusPlain(t *testing.T) {
 	})
 
 	t.Run("plans table status labels", func(t *testing.T) {
-		plans := []featureInfo{
-			{filename: "plan_new.md", approved: true, tasks: []parser.Task{
+		plans := []parser.Plan{
+			{ID: "plan_new", File: "plan_new.md", Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
-			{filename: "plan_progress.md", approved: true, tasks: []parser.Task{
+			{ID: "plan_progress", File: "plan_progress.md", Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 				{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
 			}},
-			{filename: "plan_done.md", approved: true, tasks: []parser.Task{
+			{ID: "plan_done", File: "plan_done.md", Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 			}},
-			{filename: "plan_blocked.md", approved: true, tasks: []parser.Task{
+			{ID: "plan_blocked", File: "plan_blocked.md", Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Text: "BLOCKED: x", Blocked: true}}},
 			}},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, plans, false, "TASK-001", "", "claude")
+		renderStatusPlain(&sb, plans, false, "TASK-001", "", "claude", nil, false)
 		out := sb.String()
 
 		if !strings.Contains(out, "new") {
@@ -488,10 +479,11 @@ func TestRenderStatusPlain(t *testing.T) {
 }
 
 func TestNewStatusModel(t *testing.T) {
-	plans := []featureInfo{
+	plans := []parser.Plan{
 		{
-			filename: "plan_1.md",
-			tasks: []parser.Task{
+			ID:   "plan_1",
+			File: "plan_1.md",
+			Tasks: []parser.Task{
 				{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: true}}},
 				{ID: "TASK-002", Criteria: []parser.Criterion{{Checked: false}}},
 			},
@@ -509,7 +501,6 @@ func TestNewStatusModel(t *testing.T) {
 		if m.showAll {
 			t.Error("showAll should be false")
 		}
-		// showAll=false should exclude complete tasks from selectable
 		if len(m.Tasks) != 1 {
 			t.Fatalf("Tasks len = %d, want 1", len(m.Tasks))
 		}
@@ -534,11 +525,11 @@ func TestNewStatusModel(t *testing.T) {
 }
 
 func TestRebuildForSelectedPlan(t *testing.T) {
-	plans := []featureInfo{
-		{filename: "plan_1.md", tasks: []parser.Task{
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
-		{filename: "plan_2.md", tasks: []parser.Task{
+		{ID: "plan_2", File: "plan_2.md", Tasks: []parser.Task{
 			{ID: "TASK-010", Criteria: []parser.Criterion{{Checked: false}}},
 			{ID: "TASK-011", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
@@ -586,7 +577,6 @@ func TestRebuildForSelectedPlan(t *testing.T) {
 }
 
 func TestEnsureCursorVisible(t *testing.T) {
-	// Use a model with fixed dimensions so visibleTaskLines returns a known value
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			Width:       80,
@@ -595,13 +585,11 @@ func TestEnsureCursorVisible(t *testing.T) {
 			HeaderLines: statusHeaderLines,
 		},
 	}
-	// Just verify it doesn't panic and ScrollOffset stays reasonable
 	m.ensureCursorVisible()
 	if m.ScrollOffset < 0 {
 		t.Errorf("ScrollOffset = %d, should not be negative", m.ScrollOffset)
 	}
 
-	// Cursor beyond visible range
 	m.Cursor = 100
 	m.ScrollOffset = 0
 	m.ensureCursorVisible()
@@ -609,7 +597,6 @@ func TestEnsureCursorVisible(t *testing.T) {
 		t.Errorf("ScrollOffset should advance when cursor is beyond visible range, got %d", m.ScrollOffset)
 	}
 
-	// Cursor before ScrollOffset
 	m.ScrollOffset = 50
 	m.Cursor = 10
 	m.ensureCursorVisible()
@@ -627,8 +614,8 @@ func TestStatusModel_InitReturnsCmd(t *testing.T) {
 }
 
 func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
-	plans := []featureInfo{
-		{filename: "plan_1.md", tasks: []parser.Task{
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
 	}
@@ -661,8 +648,8 @@ func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
 }
 
 func TestStatusModel_ViewBorderColor(t *testing.T) {
-	plans := []featureInfo{
-		{filename: "plan_1.md", tasks: []parser.Task{
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
 			{ID: "TASK-001", Title: "Test", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
 	}
@@ -671,7 +658,6 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false)
 		m.is2x = false
 		view := m.View()
-		// Verify the view renders without error and contains expected content
 		if !strings.Contains(view, "Status") {
 			t.Error("view should contain 'Status' header")
 		}
@@ -704,17 +690,19 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 
 func TestFindNextTask_BugsPrioritized(t *testing.T) {
 	t.Run("bugs before features", func(t *testing.T) {
-		items := []featureInfo{
+		items := []parser.Plan{
 			{
-				filename: "feature_001.md",
-				tasks: []parser.Task{
+				ID:   "feature_001",
+				File: "feature_001.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 			{
-				filename: "bug_001.md",
-				isBug:    true,
-				tasks: []parser.Task{
+				ID:    "bug_001",
+				File:  "bug_001.md",
+				IsBug: true,
+				Tasks: []parser.Task{
 					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
@@ -729,18 +717,20 @@ func TestFindNextTask_BugsPrioritized(t *testing.T) {
 	})
 
 	t.Run("falls back to features when all bugs complete", func(t *testing.T) {
-		items := []featureInfo{
+		items := []parser.Plan{
 			{
-				filename: "feature_001.md",
-				tasks: []parser.Task{
+				ID:   "feature_001",
+				File: "feature_001.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 			{
-				filename:  "bug_001.md",
-				isBug:     true,
-				completed: true,
-				tasks: []parser.Task{
+				ID:        "bug_001",
+				File:      "bug_001.md",
+				IsBug:     true,
+				Completed: true,
+				Tasks: []parser.Task{
 					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: true}}},
 				},
 			},
@@ -752,11 +742,12 @@ func TestFindNextTask_BugsPrioritized(t *testing.T) {
 	})
 
 	t.Run("only bugs", func(t *testing.T) {
-		items := []featureInfo{
+		items := []parser.Plan{
 			{
-				filename: "bug_001.md",
-				isBug:    true,
-				tasks: []parser.Task{
+				ID:    "bug_001",
+				File:  "bug_001.md",
+				IsBug: true,
+				Tasks: []parser.Task{
 					{ID: "BUG-001-001", SourceFile: "bug_001.md", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
@@ -769,10 +760,10 @@ func TestFindNextTask_BugsPrioritized(t *testing.T) {
 }
 
 func TestVisibleFeatures_WithBugs(t *testing.T) {
-	items := []featureInfo{
-		{filename: "feature_001.md"},
-		{filename: "bug_001.md", isBug: true},
-		{filename: "bug_002_completed.md", isBug: true, completed: true},
+	items := []parser.Plan{
+		{ID: "feature_001", File: "feature_001.md"},
+		{ID: "bug_001", File: "bug_001.md", IsBug: true},
+		{ID: "bug_002", File: "bug_002_completed.md", IsBug: true, Completed: true},
 	}
 
 	t.Run("showAll false hides completed bugs", func(t *testing.T) {
@@ -781,8 +772,8 @@ func TestVisibleFeatures_WithBugs(t *testing.T) {
 		if len(got) != 2 {
 			t.Fatalf("len = %d, want 2", len(got))
 		}
-		if got[1].filename != "bug_001.md" {
-			t.Errorf("got %s, want bug_001.md", got[1].filename)
+		if got[1].File != "bug_001.md" {
+			t.Errorf("got %s, want bug_001.md", got[1].File)
 		}
 	})
 
@@ -797,23 +788,25 @@ func TestVisibleFeatures_WithBugs(t *testing.T) {
 
 func TestRenderStatusPlain_WithBugs(t *testing.T) {
 	t.Run("mixed features and bugs", func(t *testing.T) {
-		items := []featureInfo{
+		items := []parser.Plan{
 			{
-				filename: "feature_001.md",
-				tasks: []parser.Task{
+				ID:   "feature_001",
+				File: "feature_001.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001-001", Title: "Feature task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 			{
-				filename: "bug_001.md",
-				isBug:    true,
-				tasks: []parser.Task{
+				ID:    "bug_001",
+				File:  "bug_001.md",
+				IsBug: true,
+				Tasks: []parser.Task{
 					{ID: "BUG-001-001", Title: "Bug task", SourceFile: "b", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, items, false, "BUG-001-001", "b", "claude")
+		renderStatusPlain(&sb, items, false, "BUG-001-001", "b", "claude", nil, false)
 		out := sb.String()
 
 		if !strings.Contains(out, "1 features (1 active)") {
@@ -831,16 +824,17 @@ func TestRenderStatusPlain_WithBugs(t *testing.T) {
 	})
 
 	t.Run("no bugs omits bug count", func(t *testing.T) {
-		items := []featureInfo{
+		items := []parser.Plan{
 			{
-				filename: "feature_001.md",
-				tasks: []parser.Task{
+				ID:   "feature_001",
+				File: "feature_001.md",
+				Tasks: []parser.Task{
 					{ID: "TASK-001-001", Title: "Task", SourceFile: "f", Criteria: []parser.Criterion{{Checked: false}}},
 				},
 			},
 		}
 		var sb strings.Builder
-		renderStatusPlain(&sb, items, false, "TASK-001-001", "f", "claude")
+		renderStatusPlain(&sb, items, false, "TASK-001-001", "f", "claude", nil, false)
 		out := sb.String()
 
 		if strings.Contains(out, "bugs") {
@@ -850,17 +844,19 @@ func TestRenderStatusPlain_WithBugs(t *testing.T) {
 }
 
 func TestNewStatusModel_WithBugs(t *testing.T) {
-	items := []featureInfo{
+	items := []parser.Plan{
 		{
-			filename: "feature_001.md",
-			tasks: []parser.Task{
+			ID:   "feature_001",
+			File: "feature_001.md",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Checked: false}}},
 			},
 		},
 		{
-			filename: "bug_001.md",
-			isBug:    true,
-			tasks: []parser.Task{
+			ID:    "bug_001",
+			File:  "bug_001.md",
+			IsBug: true,
+			Tasks: []parser.Task{
 				{ID: "BUG-001-001", Criteria: []parser.Criterion{{Checked: false}}},
 			},
 		},
@@ -872,7 +868,7 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 		if len(visible) != 2 {
 			t.Fatalf("visible features = %d, want 2", len(visible))
 		}
-		if !visible[1].isBug {
+		if !visible[1].IsBug {
 			t.Error("second visible item should be a bug")
 		}
 	})
@@ -891,17 +887,19 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 }
 
 func TestStatusModel_ViewWithBugs(t *testing.T) {
-	items := []featureInfo{
+	items := []parser.Plan{
 		{
-			filename: "feature_001.md",
-			tasks: []parser.Task{
+			ID:   "feature_001",
+			File: "feature_001.md",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Title: "Feature task", Criteria: []parser.Criterion{{Checked: false}}},
 			},
 		},
 		{
-			filename: "bug_001.md",
-			isBug:    true,
-			tasks: []parser.Task{
+			ID:    "bug_001",
+			File:  "bug_001.md",
+			IsBug: true,
+			Tasks: []parser.Task{
 				{ID: "BUG-001-001", Title: "Bug task", Criteria: []parser.Criterion{{Checked: false}}},
 			},
 		},
@@ -938,14 +936,13 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 }
 
 func TestRenderTabBar_BugSeparator(t *testing.T) {
-	items := []featureInfo{
-		{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
-		{filename: "bug_001.md", isBug: true, approved: true, tasks: []parser.Task{{ID: "B1"}}},
+	items := []parser.Plan{
+		{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{{ID: "T1"}}},
+		{ID: "bug_001", File: "bug_001.md", IsBug: true, Tasks: []parser.Task{{ID: "B1"}}},
 	}
 	m := statusModel{features: items, showAll: false}
 	m.Width = 120
 	bar := m.renderTabBar()
-	// The separator ┃ should appear between features and bugs
 	if !strings.Contains(bar, "┃") {
 		t.Error("tab bar should contain ┃ separator between features and bugs")
 	}
@@ -953,10 +950,11 @@ func TestRenderTabBar_BugSeparator(t *testing.T) {
 
 func TestRenderTabBar_ApprovalMark(t *testing.T) {
 	t.Run("approved feature shows checkmark", func(t *testing.T) {
-		items := []featureInfo{
-			{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
+		items := []parser.Plan{
+			{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{{ID: "T1"}}},
 		}
-		m := statusModel{features: items, showAll: false}
+		// opt-out mode, no explicit unapproval → approved
+		m := statusModel{features: items, showAll: false, approvalRequired: false}
 		m.Width = 120
 		bar := m.renderTabBar()
 		if !strings.Contains(bar, "✓") {
@@ -968,10 +966,11 @@ func TestRenderTabBar_ApprovalMark(t *testing.T) {
 	})
 
 	t.Run("unapproved feature shows cross", func(t *testing.T) {
-		items := []featureInfo{
-			{filename: "feature_001.md", approved: false, tasks: []parser.Task{{ID: "T1"}}},
+		items := []parser.Plan{
+			{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{{ID: "T1"}}},
 		}
-		m := statusModel{features: items, showAll: false}
+		// opt-in mode with no approvals → unapproved
+		m := statusModel{features: items, showAll: false, approvalRequired: true}
 		m.Width = 120
 		bar := m.renderTabBar()
 		if !strings.Contains(bar, "✗") {
@@ -983,11 +982,17 @@ func TestRenderTabBar_ApprovalMark(t *testing.T) {
 	})
 
 	t.Run("mixed approved and unapproved", func(t *testing.T) {
-		items := []featureInfo{
-			{filename: "feature_001.md", approved: true, tasks: []parser.Task{{ID: "T1"}}},
-			{filename: "feature_002.md", approved: false, tasks: []parser.Task{{ID: "T2"}}},
+		items := []parser.Plan{
+			{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{{ID: "T1"}}},
+			{ID: "feature_002", File: "feature_002.md", Tasks: []parser.Task{{ID: "T2"}}},
 		}
-		m := statusModel{features: items, showAll: false}
+		// opt-in mode: only feature_001 is approved
+		m := statusModel{
+			features:         items,
+			showAll:          false,
+			approvalRequired: true,
+			approvals:        approval.Approvals{"feature_001": true},
+		}
 		m.Width = 120
 		bar := m.renderTabBar()
 		if !strings.Contains(bar, "✓") {

@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -177,16 +178,16 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		return false, nil
 	}
 
-	// Build feature groups with approval filtering.
-	featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
+	// Build approved plans with approval filtering.
+	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg)
 	if fgErr != nil {
-		return false, fmt.Errorf("build feature groups: %w", fgErr)
+		return false, fmt.Errorf("build approved plans: %w", fgErr)
 	}
 
-	// Remove groups with no workable tasks.
-	var workableGroups []featureGroup
+	// Remove plans with no workable tasks.
+	var workableGroups []parser.Plan
 	for _, g := range featureGroups {
-		if countWorkable(g.tasks) > 0 {
+		if countWorkable(g.Tasks) > 0 {
 			workableGroups = append(workableGroups, g)
 		}
 	}

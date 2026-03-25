@@ -159,93 +159,35 @@ func countWorkable(tasks []parser.Task) int {
 	return n
 }
 
-// featureGroup represents a single source file (feature or bug) and all tasks within it.
-type featureGroup struct {
-	id       string        // base filename without extension (e.g. "feature_001", "bug_001")
-	maggusID string        // UUID from <!-- maggus-id: ... --> comment; empty if absent
-	file     string        // full path to the source file
-	tasks    []parser.Task // all tasks from this file (may include complete/blocked)
-	isBug    bool
-}
-
-// approvalKey returns the maggusID if set, otherwise falls back to the filename-based id.
-func (g *featureGroup) approvalKey() string {
-	if g.maggusID != "" {
-		return g.maggusID
+// buildApprovedPlans loads all plans (bugs first, then features), filters by
+// approval state, prunes stale approvals, and returns the ordered list.
+func buildApprovedPlans(dir string, cfg config.Config) ([]parser.Plan, error) {
+	plans, err := parser.LoadPlans(dir, false)
+	if err != nil {
+		return nil, err
 	}
-	return g.id
-}
 
-// buildApprovedFeatureGroups parses bug and feature files, groups them by source file,
-// filters by approval state, and returns the ordered list (bugs first, then features).
-// Bug files and feature files are both subject to approval in opt-in mode.
-func buildApprovedFeatureGroups(dir string, cfg config.Config) ([]featureGroup, error) {
 	approvals, err := approval.Load(dir)
 	if err != nil {
 		return nil, fmt.Errorf("load approvals: %w", err)
 	}
 	approvalRequired := cfg.IsApprovalRequired()
 
-	// Bug groups first.
-	bugFiles, err := parser.GlobBugFiles(dir, false)
-	if err != nil {
-		return nil, fmt.Errorf("glob bugs: %w", err)
+	// Collect all known IDs for pruning, then filter by approval.
+	var knownIDs []string
+	var approved []parser.Plan
+	for _, p := range plans {
+		knownIDs = append(knownIDs, p.ApprovalKey())
+		if isPlanApproved(p, approvals, approvalRequired) {
+			approved = append(approved, p)
+		}
 	}
 
-	var groups []featureGroup
-	var allKnownIDs []string
-
-	for _, f := range bugFiles {
-		if _, err := parser.MigrateLegacyBugIDs(f); err != nil {
-			return nil, fmt.Errorf("migrate bug IDs: %w", err)
-		}
-		tasks, err := parser.ParseFile(f)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f, err)
-		}
-		id := strings.TrimSuffix(filepath.Base(f), ".md")
-		maggusID := parser.ParseMaggusID(f)
-		approvalKey := maggusID
-		if approvalKey == "" {
-			approvalKey = id
-		}
-		allKnownIDs = append(allKnownIDs, approvalKey)
-		if !approval.IsApproved(approvals, approvalKey, approvalRequired) {
-			continue
-		}
-		groups = append(groups, featureGroup{id: id, maggusID: maggusID, file: f, tasks: tasks, isBug: true})
-	}
-
-	// Feature groups next.
-	featureFiles, err := parser.GlobFeatureFiles(dir, false)
-	if err != nil {
-		return nil, fmt.Errorf("glob features: %w", err)
-	}
-
-	for _, f := range featureFiles {
-		tasks, err := parser.ParseFile(f)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f, err)
-		}
-		id := strings.TrimSuffix(filepath.Base(f), ".md")
-		maggusID := parser.ParseMaggusID(f)
-		approvalKey := maggusID
-		if approvalKey == "" {
-			approvalKey = id
-		}
-		allKnownIDs = append(allKnownIDs, approvalKey)
-		if !approval.IsApproved(approvals, approvalKey, approvalRequired) {
-			continue
-		}
-		groups = append(groups, featureGroup{id: id, maggusID: maggusID, file: f, tasks: tasks, isBug: false})
-	}
-
-	// Prune stale entries from feature_approvals.yml.
-	if err := approval.Prune(dir, allKnownIDs); err != nil {
+	if err := approval.Prune(dir, knownIDs); err != nil {
 		return nil, fmt.Errorf("prune approvals: %w", err)
 	}
 
-	return groups, nil
+	return approved, nil
 }
 
 // filterTasksBySourceFile returns only tasks whose SourceFile matches file.
@@ -259,24 +201,24 @@ func filterTasksBySourceFile(tasks []parser.Task, file string) []parser.Task {
 	return result
 }
 
-// findGroupForTask finds the first feature group containing an incomplete task with the given ID.
-func findGroupForTask(groups []featureGroup, taskID string) *featureGroup {
-	for i := range groups {
-		for _, t := range groups[i].tasks {
+// findGroupForTask finds the first plan containing an incomplete task with the given ID.
+func findGroupForTask(plans []parser.Plan, taskID string) *parser.Plan {
+	for i := range plans {
+		for _, t := range plans[i].Tasks {
 			if t.ID == taskID && !t.IsComplete() {
-				return &groups[i]
+				return &plans[i]
 			}
 		}
 	}
 	return nil
 }
 
-// firstWorkableTask returns the first workable task from the first group that has one.
-func firstWorkableTask(groups []featureGroup) *parser.Task {
-	for _, g := range groups {
-		for i := range g.tasks {
-			if g.tasks[i].IsWorkable() {
-				return &g.tasks[i]
+// firstWorkableTask returns the first workable task from the first plan that has one.
+func firstWorkableTask(plans []parser.Plan) *parser.Task {
+	for _, p := range plans {
+		for i := range p.Tasks {
+			if p.Tasks[i].IsWorkable() {
+				return &p.Tasks[i]
 			}
 		}
 	}
@@ -317,7 +259,7 @@ func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDispl
 type workLoopParams struct {
 	tc            taskContext
 	tasks         []parser.Task  // flat merged list — used for summary remaining tasks
-	featureGroups []featureGroup // ordered approved groups to work (bugs first, then features)
+	featureGroups []parser.Plan // ordered approved plans to work (bugs first, then features)
 	count         int            // number of features to work (0 = determined by autoContinue)
 	autoContinue  bool           // from config: continue to next feature after completing one
 	runID         string
@@ -406,7 +348,7 @@ func runWorkGoroutine(params workLoopParams) {
 
 			// Set feature context in task context for TUI progress display.
 			tc := params.tc
-			tc.featureSourceFile = group.file
+			tc.featureSourceFile = group.File
 			tc.featureCurrent = fi + 1
 			tc.featureTotal = featureTotal
 
@@ -459,18 +401,18 @@ type groupTasksResult struct {
 	stopReason runner.StopReason
 }
 
-// runGroupTasks runs all workable tasks within a single feature group.
+// runGroupTasks runs all workable tasks within a single plan.
 // The inner loop mirrors the old task loop but is scoped to one source file.
-func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) groupTasksResult {
+func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) groupTasksResult {
 	var result groupTasksResult
 
-	groupTasks := group.tasks
+	groupTasks := group.Tasks
 
 	if countWorkable(groupTasks) == 0 {
 		return result
 	}
 
-	tc.logger.FeatureStart(group.id)
+	tc.logger.FeatureStart(group.ID)
 
 	var lastCompletedTaskID string
 
@@ -508,7 +450,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) gr
 
 		// Update group task list from re-parsed result, scoped to this source file.
 		if taskResult.tasks != nil {
-			groupTasks = filterTasksBySourceFile(taskResult.tasks, group.file)
+			groupTasks = filterTasksBySourceFile(taskResult.tasks, group.File)
 		}
 
 		if taskResult.failed != nil {
@@ -540,7 +482,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group featureGroup) gr
 		}
 	}
 
-	tc.logger.FeatureComplete(group.id)
+	tc.logger.FeatureComplete(group.ID)
 	return result
 }
 

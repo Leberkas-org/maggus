@@ -12,43 +12,6 @@ import (
 
 const progressBarWidth = 10
 
-type featureInfo struct {
-	filename  string
-	maggusID  string // UUID from <!-- maggus-id: ... --> comment; empty if absent
-	tasks     []parser.Task
-	completed bool // filename contains _completed
-	isBug     bool // true for bug files (from .maggus/bugs/)
-	approved  bool // from feature_approvals.yml (opt-out: true unless explicitly unapproved)
-}
-
-// approvalKey returns the maggusID if set, otherwise falls back to featureIDFromPath.
-func (f *featureInfo) approvalKey() string {
-	if f.maggusID != "" {
-		return f.maggusID
-	}
-	return featureIDFromPath(f.filename)
-}
-
-func (f *featureInfo) doneCount() int {
-	n := 0
-	for _, t := range f.tasks {
-		if t.IsComplete() {
-			n++
-		}
-	}
-	return n
-}
-
-func (f *featureInfo) blockedCount() int {
-	n := 0
-	for _, t := range f.tasks {
-		if !t.IsComplete() && t.IsBlocked() {
-			n++
-		}
-	}
-	return n
-}
-
 func buildProgressBar(done, total int) string {
 	return styles.ProgressBar(done, total, progressBarWidth)
 }
@@ -57,11 +20,11 @@ func buildProgressBarPlain(done, total int) string {
 	return styles.ProgressBarPlain(done, total, progressBarWidth)
 }
 
-// buildSelectableTasksForFeature returns the flat list of tasks for a single feature.
+// buildSelectableTasksForFeature returns the flat list of tasks for a single plan.
 // When showAll is false, completed tasks are excluded.
-func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.Task {
+func buildSelectableTasksForFeature(plan parser.Plan, showAll bool) []parser.Task {
 	var selectable []parser.Task
-	for _, t := range feature.tasks {
+	for _, t := range plan.Tasks {
 		if !showAll && t.IsComplete() {
 			continue
 		}
@@ -70,83 +33,40 @@ func buildSelectableTasksForFeature(feature featureInfo, showAll bool) []parser.
 	return selectable
 }
 
-func parseFeatures(dir string, approvalRequired bool) ([]featureInfo, error) {
-	files, err := parser.GlobFeatureFiles(dir, true)
+// loadPlansWithApprovals loads all plans and the current approval map.
+func loadPlansWithApprovals(dir string, includeCompleted bool) ([]parser.Plan, approval.Approvals, error) {
+	plans, err := parser.LoadPlans(dir, includeCompleted)
 	if err != nil {
-		return nil, fmt.Errorf("glob features: %w", err)
+		return nil, nil, err
 	}
-
 	a, err := approval.Load(dir)
 	if err != nil {
-		return nil, fmt.Errorf("load approvals: %w", err)
+		return nil, nil, fmt.Errorf("load approvals: %w", err)
 	}
-
-	var features []featureInfo
-	for _, f := range files {
-		tasks, err := parser.ParseFile(f)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f, err)
-		}
-		maggusID := parser.ParseMaggusID(f)
-		fi := featureInfo{
-			filename:  filepath.Base(f),
-			maggusID:  maggusID,
-			tasks:     tasks,
-			completed: strings.HasSuffix(f, "_completed.md"),
-		}
-		fi.approved = approval.IsApproved(a, fi.approvalKey(), approvalRequired)
-		features = append(features, fi)
-	}
-	return features, nil
+	return plans, a, nil
 }
 
-func parseBugs(dir string, approvalRequired bool) ([]featureInfo, error) {
-	files, err := parser.GlobBugFiles(dir, true)
-	if err != nil {
-		return nil, fmt.Errorf("glob bugs: %w", err)
-	}
-
-	a, err := approval.Load(dir)
-	if err != nil {
-		return nil, fmt.Errorf("load approvals: %w", err)
-	}
-
-	var bugs []featureInfo
-	for _, f := range files {
-		tasks, err := parser.ParseFile(f)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f, err)
-		}
-		maggusID := parser.ParseMaggusID(f)
-		fi := featureInfo{
-			filename:  filepath.Base(f),
-			maggusID:  maggusID,
-			tasks:     tasks,
-			completed: strings.HasSuffix(f, "_completed.md"),
-			isBug:     true,
-		}
-		fi.approved = approval.IsApproved(a, fi.approvalKey(), approvalRequired)
-		bugs = append(bugs, fi)
-	}
-	return bugs, nil
+// isPlanApproved checks whether a plan is approved given the approval map and mode.
+func isPlanApproved(p parser.Plan, a approval.Approvals, approvalRequired bool) bool {
+	return approval.IsApproved(a, p.ApprovalKey(), approvalRequired)
 }
 
-func findNextTask(features []featureInfo) (string, string) {
+func findNextTask(plans []parser.Plan) (string, string) {
 	// Bugs first, then features
-	for _, f := range features {
-		if f.completed || !f.isBug {
+	for _, p := range plans {
+		if p.Completed || !p.IsBug {
 			continue
 		}
-		next := parser.FindNextIncomplete(f.tasks)
+		next := parser.FindNextIncomplete(p.Tasks)
 		if next != nil {
 			return next.ID, next.SourceFile
 		}
 	}
-	for _, f := range features {
-		if f.completed || f.isBug {
+	for _, p := range plans {
+		if p.Completed || p.IsBug {
 			continue
 		}
-		next := parser.FindNextIncomplete(f.tasks)
+		next := parser.FindNextIncomplete(p.Tasks)
 		if next != nil {
 			return next.ID, next.SourceFile
 		}
@@ -154,41 +74,41 @@ func findNextTask(features []featureInfo) (string, string) {
 	return "", ""
 }
 
-// pruneStaleApprovals collects all known approval keys from the combined feature
-// and bug lists and calls approval.Prune to remove stale entries.
-func pruneStaleApprovals(dir string, all []featureInfo) {
+// pruneStaleApprovals collects all known approval keys from the combined plan
+// list and calls approval.Prune to remove stale entries.
+func pruneStaleApprovals(dir string, all []parser.Plan) {
 	var knownIDs []string
 	for i := range all {
-		knownIDs = append(knownIDs, all[i].approvalKey())
+		knownIDs = append(knownIDs, all[i].ApprovalKey())
 	}
 	_ = approval.Prune(dir, knownIDs)
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
-func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName string) {
+func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName string, approvals approval.Approvals, approvalRequired bool) {
 	totalTasks := 0
 	totalDone := 0
 	totalBlocked := 0
 	activeFeatures := 0
 	totalBugs := 0
 	activeBugs := 0
-	for _, f := range features {
-		totalTasks += len(f.tasks)
-		totalDone += f.doneCount()
-		totalBlocked += f.blockedCount()
-		if f.isBug {
+	for _, p := range plans {
+		totalTasks += len(p.Tasks)
+		totalDone += p.DoneCount()
+		totalBlocked += p.BlockedCount()
+		if p.IsBug {
 			totalBugs++
-			if !f.completed {
+			if !p.Completed {
 				activeBugs++
 			}
 		} else {
-			if !f.completed {
+			if !p.Completed {
 				activeFeatures++
 			}
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
-	featureCount := len(features) - totalBugs
+	featureCount := len(plans) - totalBugs
 
 	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
 	if totalBugs > 0 {
@@ -198,21 +118,23 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 	fmt.Fprintf(w, " Summary: %d/%d tasks complete · %d pending · %d blocked\n", totalDone, totalTasks, totalPending, totalBlocked)
 	fmt.Fprintf(w, " Agent: %s\n", agentName)
 
-	for _, f := range features {
-		if f.completed && !showAll {
+	for _, p := range plans {
+		if p.Completed && !showAll {
 			continue
 		}
+		filename := filepath.Base(p.File)
+		approved := isPlanApproved(p, approvals, approvalRequired)
 		fmt.Fprintln(w)
-		if f.completed {
-			fmt.Fprintf(w, " Tasks — %s (archived)\n", f.filename)
-		} else if !f.approved {
-			fmt.Fprintf(w, " Tasks — [✗] %s (unapproved)\n", f.filename)
+		if p.Completed {
+			fmt.Fprintf(w, " Tasks — %s (archived)\n", filename)
+		} else if !approved {
+			fmt.Fprintf(w, " Tasks — [✗] %s (unapproved)\n", filename)
 		} else {
-			fmt.Fprintf(w, " Tasks — %s\n", f.filename)
+			fmt.Fprintf(w, " Tasks — %s\n", filename)
 		}
 		fmt.Fprintln(w, " ──────────────────────────────────────────")
 
-		for _, t := range f.tasks {
+		for _, t := range p.Tasks {
 			var icon, prefix string
 
 			if t.IsComplete() {
@@ -231,7 +153,7 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 
 			fmt.Fprintf(w, " %s%s  %s: %s\n", prefix, icon, t.ID, t.Title)
 
-			if t.IsBlocked() && !f.completed {
+			if t.IsBlocked() && !p.Completed {
 				for _, c := range t.Criteria {
 					if !c.Blocked {
 						continue
@@ -250,35 +172,37 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 	fmt.Fprintln(w, " ──────────────────────────────────────────")
 
 	maxCountWidth := 0
-	for _, f := range features {
-		if f.completed && !showAll {
+	for _, p := range plans {
+		if p.Completed && !showAll {
 			continue
 		}
-		cw := len(fmt.Sprintf("%d/%d", f.doneCount(), len(f.tasks)))
+		cw := len(fmt.Sprintf("%d/%d", p.DoneCount(), len(p.Tasks)))
 		if cw > maxCountWidth {
 			maxCountWidth = cw
 		}
 	}
 	countFmt := fmt.Sprintf("%%-%ds", maxCountWidth)
 
-	for _, f := range features {
-		if f.completed && !showAll {
+	for _, p := range plans {
+		if p.Completed && !showAll {
 			continue
 		}
 
-		done := f.doneCount()
-		total := len(f.tasks)
+		filename := filepath.Base(p.File)
+		approved := isPlanApproved(p, approvals, approvalRequired)
+		done := p.DoneCount()
+		total := len(p.Tasks)
 		bar := buildProgressBarPlain(done, total)
 
 		var prefix, suffix string
 
-		if f.completed {
+		if p.Completed {
 			prefix = " [x] "
 			suffix = "done"
-		} else if !f.approved {
+		} else if !approved {
 			prefix = " [✗] "
 			suffix = "unapproved"
-		} else if f.blockedCount() > 0 {
+		} else if p.BlockedCount() > 0 {
 			prefix = "   "
 			suffix = "blocked"
 		} else if total > 0 && done == total {
@@ -293,6 +217,6 @@ func renderStatusPlain(w *strings.Builder, features []featureInfo, showAll bool,
 		}
 
 		countStr := fmt.Sprintf(countFmt, fmt.Sprintf("%d/%d", done, total))
-		fmt.Fprintf(w, "%s%-32s [%s]  %s   %s\n", prefix, f.filename, bar, countStr, suffix)
+		fmt.Fprintf(w, "%s%-32s [%s]  %s   %s\n", prefix, filename, bar, countStr, suffix)
 	}
 }

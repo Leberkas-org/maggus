@@ -654,15 +654,15 @@ func writeApprovals(t *testing.T, dir string, approvedIDs ...string) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_OptOutAllApproved verifies that opt-out mode
+// TestBuildApprovedPlans_OptOutAllApproved verifies that opt-out mode
 // approves all groups by default (no approval file needed).
-func TestBuildApprovedFeatureGroups_OptOutAllApproved(t *testing.T) {
+func TestBuildApprovedPlans_OptOutAllApproved(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 	writeFeatureFile(t, dir, "feature_002.md", incompleteTaskContent("TASK-002-001", "Add another"))
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -671,14 +671,14 @@ func TestBuildApprovedFeatureGroups_OptOutAllApproved(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_OptInNoApprovals verifies that opt-in mode
+// TestBuildApprovedPlans_OptInNoApprovals verifies that opt-in mode
 // returns no groups when nothing has been approved.
-func TestBuildApprovedFeatureGroups_OptInNoApprovals(t *testing.T) {
+func TestBuildApprovedPlans_OptInNoApprovals(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -687,30 +687,30 @@ func TestBuildApprovedFeatureGroups_OptInNoApprovals(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_OptInPartialApproval verifies that only
+// TestBuildApprovedPlans_OptInPartialApproval verifies that only
 // explicitly approved features are included in opt-in mode.
-func TestBuildApprovedFeatureGroups_OptInPartialApproval(t *testing.T) {
+func TestBuildApprovedPlans_OptInPartialApproval(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 	writeFeatureFile(t, dir, "feature_002.md", incompleteTaskContent("TASK-002-001", "Add another"))
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(groups) != 1 {
 		t.Errorf("opt-in with one approval: expected 1 group, got %d", len(groups))
 	}
-	if groups[0].id != "feature_001" {
-		t.Errorf("expected group id 'feature_001', got %q", groups[0].id)
+	if groups[0].ID != "feature_001" {
+		t.Errorf("expected group id 'feature_001', got %q", groups[0].ID)
 	}
 }
 
-// TestBuildApprovedFeatureGroups_BugsFirst verifies that bug groups come before
+// TestBuildApprovedPlans_BugsFirst verifies that bug groups come before
 // feature groups in the returned list.
-func TestBuildApprovedFeatureGroups_BugsFirst(t *testing.T) {
+func TestBuildApprovedPlans_BugsFirst(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 	writeBugFile(t, dir, "bug_001.md", incompleteBugContent("BUG-001-001", "Fix crash"))
@@ -718,27 +718,27 @@ func TestBuildApprovedFeatureGroups_BugsFirst(t *testing.T) {
 	writeApprovals(t, dir, "feature_001", "bug_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 groups, got %d", len(groups))
 	}
-	if !groups[0].isBug {
-		t.Errorf("expected first group to be a bug, got id=%q", groups[0].id)
+	if !groups[0].IsBug {
+		t.Errorf("expected first group to be a bug, got id=%q", groups[0].ID)
 	}
-	if groups[1].isBug {
-		t.Errorf("expected second group to be a feature, got id=%q", groups[1].id)
+	if groups[1].IsBug {
+		t.Errorf("expected second group to be a feature, got id=%q", groups[1].ID)
 	}
 }
 
-// TestBuildApprovedFeatureGroups_EmptyDir verifies that an empty directory
+// TestBuildApprovedPlans_EmptyDir verifies that an empty directory
 // returns an empty list without error.
-func TestBuildApprovedFeatureGroups_EmptyDir(t *testing.T) {
+func TestBuildApprovedPlans_EmptyDir(t *testing.T) {
 	dir := setupCleanDir(t)
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -780,16 +780,16 @@ func TestFilterTasksBySourceFile_NoMatch(t *testing.T) {
 
 // TestFindGroupForTask_Found verifies finding a group by task ID.
 func TestFindGroupForTask_Found(t *testing.T) {
-	groups := []featureGroup{
+	groups := []parser.Plan{
 		{
-			id: "feature_001",
-			tasks: []parser.Task{
+			ID: "feature_001",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
 			},
 		},
 		{
-			id: "feature_002",
-			tasks: []parser.Task{
+			ID: "feature_002",
+			Tasks: []parser.Task{
 				{ID: "TASK-002-001", Criteria: []parser.Criterion{{Text: "B", Checked: false}}},
 			},
 		},
@@ -799,18 +799,18 @@ func TestFindGroupForTask_Found(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected non-nil group")
 	}
-	if got.id != "feature_002" {
-		t.Errorf("expected feature_002, got %q", got.id)
+	if got.ID != "feature_002" {
+		t.Errorf("expected feature_002, got %q", got.ID)
 	}
 }
 
 // TestFindGroupForTask_CompletedTaskNotFound verifies that completed tasks are
 // not matched (they cannot be targeted by --task).
 func TestFindGroupForTask_CompletedTaskNotFound(t *testing.T) {
-	groups := []featureGroup{
+	groups := []parser.Plan{
 		{
-			id: "feature_001",
-			tasks: []parser.Task{
+			ID: "feature_001",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}}, // complete
 			},
 		},
@@ -824,10 +824,10 @@ func TestFindGroupForTask_CompletedTaskNotFound(t *testing.T) {
 
 // TestFindGroupForTask_NotFound verifies nil when task ID is unknown.
 func TestFindGroupForTask_NotFound(t *testing.T) {
-	groups := []featureGroup{
+	groups := []parser.Plan{
 		{
-			id: "feature_001",
-			tasks: []parser.Task{
+			ID: "feature_001",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: false}}},
 			},
 		},
@@ -841,10 +841,10 @@ func TestFindGroupForTask_NotFound(t *testing.T) {
 
 // TestFirstWorkableTask_Found verifies the first workable task is returned.
 func TestFirstWorkableTask_Found(t *testing.T) {
-	groups := []featureGroup{
+	groups := []parser.Plan{
 		{
-			id: "feature_001",
-			tasks: []parser.Task{
+			ID: "feature_001",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},  // complete
 				{ID: "TASK-001-002", Criteria: []parser.Criterion{{Text: "B", Checked: false}}}, // workable
 			},
@@ -862,10 +862,10 @@ func TestFirstWorkableTask_Found(t *testing.T) {
 
 // TestFirstWorkableTask_Empty verifies nil is returned when no workable task exists.
 func TestFirstWorkableTask_Empty(t *testing.T) {
-	groups := []featureGroup{
+	groups := []parser.Plan{
 		{
-			id: "feature_001",
-			tasks: []parser.Task{
+			ID: "feature_001",
+			Tasks: []parser.Task{
 				{ID: "TASK-001-001", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
 			},
 		},
@@ -877,9 +877,9 @@ func TestFirstWorkableTask_Empty(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_UUIDApprovalKey verifies that when a feature file
+// TestBuildApprovedPlans_UUIDApprovalKey verifies that when a feature file
 // has a maggus-id UUID, the approval check uses the UUID as key, not the filename.
-func TestBuildApprovedFeatureGroups_UUIDApprovalKey(t *testing.T) {
+func TestBuildApprovedPlans_UUIDApprovalKey(t *testing.T) {
 	dir := setupCleanDir(t)
 	// Feature with UUID.
 	uuidContent := "<!-- maggus-id: aaa0bbb0-cccc-dddd-eeee-fff000111222 -->\n" + incompleteTaskContent("TASK-001-001", "Add feature")
@@ -888,44 +888,44 @@ func TestBuildApprovedFeatureGroups_UUIDApprovalKey(t *testing.T) {
 	writeApprovals(t, dir, "aaa0bbb0-cccc-dddd-eeee-fff000111222")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
-	if groups[0].id != "feature_001" {
-		t.Errorf("expected display id 'feature_001', got %q", groups[0].id)
+	if groups[0].ID != "feature_001" {
+		t.Errorf("expected display id 'feature_001', got %q", groups[0].ID)
 	}
-	if groups[0].maggusID != "aaa0bbb0-cccc-dddd-eeee-fff000111222" {
-		t.Errorf("expected maggusID 'aaa0bbb0-cccc-dddd-eeee-fff000111222', got %q", groups[0].maggusID)
+	if groups[0].MaggusID != "aaa0bbb0-cccc-dddd-eeee-fff000111222" {
+		t.Errorf("expected maggusID 'aaa0bbb0-cccc-dddd-eeee-fff000111222', got %q", groups[0].MaggusID)
 	}
 }
 
-// TestBuildApprovedFeatureGroups_UUIDFallbackToFilename verifies that when a
+// TestBuildApprovedPlans_UUIDFallbackToFilename verifies that when a
 // feature file has no maggus-id, the filename-based ID is used for approval.
-func TestBuildApprovedFeatureGroups_UUIDFallbackToFilename(t *testing.T) {
+func TestBuildApprovedPlans_UUIDFallbackToFilename(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
-	if groups[0].maggusID != "" {
-		t.Errorf("expected empty maggusID, got %q", groups[0].maggusID)
+	if groups[0].MaggusID != "" {
+		t.Errorf("expected empty maggusID, got %q", groups[0].MaggusID)
 	}
 }
 
-// TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename verifies that approving
+// TestBuildApprovedPlans_UUIDNotApprovedByFilename verifies that approving
 // by filename does NOT work when the file has a UUID (the UUID takes precedence).
-func TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename(t *testing.T) {
+func TestBuildApprovedPlans_UUIDNotApprovedByFilename(t *testing.T) {
 	dir := setupCleanDir(t)
 	uuidContent := "<!-- maggus-id: aaa0bbb0-cccc-dddd-eeee-fff000111222 -->\n" + incompleteTaskContent("TASK-001-001", "Add feature")
 	writeFeatureFile(t, dir, "feature_001.md", uuidContent)
@@ -933,7 +933,7 @@ func TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename(t *testing.T) {
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -942,9 +942,9 @@ func TestBuildApprovedFeatureGroups_UUIDNotApprovedByFilename(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_PruneStaleEntries verifies that stale entries
+// TestBuildApprovedPlans_PruneStaleEntries verifies that stale entries
 // are removed from feature_approvals.yml after building groups.
-func TestBuildApprovedFeatureGroups_PruneStaleEntries(t *testing.T) {
+func TestBuildApprovedPlans_PruneStaleEntries(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 	// Write approvals with a stale entry.
@@ -957,7 +957,7 @@ func TestBuildApprovedFeatureGroups_PruneStaleEntries(t *testing.T) {
 	}
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	_, err := buildApprovedFeatureGroups(dir, cfg)
+	_, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -975,32 +975,32 @@ func TestBuildApprovedFeatureGroups_PruneStaleEntries(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedFeatureGroups_BugUUIDApproval verifies UUID-based approval for bug files.
-func TestBuildApprovedFeatureGroups_BugUUIDApproval(t *testing.T) {
+// TestBuildApprovedPlans_BugUUIDApproval verifies UUID-based approval for bug files.
+func TestBuildApprovedPlans_BugUUIDApproval(t *testing.T) {
 	dir := setupCleanDir(t)
 	uuidContent := "<!-- maggus-id: b0b0b0b0-1111-2222-3333-444444444444 -->\n" + incompleteBugContent("BUG-001-001", "Fix crash")
 	writeBugFile(t, dir, "bug_001.md", uuidContent)
 	writeApprovals(t, dir, "b0b0b0b0-1111-2222-3333-444444444444")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
-	if groups[0].maggusID != "b0b0b0b0-1111-2222-3333-444444444444" {
-		t.Errorf("expected maggusID 'b0b0b0b0-1111-2222-3333-444444444444', got %q", groups[0].maggusID)
+	if groups[0].MaggusID != "b0b0b0b0-1111-2222-3333-444444444444" {
+		t.Errorf("expected maggusID 'b0b0b0b0-1111-2222-3333-444444444444', got %q", groups[0].MaggusID)
 	}
-	if !groups[0].isBug {
+	if !groups[0].IsBug {
 		t.Error("expected isBug=true")
 	}
 }
 
-// TestBuildApprovedFeatureGroups_CompletedFileExcluded verifies that _completed.md
+// TestBuildApprovedPlans_CompletedFileExcluded verifies that _completed.md
 // files are not included in the group list.
-func TestBuildApprovedFeatureGroups_CompletedFileExcluded(t *testing.T) {
+func TestBuildApprovedPlans_CompletedFileExcluded(t *testing.T) {
 	dir := setupCleanDir(t)
 
 	// Completed file — should be excluded by GlobFeatureFiles.
@@ -1011,7 +1011,7 @@ func TestBuildApprovedFeatureGroups_CompletedFileExcluded(t *testing.T) {
 	}
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedFeatureGroups(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

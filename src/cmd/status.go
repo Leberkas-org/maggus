@@ -42,7 +42,7 @@ var (
 type statusModel struct {
 	taskListComponent
 
-	features     []featureInfo
+	features     []parser.Plan
 	showAll      bool
 	nextTaskID   string
 	nextTaskFile string
@@ -84,7 +84,7 @@ type statusModel struct {
 	watcherCh <-chan bool
 }
 
-func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
+func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
@@ -107,10 +107,10 @@ func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFi
 }
 
 // visibleFeatures returns the features that should be shown based on the showAll flag.
-func (m statusModel) visibleFeatures() []featureInfo {
-	var visible []featureInfo
+func (m statusModel) visibleFeatures() []parser.Plan {
+	var visible []parser.Plan
 	for _, f := range m.features {
-		if f.completed && !m.showAll {
+		if f.Completed && !m.showAll {
 			continue
 		}
 		visible = append(visible, f)
@@ -136,22 +136,15 @@ func (m *statusModel) rebuildForSelectedFeature() {
 
 // reloadFeatures reloads all features, bugs, and approvals from disk and rebuilds the current view.
 func (m *statusModel) reloadFeatures() {
-	a, err := approval.Load(m.dir)
-	if err == nil {
-		m.approvals = a
-	}
-	features, err := parseFeatures(m.dir, m.approvalRequired)
+	plans, a, err := loadPlansWithApprovals(m.dir, true)
 	if err != nil {
 		m.rebuildForSelectedFeature()
 		return
 	}
-	bugs, err := parseBugs(m.dir, m.approvalRequired)
-	if err == nil {
-		features = append(features, bugs...)
-	}
-	m.features = features
-	pruneStaleApprovals(m.dir, features)
-	m.nextTaskID, m.nextTaskFile = findNextTask(features)
+	m.approvals = a
+	m.features = plans
+	pruneStaleApprovals(m.dir, plans)
+	m.nextTaskID, m.nextTaskFile = findNextTask(plans)
 	m.rebuildForSelectedFeature()
 }
 
@@ -233,7 +226,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		visible := m.visibleFeatures()
 		var selectedFilename string
 		if m.selectedFeature < len(visible) {
-			selectedFilename = visible[m.selectedFeature].filename
+			selectedFilename = filepath.Base(visible[m.selectedFeature].File)
 		}
 		prevCursor := m.Cursor
 		prevScroll := m.ScrollOffset
@@ -241,7 +234,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Restore selection by filename
 		if selectedFilename != "" {
 			for i, f := range m.visibleFeatures() {
-				if f.filename == selectedFilename {
+				if filepath.Base(f.File) == selectedFilename {
 					m.selectedFeature = i
 					m.Tasks = buildSelectableTasksForFeature(f, m.showAll)
 					// Clamp cursor and scroll to new bounds
@@ -358,13 +351,9 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 	return m, nil
 }
 
-// featureFilePath reconstructs the full path to a feature/bug file from its base name.
-func (m statusModel) featureFilePath(f featureInfo) string {
-	subdir := "features"
-	if f.isBug {
-		subdir = "bugs"
-	}
-	return filepath.Join(m.dir, ".maggus", subdir, f.filename)
+// featureFilePath returns the full path to a plan's source file.
+func (m statusModel) featureFilePath(p parser.Plan) string {
+	return p.File
 }
 
 func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -503,14 +492,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "alt+a":
 		m.showAll = !m.showAll
-		features, err := parseFeatures(m.dir, m.approvalRequired)
+		plans, a, err := loadPlansWithApprovals(m.dir, true)
 		if err == nil {
-			bugs, bugErr := parseBugs(m.dir, m.approvalRequired)
-			if bugErr == nil {
-				features = append(features, bugs...)
-			}
-			m.features = features
-			pruneStaleApprovals(m.dir, features)
+			m.approvals = a
+			m.features = plans
+			pruneStaleApprovals(m.dir, plans)
 		}
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
 		m.rebuildForSelectedFeature()
@@ -543,13 +529,14 @@ func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	f := visible[m.selectedFeature]
-	if f.completed {
+	if f.Completed {
 		m.statusNote = "cannot approve a completed feature"
 		return m, nil
 	}
-	key := f.approvalKey()
+	key := f.ApprovalKey()
+	approved := isPlanApproved(f, m.approvals, m.approvalRequired)
 	var err error
-	if f.approved {
+	if approved {
 		err = approval.Unapprove(m.dir, key)
 		if err == nil {
 			m.statusNote = "feature unapproved"
@@ -596,7 +583,7 @@ func (m statusModel) viewConfirmDeleteFeature() string {
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
 	var sb strings.Builder
-	sb.WriteString(warnStyle.Render(fmt.Sprintf("Delete %s?", f.filename)))
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("Delete %s?", filepath.Base(f.File))))
 	sb.WriteString("\n\n")
 	sb.WriteString("  This will permanently delete the file from disk.\n\n")
 	sb.WriteString(fmt.Sprintf("  %s / %s",
@@ -646,33 +633,34 @@ func (m statusModel) renderTabBar() string {
 	needsSep := false
 	for i, p := range visible {
 		// Insert separator between features and bugs
-		if p.isBug && !needsSep {
+		if p.IsBug && !needsSep {
 			needsSep = true
 			if len(tabs) > 0 {
 				tabs = append(tabs, statusDimStyle.Render(" ┃ "))
 			}
 		}
 
-		done := p.doneCount()
-		total := len(p.tasks)
-		name := strings.TrimSuffix(p.filename, ".md")
+		done := p.DoneCount()
+		total := len(p.Tasks)
+		name := strings.TrimSuffix(filepath.Base(p.File), ".md")
+		isApproved := isPlanApproved(p, m.approvals, m.approvalRequired)
 		approvalMark := "✓"
-		if !p.approved {
+		if !isApproved {
 			approvalMark = "✗"
 		}
 		label := fmt.Sprintf(" %s %s %d/%d ", approvalMark, name, done, total)
 		if i == m.selectedFeature {
-			if !p.approved {
+			if !isApproved {
 				tabs = append(tabs, unapprovedTabStyle.Bold(true).Render(label))
-			} else if p.isBug {
+			} else if p.IsBug {
 				tabs = append(tabs, selectedBugStyle.Render(label))
 			} else {
 				tabs = append(tabs, selectedStyle.Render(label))
 			}
 		} else {
-			if !p.approved {
+			if !isApproved {
 				tabs = append(tabs, unapprovedTabStyle.Render(label))
-			} else if p.isBug {
+			} else if p.IsBug {
 				tabs = append(tabs, unselectedBugStyle.Render(label))
 			} else {
 				tabs = append(tabs, unselectedStyle.Render(label))
@@ -753,16 +741,16 @@ func (m statusModel) viewLog() string {
 	totalBugs := 0
 	activeBugs := 0
 	for _, f := range m.features {
-		totalTasks += len(f.tasks)
-		totalDone += f.doneCount()
-		totalBlocked += f.blockedCount()
-		if f.isBug {
+		totalTasks += len(f.Tasks)
+		totalDone += f.DoneCount()
+		totalBlocked += f.BlockedCount()
+		if f.IsBug {
 			totalBugs++
-			if !f.completed {
+			if !f.Completed {
 				activeBugs++
 			}
 		} else {
-			if !f.completed {
+			if !f.Completed {
 				activeFeatures++
 			}
 		}
@@ -1051,16 +1039,16 @@ func (m statusModel) viewStatus() string {
 	totalBugs := 0
 	activeBugs := 0
 	for _, f := range m.features {
-		totalTasks += len(f.tasks)
-		totalDone += f.doneCount()
-		totalBlocked += f.blockedCount()
-		if f.isBug {
+		totalTasks += len(f.Tasks)
+		totalDone += f.DoneCount()
+		totalBlocked += f.BlockedCount()
+		if f.IsBug {
 			totalBugs++
-			if !f.completed {
+			if !f.Completed {
 				activeBugs++
 			}
 		} else {
-			if !f.completed {
+			if !f.Completed {
 				activeFeatures++
 			}
 		}
@@ -1091,9 +1079,9 @@ func (m statusModel) viewStatus() string {
 	// Progress bar and summary for selected feature
 	if m.selectedFeature < len(visible) {
 		p := visible[m.selectedFeature]
-		done := p.doneCount()
-		total := len(p.tasks)
-		blocked := p.blockedCount()
+		done := p.DoneCount()
+		total := len(p.Tasks)
+		blocked := p.BlockedCount()
 		pending := total - done - blocked
 		sb.WriteString("\n " + buildProgressBar(done, total))
 		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
@@ -1111,10 +1099,10 @@ func (m statusModel) viewStatus() string {
 		p := visible[m.selectedFeature]
 
 		sb.WriteString("\n\n")
-		if p.completed {
-			sb.WriteString(statusDimGreen.Render(fmt.Sprintf(" Tasks — %s (archived)", p.filename)))
+		if p.Completed {
+			sb.WriteString(statusDimGreen.Render(fmt.Sprintf(" Tasks — %s (archived)", filepath.Base(p.File))))
 		} else {
-			fmt.Fprintf(&sb, " Tasks — %s", p.filename)
+			fmt.Fprintf(&sb, " Tasks — %s", filepath.Base(p.File))
 		}
 		sb.WriteString("\n")
 		sb.WriteString(" " + styles.Separator(42))
@@ -1131,7 +1119,7 @@ func (m statusModel) viewStatus() string {
 
 			if t.IsComplete() {
 				icon = "✓"
-				if p.completed {
+				if p.Completed {
 					style = statusDimGreen
 				} else {
 					style = statusGreenStyle
@@ -1147,7 +1135,7 @@ func (m statusModel) viewStatus() string {
 				style = lipgloss.NewStyle().Foreground(styles.Muted)
 			}
 
-			if p.completed {
+			if p.Completed {
 				style = statusDimStyle
 			}
 
@@ -1155,7 +1143,7 @@ func (m statusModel) viewStatus() string {
 			var prefix string
 			if taskIdx == m.Cursor {
 				prefix = " ▸ "
-				if !p.completed {
+				if !p.Completed {
 					style = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 				}
 			} else {
@@ -1166,7 +1154,7 @@ func (m statusModel) viewStatus() string {
 			sb.WriteString("\n")
 			sb.WriteString(style.Render(line))
 
-			if t.IsBlocked() && !p.completed {
+			if t.IsBlocked() && !p.Completed {
 				for _, c := range t.Criteria {
 					if !c.Blocked {
 						continue
@@ -1240,15 +1228,10 @@ var statusCmd = &cobra.Command{
 		agentName := cfg.Agent
 		approvalRequired := cfg.IsApprovalRequired()
 
-		features, err := parseFeatures(dir, approvalRequired)
+		features, approvals, err := loadPlansWithApprovals(dir, true)
 		if err != nil {
 			return err
 		}
-		bugs, bugErr := parseBugs(dir, approvalRequired)
-		if bugErr != nil {
-			return bugErr
-		}
-		features = append(features, bugs...)
 		pruneStaleApprovals(dir, features)
 
 		if len(features) == 0 {
@@ -1257,14 +1240,14 @@ var statusCmd = &cobra.Command{
 				return nil
 			}
 			// TUI mode: show empty status view
-			features = []featureInfo{}
+			features = []parser.Plan{}
 		}
 
 		nextTaskID, nextTaskFile := findNextTask(features)
 
 		if plain {
 			var sb strings.Builder
-			renderStatusPlain(&sb, features, all, nextTaskID, nextTaskFile, agentName)
+			renderStatusPlain(&sb, features, all, nextTaskID, nextTaskFile, agentName, approvals, approvalRequired)
 			fmt.Fprint(cmd.OutOrStdout(), sb.String())
 			return nil
 		}

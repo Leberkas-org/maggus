@@ -44,17 +44,17 @@ Replace three parallel implementations of feature/bug file loading (`featureInfo
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `cmd/status_plans.go`: `featureInfo` struct deleted, `parseFeatures()` deleted, `parseBugs()` deleted — replaced with `parser.LoadPlans()` + inline approval lookup
-- [ ] `cmd/work_loop.go`: `featureGroup` struct deleted, `buildApprovedFeatureGroups()` deleted — replaced with `parser.LoadPlans(dir, false)` + approval filtering
-- [ ] `cmd/approve.go`: `featureEntry` struct deleted, `featureIDFromPath()` deleted, `listActiveFeatures()` deleted — replaced with `parser.LoadPlans()`
-- [ ] `cmd/status.go`: all `featureInfo` references updated to `parser.Plan`
-- [ ] `cmd/menu.go`: `loadFeatureSummary()` updated to use `parser.LoadPlans()`
-- [ ] `cmd/status_test.go` updated for `parser.Plan` types
-- [ ] `cmd/work_loop_test.go` updated for `parser.Plan` types
-- [ ] `cmd/menu_test.go` updated if affected
-- [ ] `cmd/approve_test.go` updated if affected
-- [ ] All tests pass: `go test ./...`
-- [ ] `go vet ./...` passes
+- [x] `cmd/status_plans.go`: `featureInfo` struct deleted, `parseFeatures()` deleted, `parseBugs()` deleted — replaced with `parser.LoadPlans()` + inline approval lookup
+- [x] `cmd/work_loop.go`: `featureGroup` struct deleted, `buildApprovedFeatureGroups()` deleted — replaced with `parser.LoadPlans(dir, false)` + approval filtering
+- [x] `cmd/approve.go`: `featureEntry` struct deleted, `featureIDFromPath()` deleted, `listActiveFeatures()` deleted — replaced with `parser.LoadPlans()`
+- [x] `cmd/status.go`: all `featureInfo` references updated to `parser.Plan`
+- [x] `cmd/menu.go`: `loadFeatureSummary()` updated to use `parser.LoadPlans()`
+- [x] `cmd/status_test.go` updated for `parser.Plan` types
+- [x] `cmd/work_loop_test.go` updated for `parser.Plan` types
+- [x] `cmd/menu_test.go` updated if affected
+- [x] `cmd/approve_test.go` updated if affected
+- [x] All tests pass: `go test ./...`
+- [x] `go vet ./...` passes
 
 ## Task Dependency Graph
 

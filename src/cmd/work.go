@@ -138,26 +138,26 @@ Examples:
 		}
 		runID := setup.runID
 
-		// Build feature groups with approval filtering (bugs first, then features).
-		featureGroups, fgErr := buildApprovedFeatureGroups(dir, wc.cfg)
+		// Build approved plans with approval filtering (bugs first, then features).
+		featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg)
 		if fgErr != nil {
-			return fmt.Errorf("build feature groups: %w", fgErr)
+			return fmt.Errorf("build approved plans: %w", fgErr)
 		}
 
-		// When --task is set, restrict to the single group containing that task.
+		// When --task is set, restrict to the single plan containing that task.
 		if taskFlag != "" {
 			targetGroup := findGroupForTask(featureGroups, taskFlag)
 			if targetGroup == nil {
 				cmd.Println(fmt.Sprintf("Task %s not found in any approved feature or bug.", taskFlag))
 				return nil
 			}
-			featureGroups = []featureGroup{*targetGroup}
+			featureGroups = []parser.Plan{*targetGroup}
 		}
 
-		// Remove groups with no workable tasks.
-		var workableGroups []featureGroup
+		// Remove plans with no workable tasks.
+		var workableGroups []parser.Plan
 		for _, g := range featureGroups {
-			if countWorkable(g.tasks) > 0 {
+			if countWorkable(g.Tasks) > 0 {
 				workableGroups = append(workableGroups, g)
 			}
 		}

@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,53 +13,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// featureIDFromPath extracts the feature ID (base filename without extension) from a path.
-// For example: ".maggus/features/feature_003.md" → "feature_003"
-func featureIDFromPath(path string) string {
-	base := filepath.Base(path)
-	base = strings.TrimSuffix(base, ".md")
-	base = strings.TrimSuffix(base, "_completed")
-	return base
-}
-
-// featureEntry pairs a human-readable display name with the UUID-based approval key.
-type featureEntry struct {
-	displayName string // filename without extension, e.g. "feature_003"
-	approvalKey string // maggus-id UUID, or displayName as fallback
-}
-
-// listActiveFeatures returns entries for all active (non-completed) feature files in dir.
-// Each entry contains the display name and the UUID-based approval key (with filename fallback).
-func listActiveFeatures(dir string) ([]featureEntry, error) {
-	files, err := parser.GlobFeatureFiles(dir, false)
+// resolveFeature finds an active plan by display name (ID) and returns it.
+// Returns the plan and true if found, or zero value and false otherwise.
+func resolveFeature(dir, featureID string) (parser.Plan, bool, error) {
+	plans, err := parser.LoadPlans(dir, false)
 	if err != nil {
-		return nil, err
+		return parser.Plan{}, false, err
 	}
-	entries := make([]featureEntry, 0, len(files))
-	for _, f := range files {
-		name := featureIDFromPath(f)
-		key := parser.ParseMaggusID(f)
-		if key == "" {
-			key = name
-		}
-		entries = append(entries, featureEntry{displayName: name, approvalKey: key})
-	}
-	return entries, nil
-}
-
-// resolveFeature finds a feature entry by display name (filename) and returns it.
-// Returns the entry and true if found, or zero value and false otherwise.
-func resolveFeature(dir, featureID string) (featureEntry, bool, error) {
-	entries, err := listActiveFeatures(dir)
-	if err != nil {
-		return featureEntry{}, false, err
-	}
-	for _, e := range entries {
-		if e.displayName == featureID {
-			return e, true, nil
+	for _, p := range plans {
+		if p.ID == featureID {
+			return p, true, nil
 		}
 	}
-	return featureEntry{}, false, nil
+	return parser.Plan{}, false, nil
 }
 
 var approveCmd = &cobra.Command{
@@ -82,7 +47,7 @@ var approveCmd = &cobra.Command{
 }
 
 func runApprove(cmd *cobra.Command, dir, featureID string) error {
-	entry, found, err := resolveFeature(dir, featureID)
+	plan, found, err := resolveFeature(dir, featureID)
 	if err != nil {
 		return err
 	}
@@ -91,16 +56,17 @@ func runApprove(cmd *cobra.Command, dir, featureID string) error {
 		return fmt.Errorf("feature %s not found", featureID)
 	}
 
+	key := plan.ApprovalKey()
 	a, err := approval.Load(dir)
 	if err != nil {
 		return err
 	}
-	if a[entry.approvalKey] {
+	if a[key] {
 		cmd.Println(fmt.Sprintf("Feature %s is already approved", featureID))
 		return nil
 	}
 
-	if err := approval.Approve(dir, entry.approvalKey); err != nil {
+	if err := approval.Approve(dir, key); err != nil {
 		return err
 	}
 	cmd.Println(fmt.Sprintf("Approved feature %s", featureID))
@@ -109,7 +75,7 @@ func runApprove(cmd *cobra.Command, dir, featureID string) error {
 
 // runApproveInteractive shows an interactive picker of unapproved features.
 func runApproveInteractive(cmd *cobra.Command, dir string) error {
-	entries, err := listActiveFeatures(dir)
+	plans, err := parser.LoadPlans(dir, false)
 	if err != nil {
 		return err
 	}
@@ -119,11 +85,11 @@ func runApproveInteractive(cmd *cobra.Command, dir string) error {
 		return err
 	}
 
-	// Filter to only unapproved features
-	var unapproved []featureEntry
-	for _, e := range entries {
-		if !a[e.approvalKey] {
-			unapproved = append(unapproved, e)
+	// Filter to only unapproved plans.
+	var unapproved []parser.Plan
+	for _, p := range plans {
+		if !a[p.ApprovalKey()] {
+			unapproved = append(unapproved, p)
 		}
 	}
 
@@ -133,8 +99,8 @@ func runApproveInteractive(cmd *cobra.Command, dir string) error {
 	}
 
 	displayNames := make([]string, len(unapproved))
-	for i, e := range unapproved {
-		displayNames[i] = e.displayName
+	for i, p := range unapproved {
+		displayNames[i] = p.ID
 	}
 
 	selected, ok, err := runFeaturePicker("Select a feature to approve:", displayNames)
@@ -167,7 +133,7 @@ var unapproveCmd = &cobra.Command{
 }
 
 func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
-	entry, found, err := resolveFeature(dir, featureID)
+	plan, found, err := resolveFeature(dir, featureID)
 	if err != nil {
 		return err
 	}
@@ -176,16 +142,17 @@ func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
 		return fmt.Errorf("feature %s not found", featureID)
 	}
 
+	key := plan.ApprovalKey()
 	a, err := approval.Load(dir)
 	if err != nil {
 		return err
 	}
-	if !a[entry.approvalKey] {
+	if !a[key] {
 		cmd.Println(fmt.Sprintf("Feature %s is not approved", featureID))
 		return nil
 	}
 
-	if err := approval.Unapprove(dir, entry.approvalKey); err != nil {
+	if err := approval.Unapprove(dir, key); err != nil {
 		return err
 	}
 	cmd.Println(fmt.Sprintf("Unapproved feature %s", featureID))
@@ -194,7 +161,7 @@ func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
 
 // runUnapproveInteractive shows an interactive picker of approved features.
 func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
-	entries, err := listActiveFeatures(dir)
+	plans, err := parser.LoadPlans(dir, false)
 	if err != nil {
 		return err
 	}
@@ -204,22 +171,22 @@ func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
 		return err
 	}
 
-	// Filter to only approved features
-	var approved []featureEntry
-	for _, e := range entries {
-		if a[e.approvalKey] {
-			approved = append(approved, e)
+	// Filter to only approved plans
+	var approvedPlans []parser.Plan
+	for _, p := range plans {
+		if a[p.ApprovalKey()] {
+			approvedPlans = append(approvedPlans, p)
 		}
 	}
 
-	if len(approved) == 0 {
+	if len(approvedPlans) == 0 {
 		cmd.Println("No features are currently approved.")
 		return nil
 	}
 
-	displayNames := make([]string, len(approved))
-	for i, e := range approved {
-		displayNames[i] = e.displayName
+	displayNames := make([]string, len(approvedPlans))
+	for i, p := range approvedPlans {
+		displayNames[i] = p.ID
 	}
 
 	selected, ok, err := runFeaturePicker("Select a feature to unapprove:", displayNames)

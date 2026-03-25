@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
-	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	xterm "golang.org/x/term"
@@ -248,43 +248,37 @@ func loadFeatureSummary() featureSummary {
 		return featureSummary{}
 	}
 
+	plans, err := parser.LoadPlans(dir, true)
+	if err != nil {
+		return featureSummary{}
+	}
+
+	pruneStaleApprovals(dir, plans)
+
 	var s featureSummary
-
-	cfg, cfgErr := config.Load(dir)
-	approvalRequired := cfgErr == nil && cfg.IsApprovalRequired()
-
-	features, err := parseFeatures(dir, approvalRequired)
-	if err == nil {
-		s.features = len(features)
-		for _, f := range features {
-			s.tasks += len(f.tasks)
-			s.done += f.doneCount()
-			s.blocked += f.blockedCount()
-			for _, t := range f.tasks {
+	for _, p := range plans {
+		if p.IsBug {
+			s.bugs++
+			s.bugTasks += len(p.Tasks)
+			s.bugDone += p.DoneCount()
+			s.bugBlocked += p.BlockedCount()
+			for _, t := range p.Tasks {
+				if t.IsWorkable() {
+					s.bugWorkable++
+				}
+			}
+		} else {
+			s.features++
+			s.tasks += len(p.Tasks)
+			s.done += p.DoneCount()
+			s.blocked += p.BlockedCount()
+			for _, t := range p.Tasks {
 				if t.IsWorkable() {
 					s.workable++
 				}
 			}
 		}
 	}
-
-	bugs, err := parseBugs(dir, approvalRequired)
-	if err == nil {
-		s.bugs = len(bugs)
-		for _, b := range bugs {
-			s.bugTasks += len(b.tasks)
-			s.bugDone += b.doneCount()
-			s.bugBlocked += b.blockedCount()
-			for _, t := range b.tasks {
-				if t.IsWorkable() {
-					s.bugWorkable++
-				}
-			}
-		}
-	}
-
-	all := append(features, bugs...)
-	pruneStaleApprovals(dir, all)
 
 	return s
 }
