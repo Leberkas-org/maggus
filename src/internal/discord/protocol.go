@@ -60,9 +60,9 @@ type handshakePayload struct {
 
 // activityPayload is the SET_ACTIVITY command sent to Discord.
 type activityPayload struct {
-	Cmd   string         `json:"cmd"`
-	Args  activityArgs   `json:"args"`
-	Nonce string         `json:"nonce"`
+	Cmd   string       `json:"cmd"`
+	Args  activityArgs `json:"args"`
+	Nonce string       `json:"nonce"`
 }
 
 type activityArgs struct {

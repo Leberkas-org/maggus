@@ -813,7 +813,6 @@ func TestMigrateLegacyBugIDs_NoLegacy(t *testing.T) {
 	}
 }
 
-
 func TestParseBugs_AutoMigration(t *testing.T) {
 	dir := t.TempDir()
 	writeTempBug(t, dir, "bug_001.md", `# Bug 001

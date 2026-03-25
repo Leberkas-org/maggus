@@ -40,7 +40,7 @@ type statusModel struct {
 	// Feature tab selection
 	selectedFeature int // index into visibleFeatures()
 
-	dir       string            // working directory for file operations
+	dir       string             // working directory for file operations
 	approvals approval.Approvals // cached approvals; reloaded on reloadFeatures
 
 	approvalRequired bool // from config; used when reloading features
@@ -51,9 +51,9 @@ type statusModel struct {
 	statusNote string
 
 	// Live log panel
-	showLog      bool
-	logLines     []string
-	logScroll    int
+	showLog       bool
+	logLines      []string
+	logScroll     int
 	logAutoScroll bool
 	daemon        daemonStatus
 }
@@ -63,13 +63,13 @@ func newStatusModel(features []featureInfo, showAll bool, nextTaskID, nextTaskFi
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
 		},
-		features:      features,
-		showAll:       showAll,
-		nextTaskID:    nextTaskID,
-		nextTaskFile:  nextTaskFile,
-		agentName:     agentName,
-		dir:           dir,
-		showLog:       showLog,
+		features:         features,
+		showAll:          showAll,
+		nextTaskID:       nextTaskID,
+		nextTaskFile:     nextTaskFile,
+		agentName:        agentName,
+		dir:              dir,
+		showLog:          showLog,
 		approvalRequired: approvalRequired,
 		logAutoScroll:    true,
 	}
@@ -508,10 +508,10 @@ func (m statusModel) renderDaemonStatusLine() string {
 		indicator := statusCyanStyle.Render("●")
 		line := fmt.Sprintf(" %s daemon running (PID %d)", indicator, m.daemon.PID)
 		if m.daemon.CurrentFeature != "" {
-			line += statusDimStyle.Render(" · "+m.daemon.CurrentFeature)
+			line += statusDimStyle.Render(" · " + m.daemon.CurrentFeature)
 		}
 		if m.daemon.CurrentTask != "" {
-			line += statusDimStyle.Render(" · "+m.daemon.CurrentTask)
+			line += statusDimStyle.Render(" · " + m.daemon.CurrentTask)
 		}
 		return line
 	}
@@ -572,7 +572,7 @@ func (m statusModel) viewLog() string {
 	sb.WriteString("\n")
 	logTitle := styles.Title.Render(" Live Log")
 	if m.daemon.LogPath != "" {
-		logTitle += statusDimStyle.Render("  " + m.daemon.RunID+"/run.log")
+		logTitle += statusDimStyle.Render("  " + m.daemon.RunID + "/run.log")
 	}
 	sb.WriteString(logTitle)
 	sb.WriteString("\n")

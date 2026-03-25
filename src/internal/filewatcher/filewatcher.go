@@ -131,8 +131,8 @@ func (w *Watcher) loop() {
 
 	var timer *time.Timer
 	var timerC <-chan time.Time
-	var hasCreate bool   // true if any Create event seen in the current debounce window
-	var lastPath string  // path of the last relevant event in the current debounce window
+	var hasCreate bool  // true if any Create event seen in the current debounce window
+	var lastPath string // path of the last relevant event in the current debounce window
 
 	for {
 		select {

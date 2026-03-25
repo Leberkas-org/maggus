@@ -31,13 +31,13 @@ type skillMapping struct {
 }
 
 var skillMappings = map[string]skillMapping{
-	"open console":          {skill: "", usageFile: "usage_prompt.jsonl"},
-	"/maggus-plan":          {skill: "/maggus-plan", usageFile: "usage_plan.jsonl"},
-	"/maggus-vision":        {skill: "/maggus-vision", usageFile: "usage_vision.jsonl"},
-	"/maggus-architecture":  {skill: "/maggus-architecture", usageFile: "usage_architecture.jsonl"},
-	"/maggus-bugreport":     {skill: "/maggus-bugreport", usageFile: "usage_bugreport.jsonl"},
-	"/bryan-plan":           {skill: "/bryan-plan", usageFile: "usage_bryan_plan.jsonl"},
-	"/bryan-bugreport":      {skill: "/bryan-bugreport", usageFile: "usage_bryan_bugreport.jsonl"},
+	"open console":         {skill: "", usageFile: "usage_prompt.jsonl"},
+	"/maggus-plan":         {skill: "/maggus-plan", usageFile: "usage_plan.jsonl"},
+	"/maggus-vision":       {skill: "/maggus-vision", usageFile: "usage_vision.jsonl"},
+	"/maggus-architecture": {skill: "/maggus-architecture", usageFile: "usage_architecture.jsonl"},
+	"/maggus-bugreport":    {skill: "/maggus-bugreport", usageFile: "usage_bugreport.jsonl"},
+	"/bryan-plan":          {skill: "/bryan-plan", usageFile: "usage_bryan_plan.jsonl"},
+	"/bryan-bugreport":     {skill: "/bryan-bugreport", usageFile: "usage_bryan_bugreport.jsonl"},
 }
 
 func runPrompt(cmd *cobra.Command, args []string) error {
