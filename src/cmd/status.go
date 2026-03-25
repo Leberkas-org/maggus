@@ -818,15 +818,45 @@ func (m statusModel) renderSnapshotPanel() string {
 		sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Cost:"), statusDimStyle.Render("N/A")))
 	}
 
-	// Elapsed since snapshot update
-	if snap.UpdatedAt != "" {
-		if t, err := time.Parse(time.RFC3339, snap.UpdatedAt); err == nil {
-			elapsed := time.Since(t).Truncate(time.Second)
-			sb.WriteString(fmt.Sprintf("  %s %s\n", statusBoldStyle.Render("Updated:"), statusDimStyle.Render(elapsed.String()+" ago")))
+	// Run and task elapsed times
+	runElapsed := "—"
+	if snap.RunStartedAt != "" {
+		if t, err := time.Parse(time.RFC3339, snap.RunStartedAt); err == nil {
+			runElapsed = formatHumanDuration(time.Since(t))
 		}
 	}
+	sb.WriteString(fmt.Sprintf("  %s     %s\n", statusBoldStyle.Render("Run:"), statusDimStyle.Render(runElapsed)))
+
+	taskElapsed := "—"
+	if snap.TaskStartedAt != "" {
+		if t, err := time.Parse(time.RFC3339, snap.TaskStartedAt); err == nil {
+			taskElapsed = formatHumanDuration(time.Since(t))
+		}
+	}
+	sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
 
 	return sb.String()
+}
+
+// formatHumanDuration formats a duration as human-friendly text (e.g. "5m 32s", "1h 12m 5s").
+func formatHumanDuration(d time.Duration) string {
+	d = d.Truncate(time.Second)
+	if d < time.Second {
+		return "0s"
+	}
+
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	case m > 0:
+		return fmt.Sprintf("%dm %ds", m, s)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
 }
 
 // formatSnapshotModelTokens formats per-model token breakdown from the snapshot.
