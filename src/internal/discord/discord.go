@@ -26,10 +26,13 @@ const AssetKeyLargeImage = "maggus_logo"
 
 // PresenceState holds the data needed to update the Discord Rich Presence.
 type PresenceState struct {
-	TaskID       string
-	TaskTitle    string
-	FeatureTitle string
-	StartTime    time.Time
+	TaskID          string
+	TaskTitle       string
+	FeatureTitle    string
+	StartTime       time.Time
+	Verb            string // e.g. "Working", "Fixing", "Planning", "Consulting"
+	ProgressCurrent int    // completed tasks (0 means no progress)
+	ProgressTotal   int    // total tasks (0 means no progress bar)
 }
 
 // Presence manages a connection to Discord's local IPC for Rich Presence updates.

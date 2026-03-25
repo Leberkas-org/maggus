@@ -30,15 +30,15 @@ Enhance the Discord Rich Presence integration to show more contextual informatio
 **Parallel:** yes — can run alongside nothing (foundational task, but small)
 
 **Acceptance Criteria:**
-- [ ] `PresenceState` in `internal/discord/discord.go` has a new `Verb` field (string) — e.g. "Working", "Fixing", "Planning", "Consulting"
-- [ ] `PresenceState` has new `ProgressCurrent` (int) and `ProgressTotal` (int) fields for task progress (0/0 means no progress bar)
-- [ ] `buildActivity()` in `protocol.go` uses `Verb` for the `State` field instead of hardcoded "Running Maggus". Falls back to "Running Maggus" when Verb is empty (backward compat)
-- [ ] When `ProgressTotal > 0`, the state field format is: `"Verb — Current/Total tasks (XX%)"` (e.g. "Working — 3/7 tasks (43%)")
-- [ ] When `ProgressTotal == 0`, the state field is just the verb (e.g. "Consulting")
-- [ ] `FormatDetails()` behavior is unchanged
-- [ ] Existing tests in `discord_test.go` still pass
-- [ ] New unit tests cover: verb-only state, verb with progress, empty verb fallback, progress percentage calculation (including 0/0, 1/1, 0/5 edge cases)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `PresenceState` in `internal/discord/discord.go` has a new `Verb` field (string) — e.g. "Working", "Fixing", "Planning", "Consulting"
+- [x] `PresenceState` has new `ProgressCurrent` (int) and `ProgressTotal` (int) fields for task progress (0/0 means no progress bar)
+- [x] `buildActivity()` in `protocol.go` uses `Verb` for the `State` field instead of hardcoded "Running Maggus". Falls back to "Running Maggus" when Verb is empty (backward compat)
+- [x] When `ProgressTotal > 0`, the state field format is: `"Verb — Current/Total tasks (XX%)"` (e.g. "Working — 3/7 tasks (43%)")
+- [x] When `ProgressTotal == 0`, the state field is just the verb (e.g. "Consulting")
+- [x] `FormatDetails()` behavior is unchanged
+- [x] Existing tests in `discord_test.go` still pass
+- [x] New unit tests cover: verb-only state, verb with progress, empty verb fallback, progress percentage calculation (including 0/0, 1/1, 0/5 edge cases)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-005-002: Add skill-to-verb mapping and wire prompt command to Discord
 **Description:** As a user, I want my Discord status to show what I'm doing in prompt mode (e.g. "Planning" when running `/maggus-plan`, "Consulting" when using open console) so my friends and colleagues see meaningful activity.

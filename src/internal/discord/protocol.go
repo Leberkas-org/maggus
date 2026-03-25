@@ -86,11 +86,24 @@ type timestamps struct {
 	Start *int64 `json:"start,omitempty"`
 }
 
+// formatState builds the state string from verb and progress fields.
+func formatState(state PresenceState) string {
+	verb := state.Verb
+	if verb == "" {
+		verb = "Running Maggus"
+	}
+	if state.ProgressTotal > 0 {
+		pct := state.ProgressCurrent * 100 / state.ProgressTotal
+		return fmt.Sprintf("%s \u2014 %d/%d tasks (%d%%)", verb, state.ProgressCurrent, state.ProgressTotal, pct)
+	}
+	return verb
+}
+
 // buildActivity constructs the activity payload from a PresenceState.
 func buildActivity(state PresenceState) *activity {
 	a := &activity{
 		Details: FormatDetails(state),
-		State:   "Running Maggus",
+		State:   formatState(state),
 		Assets: &assets{
 			LargeImage: AssetKeyLargeImage,
 			LargeText:  "Maggus",

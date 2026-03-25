@@ -314,3 +314,83 @@ func TestPresenceUpdateWhenNotConnected(t *testing.T) {
 		t.Errorf("Update on unconnected Presence: %v", err)
 	}
 }
+
+func TestFormatState(t *testing.T) {
+	tests := []struct {
+		name  string
+		state PresenceState
+		want  string
+	}{
+		{
+			name:  "empty verb falls back to Running Maggus",
+			state: PresenceState{},
+			want:  "Running Maggus",
+		},
+		{
+			name:  "verb only no progress",
+			state: PresenceState{Verb: "Consulting"},
+			want:  "Consulting",
+		},
+		{
+			name:  "verb with progress",
+			state: PresenceState{Verb: "Working", ProgressCurrent: 3, ProgressTotal: 7},
+			want:  "Working — 3/7 tasks (42%)",
+		},
+		{
+			name:  "verb with full progress",
+			state: PresenceState{Verb: "Working", ProgressCurrent: 1, ProgressTotal: 1},
+			want:  "Working — 1/1 tasks (100%)",
+		},
+		{
+			name:  "verb with zero current",
+			state: PresenceState{Verb: "Fixing", ProgressCurrent: 0, ProgressTotal: 5},
+			want:  "Fixing — 0/5 tasks (0%)",
+		},
+		{
+			name:  "zero total means no progress",
+			state: PresenceState{Verb: "Planning", ProgressCurrent: 0, ProgressTotal: 0},
+			want:  "Planning",
+		},
+		{
+			name:  "empty verb with progress falls back",
+			state: PresenceState{ProgressCurrent: 2, ProgressTotal: 4},
+			want:  "Running Maggus — 2/4 tasks (50%)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatState(tt.state)
+			if got != tt.want {
+				t.Errorf("formatState() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildActivityWithVerb(t *testing.T) {
+	state := PresenceState{
+		TaskID:    "TASK-001",
+		TaskTitle: "Test",
+		Verb:      "Fixing",
+	}
+	a := buildActivity(state)
+	if a.State != "Fixing" {
+		t.Errorf("State = %q, want %q", a.State, "Fixing")
+	}
+}
+
+func TestBuildActivityWithVerbAndProgress(t *testing.T) {
+	state := PresenceState{
+		TaskID:          "TASK-001",
+		TaskTitle:       "Test",
+		Verb:            "Working",
+		ProgressCurrent: 3,
+		ProgressTotal:   7,
+	}
+	a := buildActivity(state)
+	want := "Working — 3/7 tasks (42%)"
+	if a.State != want {
+		t.Errorf("State = %q, want %q", a.State, want)
+	}
+}
