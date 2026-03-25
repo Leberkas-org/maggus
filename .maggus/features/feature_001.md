@@ -66,16 +66,16 @@ This uses Discord's local IPC protocol (no bot, no network auth) and is opt-in v
 **Model:** opus — IPC protocol implementation, platform-specific pipes, connection management
 
 **Acceptance Criteria:**
-- [ ] New package `internal/discord` with a `Presence` type
-- [ ] Implements Discord IPC protocol directly — no external library dependency (uses Unix socket on Linux/macOS, named pipe `\\.\pipe\discord-ipc-0` on Windows)
-- [ ] `Connect()` method — connects to Discord IPC; returns nil error silently if Discord is not running
-- [ ] `Update(state PresenceState)` method — sets activity with: details (feature title + task info), state ("Running Maggus"), large image key ("maggus_logo"), timestamps
-- [ ] `Close()` method — clears presence and disconnects cleanly
-- [ ] `PresenceState` struct has fields: `TaskID`, `TaskTitle`, `FeatureTitle`, `StartTime`
-- [ ] Platform-specific IPC connection files: `ipc_windows.go` and `ipc_unix.go` (build tags)
-- [ ] If Discord disconnects mid-session, logs once and stops trying (no retry spam)
-- [ ] Unit tests for state formatting logic and message serialization (not IPC itself — that requires Discord running)
-- [ ] `go vet ./...` passes
+- [x] New package `internal/discord` with a `Presence` type
+- [x] Implements Discord IPC protocol directly — no external library dependency (uses Unix socket on Linux/macOS, named pipe `\\.\pipe\discord-ipc-0` on Windows)
+- [x] `Connect()` method — connects to Discord IPC; returns nil error silently if Discord is not running
+- [x] `Update(state PresenceState)` method — sets activity with: details (feature title + task info), state ("Running Maggus"), large image key ("maggus_logo"), timestamps
+- [x] `Close()` method — clears presence and disconnects cleanly
+- [x] `PresenceState` struct has fields: `TaskID`, `TaskTitle`, `FeatureTitle`, `StartTime`
+- [x] Platform-specific IPC connection files: `ipc_windows.go` and `ipc_unix.go` (build tags)
+- [x] If Discord disconnects mid-session, logs once and stops trying (no retry spam)
+- [x] Unit tests for state formatting logic and message serialization (not IPC itself — that requires Discord running)
+- [x] `go vet ./...` passes
 
 ### TASK-001-004: Integrate presence updates into the work loop TUI
 **Description:** As a user, I want my Discord status to automatically update as Maggus works through tasks so that my teammates can see what Maggus is doing.
