@@ -38,13 +38,13 @@ The status view's "Updated" line currently shows time since the last snapshot wr
 **Parallel:** yes — can run alongside TASK-006-001
 
 **Acceptance Criteria:**
-- [ ] `formatSnapshotModelTokens()` in `status.go` returns multi-line output, one line per model
-- [ ] Each line format: `  <model>: <in> in / <out> out ($<cost>)` — indented to align under the "Tokens:" label
-- [ ] The old single-line `Model:` summary line is removed (model names now appear in the per-model breakdown)
-- [ ] The aggregate `Tokens:` line still shows total in/out
-- [ ] Cost per model shown inline; total `Cost:` line remains
-- [ ] Visually verified: no line exceeds 80 characters for typical model names
-- [ ] `go vet ./...` passes
+- [x] `formatSnapshotModelTokens()` in `status.go` returns multi-line output, one line per model
+- [x] Each line format: `  <model>: <in> in / <out> out ($<cost>)` — indented to align under the "Tokens:" label
+- [x] The old single-line `Model:` summary line is removed (model names now appear in the per-model breakdown)
+- [x] The aggregate `Tokens:` line still shows total in/out
+- [x] Cost per model shown inline; total `Cost:` line remains
+- [x] Visually verified: no line exceeds 80 characters for typical model names
+- [x] `go vet ./...` passes
 
 ### TASK-006-003: Replace "Updated" with run elapsed and task elapsed in snapshot panel
 **Description:** As a user, I want to see how long the run has been going and how long the current task has been running instead of "Updated: 3s ago".

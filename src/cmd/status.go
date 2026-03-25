@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -795,8 +796,6 @@ func (m statusModel) renderSnapshotPanel() string {
 	// ── Bottom zone (fixed): model, tokens, cost, elapsed ──
 	sb.WriteString(" " + styles.Separator(42) + "\n")
 
-	sb.WriteString(fmt.Sprintf("  %s   %s\n", statusBoldStyle.Render("Model:"), statusDimStyle.Render(m.snapshotModelSummary())))
-
 	// Tokens
 	totalIn := snap.TokenInput
 	if totalIn > 0 || snap.TokenOutput > 0 {
@@ -804,9 +803,9 @@ func (m statusModel) renderSnapshotPanel() string {
 			runner.FormatTokens(totalIn), runner.FormatTokens(snap.TokenOutput))
 		sb.WriteString(fmt.Sprintf("  %s  %s\n", statusBoldStyle.Render("Tokens:"), statusDimStyle.Render(tokenStr)))
 
-		// Per-model breakdown
+		// Per-model breakdown (one line per model)
 		if len(snap.ModelBreakdown) > 0 {
-			sb.WriteString("          " + statusDimStyle.Render(m.formatSnapshotModelTokens()) + "\n")
+			sb.WriteString(m.formatSnapshotModelTokens())
 		}
 
 		costStr := "N/A"
@@ -830,30 +829,29 @@ func (m statusModel) renderSnapshotPanel() string {
 	return sb.String()
 }
 
-// snapshotModelSummary returns a summary of models from the snapshot breakdown.
-func (m statusModel) snapshotModelSummary() string {
-	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
-		return "-"
-	}
-	names := make([]string, 0, len(m.snapshot.ModelBreakdown))
-	for name := range m.snapshot.ModelBreakdown {
-		names = append(names, name)
-	}
-	return strings.Join(names, ", ")
-}
-
 // formatSnapshotModelTokens formats per-model token breakdown from the snapshot.
+// Returns multi-line output with one line per model, indented to align under "Tokens:".
 func (m statusModel) formatSnapshotModelTokens() string {
 	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
 		return ""
 	}
-	var parts []string
-	for name, usage := range m.snapshot.ModelBreakdown {
-		totalIn := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
-		parts = append(parts, fmt.Sprintf("%s: %s in / %s out",
-			name, runner.FormatTokens(totalIn), runner.FormatTokens(usage.OutputTokens)))
+	// Sort model names for stable output
+	names := make([]string, 0, len(m.snapshot.ModelBreakdown))
+	for name := range m.snapshot.ModelBreakdown {
+		names = append(names, name)
 	}
-	return strings.Join(parts, "  ·  ")
+	sort.Strings(names)
+
+	var sb strings.Builder
+	for _, name := range names {
+		usage := m.snapshot.ModelBreakdown[name]
+		totalIn := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
+		costStr := runner.FormatCost(usage.CostUSD)
+		line := fmt.Sprintf("  %s: %s in / %s out (%s)",
+			name, runner.FormatTokens(totalIn), runner.FormatTokens(usage.OutputTokens), costStr)
+		sb.WriteString("  " + statusDimStyle.Render(line) + "\n")
+	}
+	return sb.String()
 }
 
 func (m statusModel) viewStatus() string {
