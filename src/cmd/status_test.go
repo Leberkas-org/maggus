@@ -1,13 +1,93 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
+
+func TestFeatureInfo_ApprovalKey(t *testing.T) {
+	t.Run("uses maggusID when set", func(t *testing.T) {
+		f := &featureInfo{filename: "feature_001.md", maggusID: "abc-123"}
+		if got := f.approvalKey(); got != "abc-123" {
+			t.Errorf("approvalKey() = %q, want %q", got, "abc-123")
+		}
+	})
+
+	t.Run("falls back to featureIDFromPath when maggusID empty", func(t *testing.T) {
+		f := &featureInfo{filename: "feature_001.md"}
+		want := featureIDFromPath("feature_001.md")
+		if got := f.approvalKey(); got != want {
+			t.Errorf("approvalKey() = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestPruneStaleApprovals(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := dir + "/.maggus"
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write an approvals file with a stale entry
+	data := "stale-uuid: true\nactive-uuid: true\n"
+	if err := os.WriteFile(maggusDir+"/feature_approvals.yml", []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	features := []featureInfo{
+		{filename: "feature_001.md", maggusID: "active-uuid"},
+	}
+	pruneStaleApprovals(dir, features)
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a["stale-uuid"]; ok {
+		t.Error("stale-uuid should have been pruned")
+	}
+	if _, ok := a["active-uuid"]; !ok {
+		t.Error("active-uuid should still be present")
+	}
+}
+
+func TestPruneStaleApprovals_FallbackKey(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := dir + "/.maggus"
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Feature without maggusID uses filename-based key
+	fallbackKey := featureIDFromPath("feature_002.md")
+	data := fallbackKey + ": true\nold-entry: false\n"
+	if err := os.WriteFile(maggusDir+"/feature_approvals.yml", []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	features := []featureInfo{
+		{filename: "feature_002.md"}, // no maggusID
+	}
+	pruneStaleApprovals(dir, features)
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a["old-entry"]; ok {
+		t.Error("old-entry should have been pruned")
+	}
+	if _, ok := a[fallbackKey]; !ok {
+		t.Errorf("%s should still be present", fallbackKey)
+	}
+}
 
 func TestFeatureInfo_DoneCount(t *testing.T) {
 	tests := []struct {

@@ -74,15 +74,15 @@ This feature migrates the approval system to use that UUID as the key, and adds 
 **Parallel:** yes — can run alongside TASK-003-004 and TASK-003-005
 
 **Acceptance Criteria:**
-- [ ] `featureInfo` in `src/cmd/status_plans.go` gains a `maggusID string` field
-- [ ] `parseFeatures` calls `parser.ParseMaggusID(f)` for each file and stores the result in `featureInfo.maggusID`
-- [ ] `parseBugs` does the same for bug files
-- [ ] Both functions use `maggusID` as the approval key when calling `approval.IsApproved`; if `maggusID` is empty, they fall back to `featureIDFromPath(f)` (backwards compatibility)
-- [ ] After building both feature and bug lists, a combined list of all known IDs (UUIDs or filename fallbacks) is passed to `approval.Prune` to remove stale entries
-- [ ] `handleApproveToggle` in `src/cmd/status.go` uses `f.maggusID` (with filename fallback) instead of `featureIDFromPath(f.filename)` when calling `approval.Approve` / `approval.Unapprove`
-- [ ] `featureIDFromPath` is kept (still used in `approve.go` as a fallback label) but no longer used as a primary approval key in `status_plans.go`
-- [ ] Existing status TUI tests pass; add or update tests for the new pruning behaviour
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `featureInfo` in `src/cmd/status_plans.go` gains a `maggusID string` field
+- [x] `parseFeatures` calls `parser.ParseMaggusID(f)` for each file and stores the result in `featureInfo.maggusID`
+- [x] `parseBugs` does the same for bug files
+- [x] Both functions use `maggusID` as the approval key when calling `approval.IsApproved`; if `maggusID` is empty, they fall back to `featureIDFromPath(f)` (backwards compatibility)
+- [x] After building both feature and bug lists, a combined list of all known IDs (UUIDs or filename fallbacks) is passed to `approval.Prune` to remove stale entries
+- [x] `handleApproveToggle` in `src/cmd/status.go` uses `f.maggusID` (with filename fallback) instead of `featureIDFromPath(f.filename)` when calling `approval.Approve` / `approval.Unapprove`
+- [x] `featureIDFromPath` is kept (still used in `approve.go` as a fallback label) but no longer used as a primary approval key in `status_plans.go`
+- [x] Existing status TUI tests pass; add or update tests for the new pruning behaviour
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-003-004: Update `featureGroup` and `buildApprovedFeatureGroups` in the work loop
 

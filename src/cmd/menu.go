@@ -283,6 +283,9 @@ func loadFeatureSummary() featureSummary {
 		}
 	}
 
+	all := append(features, bugs...)
+	pruneStaleApprovals(dir, all)
+
 	return s
 }
 

@@ -14,10 +14,19 @@ const progressBarWidth = 10
 
 type featureInfo struct {
 	filename  string
+	maggusID  string // UUID from <!-- maggus-id: ... --> comment; empty if absent
 	tasks     []parser.Task
 	completed bool // filename contains _completed
 	isBug     bool // true for bug files (from .maggus/bugs/)
 	approved  bool // from feature_approvals.yml (opt-out: true unless explicitly unapproved)
+}
+
+// approvalKey returns the maggusID if set, otherwise falls back to featureIDFromPath.
+func (f *featureInfo) approvalKey() string {
+	if f.maggusID != "" {
+		return f.maggusID
+	}
+	return featureIDFromPath(f.filename)
 }
 
 func (f *featureInfo) doneCount() int {
@@ -78,13 +87,15 @@ func parseFeatures(dir string, approvalRequired bool) ([]featureInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
-		featureID := featureIDFromPath(f)
-		features = append(features, featureInfo{
+		maggusID := parser.ParseMaggusID(f)
+		fi := featureInfo{
 			filename:  filepath.Base(f),
+			maggusID:  maggusID,
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
-			approved:  approval.IsApproved(a, featureID, approvalRequired),
-		})
+		}
+		fi.approved = approval.IsApproved(a, fi.approvalKey(), approvalRequired)
+		features = append(features, fi)
 	}
 	return features, nil
 }
@@ -106,14 +117,16 @@ func parseBugs(dir string, approvalRequired bool) ([]featureInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
-		featureID := featureIDFromPath(f)
-		bugs = append(bugs, featureInfo{
+		maggusID := parser.ParseMaggusID(f)
+		fi := featureInfo{
 			filename:  filepath.Base(f),
+			maggusID:  maggusID,
 			tasks:     tasks,
 			completed: strings.HasSuffix(f, "_completed.md"),
 			isBug:     true,
-			approved:  approval.IsApproved(a, featureID, approvalRequired),
-		})
+		}
+		fi.approved = approval.IsApproved(a, fi.approvalKey(), approvalRequired)
+		bugs = append(bugs, fi)
 	}
 	return bugs, nil
 }
@@ -139,6 +152,16 @@ func findNextTask(features []featureInfo) (string, string) {
 		}
 	}
 	return "", ""
+}
+
+// pruneStaleApprovals collects all known approval keys from the combined feature
+// and bug lists and calls approval.Prune to remove stale entries.
+func pruneStaleApprovals(dir string, all []featureInfo) {
+	var knownIDs []string
+	for i := range all {
+		knownIDs = append(knownIDs, all[i].approvalKey())
+	}
+	_ = approval.Prune(dir, knownIDs)
 }
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).

@@ -124,6 +124,7 @@ func (m *statusModel) reloadFeatures() {
 		features = append(features, bugs...)
 	}
 	m.features = features
+	pruneStaleApprovals(m.dir, features)
 	m.nextTaskID, m.nextTaskFile = findNextTask(features)
 	m.rebuildForSelectedFeature()
 }
@@ -331,6 +332,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				features = append(features, bugs...)
 			}
 			m.features = features
+			pruneStaleApprovals(m.dir, features)
 		}
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
 		m.rebuildForSelectedFeature()
@@ -361,15 +363,15 @@ func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 		m.statusNote = "cannot approve a completed feature"
 		return m, nil
 	}
-	featureID := featureIDFromPath(f.filename)
+	key := f.approvalKey()
 	var err error
 	if f.approved {
-		err = approval.Unapprove(m.dir, featureID)
+		err = approval.Unapprove(m.dir, key)
 		if err == nil {
 			m.statusNote = "feature unapproved"
 		}
 	} else {
-		err = approval.Approve(m.dir, featureID)
+		err = approval.Approve(m.dir, key)
 		if err == nil {
 			m.statusNote = "feature approved"
 		}
@@ -816,6 +818,7 @@ var statusCmd = &cobra.Command{
 			return bugErr
 		}
 		features = append(features, bugs...)
+		pruneStaleApprovals(dir, features)
 
 		if len(features) == 0 {
 			if plain {
