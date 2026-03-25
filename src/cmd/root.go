@@ -57,14 +57,29 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialise Discord Rich Presence for the menu if enabled.
+	// Connect in the background so the TUI renders instantly.
 	var presence *discord.Presence
+	var presenceReady <-chan struct{}
 	cwd, _ := os.Getwd()
 	if cfg, err := config.Load(cwd); err == nil && cfg.DiscordPresence {
 		presence = &discord.Presence{}
-		_ = presence.Connect()
+		ch := make(chan struct{})
+		presenceReady = ch
+		menuStart := time.Now()
+		go func() {
+			_ = presence.Connect()
+			close(ch)
+			// Send the initial "In Main Menu" update that the main
+			// goroutine may have skipped while we were connecting.
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: "In Main Menu",
+				StartTime:    menuStart,
+			})
+		}()
 	}
 	defer func() {
 		if presence != nil {
+			<-presenceReady // wait for Connect to finish before closing
 			_ = presence.Close()
 		}
 	}()
@@ -72,10 +87,16 @@ func runMenu(cmd *cobra.Command, args []string) error {
 	for {
 		// Show idle presence while in the main menu.
 		if presence != nil {
-			_ = presence.Update(discord.PresenceState{
-				FeatureTitle: "In Main Menu",
-				StartTime:    time.Now(),
-			})
+			select {
+			case <-presenceReady:
+				_ = presence.Update(discord.PresenceState{
+					FeatureTitle: "In Main Menu",
+					StartTime:    time.Now(),
+				})
+			default:
+				// Still connecting in background; the goroutine will
+				// send the initial update once connected.
+			}
 		}
 		m := newMenuModel(loadFeatureSummary())
 		p := tea.NewProgram(m, tea.WithAltScreen())
