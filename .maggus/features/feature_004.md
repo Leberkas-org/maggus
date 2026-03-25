@@ -58,8 +58,8 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
 **Parallel:** yes — can run alongside TASK-004-001
 
 **Acceptance Criteria:**
-- [ ] New package `src/internal/hooks/` is created
-- [ ] `hooks.Event` struct defines the JSON payload shape:
+- [x] New package `src/internal/hooks/` is created
+- [x] `hooks.Event` struct defines the JSON payload shape:
   ```go
   type Event struct {
       Type           string     `json:"event"`           // "feature_complete", "bug_complete", "task_complete"
@@ -75,15 +75,15 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
       Title string `json:"title"`
   }
   ```
-- [ ] `hooks.Run(commands []HookEntry, event Event, workDir string, logger *log.Logger)` executes each command sequentially
-- [ ] For each command: the JSON-encoded event is written to the command's stdin
-- [ ] Each command is executed with a 30-second timeout using `context.WithTimeout`
-- [ ] The command's working directory is set to `workDir`
-- [ ] If a command fails (non-zero exit, timeout, spawn error), the error is logged as a warning and execution continues to the next hook
-- [ ] If a command produces stderr output, it is included in the warning log
-- [ ] `hooks.Run` with an empty `commands` slice is a no-op (returns immediately)
-- [ ] Unit tests cover: successful execution, command failure (logged, not fatal), timeout, empty commands, JSON payload correctness
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `hooks.Run(commands []HookEntry, event Event, workDir string, logger *log.Logger)` executes each command sequentially
+- [x] For each command: the JSON-encoded event is written to the command's stdin
+- [x] Each command is executed with a 30-second timeout using `context.WithTimeout`
+- [x] The command's working directory is set to `workDir`
+- [x] If a command fails (non-zero exit, timeout, spawn error), the error is logged as a warning and execution continues to the next hook
+- [x] If a command produces stderr output, it is included in the warning log
+- [x] `hooks.Run` with an empty `commands` slice is a no-op (returns immediately)
+- [x] Unit tests cover: successful execution, command failure (logged, not fatal), timeout, empty commands, JSON payload correctness
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-004-003: Wire feature and bug completion hooks into work_task.go
 **Description:** As a developer, I want the work loop to fire `on_feature_complete` and `on_bug_complete` hooks after marking completed files, so that users' scripts run at the right time.

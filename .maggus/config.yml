@@ -3,7 +3,7 @@ model: opus
 include: []
 worktree: false
 auto_work: delayed
-approval_mode: ""
+approval_mode: opt-in
 auto_continue: null
 notifications:
     sound: true
@@ -20,3 +20,4 @@ git:
 on_complete:
     feature: delete
     bug: delete
+discord_presence: true
