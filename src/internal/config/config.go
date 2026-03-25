@@ -90,6 +90,18 @@ func (g GitConfig) ProtectedBranchList() []string {
 	return filtered
 }
 
+// HookEntry represents a single hook command to execute.
+type HookEntry struct {
+	Run string `yaml:"run"`
+}
+
+// HooksConfig holds lifecycle hook definitions.
+type HooksConfig struct {
+	OnFeatureComplete []HookEntry `yaml:"on_feature_complete"`
+	OnBugComplete     []HookEntry `yaml:"on_bug_complete"`
+	OnTaskComplete    []HookEntry `yaml:"on_task_complete"`
+}
+
 // OnCompleteConfig holds settings for what happens when a feature or bug file is fully completed.
 type OnCompleteConfig struct {
 	Feature string `yaml:"feature"`
@@ -139,6 +151,7 @@ type Config struct {
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git                GitConfig           `yaml:"git"`
 	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
+	Hooks              HooksConfig         `yaml:"hooks"`
 	DiscordPresence    bool                `yaml:"discord_presence"`
 }
 

@@ -31,10 +31,10 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
 **Parallel:** yes — can run alongside TASK-004-002
 
 **Acceptance Criteria:**
-- [ ] `HooksConfig` struct is added to `src/internal/config/config.go` with fields `OnFeatureComplete`, `OnBugComplete`, and `OnTaskComplete`, each a `[]HookEntry`
-- [ ] `HookEntry` struct has a `Run string` field (`yaml:"run"`)
-- [ ] `Config` struct gains a `Hooks HooksConfig` field (`yaml:"hooks"`)
-- [ ] Parsing the following YAML populates the config correctly:
+- [x] `HooksConfig` struct is added to `src/internal/config/config.go` with fields `OnFeatureComplete`, `OnBugComplete`, and `OnTaskComplete`, each a `[]HookEntry`
+- [x] `HookEntry` struct has a `Run string` field (`yaml:"run"`)
+- [x] `Config` struct gains a `Hooks HooksConfig` field (`yaml:"hooks"`)
+- [x] Parsing the following YAML populates the config correctly:
   ```yaml
   hooks:
     on_feature_complete:
@@ -45,9 +45,9 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
     on_task_complete:
       - run: "./scripts/log-task.sh"
   ```
-- [ ] Empty or missing `hooks` section results in empty slices (no errors)
-- [ ] Unit tests cover: full config, partial config (only one event type), empty hooks, missing hooks section
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Empty or missing `hooks` section results in empty slices (no errors)
+- [x] Unit tests cover: full config, partial config (only one event type), empty hooks, missing hooks section
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-004-002: Create internal/hooks package with executor
 **Description:** As a developer, I want a hooks executor that runs shell commands with a JSON payload on stdin, so that lifecycle events can trigger user-defined scripts.

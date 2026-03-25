@@ -784,6 +784,138 @@ func TestLoad_DiscordPresenceFalse(t *testing.T) {
 	}
 }
 
+func TestLoad_HooksFullConfig(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+  on_feature_complete:
+    - run: "./scripts/notify.sh"
+    - run: "powershell -File ./scripts/track.ps1"
+  on_bug_complete:
+    - run: "./scripts/close-ticket.sh"
+  on_task_complete:
+    - run: "./scripts/log-task.sh"
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 2 {
+		t.Fatalf("OnFeatureComplete length = %d, want 2", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if cfg.Hooks.OnFeatureComplete[0].Run != "./scripts/notify.sh" {
+		t.Errorf("OnFeatureComplete[0].Run = %q, want %q", cfg.Hooks.OnFeatureComplete[0].Run, "./scripts/notify.sh")
+	}
+	if cfg.Hooks.OnFeatureComplete[1].Run != "powershell -File ./scripts/track.ps1" {
+		t.Errorf("OnFeatureComplete[1].Run = %q, want %q", cfg.Hooks.OnFeatureComplete[1].Run, "powershell -File ./scripts/track.ps1")
+	}
+	if len(cfg.Hooks.OnBugComplete) != 1 {
+		t.Fatalf("OnBugComplete length = %d, want 1", len(cfg.Hooks.OnBugComplete))
+	}
+	if cfg.Hooks.OnBugComplete[0].Run != "./scripts/close-ticket.sh" {
+		t.Errorf("OnBugComplete[0].Run = %q, want %q", cfg.Hooks.OnBugComplete[0].Run, "./scripts/close-ticket.sh")
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 1 {
+		t.Fatalf("OnTaskComplete length = %d, want 1", len(cfg.Hooks.OnTaskComplete))
+	}
+	if cfg.Hooks.OnTaskComplete[0].Run != "./scripts/log-task.sh" {
+		t.Errorf("OnTaskComplete[0].Run = %q, want %q", cfg.Hooks.OnTaskComplete[0].Run, "./scripts/log-task.sh")
+	}
+}
+
+func TestLoad_HooksPartialConfig(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+  on_task_complete:
+    - run: "./scripts/log-task.sh"
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 1 {
+		t.Fatalf("OnTaskComplete length = %d, want 1", len(cfg.Hooks.OnTaskComplete))
+	}
+	if cfg.Hooks.OnTaskComplete[0].Run != "./scripts/log-task.sh" {
+		t.Errorf("OnTaskComplete[0].Run = %q, want %q", cfg.Hooks.OnTaskComplete[0].Run, "./scripts/log-task.sh")
+	}
+}
+
+func TestLoad_HooksEmptySection(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 0 {
+		t.Errorf("OnTaskComplete length = %d, want 0", len(cfg.Hooks.OnTaskComplete))
+	}
+}
+
+func TestLoad_HooksMissingSection(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 0 {
+		t.Errorf("OnTaskComplete length = %d, want 0", len(cfg.Hooks.OnTaskComplete))
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")
