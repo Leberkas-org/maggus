@@ -69,7 +69,6 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 	runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
 
 	runID := daemonRunIDFlag
-	pollInterval := wc.cfg.DaemonPollIntervalDuration()
 
 	// Open structured run log (shared across cycles).
 	runLogger, logErr := runlog.Open(runID, dir)
@@ -97,16 +96,14 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		}
 
 		// No work found — enter wait state.
-		runLogger.Info(fmt.Sprintf("no work found, watching for changes (timeout: %s)", pollInterval))
+		runLogger.Info("no work found, watching for changes")
 
-		wakeReason, wakePath := waitForChanges(dir, pollInterval, workCtx)
+		wakeReason, wakePath := waitForChanges(dir, workCtx)
 		switch wakeReason {
 		case wakeSignal:
 			return nil
 		case wakeFileChange:
 			runLogger.Info(fmt.Sprintf("file change detected: %s", wakePath))
-		case wakeTimeout:
-			runLogger.Info("poll timeout reached, rechecking")
 		}
 	}
 }
@@ -117,12 +114,11 @@ type wakeReason int
 const (
 	wakeSignal     wakeReason = iota // shutdown signal received
 	wakeFileChange                   // file change detected
-	wakeTimeout                      // poll timeout expired
 )
 
-// waitForChanges blocks until a file change, timeout, or context cancellation.
+// waitForChanges blocks until a file change or context cancellation.
 // Returns the reason for waking and the path of the changed file (if applicable).
-func waitForChanges(dir string, timeout time.Duration, ctx context.Context) (wakeReason, string) {
+func waitForChanges(dir string, ctx context.Context) (wakeReason, string) {
 	type fileEvent struct {
 		path string
 	}
@@ -143,7 +139,7 @@ func waitForChanges(dir string, timeout time.Duration, ctx context.Context) (wak
 
 	fw, fwErr := filewatcher.New(dir, sendFn, 500*time.Millisecond)
 	if fwErr != nil {
-		// If watcher fails, fall back to pure poll.
+		// If watcher fails, log and block on context only.
 		fw = nil
 	}
 	defer func() {
@@ -152,16 +148,11 @@ func waitForChanges(dir string, timeout time.Duration, ctx context.Context) (wak
 		}
 	}()
 
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
 	select {
 	case <-ctx.Done():
 		return wakeSignal, ""
 	case evt := <-wakeCh:
 		return wakeFileChange, evt.path
-	case <-timer.C:
-		return wakeTimeout, ""
 	}
 }
 

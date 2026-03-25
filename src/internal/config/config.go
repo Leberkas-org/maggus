@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -136,28 +135,11 @@ type Config struct {
 	Worktree           bool                `yaml:"worktree"`
 	AutoWork           string              `yaml:"auto_work"`
 	ApprovalMode       string              `yaml:"approval_mode"`
-	AutoContinue       *bool               `yaml:"auto_continue"`
-	DaemonPollInterval string              `yaml:"daemon_poll_interval"`
-	Notifications      NotificationsConfig `yaml:"notifications"`
+	AutoContinue  *bool               `yaml:"auto_continue"`
+	Notifications NotificationsConfig `yaml:"notifications"`
 	Git                GitConfig           `yaml:"git"`
 	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
 	DiscordPresence    bool                `yaml:"discord_presence"`
-}
-
-// DefaultDaemonPollInterval is the fallback poll interval when no value is configured.
-const DefaultDaemonPollInterval = 5 * time.Minute
-
-// DaemonPollIntervalDuration returns the daemon poll interval as a time.Duration.
-// Falls back to 5 minutes if the value is empty or unparseable.
-func (c Config) DaemonPollIntervalDuration() time.Duration {
-	if c.DaemonPollInterval == "" {
-		return DefaultDaemonPollInterval
-	}
-	d, err := time.ParseDuration(c.DaemonPollInterval)
-	if err != nil {
-		return DefaultDaemonPollInterval
-	}
-	return d
 }
 
 // IsApprovalRequired returns true when approval_mode is opt-in (the default).

@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestLoad_MissingFile(t *testing.T) {
@@ -699,34 +698,15 @@ func TestLoad_GitConfigDefaults(t *testing.T) {
 	}
 }
 
-func TestDaemonPollIntervalDuration_Default(t *testing.T) {
-	cfg := Config{}
-	if got := cfg.DaemonPollIntervalDuration(); got != 5*time.Minute {
-		t.Errorf("DaemonPollIntervalDuration() = %v, want 5m", got)
-	}
-}
-
-func TestDaemonPollIntervalDuration_Configured(t *testing.T) {
-	cfg := Config{DaemonPollInterval: "30s"}
-	if got := cfg.DaemonPollIntervalDuration(); got != 30*time.Second {
-		t.Errorf("DaemonPollIntervalDuration() = %v, want 30s", got)
-	}
-}
-
-func TestDaemonPollIntervalDuration_Invalid(t *testing.T) {
-	cfg := Config{DaemonPollInterval: "not-a-duration"}
-	if got := cfg.DaemonPollIntervalDuration(); got != 5*time.Minute {
-		t.Errorf("DaemonPollIntervalDuration() = %v, want 5m (default)", got)
-	}
-}
-
-func TestLoad_DaemonPollInterval(t *testing.T) {
+func TestLoad_DaemonPollInterval_Ignored(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")
 	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// daemon_poll_interval is no longer used but should be silently ignored.
 	content := `daemon_poll_interval: "2m"
+model: sonnet
 `
 	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -734,13 +714,10 @@ func TestLoad_DaemonPollInterval(t *testing.T) {
 
 	cfg, err := Load(dir)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("expected no error loading config with removed daemon_poll_interval key, got %v", err)
 	}
-	if cfg.DaemonPollInterval != "2m" {
-		t.Errorf("DaemonPollInterval = %q, want %q", cfg.DaemonPollInterval, "2m")
-	}
-	if got := cfg.DaemonPollIntervalDuration(); got != 2*time.Minute {
-		t.Errorf("DaemonPollIntervalDuration() = %v, want 2m", got)
+	if cfg.Model != "sonnet" {
+		t.Errorf("Model = %q, want %q", cfg.Model, "sonnet")
 	}
 }
 

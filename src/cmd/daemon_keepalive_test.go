@@ -8,26 +8,6 @@ import (
 	"time"
 )
 
-func TestWaitForChanges_Timeout(t *testing.T) {
-	dir := t.TempDir()
-	featDir := filepath.Join(dir, ".maggus", "features")
-	if err := os.MkdirAll(featDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	ctx := context.Background()
-	start := time.Now()
-	reason, _ := waitForChanges(dir, 200*time.Millisecond, ctx)
-	elapsed := time.Since(start)
-
-	if reason != wakeTimeout {
-		t.Errorf("expected wakeTimeout, got %v", reason)
-	}
-	if elapsed < 150*time.Millisecond {
-		t.Errorf("returned too fast: %v", elapsed)
-	}
-}
-
 func TestWaitForChanges_FileChange(t *testing.T) {
 	dir := t.TempDir()
 	featDir := filepath.Join(dir, ".maggus", "features")
@@ -43,7 +23,7 @@ func TestWaitForChanges_FileChange(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(featDir, "feature_099.md"), []byte("# Test"), 0o644)
 	}()
 
-	reason, path := waitForChanges(dir, 5*time.Second, ctx)
+	reason, path := waitForChanges(dir, ctx)
 
 	if reason != wakeFileChange {
 		t.Errorf("expected wakeFileChange, got %v", reason)
@@ -69,7 +49,7 @@ func TestWaitForChanges_ContextCancel(t *testing.T) {
 	}()
 
 	start := time.Now()
-	reason, _ := waitForChanges(dir, 5*time.Second, ctx)
+	reason, _ := waitForChanges(dir, ctx)
 	elapsed := time.Since(start)
 
 	if reason != wakeSignal {
@@ -82,12 +62,18 @@ func TestWaitForChanges_ContextCancel(t *testing.T) {
 
 func TestWaitForChanges_NoFeaturesDir(t *testing.T) {
 	dir := t.TempDir()
-	// Don't create .maggus/features — watcher should still work (pure poll fallback).
+	// Don't create .maggus/features — watcher creation fails, so waitForChanges
+	// blocks on context only; cancel to verify clean shutdown.
 
-	ctx := context.Background()
-	reason, _ := waitForChanges(dir, 200*time.Millisecond, ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
 
-	if reason != wakeTimeout {
-		t.Errorf("expected wakeTimeout with missing features dir, got %v", reason)
+	reason, _ := waitForChanges(dir, ctx)
+
+	if reason != wakeSignal {
+		t.Errorf("expected wakeSignal with missing features dir, got %v", reason)
 	}
 }
