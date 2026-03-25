@@ -90,14 +90,16 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown skill: %s", result.Skill)
 	}
 
-	// Initialise Discord Rich Presence if enabled.
-	var presence *discord.Presence
-	if cfg.DiscordPresence {
+	// Use shared presence from root menu if available; otherwise create our own.
+	presence := sharedPresence
+	ownPresence := false
+	if presence == nil && cfg.DiscordPresence {
 		presence = &discord.Presence{}
 		_ = presence.Connect()
+		ownPresence = true
 	}
 	defer func() {
-		if presence != nil {
+		if ownPresence && presence != nil {
 			_ = presence.Close()
 		}
 	}()

@@ -34,6 +34,11 @@ func init() {
 // caps holds the detected tool capabilities for this run.
 var caps capabilities.Capabilities
 
+// sharedPresence holds a Discord Presence instance created by the root menu
+// and shared with subcommands (prompt, work). When non-nil, subcommands use
+// this instead of creating their own connection.
+var sharedPresence *discord.Presence
+
 var rootCmd = &cobra.Command{
 	Use:     "maggus",
 	Short:   "Your best and worst co-worker — a junior dev that just works",
@@ -127,8 +132,21 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		if err := sub.ParseFlags(remaining); err != nil {
 			return err
 		}
+		// Share the menu's Discord presence with the subcommand.
+		if presence != nil {
+			select {
+			case <-presenceReady:
+				sharedPresence = presence
+			default:
+				// Still connecting — subcommand will create its own.
+			}
+		}
+
 		// Run the command; ignore errors so we return to the menu
 		_ = sub.RunE(sub, sub.Flags().Args())
+
+		// Reclaim presence ownership so the next loop iteration resets to "In Main Menu".
+		sharedPresence = nil
 	}
 }
 
