@@ -42,6 +42,7 @@ type Watcher struct {
 // before sending an UpdateMsg via the send function.
 func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error) {
 	dirs := []string{
+		filepath.Join(baseDir, ".maggus"),
 		filepath.Join(baseDir, ".maggus", "features"),
 		filepath.Join(baseDir, ".maggus", "bugs"),
 	}
@@ -206,6 +207,9 @@ func isRelevantEvent(event fsnotify.Event) bool {
 		return false
 	}
 	name := filepath.Base(event.Name)
+	if name == "feature_approvals.yml" {
+		return true
+	}
 	if strings.HasPrefix(name, "feature_") && strings.HasSuffix(name, ".md") {
 		return true
 	}
