@@ -163,7 +163,6 @@ func buildSessionInfo(beforeSnapshot map[string]bool, startTime time.Time) *Sess
 	}
 }
 
-
 // pluginInfo represents a single entry from `claude plugin list --json`.
 type pluginInfo struct {
 	ID      string `json:"id"`
