@@ -112,13 +112,13 @@ This feature adds a hooks system to `.maggus/config.yml` that lets users define 
 **Parallel:** yes — can run alongside TASK-004-003
 
 **Acceptance Criteria:**
-- [ ] After a successful commit in `completeTask`, `hooks.Run` is called with `config.Hooks.OnTaskComplete` and an `Event` of type `"task_complete"`
-- [ ] The event payload includes: source file basename, maggus-id of the source file, task ID, task title, and timestamp
-- [ ] The `tasks` field in the event contains a single entry (the completed task)
-- [ ] The `action` field is empty for task completion events
-- [ ] Hooks run after the commit succeeds but before the between-task sync check
-- [ ] When no `on_task_complete` hooks are configured, there is zero overhead
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] After a successful commit in `completeTask`, `hooks.Run` is called with `config.Hooks.OnTaskComplete` and an `Event` of type `"task_complete"`
+- [x] The event payload includes: source file basename, maggus-id of the source file, task ID, task title, and timestamp
+- [x] The `tasks` field in the event contains a single entry (the completed task)
+- [x] The `action` field is empty for task completion events
+- [x] Hooks run after the commit succeeds but before the between-task sync check
+- [x] When no `on_task_complete` hooks are configured, there is zero overhead
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-004-005: Integration test for hooks end-to-end
 **Description:** As a developer, I want an integration test that verifies hooks fire with correct JSON payloads during the completion flow, so that we have confidence the wiring is correct.

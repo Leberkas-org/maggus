@@ -228,6 +228,20 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 		tc.p.Send(runner.CommitMsg{Message: commitResult.Message})
 		tc.notifier.PlayTaskComplete()
 		result.committed = true
+
+		// Fire task completion hooks (zero overhead when unconfigured).
+		if len(tc.hooks.OnTaskComplete) > 0 {
+			event := hooks.Event{
+				Type:      "task_complete",
+				File:      filepath.Base(task.SourceFile),
+				MaggusID:  parser.ParseMaggusID(task.SourceFile),
+				Title:     task.Title,
+				Action:    "",
+				Tasks:     []hooks.TaskInfo{{ID: task.ID, Title: task.Title}},
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+			}
+			hooks.Run(tc.hooks.OnTaskComplete, event, tc.workDir, log.Default())
+		}
 	} else {
 		msg := commitResult.Message
 		if msg == "" {
