@@ -144,6 +144,11 @@ type TUIModel struct {
 	taskActiveStart   time.Time     // when the current task began (zero if no task active)
 	taskActive        bool          // true while a task is actively running
 
+	// Progress tab middle zone scroll state (independent from detail tab)
+	progressScrollOffset int  // scroll offset for the progress tool list (in lines)
+	progressAutoScroll   bool // true when progress tool list auto-scrolls to bottom
+	progressTotalLines   int  // total tool entry lines in progress middle zone
+
 	// Sync check state (between-task remote sync)
 	sync syncState
 
@@ -236,7 +241,8 @@ func NewTUIModel(model string, version string, fingerprint string, cancelFunc fu
 		runStartTime:     now,
 		width:            120,
 		height:           40,
-		detailAutoScroll: true,
+		detailAutoScroll:   true,
+		progressAutoScroll: true,
 		stopFlag:         &atomic.Bool{},
 		stopAtTaskIDFlag: &atomic.Value{},
 		cancelFunc:       cancelFunc,
@@ -337,6 +343,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		clampDetailScroll(&m)
+		clampProgressScroll(&m)
 		return m, tea.ClearScreen
 
 	case tickMsg:

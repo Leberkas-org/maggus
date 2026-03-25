@@ -374,6 +374,77 @@ func (m TUIModel) detailAvailableHeight() int {
 	return available
 }
 
+// progressAvailableHeight returns the number of visible lines in the progress middle zone.
+// The middle zone gets all remaining space after the top zone, bottom zone, header, tab bar, and footer.
+func (m TUIModel) progressAvailableHeight() int {
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	// Header lines (variable, but approximately 5-6 lines):
+	//   version+fingerprint (1), CWD (1), optional 2x (0-1), progress bar (0-1),
+	//   optional bugs (0-1), optional notification (0-1), optional stop (0-1), separator (1)
+	// Task ID line + blank (2)
+	// Tab bar + separator (2)
+	// Top zone: status (1), output (1), separator (1) = 3
+	// Bottom zone: model (1), extras (1), commits (1), elapsed (1), tokens (1), cost (1), separator (1) = 7
+	// Footer (1) — handled by FullScreenLeftColor
+	headerLines := m.headerLineCount()
+	const taskInfoLines = 2   // "TASK-ID: Title" + blank
+	const tabBarLines = 2     // tab labels + separator
+	const topZoneLines = 3    // status + output + separator
+	const bottomZoneLines = 8 // separator + model + extras + commits + elapsed + tokens + per-model tokens + cost
+	const footerLine = 1      // footer (accounted for by FullScreenLeftColor)
+
+	reserved := headerLines + taskInfoLines + tabBarLines + topZoneLines + bottomZoneLines + footerLine
+	available := innerH - reserved
+	if available < 1 {
+		available = 1
+	}
+	return available
+}
+
+// headerLineCount returns the number of lines rendered by renderHeaderInner.
+func (m TUIModel) headerLineCount() int {
+	lines := 1 // version + fingerprint
+	if m.banner.CWD != "" {
+		lines++ // CWD
+	}
+	if m.banner.TwoXExpiresIn != "" {
+		lines++ // 2x timer
+	}
+	if m.totalIters > 0 {
+		lines++ // progress bar
+	}
+	if m.activeBugs > 0 {
+		lines++ // bug hint
+	}
+	if m.notification != "" && !m.showStopPicker && !m.done {
+		lines++ // notification
+	}
+	if m.stopAfterTask {
+		lines++ // stop indicator
+	}
+	lines++ // separator
+	return lines
+}
+
+// clampProgressScroll ensures progressScrollOffset is within valid bounds and updates auto-scroll state.
+func clampProgressScroll(m *TUIModel) {
+	available := m.progressAvailableHeight()
+	maxOffset := m.progressTotalLines - available
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.progressScrollOffset > maxOffset {
+		m.progressScrollOffset = maxOffset
+	}
+	if m.progressScrollOffset < 0 {
+		m.progressScrollOffset = 0
+	}
+	// Re-enable auto-scroll if scrolled to bottom
+	if m.progressScrollOffset >= maxOffset && maxOffset > 0 {
+		m.progressAutoScroll = true
+	}
+}
+
 // clampDetailScroll ensures detailScrollOffset is within valid bounds and updates auto-scroll state.
 func clampDetailScroll(m *TUIModel) {
 	available := m.detailAvailableHeight()
@@ -568,34 +639,224 @@ func (m TUIModel) renderTaskTab(w int) string {
 	return b.String()
 }
 
-// renderView renders the main work-in-progress view with tabs.
-func (m TUIModel) renderView() string {
-	taskElapsed := time.Since(m.startTime).Truncate(time.Second)
-	runElapsed := time.Since(m.runStartTime).Truncate(time.Second)
-	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+// renderProgressTab renders the 3-zone Progress tab layout:
+//   - Top zone (fixed): spinner+status, last output line, separator
+//   - Middle zone (scrollable): compact tool list with scroll indicator
+//   - Bottom zone (fixed): separator, model, extras, commits, elapsed, tokens (per-model), cost
+func (m TUIModel) renderProgressTab(w int) string {
+	var b strings.Builder
 
+	contentWidth := w - 11
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	// Spinner + status color
 	spinner := cyanStyle.Render(spinnerFrames[m.frame])
 	sColor := statusStyle
-	if m.status == "Done" {
+	switch m.status {
+	case "Done":
 		sColor = greenStyle
 		spinner = greenStyle.Render("✓")
-	} else if m.status == "Failed" {
+	case "Failed":
 		sColor = redStyle
 		spinner = redStyle.Render("✗")
-	} else if m.status == "Interrupted" {
+	case "Interrupted":
 		sColor = redStyle
 		spinner = redStyle.Render("⊘")
 	}
+
+	// ── Top zone (fixed) ──
+	b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
+	b.WriteString(styles.Separator(w) + "\n")
+
+	// ── Middle zone (scrollable compact tool list) ──
+	available := m.progressAvailableHeight()
+	totalTools := len(m.toolEntries)
+
+	if totalTools == 0 {
+		b.WriteString(grayStyle.Render("  No tool invocations yet.") + "\n")
+		// Fill remaining height
+		for i := 1; i < available; i++ {
+			b.WriteString("\n")
+		}
+	} else {
+		// Build compact tool lines
+		toolLines := make([]string, totalTools)
+		for i, entry := range m.toolEntries {
+			icon := toolIcon(entry.Type)
+			ts := entry.Timestamp.Format("15:04:05")
+			desc := styles.Truncate(entry.Description, contentWidth-2)
+			toolLines[i] = fmt.Sprintf("  %s %s: %s  %s",
+				icon,
+				cyanStyle.Render(entry.Type),
+				blueStyle.Render(desc),
+				grayStyle.Render(ts))
+		}
+
+		// Viewport: clamp offset
+		offset := m.progressScrollOffset
+		maxOffset := totalTools - available
+		if maxOffset < 0 {
+			maxOffset = 0
+		}
+		if offset > maxOffset {
+			offset = maxOffset
+		}
+		if offset < 0 {
+			offset = 0
+		}
+
+		// Scroll indicator
+		if totalTools > available {
+			end := offset + available
+			if end > totalTools {
+				end = totalTools
+			}
+			indicator := grayStyle.Render(fmt.Sprintf("[%d-%d of %d]", offset+1, end, totalTools))
+			b.WriteString(indicator + "\n")
+			// The indicator takes one line from available
+			viewH := available - 1
+			if viewH < 1 {
+				viewH = 1
+			}
+			end = offset + viewH
+			if end > totalTools {
+				end = totalTools
+			}
+			for _, line := range toolLines[offset:end] {
+				b.WriteString(line + "\n")
+			}
+			// Pad remaining
+			rendered := end - offset
+			for i := rendered; i < viewH; i++ {
+				b.WriteString("\n")
+			}
+		} else {
+			// All fit — no indicator needed
+			for _, line := range toolLines {
+				b.WriteString(line + "\n")
+			}
+			// Pad remaining
+			for i := totalTools; i < available; i++ {
+				b.WriteString("\n")
+			}
+		}
+	}
+
+	// ── Bottom zone (fixed) ──
+	b.WriteString(styles.Separator(w) + "\n")
 
 	extrasStr := m.extras
 	if extrasStr == "" {
 		extrasStr = "-"
 	}
 
-	contentWidth := innerW - 11
-	if contentWidth < 20 {
-		contentWidth = 20
+	b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
+
+	// Commits count
+	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Commits:"), grayStyle.Render(fmt.Sprintf("%d", len(m.commits)))))
+
+	// Elapsed: task + active run + avg per task
+	taskElapsed := time.Since(m.startTime).Truncate(time.Second)
+	activeRunElapsed := m.ActiveRunElapsed().Truncate(time.Second)
+	avgPerTask := m.avgTimePerTask()
+	elapsedStr := fmt.Sprintf("Task: %s   ·   Run: %s",
+		grayStyle.Render(formatHHMMSS(taskElapsed)),
+		grayStyle.Render(formatHHMMSS(activeRunElapsed)))
+	if avgPerTask > 0 {
+		elapsedStr += fmt.Sprintf("   ·   Avg: %s", grayStyle.Render(formatHHMMSS(avgPerTask)))
 	}
+	b.WriteString(fmt.Sprintf("  %s %s\n", boldStyle.Render("Elapsed:"), elapsedStr))
+
+	// Tokens — per-model breakdown
+	if m.tokens.hasData {
+		totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
+		var tokenStr string
+		if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
+			tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
+				FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
+				FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
+		} else {
+			tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
+		}
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
+
+		// Per-model token lines
+		if len(m.tokens.totalModelUsage) > 0 {
+			b.WriteString("          " + grayStyle.Render(m.formatPerModelTokens()) + "\n")
+		}
+
+		costStr := "N/A"
+		if m.tokens.totalCost > 0 {
+			costStr = FormatCost(m.tokens.totalCost)
+		}
+		b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render(costStr)))
+	} else {
+		b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
+		b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render("N/A")))
+	}
+
+	return b.String()
+}
+
+// formatPerModelTokens formats per-model token usage as a single line.
+// e.g., "opus: 45.2k in / 12.1k out  ·  sonnet: 8k in / 2k out"
+func (m TUIModel) formatPerModelTokens() string {
+	if len(m.tokens.totalModelUsage) == 0 {
+		return ""
+	}
+
+	// Sort model names for stable output
+	names := make([]string, 0, len(m.tokens.totalModelUsage))
+	for name := range m.tokens.totalModelUsage {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var parts []string
+	for _, name := range names {
+		mt := m.tokens.totalModelUsage[name]
+		totalIn := mt.InputTokens + mt.CacheCreationInputTokens + mt.CacheReadInputTokens
+		parts = append(parts, fmt.Sprintf("%s: %s in / %s out",
+			shortModelName(name), FormatTokens(totalIn), FormatTokens(mt.OutputTokens)))
+	}
+	return strings.Join(parts, "  ·  ")
+}
+
+// shortModelName extracts a short display name from a full model ID.
+// e.g., "claude-opus-4-6" → "opus", "claude-sonnet-4-6" → "sonnet"
+func shortModelName(fullName string) string {
+	// Known patterns
+	for _, short := range []string{"opus", "sonnet", "haiku"} {
+		if strings.Contains(strings.ToLower(fullName), short) {
+			return short
+		}
+	}
+	// Fallback: return the full name, truncated
+	if len(fullName) > 20 {
+		return fullName[:20]
+	}
+	return fullName
+}
+
+// avgTimePerTask calculates the average elapsed time per completed task from usage history.
+func (m TUIModel) avgTimePerTask() time.Duration {
+	if len(m.tokens.usages) == 0 {
+		return 0
+	}
+	var total time.Duration
+	for _, u := range m.tokens.usages {
+		total += u.EndTime.Sub(u.StartTime)
+	}
+	return (total / time.Duration(len(m.tokens.usages))).Truncate(time.Second)
+}
+
+// renderView renders the main work-in-progress view with tabs.
+func (m TUIModel) renderView() string {
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
 
 	var b strings.Builder
 
@@ -617,52 +878,8 @@ func (m TUIModel) renderView() string {
 
 		// Tab content
 		switch m.activeTab {
-		case 0: // Progress
-			b.WriteString(fmt.Sprintf("%s %s  %s\n", spinner, boldStyle.Render("Status:"), sColor.Render(m.status)))
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Output:"), styles.Truncate(m.output, contentWidth)))
-
-			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Tools:"), grayStyle.Render(fmt.Sprintf("(%d total)", m.toolCount))))
-			recentStart := 0
-			if len(m.toolEntries) > maxToolHistory {
-				recentStart = len(m.toolEntries) - maxToolHistory
-			}
-			recentTools := m.toolEntries[recentStart:]
-			for i, entry := range recentTools {
-				prefix := grayStyle.Render("│")
-				if i == len(recentTools)-1 {
-					prefix = blueStyle.Render("▶")
-				}
-				b.WriteString(fmt.Sprintf("  %s %s\n", prefix, blueStyle.Render(styles.Truncate(entry.Description, contentWidth))))
-			}
-			for i := len(recentTools); i < maxToolHistory; i++ {
-				b.WriteString("\n")
-			}
-
-			b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Extras:"), cyanStyle.Render(styles.Truncate(extrasStr, contentWidth))))
-			b.WriteString(fmt.Sprintf("  %s   %s\n", boldStyle.Render("Model:"), grayStyle.Render(m.model)))
-			b.WriteString(fmt.Sprintf("  %s Task: %s   ·   Run: %s\n", boldStyle.Render("Elapsed:"), grayStyle.Render(formatHHMMSS(taskElapsed)), grayStyle.Render(formatHHMMSS(runElapsed))))
-
-			if m.tokens.hasData {
-				totalIn := m.tokens.totalInput + m.tokens.totalCacheCreation + m.tokens.totalCacheRead
-				var tokenStr string
-				if m.tokens.totalCacheCreation > 0 || m.tokens.totalCacheRead > 0 {
-					tokenStr = fmt.Sprintf("%s in / %s out (cache: %s write, %s read)",
-						FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput),
-						FormatTokens(m.tokens.totalCacheCreation), FormatTokens(m.tokens.totalCacheRead))
-				} else {
-					tokenStr = fmt.Sprintf("%s in / %s out", FormatTokens(totalIn), FormatTokens(m.tokens.totalOutput))
-				}
-				b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render(tokenStr)))
-
-				costStr := "N/A"
-				if m.tokens.totalCost > 0 {
-					costStr = FormatCost(m.tokens.totalCost)
-				}
-				b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render(costStr)))
-			} else {
-				b.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render("Tokens:"), grayStyle.Render("N/A")))
-				b.WriteString(fmt.Sprintf("  %s    %s\n", boldStyle.Render("Cost:"), grayStyle.Render("N/A")))
-			}
+		case 0: // Progress — 3-zone layout
+			b.WriteString(m.renderProgressTab(innerW))
 
 		case 1: // Detail (tool log)
 			b.WriteString(m.renderDetailPanel(innerW, m.detailAvailableHeight()))
@@ -691,7 +908,7 @@ func (m TUIModel) renderView() string {
 	} else {
 		var footerParts []string
 		footerParts = append(footerParts, "←/→ tabs")
-		if m.activeTab == 1 {
+		if m.activeTab == 0 || m.activeTab == 1 {
 			footerParts = append(footerParts, "↑/↓ scroll · home/end jump")
 		}
 		if m.stopAfterTask {

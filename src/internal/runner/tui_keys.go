@@ -43,6 +43,13 @@ func (m *TUIModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Progress tab scrolling (tab 0)
+	if m.activeTab == 0 && m.taskID != "" {
+		if cmd, handled := m.handleProgressScroll(msg); handled {
+			return m, cmd
+		}
+	}
+
 	// Detail tab scrolling (tab 1)
 	if m.activeTab == 1 && m.taskID != "" {
 		if cmd, handled := m.handleDetailScroll(msg); handled {
@@ -208,6 +215,33 @@ func (m *TUIModel) applyStopPickerSelection() (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleProgressScroll processes scroll keys for the progress tab middle zone.
+// Returns the command and true if the key was handled.
+func (m *TUIModel) handleProgressScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
+	case tea.KeyUp:
+		if m.progressScrollOffset > 0 {
+			m.progressScrollOffset--
+			m.progressAutoScroll = false
+		}
+		return nil, true
+	case tea.KeyDown:
+		m.progressScrollOffset++
+		clampProgressScroll(m)
+		return nil, true
+	case tea.KeyHome:
+		m.progressScrollOffset = 0
+		m.progressAutoScroll = false
+		return nil, true
+	case tea.KeyEnd:
+		m.progressScrollOffset = m.progressTotalLines
+		m.progressAutoScroll = true
+		clampProgressScroll(m)
+		return nil, true
+	}
+	return nil, false
 }
 
 // handleDetailScroll processes scroll keys for the detail tab.

@@ -13,7 +13,6 @@ var ErrInterrupted = agent.ErrInterrupted
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
-const maxToolHistory = 10
 const maxCommitHistory = 5
 
 // RunClaude invokes Claude Code in streaming mode. This is a thin wrapper

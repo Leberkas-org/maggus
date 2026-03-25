@@ -48,6 +48,9 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.detailScrollOffset = 0
 	m.detailAutoScroll = true
 	m.detailTotalLines = 0
+	m.progressScrollOffset = 0
+	m.progressAutoScroll = true
+	m.progressTotalLines = 0
 	m.startTime = time.Now()
 	// Mark the new task as actively running
 	m.taskActiveStart = time.Now()
@@ -77,6 +80,12 @@ func (m *TUIModel) handleToolMsg(msg agent.ToolMsg) {
 		m.detailScrollOffset = m.detailTotalLines
 	}
 	clampDetailScroll(m)
+	// Update progress middle zone scroll state
+	m.progressTotalLines = len(m.toolEntries)
+	if m.progressAutoScroll {
+		m.progressScrollOffset = m.progressTotalLines
+	}
+	clampProgressScroll(m)
 	if m.onToolUse != nil {
 		m.onToolUse(m.taskID, msg.Type, msg.Description)
 	}
