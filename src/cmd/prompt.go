@@ -3,9 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,17 @@ func init() {
 type skillMapping struct {
 	skill     string // e.g. "/maggus-plan"; empty for Plain
 	usageFile string // e.g. "usage_plan.jsonl"
+}
+
+// skillVerbMapping maps picker labels to Discord presence verbs.
+var skillVerbMapping = map[string]string{
+	"open console":         "Consulting",
+	"/maggus-plan":         "Planning",
+	"/maggus-vision":       "Visioning",
+	"/maggus-architecture": "Architecting",
+	"/maggus-bugreport":    "Reporting Bug",
+	"/bryan-plan":          "Planning",
+	"/bryan-bugreport":     "Reporting Bug",
 }
 
 var skillMappings = map[string]skillMapping{
@@ -75,6 +88,32 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	mapping, ok := skillMappings[result.Skill]
 	if !ok {
 		return fmt.Errorf("unknown skill: %s", result.Skill)
+	}
+
+	// Initialise Discord Rich Presence if enabled.
+	var presence *discord.Presence
+	if cfg.DiscordPresence {
+		presence = &discord.Presence{}
+		_ = presence.Connect()
+	}
+	defer func() {
+		if presence != nil {
+			_ = presence.Close()
+		}
+	}()
+
+	// Update presence with the selected skill's verb.
+	if presence != nil {
+		verb := skillVerbMapping[result.Skill]
+		details := result.Skill
+		if result.Skill == "open console" {
+			details = "Open Console"
+		}
+		_ = presence.Update(discord.PresenceState{
+			FeatureTitle: details,
+			Verb:         verb,
+			StartTime:    time.Now(),
+		})
 	}
 
 	agentName := cfg.Agent

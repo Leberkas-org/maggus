@@ -49,7 +49,7 @@ Enhance the Discord Rich Presence integration to show more contextual informatio
 **Parallel:** yes — can run alongside TASK-005-003, TASK-005-004
 
 **Acceptance Criteria:**
-- [ ] A verb mapping exists (can be in `cmd/prompt.go` or a shared location) that maps picker labels to Discord verbs:
+- [x] A verb mapping exists (can be in `cmd/prompt.go` or a shared location) that maps picker labels to Discord verbs:
   - `"open console"` → `"Consulting"`
   - `"/maggus-plan"` → `"Planning"`
   - `"/maggus-vision"` → `"Visioning"`
@@ -57,12 +57,12 @@ Enhance the Discord Rich Presence integration to show more contextual informatio
   - `"/maggus-bugreport"` → `"Reporting Bug"`
   - `"/bryan-plan"` → `"Planning"`
   - `"/bryan-bugreport"` → `"Reporting Bug"`
-- [ ] `runPrompt()` in `cmd/prompt.go` connects to Discord presence (same pattern as `runMenu` — check `cfg.DiscordPresence`, connect, defer close)
-- [ ] After the user picks a skill, Discord presence is updated with the appropriate verb, no progress (ProgressTotal=0), and `StartTime` set to now
-- [ ] The details field shows the skill name or "Open Console" as the feature title
-- [ ] Presence is cleared on command exit (deferred Close)
-- [ ] When Discord is not running, the prompt command works exactly as before (no errors)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `runPrompt()` in `cmd/prompt.go` connects to Discord presence (same pattern as `runMenu` — check `cfg.DiscordPresence`, connect, defer close)
+- [x] After the user picks a skill, Discord presence is updated with the appropriate verb, no progress (ProgressTotal=0), and `StartTime` set to now
+- [x] The details field shows the skill name or "Open Console" as the feature title
+- [x] Presence is cleared on command exit (deferred Close)
+- [x] When Discord is not running, the prompt command works exactly as before (no errors)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-005-003: Use "Working" vs "Fixing" verbs in the work loop
 **Description:** As a user, I want Discord to show "Working" when Maggus processes a feature task and "Fixing" when it processes a bug task, so my status reflects what kind of work is happening.
