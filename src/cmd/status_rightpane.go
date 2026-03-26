@@ -67,7 +67,10 @@ func (m statusModel) renderRightPane(width, height int) string {
 	}
 
 	full := tabBar + "\n" + sep + "\n" + content
-	return lipgloss.NewStyle().Width(width).Height(height).Render(full)
+	rendered := lipgloss.NewStyle().Width(width).Height(height).Render(full)
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
+	borderLine := strings.Repeat(borderStyle.Render("─"), width)
+	return rendered + "\n" + borderLine
 }
 
 // rightPaneContentHeight returns the content height available for tab content in the right pane

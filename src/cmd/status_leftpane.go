@@ -105,7 +105,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 		// Cursor indicator (1 visual char).
 		var cursorChar string
 		if isSelected {
-			cursorChar = cursorStyle.Render("▶")
+			cursorChar = cursorStyle.Render("▸")
 		} else {
 			cursorChar = " "
 		}
