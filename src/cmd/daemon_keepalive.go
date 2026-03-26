@@ -207,7 +207,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	repoDir := dir
 	workDir := dir
 
-	branchMsg, brErr := setupBranch(wc.useWorktree, repoDir, branchTask, runID, wc.cfg.Git)
+	branchMsg, brErr := setupBranch(repoDir, branchTask, wc.cfg.Git)
 	if brErr != nil {
 		return false, fmt.Errorf("setup branch: %w", brErr)
 	}
@@ -270,7 +270,6 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		resolvedModel: wc.resolvedModel,
 		notifier:      wc.notifier,
 		validIncludes: wc.validIncludes,
-		useWorktree:   wc.useWorktree,
 		repoDir:       repoDir,
 		workDir:       workDir,
 		runID:         runID,

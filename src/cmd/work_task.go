@@ -22,7 +22,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/tasklock"
 )
 
 // taskAction indicates what the work loop should do after a task iteration.
@@ -54,7 +53,6 @@ type taskContext struct {
 	resolvedModel string
 	notifier      *notify.Notifier
 	validIncludes []string
-	useWorktree   bool
 	repoDir       string
 	workDir       string
 	runID         string
@@ -72,9 +70,9 @@ type taskContext struct {
 	featureTotal      int          // total features being processed (for TUI display)
 }
 
-// runTask executes a single task iteration: finds the next task, acquires a
-// lock (in worktree mode), builds the prompt, runs the agent, re-parses features,
-// marks completed features, stages renames, commits, and handles the result.
+// runTask executes a single task iteration: finds the next task, builds the
+// prompt, runs the agent, re-parses features, marks completed features, stages
+// renames, commits, and handles the result.
 //
 // The caller's loop index (i) and total count are needed for progress tracking
 // and prompt metadata. The tasks slice is the current parsed task list.
@@ -85,20 +83,9 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Find next workable task.
-	next := findNextWorkableTask(tasks, tc.useWorktree, tc.repoDir)
+	next := findNextWorkableTask(tasks)
 	if next == nil {
 		return taskResult{action: taskBreak}
-	}
-
-	// Acquire task lock in worktree mode.
-	var lock tasklock.Lock
-	if tc.useWorktree {
-		var lockErr error
-		lock, lockErr = tasklock.Acquire(tc.repoDir, next.ID, tc.runID)
-		if lockErr != nil {
-			// Another session grabbed it between check and acquire; retry.
-			return taskResult{action: taskRetry}
-		}
 	}
 
 	// Signal iteration start to the TUI.
@@ -129,7 +116,6 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	builtPrompt := prompt.Build(next, opts)
 	model := resolveTaskModel(next.Model, tc.resolvedModel)
 	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.p); err != nil {
-		releaseLock(lock, tc.useWorktree)
 		if tc.workCtx.Err() != nil {
 			return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
 		}
@@ -148,7 +134,6 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	// Re-parse to pick up any changes the agent made (bugs + features).
 	parsedTasks, parseErr := parseAllTasks(tc.workDir)
 	if parseErr != nil {
-		releaseLock(lock, tc.useWorktree)
 		reason := fmt.Sprintf("re-parse tasks: %v", parseErr)
 		return taskResult{
 			action: taskSkipToNext,
@@ -195,21 +180,20 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 		scopedTasks = filterTasksBySourceFile(parsedTasks, tc.featureSourceFile)
 	}
 
-	// Commit, release lock, update progress, and check sync.
-	result := completeTask(tc, next, lock, scopedTasks, i, count, maxCount)
+	// Commit, update progress, and check sync.
+	result := completeTask(tc, next, scopedTasks, i, count, maxCount)
 	result.taskID = next.ID
 	return result
 }
 
 // completeTask encapsulates post-agent-execution logic: committing via COMMIT.md,
-// releasing the task lock, sending progress updates, and running between-task sync checks.
+// sending progress updates, and running between-task sync checks.
 // It returns a taskResult indicating whether the loop should continue, break, or skip.
 // maxCount is the user-requested task limit; when >0 the computed progress total is capped at it.
-func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedTasks []parser.Task, i, count, maxCount int) taskResult {
+func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, i, count, maxCount int) taskResult {
 	// Commit using COMMIT.md.
 	commitResult, commitErr := gitcommit.CommitIteration(tc.workDir, task.ID+": "+task.Title)
 	if commitErr != nil {
-		releaseLock(lock, tc.useWorktree)
 		reason := commitErr.Error()
 		tc.logger.TaskFailed(task.ID, reason)
 		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", task.ID, reason)})
@@ -219,8 +203,6 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 			failed: &failedTask{ID: task.ID, Title: task.Title, Reason: reason},
 		}
 	}
-
-	releaseLock(lock, tc.useWorktree)
 
 	result := taskResult{
 		action: taskContinue,
@@ -293,13 +275,9 @@ func completeTask(tc taskContext, task *parser.Task, lock tasklock.Lock, parsedT
 }
 
 // findNextWorkableTask returns the next task to work on, respecting --task flag, worktree
-// mode locking, and standard incomplete task ordering.
-func findNextWorkableTask(tasks []parser.Task, useWorktree bool, repoDir string) *parser.Task {
+func findNextWorkableTask(tasks []parser.Task) *parser.Task {
 	if taskFlag != "" {
 		return findTaskByID(tasks, taskFlag)
-	}
-	if useWorktree {
-		return findNextUnlocked(tasks, repoDir)
 	}
 	return parser.FindNextIncomplete(tasks)
 }
@@ -355,13 +333,6 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		FeatureTotal:    featureTotal,
 		TaskModel:       task.Model,
 	})
-}
-
-// releaseLock releases a task lock if worktree mode is active.
-func releaseLock(lock tasklock.Lock, useWorktree bool) {
-	if useWorktree {
-		lock.Release()
-	}
 }
 
 // syncBreak is returned by betweenTaskSync when the work loop should stop.

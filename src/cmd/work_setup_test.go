@@ -90,15 +90,11 @@ func saveAndRestoreFlags(t *testing.T) {
 	origModel := modelFlag
 	origAgent := agentFlag
 	origTask := taskFlag
-	origWorktree := worktreeFlag
-	origNoWorktree := noWorktreeFlag
 	t.Cleanup(func() {
 		countFlag = origCount
 		modelFlag = origModel
 		agentFlag = origAgent
 		taskFlag = origTask
-		worktreeFlag = origWorktree
-		noWorktreeFlag = origNoWorktree
 	})
 }
 
@@ -228,74 +224,6 @@ func TestWorkSetup_ConfigAgentUsedWhenNoFlag(t *testing.T) {
 
 	if receivedAgentName != "opencode" {
 		t.Errorf("agent created with name %q, want %q", receivedAgentName, "opencode")
-	}
-}
-
-// --- Worktree flag precedence tests ---
-
-func TestWorkSetup_WorktreeFlagOverridesConfig(t *testing.T) {
-	saveAndRestoreFlags(t)
-	stubs := defaultSetupStubs()
-	stubs.loadConfig = func(string) (config.Config, error) {
-		return config.Config{Worktree: false}, nil
-	}
-	stubSetupDeps(t, stubs)
-
-	worktreeFlag = true
-	noWorktreeFlag = false
-	countFlag = 1
-
-	wc, err := workSetup(newDummyCmd(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !wc.useWorktree {
-		t.Error("expected useWorktree=true when --worktree flag is set")
-	}
-}
-
-func TestWorkSetup_NoWorktreeFlagOverridesAll(t *testing.T) {
-	saveAndRestoreFlags(t)
-	stubs := defaultSetupStubs()
-	stubs.loadConfig = func(string) (config.Config, error) {
-		return config.Config{Worktree: true}, nil
-	}
-	stubSetupDeps(t, stubs)
-
-	worktreeFlag = true
-	noWorktreeFlag = true
-	countFlag = 1
-
-	wc, err := workSetup(newDummyCmd(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if wc.useWorktree {
-		t.Error("expected useWorktree=false when --no-worktree flag is set (overrides --worktree and config)")
-	}
-}
-
-func TestWorkSetup_ConfigWorktreeUsedWhenNoFlags(t *testing.T) {
-	saveAndRestoreFlags(t)
-	stubs := defaultSetupStubs()
-	stubs.loadConfig = func(string) (config.Config, error) {
-		return config.Config{Worktree: true}, nil
-	}
-	stubSetupDeps(t, stubs)
-
-	worktreeFlag = false
-	noWorktreeFlag = false
-	countFlag = 1
-
-	wc, err := workSetup(newDummyCmd(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !wc.useWorktree {
-		t.Error("expected useWorktree=true from config when no CLI flags set")
 	}
 }
 

@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/leberkas-org/maggus/internal/agent"
@@ -14,7 +13,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +37,6 @@ type workConfig struct {
 	resolvedModel   string
 	modelDisplay    string
 	notifier        *notify.Notifier
-	useWorktree     bool
 	hostFingerprint string
 }
 
@@ -113,15 +110,6 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 	// Create notifier for sound notifications.
 	notifier := notify.New(cfg.Notifications)
 
-	// Resolve worktree mode: --no-worktree > --worktree > config > default (false)
-	useWorktree := cfg.Worktree
-	if worktreeFlag {
-		useWorktree = true
-	}
-	if noWorktreeFlag {
-		useWorktree = false
-	}
-
 	// Ensure .gitignore has required entries
 	if _, err := ensureGitignoreFn(dir); err != nil {
 		return nil, fmt.Errorf("check gitignore: %w", err)
@@ -151,24 +139,13 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 		resolvedModel:   resolvedModel,
 		modelDisplay:    modelDisplay,
 		notifier:        notifier,
-		useWorktree:     useWorktree,
 		hostFingerprint: hostFingerprint,
 	}, nil
 }
 
-// setupBranch handles worktree creation or feature branch creation.
-// Returns the branch message (non-worktree mode) or empty string.
-func setupBranch(useWorktree bool, repoDir string, nextTask *parser.Task, runID string, gitCfg config.GitConfig) (string, error) {
-	if useWorktree {
-		cleanStaleWorktrees(repoDir)
-		branchName := gitbranch.BranchName(nextTask.ID)
-		wtPath := filepath.Join(repoDir, ".maggus-work", runID)
-		if err := worktree.Create(repoDir, wtPath, branchName); err != nil {
-			return "", fmt.Errorf("create worktree: %w", err)
-		}
-		return "", nil
-	}
-
+// setupBranch creates or ensures the feature branch for the current run.
+// Returns the branch message or empty string when auto-branch is disabled.
+func setupBranch(repoDir string, nextTask *parser.Task, gitCfg config.GitConfig) (string, error) {
 	if !gitCfg.IsAutoBranchEnabled() {
 		return "Auto-branch disabled, staying on current branch", nil
 	}
