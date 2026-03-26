@@ -189,16 +189,16 @@ func (m statusModel) viewStatusSplit() string {
 // statusSplitFooter returns the contextual key hint string for the current split-pane focus state.
 func (m statusModel) statusSplitFooter() string {
 	if m.leftFocused {
-		return "↑/↓ navigate  enter: details  tab: switch pane  alt+p: approve  1: left  2-5: tabs  q: exit"
+		return "↑/↓ navigate  enter: details  alt+p: approve  1: left  2-5: tabs  q: exit"
 	}
 	switch m.activeTab {
 	case 0:
-		return "↑/↓ scroll  G: bottom  1: left  2-5: tabs  tab: switch pane  q: exit"
+		return "↑/↓ scroll  G: bottom  1: left  2-5: tabs  q: exit"
 	case 1:
-		return "↑/↓ navigate  enter: detail  1: left  2-5: tabs  tab: switch pane  q: exit"
+		return "↑/↓ navigate  enter: detail  1: left  2-5: tabs  q: exit"
 	case 2:
-		return "↑/↓ scroll  1: left  2-5: tabs  tab: switch pane  q: exit"
+		return "↑/↓ scroll  1: left  2-5: tabs  q: exit"
 	default:
-		return "1: left  2-5: tabs  tab: switch pane  q: exit"
+		return "1: left  2-5: tabs  q: exit"
 	}
 }

@@ -348,29 +348,6 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Tab key: switch pane focus in split mode; open log panel in compact mode.
-	if key == "tab" {
-		if m.width > 0 && m.height > 0 {
-			m.leftFocused = !m.leftFocused
-			return m, nil
-		}
-		m.showLog = true
-		m.logAutoScroll = true
-		m.logScroll = m.maxLogScroll()
-		if m.presence != nil {
-			details := m.daemon.CurrentTask
-			if details == "" {
-				details = "No active task"
-			}
-			_ = m.presence.Update(discord.PresenceState{
-				FeatureTitle: details,
-				Verb:         "Looking at output",
-				StartTime:    time.Now(),
-			})
-		}
-		return m, nil
-	}
-
 	// Right pane is focused in split mode: route keys by active tab.
 	if !m.leftFocused && m.width > 0 && m.height > 0 {
 		// Tab 2 — Feature Details: delegate to the task list component.
