@@ -16,8 +16,12 @@ func (m statusModel) View() string {
 	if m.confirmDeleteFeature {
 		return m.viewConfirmDeleteFeature()
 	}
-	if v := m.taskListComponent.View(); v != "" {
-		return v
+	// Full-screen component takeover only in compact (non-split) mode.
+	// In split mode, task detail and confirm-delete are rendered inline in Tab 2.
+	if m.width == 0 || m.height == 0 {
+		if v := m.taskListComponent.View(); v != "" {
+			return v
+		}
 	}
 	if m.showLog {
 		return m.viewLog()

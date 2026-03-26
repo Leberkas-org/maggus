@@ -113,14 +113,14 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** yes — can run alongside TASK-001-006 and TASK-001-007
 
 **Acceptance Criteria:**
-- [ ] Tab 2 renders the `taskListComponent` loaded with the selected plan's tasks
-- [ ] Feature title, progress bar (`█░` style), and done/total count shown above the task list
-- [ ] `↑↓` navigates tasks when right pane is focused and Tab 2 is active
-- [ ] `enter` opens the task detail view (using existing `detail.go` rendering) inline in the right pane
-- [ ] `esc` from detail view returns to the task list
-- [ ] Criteria mode and action picker (unblock, resolve, delete, skip) work as in the existing implementation
-- [ ] When the selected plan changes (left pane navigation), the task list reloads and cursor resets to 0
-- [ ] `go build ./...` passes
+- [x] Tab 2 renders the `taskListComponent` loaded with the selected plan's tasks
+- [x] Feature title, progress bar (`█░` style), and done/total count shown above the task list
+- [x] `↑↓` navigates tasks when right pane is focused and Tab 2 is active
+- [x] `enter` opens the task detail view (using existing `detail.go` rendering) inline in the right pane
+- [x] `esc` from detail view returns to the task list
+- [x] Criteria mode and action picker (unblock, resolve, delete, skip) work as in the existing implementation
+- [x] When the selected plan changes (left pane navigation), the task list reloads and cursor resets to 0
+- [x] `go build ./...` passes
 
 ---
 

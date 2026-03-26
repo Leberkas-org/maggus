@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -54,6 +56,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 	switch m.activeTab {
 	case 0:
 		content = m.renderOutputTab(width, contentH)
+	case 1:
+		content = m.renderFeatureDetailsTab(width, contentH)
 	default:
 		placeholder := statusDimStyle.Render("\n  (coming soon)")
 		content = lipgloss.NewStyle().Width(width).Height(contentH).Render(placeholder)
@@ -297,4 +301,138 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
 
 	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+}
+
+// renderFeatureDetailsTab renders Tab 2 content: task list or inline detail view.
+func (m statusModel) renderFeatureDetailsTab(width, height int) string {
+	c := &m.taskListComponent
+	if c.ConfirmDelete {
+		return m.renderTab2ConfirmDelete(width, height)
+	}
+	if c.ShowDetail && c.detailReady {
+		return m.renderTab2Detail(width, height)
+	}
+	return m.renderTab2TaskList(width, height, m.selectedPlan())
+}
+
+// renderTab2Detail renders the task detail view inline within the right pane.
+func (m statusModel) renderTab2Detail(width, height int) string {
+	c := &m.taskListComponent
+	if !c.detailReady || height < 2 {
+		return lipgloss.NewStyle().Width(width).Height(height).Render("")
+	}
+
+	scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
+	footer := detailFooter(&c.Detail, scrollable)
+
+	contentH := height - 1
+	if contentH < 1 {
+		contentH = 1
+	}
+	viewStr := lipgloss.NewStyle().Width(width).Height(contentH).Render(c.detailViewport.View())
+	return viewStr + "\n" + footer
+}
+
+// renderTab2ConfirmDelete renders the task delete confirmation inline.
+func (m statusModel) renderTab2ConfirmDelete(width, height int) string {
+	c := &m.taskListComponent
+	if c.Cursor >= len(c.Tasks) {
+		return lipgloss.NewStyle().Width(width).Height(height).Render("")
+	}
+	t := c.Tasks[c.Cursor]
+	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("  Delete %s: %s?", t.ID, t.Title)))
+	sb.WriteString("\n\n")
+	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  Plan: %s", filepath.Base(t.SourceFile))))
+	sb.WriteString("\n\n")
+	sb.WriteString("  This will permanently remove the task from the plan file.\n\n")
+	sb.WriteString(fmt.Sprintf("  %s / %s",
+		lipgloss.NewStyle().Bold(true).Render("y/enter: confirm"),
+		mutedStyle.Render("n/esc: cancel")))
+
+	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+}
+
+// renderTab2TaskList renders the task list with feature header for Tab 2.
+func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) string {
+	var sb strings.Builder
+
+	// Header: title + progress bar + done/total count
+	done := plan.DoneCount()
+	total := len(plan.Tasks)
+	planID := plan.ID
+	if planID == "" {
+		planID = filepath.Base(plan.File)
+	}
+	titleStr := styles.Truncate(planID, width-2)
+	bar := buildProgressBar(done, total)
+	count := statusDimStyle.Render(fmt.Sprintf(" %d/%d", done, total))
+
+	sb.WriteString("\n " + styles.Title.Render(titleStr) + "\n")
+	sb.WriteString(" " + bar + count + "\n")
+	sb.WriteString(" " + styles.Separator(min(42, width-2)) + "\n")
+
+	// Header occupies 4 lines; reserve 1 for footer hint.
+	headerLines := 4
+	footerLines := 1
+	listH := height - headerLines - footerLines
+	if listH < 1 {
+		listH = 1
+	}
+
+	tasks := m.taskListComponent.Tasks
+	cursor := m.taskListComponent.Cursor
+	scrollOffset := m.taskListComponent.ScrollOffset
+
+	if len(tasks) == 0 {
+		sb.WriteString(statusDimStyle.Render("  No tasks") + "\n")
+	} else {
+		end := min(scrollOffset+listH, len(tasks))
+		for i := scrollOffset; i < end; i++ {
+			t := tasks[i]
+			var icon string
+			var style lipgloss.Style
+			if t.IsComplete() {
+				icon = "✓"
+				style = statusGreenStyle
+			} else if t.IsBlocked() {
+				icon = "⚠"
+				style = statusRedStyle
+			} else if t.ID == m.nextTaskID && t.SourceFile == m.nextTaskFile {
+				icon = "→"
+				style = statusCyanStyle
+			} else {
+				icon = "○"
+				style = lipgloss.NewStyle().Foreground(styles.Muted)
+			}
+
+			var prefix string
+			if i == cursor {
+				prefix = " ▸ "
+				style = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+			} else {
+				prefix = "   "
+			}
+
+			line := fmt.Sprintf("%s%s  %s: %s", prefix, icon, t.ID, t.Title)
+			sb.WriteString(style.Render(line) + "\n")
+		}
+		// Scroll indicator
+		if len(tasks) > listH {
+			hint := fmt.Sprintf(" [%d-%d of %d]", scrollOffset+1, min(scrollOffset+listH, len(tasks)), len(tasks))
+			sb.WriteString(statusDimStyle.Render(hint) + "\n")
+		}
+	}
+
+	// Footer hint
+	footerStr := styles.StatusBar.Render("↑↓ navigate · enter: detail · tab: switch pane · q: exit")
+	contentH := height - footerLines
+	if contentH < 1 {
+		contentH = 1
+	}
+	return lipgloss.NewStyle().Width(width).Height(contentH).Render(sb.String()) + "\n" + footerStr
 }

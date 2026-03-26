@@ -39,6 +39,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.HandleResize(msg.Width, msg.Height)
 		m.currentTaskViewport.Width = msg.Width
 		m.currentTaskViewport.Height = msg.Height
+		// Keep Tab 2 detail viewport sized to the right pane if it's open.
+		if m.taskListComponent.ShowDetail && m.taskListComponent.detailReady {
+			m.resizeTab2DetailViewport()
+		}
 		return m, nil
 
 	case claude2xResultMsg:
@@ -125,6 +129,28 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	cmd := m.UpdateViewport(msg)
 	return m, cmd
+}
+
+// resizeTab2DetailViewport resizes the embedded taskListComponent's detail viewport
+// to the right-pane content area dimensions so it renders correctly in Tab 2.
+func (m *statusModel) resizeTab2DetailViewport() {
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+	leftW := m.width / 3
+	if leftW > 50 {
+		leftW = 50
+	}
+	rightW := innerW - leftW
+	if rightW < 1 {
+		rightW = 1
+	}
+	contentH := m.rightPaneContentHeight()
+	// -1 for the footer line rendered below the viewport in renderTab2Detail.
+	vpH := contentH - 1
+	if vpH < 1 {
+		vpH = 1
+	}
+	m.taskListComponent.detailViewport.Width = rightW
+	m.taskListComponent.detailViewport.Height = vpH
 }
 
 // applyLogLines updates the log line buffer and adjusts the scroll position.
@@ -350,8 +376,32 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Right pane is focused in split mode: route ↑↓ to log scroll when on Tab 1.
+	// Right pane is focused in split mode: route keys by active tab.
 	if !m.leftFocused && m.width > 0 && m.height > 0 {
+		// Tab 2 — Feature Details: delegate to the task list component.
+		if m.activeTab == 1 {
+			// Allow esc to close detail/confirm without quitting.
+			if key == "esc" && !m.taskListComponent.ShowDetail && !m.taskListComponent.ConfirmDelete {
+				return m, tea.Quit
+			}
+			if key == "q" || key == "ctrl+c" {
+				return m, tea.Quit
+			}
+			cmd, action := m.taskListComponent.Update(msg)
+			switch action {
+			case taskListQuit:
+				return m, tea.Quit
+			case taskListDeleted:
+				m.reloadPlans()
+			}
+			// After opening detail, resize its viewport to fit the right pane.
+			if m.taskListComponent.ShowDetail && m.taskListComponent.detailReady {
+				m.resizeTab2DetailViewport()
+			}
+			return m, cmd
+		}
+
+		// Tab 1 — Output: log scroll.
 		switch key {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
@@ -427,6 +477,10 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case taskListDeleted:
 		m.reloadPlans()
+	}
+	// In split mode, keep Tab 2 detail viewport sized to the right pane.
+	if m.width > 0 && m.height > 0 && m.taskListComponent.ShowDetail && m.taskListComponent.detailReady {
+		m.resizeTab2DetailViewport()
 	}
 	return m, cmd
 }
