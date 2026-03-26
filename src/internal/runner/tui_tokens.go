@@ -10,6 +10,7 @@ import (
 
 // TaskUsage records token usage for a single task/iteration.
 type TaskUsage struct {
+	Kind                     string
 	ItemID                   string
 	ItemShort                string
 	ItemTitle                string
@@ -90,11 +91,12 @@ func (t *tokenState) addModelUsage(msg agent.ModelUsageMsg) {
 // saveAndReset saves the current iteration's token usage and resets iteration counters.
 // Item-level fields and startTime come from the parent model since tokenState
 // doesn't track task metadata.
-func (t *tokenState) saveAndReset(taskShort, itemID, itemShort, itemTitle string, startTime time.Time) {
+func (t *tokenState) saveAndReset(kind string, taskShort, itemID, itemShort, itemTitle string, startTime time.Time) {
 	if taskShort == "" || (t.iterInput == 0 && t.iterOutput == 0 && t.iterCacheCreation == 0 && t.iterCacheRead == 0) {
 		return
 	}
 	tu := TaskUsage{
+		Kind:                     kind,
 		ItemID:                   itemID,
 		ItemShort:                itemShort,
 		ItemTitle:                itemTitle,

@@ -672,6 +672,8 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	t.Run("empty features view renders with 2x", func(t *testing.T) {
 		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
 		m.is2x = true
+		m.width = 120
+		m.height = 40
 		view := m.View()
 		if !strings.Contains(view, "No features found") {
 			t.Error("empty view should contain 'No features found'")

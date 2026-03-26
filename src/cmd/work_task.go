@@ -311,11 +311,16 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		}
 	}
 
-	var itemID, itemShort, itemTitle string
+	var itemID, itemShort, itemTitle, kind string
 	if plan != nil {
 		itemID = plan.MaggusID
 		itemShort = plan.ID
 		itemTitle = parser.ParseFileTitle(plan.File)
+		if plan.IsBug {
+			kind = "bug"
+		} else {
+			kind = "feature"
+		}
 	}
 
 	p.Send(runner.IterationStartMsg{
@@ -326,6 +331,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		ItemID:          itemID,
 		ItemShort:       itemShort,
 		ItemTitle:       itemTitle,
+		Kind:            kind,
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
 		RemainingTasks:  remaining,

@@ -92,6 +92,11 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	// Horizontal separator under daemon status line.
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
 
+	// Empty state.
+	if len(visible) == 0 {
+		lines = append(lines, mutedStyle.Render("  No features found"))
+	}
+
 	// Plan rows: features first, separator, then bugs.
 	bugSepAdded := false
 	bugAdded := false

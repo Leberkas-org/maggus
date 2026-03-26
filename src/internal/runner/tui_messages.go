@@ -17,7 +17,7 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 		m.activeRunDuration += time.Since(m.taskActiveStart)
 		m.taskActive = false
 	}
-	m.tokens.saveAndReset(m.taskID, m.itemID, m.itemShort, m.itemTitle, m.startTime)
+	m.tokens.saveAndReset(m.itemKind, m.taskID, m.itemID, m.itemShort, m.itemTitle, m.startTime)
 	m.currentIter = msg.Current
 	// In feature mode, reset the task counter when entering a new feature.
 	// In non-feature mode, use max to avoid bar shrinkage when new tasks appear.
@@ -31,6 +31,7 @@ func (m *TUIModel) handleIterationStart(msg IterationStartMsg) {
 	m.itemID = msg.ItemID
 	m.itemShort = msg.ItemShort
 	m.itemTitle = msg.ItemTitle
+	m.itemKind = msg.Kind
 	m.taskDescription = msg.TaskDescription
 	m.taskCriteria = msg.TaskCriteria
 	m.remainingTasks = msg.RemainingTasks

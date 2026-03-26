@@ -82,7 +82,7 @@ type summaryState struct {
 func (s *summaryState) handleSummaryMsg(msg tea.Msg, m *TUIModel) (handled bool) {
 	switch msg := msg.(type) {
 	case SummaryMsg:
-		m.tokens.saveAndReset(m.taskID, m.itemID, m.itemShort, m.itemTitle, m.startTime)
+		m.tokens.saveAndReset(m.itemKind, m.taskID, m.itemID, m.itemShort, m.itemTitle, m.startTime)
 		s.show = true
 		s.data = msg.Data
 		s.elapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)

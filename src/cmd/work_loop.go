@@ -229,6 +229,7 @@ func setupUsageCallback(m *runner.TUIModel, runID string, dir, modelDisplay, age
 		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
 			Repository:               repoURL,
+			Kind:                     tu.Kind,
 			ItemID:                   tu.ItemID,
 			ItemShort:                tu.ItemShort,
 			ItemTitle:                tu.ItemTitle,
@@ -254,10 +255,10 @@ func setupUsageCallback(m *runner.TUIModel, runID string, dir, modelDisplay, age
 // workLoopParams bundles the parameters for runWorkGoroutine.
 type workLoopParams struct {
 	tc            taskContext
-	tasks         []parser.Task  // flat merged list — used for summary remaining tasks
+	tasks         []parser.Task // flat merged list — used for summary remaining tasks
 	featureGroups []parser.Plan // ordered approved plans to work (bugs first, then features)
-	count         int            // number of features to work (0 = determined by autoContinue)
-	autoContinue  bool           // from config: continue to next feature after completing one
+	count         int           // number of features to work (0 = determined by autoContinue)
+	autoContinue  bool          // from config: continue to next feature after completing one
 	runID         string
 	startTime     time.Time
 	p             *tea.Program
@@ -570,7 +571,6 @@ func captureShortHash(workDir string) string {
 	out, _ := cmd.Output()
 	return strings.TrimSpace(string(out))
 }
-
 
 // isTaskAtOrPastTarget returns true if lastCompletedTaskID appears at or after
 // targetID in the task list ordering. This handles the case where the target
