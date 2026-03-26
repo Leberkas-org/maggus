@@ -283,7 +283,7 @@ func TestToolUse(t *testing.T) {
 	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
-	l.ToolUse("TASK-001-001", "Read", "src/main.go")
+	l.ToolUse("TASK-001-001", "Read", map[string]string{"file": "src/main.go"})
 
 	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
@@ -296,8 +296,8 @@ func TestToolUse(t *testing.T) {
 	if e.Tool != "Read" {
 		t.Errorf("tool = %q, want Read", e.Tool)
 	}
-	if e.Description != "src/main.go" {
-		t.Errorf("description = %q, want src/main.go", e.Description)
+	if e.Input["file"] != "src/main.go" {
+		t.Errorf("input[file] = %q, want src/main.go", e.Input["file"])
 	}
 }
 
@@ -308,7 +308,7 @@ func TestMultipleEventsOrdered(t *testing.T) {
 
 	l.FeatureStart("feature_001")
 	l.TaskStart("TASK-001-001", "First task")
-	l.ToolUse("TASK-001-001", "Bash", "go build")
+	l.ToolUse("TASK-001-001", "Bash", map[string]string{"command": "go build"})
 	l.TaskComplete("TASK-001-001", "deadbeef")
 	l.FeatureComplete("feature_001")
 
@@ -406,7 +406,7 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	l.TaskStart("x", "y")
 	l.TaskComplete("x", "hash")
 	l.TaskFailed("x", "reason")
-	l.ToolUse("x", "Read", "file")
+	l.ToolUse("x", "Read", map[string]string{"file": "file"})
 	l.Output("x", "text")
 	l.Info("msg")
 	_ = l.Close()

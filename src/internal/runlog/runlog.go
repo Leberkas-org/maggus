@@ -12,25 +12,50 @@ import (
 // Logger writes structured run events to a flat log file in .maggus/runs/.
 // All methods are safe to call on a nil Logger (no-op).
 type Logger struct {
-	w             *os.File
-	dir           string
-	currentItemID string
+	w               *os.File
+	dir             string
+	currentMaggusID string
+}
+
+// ModelTokensEntry holds per-model token counts and cost for a task_usage event.
+type ModelTokensEntry struct {
+	InputTokens              int     `json:"input_tokens,omitempty"`
+	OutputTokens             int     `json:"output_tokens,omitempty"`
+	CacheCreationInputTokens int     `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int     `json:"cache_read_input_tokens,omitempty"`
+	CostUSD                  float64 `json:"cost_usd,omitempty"`
+}
+
+// TaskUsageData is the parameter type for Logger.TaskUsage.
+type TaskUsageData struct {
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	CostUSD                  float64
+	ModelUsage               map[string]ModelTokensEntry
 }
 
 // Entry represents a single JSONL log entry written to the log file.
 type Entry struct {
-	Ts          string `json:"ts"`
-	Level       string `json:"level"`
-	Event       string `json:"event"`
-	ItemID      string `json:"item_id,omitempty"`
-	FeatureID   string `json:"feature_id,omitempty"`
-	TaskID      string `json:"task_id,omitempty"`
-	Title       string `json:"title,omitempty"`
-	Commit      string `json:"commit,omitempty"`
-	Tool        string `json:"tool,omitempty"`
-	Description string `json:"description,omitempty"`
-	Text        string `json:"text,omitempty"`
-	Reason      string `json:"reason,omitempty"`
+	Ts                       string            `json:"ts"`
+	Level                    string            `json:"level"`
+	Event                    string            `json:"event"`
+	MaggusID                 string            `json:"maggus_id,omitempty"`
+	FeatureID                string            `json:"feature_id,omitempty"`
+	TaskID                   string            `json:"task_id,omitempty"`
+	Title                    string            `json:"title,omitempty"`
+	Commit                   string            `json:"commit,omitempty"`
+	Tool                     string            `json:"tool,omitempty"`
+	Input                    map[string]string `json:"input,omitempty"`
+	Text                     string            `json:"text,omitempty"`
+	Reason                   string            `json:"reason,omitempty"`
+	InputTokens              int               `json:"input_tokens,omitempty"`
+	OutputTokens             int               `json:"output_tokens,omitempty"`
+	CacheCreationInputTokens int               `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int               `json:"cache_read_input_tokens,omitempty"`
+	CostUSD                  float64           `json:"cost_usd,omitempty"`
+	ModelUsage               map[string]ModelTokensEntry `json:"model_usage,omitempty"`
 }
 
 // Open creates a log file at .maggus/runs/<timestamp>_<maggusID>.log, or
@@ -104,14 +129,14 @@ func (l *Logger) Close() error {
 	return l.w.Close()
 }
 
-// SetCurrentItem sets the item ID that will be injected into all subsequent log entries.
-// Pass an empty string to clear the current item (entries outside any active plan).
+// SetCurrentMaggusID sets the maggus ID that will be injected into all subsequent log entries.
+// Pass an empty string to clear the current ID (entries outside any active plan).
 // Safe to call on a nil Logger (no-op).
-func (l *Logger) SetCurrentItem(itemID string) {
+func (l *Logger) SetCurrentMaggusID(maggusID string) {
 	if l == nil {
 		return
 	}
-	l.currentItemID = itemID
+	l.currentMaggusID = maggusID
 }
 
 // emit writes a single JSONL entry to the log file.
@@ -119,8 +144,8 @@ func (l *Logger) emit(entry Entry) {
 	if l == nil || l.w == nil {
 		return
 	}
-	if entry.ItemID == "" {
-		entry.ItemID = l.currentItemID
+	if entry.MaggusID == "" {
+		entry.MaggusID = l.currentMaggusID
 	}
 	entry.Ts = time.Now().UTC().Format(time.RFC3339)
 	data, err := json.Marshal(entry)
@@ -156,9 +181,23 @@ func (l *Logger) TaskFailed(taskID, reason string) {
 	l.emit(Entry{Level: "error", Event: "task_failed", TaskID: taskID, Reason: reason})
 }
 
-// ToolUse logs a tool use event from the agent.
-func (l *Logger) ToolUse(taskID, toolType, description string) {
-	l.emit(Entry{Level: "info", Event: "tool_use", TaskID: taskID, Tool: toolType, Description: description})
+// ToolUse logs a tool use event from the agent with structured input params.
+func (l *Logger) ToolUse(taskID, toolType string, params map[string]string) {
+	l.emit(Entry{Level: "info", Event: "tool_use", TaskID: taskID, Tool: toolType, Input: params})
+}
+
+// TaskUsage logs token and cost usage for a completed task.
+func (l *Logger) TaskUsage(data TaskUsageData) {
+	l.emit(Entry{
+		Level:                    "info",
+		Event:                    "task_usage",
+		InputTokens:              data.InputTokens,
+		OutputTokens:             data.OutputTokens,
+		CacheCreationInputTokens: data.CacheCreationInputTokens,
+		CacheReadInputTokens:     data.CacheReadInputTokens,
+		CostUSD:                  data.CostUSD,
+		ModelUsage:               data.ModelUsage,
+	})
 }
 
 // Output logs agent output text for a task. The text is written as-is with no truncation.

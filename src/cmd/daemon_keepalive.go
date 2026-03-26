@@ -219,7 +219,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		runStartedAt:  setup.startTime,
 	}
 	dm.SetOnToolUse(func(taskID, toolType, description string) {
-		runLogger.ToolUse(taskID, toolType, description)
+		runLogger.ToolUse(taskID, toolType, map[string]string{"description": description})
 	})
 	dm.SetOnOutput(func(taskID, text string) {
 		runLogger.Output(taskID, text)

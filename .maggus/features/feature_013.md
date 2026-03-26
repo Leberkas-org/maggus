@@ -32,17 +32,17 @@ Additionally, the `item_id` field carries the maggus UUID but its name is opaque
 **Parallel:** no — other tasks depend on the new schema
 
 **Acceptance Criteria:**
-- [ ] `Entry.ItemID` (json: `item_id`) renamed to `Entry.MaggusID` (json: `maggus_id`)
-- [ ] `Entry.Description string` removed; `Entry.Input map[string]string` added (json: `input,omitempty`)
-- [ ] Token/cost fields added to `Entry`: `InputTokens int`, `OutputTokens int`, `CacheCreationInputTokens int`, `CacheReadInputTokens int`, `CostUSD float64`, `ModelUsage map[string]ModelTokensEntry` (all `omitempty`)
-- [ ] `ModelTokensEntry` struct added to the package (same fields as above per-model, plus `CostUSD float64`)
-- [ ] `TaskUsageData` struct added as the parameter type for the new `TaskUsage` method
-- [ ] `Logger.currentItemID` field renamed to `currentMaggusID`
-- [ ] `Logger.SetCurrentItem` renamed to `Logger.SetCurrentMaggusID`
-- [ ] `Logger.ToolUse` signature changed to `ToolUse(taskID, toolType string, params map[string]string)`; emits `Input: params`
-- [ ] `Logger.TaskUsage(data TaskUsageData)` method added; emits `event: "task_usage"` with token/cost fields
-- [ ] `go build ./...` passes
-- [ ] `go test ./internal/runlog/...` passes
+- [x] `Entry.ItemID` (json: `item_id`) renamed to `Entry.MaggusID` (json: `maggus_id`)
+- [x] `Entry.Description string` removed; `Entry.Input map[string]string` added (json: `input,omitempty`)
+- [x] Token/cost fields added to `Entry`: `InputTokens int`, `OutputTokens int`, `CacheCreationInputTokens int`, `CacheReadInputTokens int`, `CostUSD float64`, `ModelUsage map[string]ModelTokensEntry` (all `omitempty`)
+- [x] `ModelTokensEntry` struct added to the package (same fields as above per-model, plus `CostUSD float64`)
+- [x] `TaskUsageData` struct added as the parameter type for the new `TaskUsage` method
+- [x] `Logger.currentItemID` field renamed to `currentMaggusID`
+- [x] `Logger.SetCurrentItem` renamed to `Logger.SetCurrentMaggusID`
+- [x] `Logger.ToolUse` signature changed to `ToolUse(taskID, toolType string, params map[string]string)`; emits `Input: params`
+- [x] `Logger.TaskUsage(data TaskUsageData)` method added; emits `event: "task_usage"` with token/cost fields
+- [x] `go build ./...` passes
+- [x] `go test ./internal/runlog/...` passes
 
 ### TASK-013-002: Update runlog tests
 **Description:** As a developer, I want the runlog tests updated to the new struct fields and method signatures so that the test suite stays green.

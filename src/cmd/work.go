@@ -254,7 +254,7 @@ Examples:
 		m.SetWatcher(workDir)
 		setupUsageCallback(&m, runID, workDir, wc.modelDisplay, wc.activeAgent.Name())
 		m.SetOnToolUse(func(taskID, toolType, description string) {
-			runLogger.ToolUse(taskID, toolType, description)
+			runLogger.ToolUse(taskID, toolType, map[string]string{"description": description})
 		})
 		m.SetOnOutput(func(taskID, text string) {
 			runLogger.Output(taskID, text)

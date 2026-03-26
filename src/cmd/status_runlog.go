@@ -162,9 +162,12 @@ func formatLogLine(raw string) string {
 	switch entry.Event {
 	case "tool_use":
 		toolTag := logToolStyle.Render(fmt.Sprintf("[%s]", entry.Tool))
-		desc := entry.Description
-		if desc == "" {
-			desc = entry.Tool
+		desc := entry.Tool
+		for _, key := range []string{"file", "command", "pattern", "skill", "description"} {
+			if v, ok := entry.Input[key]; ok && v != "" {
+				desc = v
+				break
+			}
 		}
 		return fmt.Sprintf("%s%s %s %s", tsStr, taskID, toolTag, logInfoStyle.Render(desc))
 
@@ -228,9 +231,6 @@ func formatLogLine(raw string) string {
 		var parts []string
 		if entry.Text != "" {
 			parts = append(parts, entry.Text)
-		}
-		if entry.Description != "" {
-			parts = append(parts, entry.Description)
 		}
 		if len(parts) == 0 {
 			parts = append(parts, entry.Event)
