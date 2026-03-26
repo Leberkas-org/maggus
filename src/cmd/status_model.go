@@ -93,7 +93,7 @@ type statusModel struct {
 	watcherCh <-chan bool
 }
 
-func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool) statusModel {
+func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
@@ -106,6 +106,7 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		dir:              dir,
 		showLog:          showLog,
 		approvalRequired: approvalRequired,
+		approvals:        approvals,
 		logAutoScroll:    true,
 		leftFocused:      true,
 		activeTab:        0,

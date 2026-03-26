@@ -219,7 +219,7 @@ var statusCmd = &cobra.Command{
 			}
 		}, 300*time.Millisecond)
 
-		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired)
+		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired, approvals)
 		m.presence = sharedPresence
 		m.watcherCh = watcherCh
 		m.watcher = w
