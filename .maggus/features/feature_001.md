@@ -152,16 +152,16 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] New file `cmd/status_metrics.go` with function `loadFeatureMetrics(itemID string) featureMetrics` that reads `~/.maggus/usage/work.jsonl`, filters records by `item_id == itemID`, and returns aggregated stats
-- [ ] New function `loadRepoMetrics(repoURL string) repoMetrics` that filters the same file by `repository == repoURL`
-- [ ] `featureMetrics` contains: `tasksCompleted int`, `totalCostUSD float64`, `totalTokens int64`, `cacheHitRate float64`, `cacheSavingsUSD float64`, `avgDurationSecs float64`, `avgCostUSD float64`, `modelBreakdown map[string]modelStat`
-- [ ] `repoMetrics` contains: `featuresCompleted int`, `bugsCompleted int`, `tasksCompleted int`, `totalCostUSD float64`, `totalTokens int64`, `gitCommits int`
-- [ ] Cache hit rate calculated as `cacheReadTokens / (inputTokens + cacheReadTokens)`
-- [ ] Cache savings calculated as `cacheReadTokens * (fullInputPrice - cacheReadPrice)` using opus pricing as default approximation
-- [ ] Tab 4 renders 4 sections: **Selected Feature**, **This Repository**, **All Time (Global)** (from `~/.maggus/metrics.yml`), **Model Breakdown**
-- [ ] Each section uses a two-column grid: label (muted) + value (bright)
-- [ ] Metrics reload when selected plan changes
-- [ ] `go build ./...` passes
+- [x] New file `cmd/status_metrics.go` with function `loadFeatureMetrics(itemID string) featureMetrics` that reads `~/.maggus/usage/work.jsonl`, filters records by `item_id == itemID`, and returns aggregated stats
+- [x] New function `loadRepoMetrics(repoURL string) repoMetrics` that filters the same file by `repository == repoURL`
+- [x] `featureMetrics` contains: `tasksCompleted int`, `totalCostUSD float64`, `totalTokens int64`, `cacheHitRate float64`, `cacheSavingsUSD float64`, `avgDurationSecs float64`, `avgCostUSD float64`, `modelBreakdown map[string]modelStat`
+- [x] `repoMetrics` contains: `featuresCompleted int`, `bugsCompleted int`, `tasksCompleted int`, `totalCostUSD float64`, `totalTokens int64`, `gitCommits int`
+- [x] Cache hit rate calculated as `cacheReadTokens / (inputTokens + cacheReadTokens)`
+- [x] Cache savings calculated as `cacheReadTokens * (fullInputPrice - cacheReadPrice)` using opus pricing as default approximation
+- [x] Tab 4 renders 4 sections: **Selected Feature**, **This Repository**, **All Time (Global)** (from `~/.maggus/metrics.yml`), **Model Breakdown**
+- [x] Each section uses a two-column grid: label (muted) + value (bright)
+- [x] Metrics reload when selected plan changes
+- [x] `go build ./...` passes
 
 ---
 

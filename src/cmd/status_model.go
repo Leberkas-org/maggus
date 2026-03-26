@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/discord"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -82,6 +83,11 @@ type statusModel struct {
 	// Discord Rich Presence (nil when not configured)
 	presence *discord.Presence
 
+	// Cached metrics for Tab 4
+	cachedFeatureMetrics featureMetrics
+	cachedRepoMetrics    repoMetrics
+	cachedGlobalMetrics  globalconfig.Metrics
+
 	// File watcher for live feature reload
 	watcher   *filewatcher.Watcher
 	watcherCh <-chan bool
@@ -108,6 +114,7 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 	if len(visible) > 0 {
 		m.Tasks = buildSelectableTasksForFeature(visible[0], showAll)
 	}
+	m.loadMetrics()
 	return m
 }
 
@@ -147,6 +154,7 @@ func (m *statusModel) rebuildForSelectedPlan() {
 	}
 	m.Cursor = 0
 	m.ScrollOffset = 0
+	m.loadMetrics()
 }
 
 // reloadPlans reloads all plans and approvals from disk and rebuilds the current view.

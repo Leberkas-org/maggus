@@ -60,9 +60,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 		content = m.renderFeatureDetailsTab(width, contentH)
 	case 2:
 		content = m.renderCurrentTaskTab(width, contentH)
-	default:
-		placeholder := statusDimStyle.Render("\n  (coming soon)")
-		content = lipgloss.NewStyle().Width(width).Height(contentH).Render(placeholder)
+	case 3:
+		content = m.renderMetricsTab(width, contentH)
 	}
 
 	full := tabBar + "\n" + sep + "\n" + content
