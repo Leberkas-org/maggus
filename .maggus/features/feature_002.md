@@ -68,14 +68,14 @@ This feature fixes both issues:
 **Parallel:** no — depends on the focus state work in TASK-002-002
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/status_view.go` `viewStatusSplit()` passes a non-empty footer string to `styles.FullScreenLeftColor()`
-- [ ] A helper method `statusSplitFooter()` (or inline logic) generates the footer based on `m.leftFocused` and `m.activeTab`
-- [ ] Left pane focused footer: `↑/↓ navigate  enter: details  tab: switch pane  alt+p: approve  q: exit`
-- [ ] Right pane focused, tab 0 (Output): `↑/↓ scroll  G: bottom  1-4: tabs  tab: switch pane  q: exit`
-- [ ] Right pane focused, tab 1 (Feature Details): `↑/↓ navigate  enter: detail  1-4: tabs  tab: switch pane  q: exit`
-- [ ] Right pane focused, tab 2 (Current Task): `↑/↓ scroll  1-4: tabs  tab: switch pane  q: exit`
-- [ ] Right pane focused, tab 3 (Metrics): `1-4: tabs  tab: switch pane  q: exit`
-- [ ] Footer is rendered using `styles.StatusBar` style for visual consistency with other views
+- [x] `src/cmd/status_view.go` `viewStatusSplit()` passes a non-empty footer string to `styles.FullScreenLeftColor()`
+- [x] A helper method `statusSplitFooter()` (or inline logic) generates the footer based on `m.leftFocused` and `m.activeTab`
+- [x] Left pane focused footer: `↑/↓ navigate  enter: details  tab: switch pane  alt+p: approve  q: exit`
+- [x] Right pane focused, tab 0 (Output): `↑/↓ scroll  G: bottom  1-4: tabs  tab: switch pane  q: exit`
+- [x] Right pane focused, tab 1 (Feature Details): `↑/↓ navigate  enter: detail  1-4: tabs  tab: switch pane  q: exit`
+- [x] Right pane focused, tab 2 (Current Task): `↑/↓ scroll  1-4: tabs  tab: switch pane  q: exit`
+- [x] Right pane focused, tab 3 (Metrics): `1-4: tabs  tab: switch pane  q: exit`
+- [x] Footer is rendered using `styles.StatusBar` style for visual consistency with other views
 
 ---
 

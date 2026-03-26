@@ -182,5 +182,23 @@ func (m statusModel) viewStatusSplit() string {
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 	borderColor := styles.ThemeColor(m.is2x)
-	return styles.FullScreenLeftColor(content, "", m.width, m.height, borderColor)
+	footer := styles.StatusBar.Render(m.statusSplitFooter())
+	return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
+}
+
+// statusSplitFooter returns the contextual key hint string for the current split-pane focus state.
+func (m statusModel) statusSplitFooter() string {
+	if m.leftFocused {
+		return "↑/↓ navigate  enter: details  tab: switch pane  alt+p: approve  q: exit"
+	}
+	switch m.activeTab {
+	case 0:
+		return "↑/↓ scroll  G: bottom  1-4: tabs  tab: switch pane  q: exit"
+	case 1:
+		return "↑/↓ navigate  enter: detail  1-4: tabs  tab: switch pane  q: exit"
+	case 2:
+		return "↑/↓ scroll  1-4: tabs  tab: switch pane  q: exit"
+	default:
+		return "1-4: tabs  tab: switch pane  q: exit"
+	}
 }
