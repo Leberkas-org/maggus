@@ -167,14 +167,14 @@ func (m *statusModel) logItemCount() int {
 }
 
 // logVisibleLines returns the number of visible lines available for the scrollable
-// area in the log panel. In rich mode, this accounts for the fixed header/footer zones.
+// area in the log panel. In split-pane mode, delegates to outputTabScrollableLines.
 func (m *statusModel) logVisibleLines() int {
+	if m.width > 0 && m.height > 0 {
+		return m.outputTabScrollableLines()
+	}
+	// Legacy compact (non-split) mode.
 	total := m.visibleTaskLines()
 	if m.snapshot != nil && m.daemon.Running {
-		// Rich view uses fixed lines: status + output + separator (top) = 3
-		// Bottom zone: separator + model + tokens + cost + elapsed = 5
-		// Log title + separator = 2, plus scroll indicator = 1
-		// Total fixed overhead within the log area = ~11
 		overhead := 11
 		avail := total - overhead
 		if avail < 3 {
@@ -262,7 +262,7 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// When the log panel is active, j/k/up/down scroll the log.
+	// Legacy compact mode: log panel is open (non-split view only).
 	if m.showLog {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
@@ -314,8 +314,25 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	m.syncDetailSuffix()
 
-	switch msg.String() {
-	case "tab":
+	key := msg.String()
+
+	// Keys 1–4 switch the right-pane active tab regardless of pane focus.
+	switch key {
+	case "1", "2", "3", "4":
+		m.activeTab = int(key[0] - '1')
+		if m.activeTab == 0 {
+			m.logAutoScroll = true
+			m.logScroll = m.maxLogScroll()
+		}
+		return m, nil
+	}
+
+	// Tab key: switch pane focus in split mode; open log panel in compact mode.
+	if key == "tab" {
+		if m.width > 0 && m.height > 0 {
+			m.leftFocused = !m.leftFocused
+			return m, nil
+		}
 		m.showLog = true
 		m.logAutoScroll = true
 		m.logScroll = m.maxLogScroll()
@@ -331,6 +348,39 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 		return m, nil
+	}
+
+	// Right pane is focused in split mode: route ↑↓ to log scroll when on Tab 1.
+	if !m.leftFocused && m.width > 0 && m.height > 0 {
+		switch key {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+		case "down":
+			if m.activeTab == 0 {
+				m.logAutoScroll = false
+				m.logScroll = min(m.logScroll+1, m.maxLogScroll())
+			}
+		case "up":
+			if m.activeTab == 0 {
+				m.logAutoScroll = false
+				m.logScroll = max(m.logScroll-1, 0)
+			}
+		case "G":
+			if m.activeTab == 0 {
+				m.logAutoScroll = true
+				m.logScroll = m.maxLogScroll()
+			}
+		case "g":
+			if m.activeTab == 0 {
+				m.logAutoScroll = false
+				m.logScroll = 0
+			}
+		}
+		return m, nil
+	}
+
+	// Left pane is focused (default): feature navigation.
+	switch key {
 	case "right":
 		visible := m.visiblePlans()
 		if len(visible) > 1 {
@@ -370,7 +420,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.movePlanDown()
 	}
 
-	// Delegate to component for shared navigation
+	// Delegate to component for shared navigation (task list, detail view, etc.)
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
 	case taskListQuit, taskListRun:

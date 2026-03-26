@@ -93,14 +93,14 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** yes — can run alongside TASK-001-002
 
 **Acceptance Criteria:**
-- [ ] Tab bar renders at top of right pane: `1 Output  2 Feature Details  3 Current Task  4 Metrics`; active tab has bottom underline in primary color and bold text; inactive tabs are muted; number prefix is dimmed
-- [ ] Pressing `1`–`4` switches `activeTab` regardless of which pane has focus
-- [ ] Tab 1 renders the live output view: migrated and adapted from the current `status_runlog.go` rich/plain snapshot rendering
-- [ ] Rich view (when snapshot available and daemon running): spinner + status line, task ID + title, tool invocations list, token/cost, elapsed time
-- [ ] Plain view (fallback): raw log lines with scroll indicator
-- [ ] `↑↓` scrolls the log when right pane is focused and Tab 1 is active
-- [ ] Log polling (200ms tick) and spinner (80ms tick) still function correctly
-- [ ] `go build ./...` passes
+- [x] Tab bar renders at top of right pane: `1 Output  2 Feature Details  3 Current Task  4 Metrics`; active tab has bottom underline in primary color and bold text; inactive tabs are muted; number prefix is dimmed
+- [x] Pressing `1`–`4` switches `activeTab` regardless of which pane has focus
+- [x] Tab 1 renders the live output view: migrated and adapted from the current `status_runlog.go` rich/plain snapshot rendering
+- [x] Rich view (when snapshot available and daemon running): spinner + status line, task ID + title, tool invocations list, token/cost, elapsed time
+- [x] Plain view (fallback): raw log lines with scroll indicator
+- [x] `↑↓` scrolls the log when right pane is focused and Tab 1 is active
+- [x] Log polling (200ms tick) and spinner (80ms tick) still function correctly
+- [x] `go build ./...` passes
 
 ---
 
