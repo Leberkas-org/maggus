@@ -205,6 +205,25 @@ func (m statusModel) statusSplitFooter() string {
 	case 0:
 		return "↑/↓ scroll  G: bottom  1: left  2-5: tabs  q: exit"
 	case 1:
+		c := &m.taskListComponent
+		if c.ShowDetail {
+			ds := &c.Detail
+			if ds.criteriaMode {
+				if ds.showActionPicker {
+					return "↑/↓: select action · enter: confirm · esc: cancel"
+				}
+				return "↑/↓: navigate blocked · enter: action · tab: scroll mode · esc: back"
+			}
+			scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
+			var parts []string
+			if scrollable {
+				parts = append(parts, "↑/↓: scroll")
+			}
+			parts = append(parts, "pgup/pgdn: prev/next task")
+			parts = append(parts, "tab: manage blocked")
+			parts = append(parts, "alt+r: run · alt+bksp: delete · esc: back · q: exit")
+			return strings.Join(parts, " · ")
+		}
 		return "↑/↓ navigate  enter: detail  tab: switch pane  1: left  2-5: tabs  q: exit"
 	case 2:
 		return "↑/↓ scroll  1: left  2-5: tabs  q: exit"

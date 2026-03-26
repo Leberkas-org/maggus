@@ -151,8 +151,8 @@ func (m *statusModel) resizeTab2DetailViewport() {
 		rightW = 1
 	}
 	contentH := m.rightPaneContentHeight()
-	// -1 for the footer line rendered below the viewport in renderTab2Detail.
-	vpH := contentH - 1
+	// Full content height; footer is rendered in the shared split footer bar.
+	vpH := contentH
 	if vpH < 1 {
 		vpH = 1
 	}

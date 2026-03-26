@@ -77,18 +77,18 @@ This feature:
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] In `renderTab2Detail` (`status_rightpane.go`): remove `footer := detailFooter(...)` and remove `+ "\n" + footer` from the return; the function now renders the full `height` into the viewport with no footer line reserved
-- [ ] In `status_update.go` (the function that sizes `detailViewport`): remove the `-1` comment and change `vpH := contentH - 1` to `vpH := contentH`, then update the associated comment
-- [ ] In `statusSplitFooter()` (`status_view.go`): add sub-state handling for `activeTab == 1` when `m.taskListComponent.ShowDetail` is true — replicate the 4 states from `detailFooter()`:
+- [x] In `renderTab2Detail` (`status_rightpane.go`): remove `footer := detailFooter(...)` and remove `+ "\n" + footer` from the return; the function now renders the full `height` into the viewport with no footer line reserved
+- [x] In `status_update.go` (the function that sizes `detailViewport`): remove the `-1` comment and change `vpH := contentH - 1` to `vpH := contentH`, then update the associated comment
+- [x] In `statusSplitFooter()` (`status_view.go`): add sub-state handling for `activeTab == 1` when `m.taskListComponent.ShowDetail` is true — replicate the 4 states from `detailFooter()`:
   - `criteriaMode && showActionPicker` → `"↑/↓: select action  enter: confirm  esc: cancel"`
   - `criteriaMode` → `"↑/↓: navigate blocked  enter: action  tab: scroll mode  esc: back"`
   - `ShowDetail && scrollable` → include scroll hint + pgup/pgdn + tab/manage blocked + alt+r/alt+bksp + esc/q hints
   - `ShowDetail` (not scrollable) → same minus scroll hint
-- [ ] For the "scrollable" sub-state: scrollable is `c.detailViewport.TotalLineCount() > c.detailViewport.Height`
-- [ ] No duplicate footer appears inside the detail view content area
-- [ ] `detailFooter()` in `detail.go` is NOT deleted — it is still used by `tasklist.go` (standalone task list component)
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] For the "scrollable" sub-state: scrollable is `c.detailViewport.TotalLineCount() > c.detailViewport.Height`
+- [x] No duplicate footer appears inside the detail view content area
+- [x] `detailFooter()` in `detail.go` is NOT deleted — it is still used by `tasklist.go` (standalone task list component)
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

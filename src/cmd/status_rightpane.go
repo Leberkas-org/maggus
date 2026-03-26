@@ -381,15 +381,7 @@ func (m statusModel) renderTab2Detail(width, height int) string {
 		return lipgloss.NewStyle().Width(width).Height(height).Render("")
 	}
 
-	scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
-	footer := detailFooter(&c.Detail, scrollable)
-
-	contentH := height - 1
-	if contentH < 1 {
-		contentH = 1
-	}
-	viewStr := lipgloss.NewStyle().Width(width).Height(contentH).Render(c.detailViewport.View())
-	return viewStr + "\n" + footer
+	return lipgloss.NewStyle().Width(width).Height(height).Render(c.detailViewport.View())
 }
 
 // renderTab2ConfirmDelete renders the task delete confirmation inline.
