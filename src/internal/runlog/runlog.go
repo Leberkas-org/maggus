@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
-// Logger writes structured run events to .maggus/runs/<runID>/run.log.
+// Logger writes structured run events to a flat log file in .maggus/runs/.
 // All methods are safe to call on a nil Logger (no-op).
 type Logger struct {
 	w             *os.File
-	runID         string
 	dir           string
 	currentItemID string
 }
 
-// Entry represents a single JSONL log entry written to run.log.
+// Entry represents a single JSONL log entry written to the log file.
 type Entry struct {
 	Ts          string `json:"ts"`
 	Level       string `json:"level"`
@@ -33,19 +33,67 @@ type Entry struct {
 	Reason      string `json:"reason,omitempty"`
 }
 
-// Open creates or opens the run log at .maggus/runs/<runID>/run.log.
-// The run directory is created if it does not exist.
-func Open(runID, dir string) (*Logger, error) {
-	runDir := filepath.Join(dir, ".maggus", "runs", runID)
-	if err := os.MkdirAll(runDir, 0755); err != nil {
-		return nil, fmt.Errorf("create run dir: %w", err)
+// Open creates a log file at .maggus/runs/<timestamp>_<maggusID>.log, or
+// .maggus/runs/<timestamp>.log when maggusID is empty. The runs directory is
+// created if it does not exist. After opening, older log files are pruned so
+// that at most maxFiles log files are retained (daemon.log is never pruned).
+func Open(maggusID, dir string, maxFiles int) (*Logger, error) {
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	if err := os.MkdirAll(runsDir, 0755); err != nil {
+		return nil, fmt.Errorf("create runs dir: %w", err)
 	}
-	logPath := filepath.Join(runDir, "run.log")
+
+	ts := time.Now().Format("20060102-150405")
+	var name string
+	if maggusID == "" {
+		name = ts + ".log"
+	} else {
+		name = ts + "_" + maggusID + ".log"
+	}
+
+	logPath := filepath.Join(runsDir, name)
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("open run.log: %w", err)
+		return nil, fmt.Errorf("open log file: %w", err)
 	}
-	return &Logger{w: f, runID: runID, dir: dir}, nil
+
+	pruneLogFiles(runsDir, maxFiles)
+
+	return &Logger{w: f, dir: dir}, nil
+}
+
+// pruneLogFiles removes the oldest .log files in runsDir when the count
+// exceeds maxFiles. daemon.log is always excluded from pruning.
+func pruneLogFiles(runsDir string, maxFiles int) {
+	if maxFiles <= 0 {
+		return
+	}
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		return
+	}
+
+	var logFiles []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if name == "daemon.log" {
+			continue
+		}
+		if filepath.Ext(name) == ".log" {
+			logFiles = append(logFiles, name)
+		}
+	}
+
+	// ReadDir returns entries sorted by name; timestamp-prefixed names sort
+	// chronologically, so logFiles[0] is the oldest.
+	sort.Strings(logFiles)
+	for len(logFiles) > maxFiles {
+		_ = os.Remove(filepath.Join(runsDir, logFiles[0]))
+		logFiles = logFiles[1:]
+	}
 }
 
 // Close flushes and closes the log file.
@@ -66,7 +114,7 @@ func (l *Logger) SetCurrentItem(itemID string) {
 	l.currentItemID = itemID
 }
 
-// emit writes a single JSONL entry to run.log.
+// emit writes a single JSONL entry to the log file.
 func (l *Logger) emit(entry Entry) {
 	if l == nil || l.w == nil {
 		return

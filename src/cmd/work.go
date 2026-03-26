@@ -209,7 +209,7 @@ Examples:
 		runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
 
 		// Open structured run log; failures are non-fatal.
-		runLogger, logErr := runlog.Open(runID, dir)
+		runLogger, logErr := runlog.Open(featureGroups[0].MaggusID, dir, wc.cfg.LogMaxFiles())
 		if logErr != nil {
 			cmd.Printf("Warning: could not open run log: %v\n", logErr)
 		}

@@ -53,21 +53,21 @@ the oldest such files when the retention limit is exceeded.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `runlog.Open` signature changes from `Open(runID, dir string)` to `Open(maggusID, dir string, maxFiles int)`
-- [ ] The log file is written to `.maggus/runs/<timestamp>_<maggusID>.log` where timestamp uses format `20060102-150405`
-- [ ] If `maggusID` is empty (plan file has no `<!-- maggus-id: ... -->`), a timestamp-only name is used: `<timestamp>.log`
-- [ ] No subdirectory is created under `runs/`; `os.MkdirAll` targets `.maggus/runs/` directly
-- [ ] After successfully opening the new log file, the pruning logic runs:
+- [x] `runlog.Open` signature changes from `Open(runID, dir string)` to `Open(maggusID, dir string, maxFiles int)`
+- [x] The log file is written to `.maggus/runs/<timestamp>_<maggusID>.log` where timestamp uses format `20060102-150405`
+- [x] If `maggusID` is empty (plan file has no `<!-- maggus-id: ... -->`), a timestamp-only name is used: `<timestamp>.log`
+- [x] No subdirectory is created under `runs/`; `os.MkdirAll` targets `.maggus/runs/` directly
+- [x] After successfully opening the new log file, the pruning logic runs:
   - Scans `.maggus/runs/` for files matching the pattern `*_*.log` (underscore between timestamp and maggus_id)
   - Files named `daemon.log` are excluded from pruning entirely
   - Files are sorted by name ascending (oldest timestamp first)
   - If the count exceeds `maxFiles`, the oldest files are deleted until the count equals `maxFiles`
   - Pruning errors are non-fatal (log to stderr if deletion fails, continue)
-- [ ] The `Logger` struct no longer stores `runID` (it is now derived from the filename and not needed at runtime); `dir` still stored for potential future use
-- [ ] All existing tests in `src/internal/runlog/runlog_test.go` are updated to use the new `Open(maggusID, dir, maxFiles)` signature
-- [ ] New tests cover: pruning removes correct files, `daemon.log` is never pruned, empty `maggusID` fallback name, log file written to flat path (no subdirectory)
-- [ ] `go test ./internal/runlog` passes
-- [ ] `go vet ./...` passes
+- [x] The `Logger` struct no longer stores `runID` (it is now derived from the filename and not needed at runtime); `dir` still stored for potential future use
+- [x] All existing tests in `src/internal/runlog/runlog_test.go` are updated to use the new `Open(maggusID, dir, maxFiles)` signature
+- [x] New tests cover: pruning removes correct files, `daemon.log` is never pruned, empty `maggusID` fallback name, log file written to flat path (no subdirectory)
+- [x] `go test ./internal/runlog` passes
+- [x] `go vet ./...` passes
 
 ---
 

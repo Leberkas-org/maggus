@@ -12,22 +12,115 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
-func TestOpen_CreatesRunDir(t *testing.T) {
+// findLogFile finds the single non-daemon .log file in .maggus/runs/ (for testing).
+func findLogFile(t *testing.T, dir string) string {
+	t.Helper()
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		t.Fatalf("read runs dir: %v", err)
+	}
+	var logs []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" && e.Name() != "daemon.log" {
+			logs = append(logs, filepath.Join(runsDir, e.Name()))
+		}
+	}
+	if len(logs) == 0 {
+		t.Fatal("no log file found in runs dir")
+	}
+	if len(logs) > 1 {
+		t.Fatalf("expected 1 log file, got %d: %v", len(logs), logs)
+	}
+	return logs[0]
+}
+
+func TestOpen_CreatesLogFile(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("20260101-120000", dir)
+	l, err := runlog.Open("abc-uuid", dir, 50)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	defer l.Close()
 
-	logPath := filepath.Join(dir, ".maggus", "runs", "20260101-120000", "run.log")
-	if _, err := os.Stat(logPath); err != nil {
-		t.Fatalf("run.log not created: %v", err)
+	// The log file should exist at a flat path inside .maggus/runs/
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		t.Fatalf("read runs dir: %v", err)
+	}
+	var logFiles []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logFiles = append(logFiles, e.Name())
+		}
+	}
+	if len(logFiles) == 0 {
+		t.Fatal("no .log file created in .maggus/runs/")
+	}
+	// Filename must contain the maggusID
+	if !strings.Contains(logFiles[0], "abc-uuid") {
+		t.Errorf("log filename %q does not contain maggusID %q", logFiles[0], "abc-uuid")
+	}
+	// No subdirectory should have been created
+	for _, e := range entries {
+		if e.IsDir() {
+			t.Errorf("unexpected subdirectory %q created under runs/", e.Name())
+		}
+	}
+}
+
+func TestOpen_FlatPath_NoSubdirectory(t *testing.T) {
+	dir := t.TempDir()
+	l, err := runlog.Open("someid", dir, 50)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer l.Close()
+
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		t.Fatalf("read runs dir: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			t.Errorf("unexpected subdirectory %q created under runs/", e.Name())
+		}
+	}
+}
+
+func TestOpen_EmptyMaggusID_TimestampOnlyName(t *testing.T) {
+	dir := t.TempDir()
+	l, err := runlog.Open("", dir, 50)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer l.Close()
+
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		t.Fatalf("read runs dir: %v", err)
+	}
+	var logFiles []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logFiles = append(logFiles, e.Name())
+		}
+	}
+	if len(logFiles) == 0 {
+		t.Fatal("no .log file created")
+	}
+	name := logFiles[0]
+	// Name should be <timestamp>.log with no underscore separator
+	if strings.Count(name, "_") != 0 {
+		t.Errorf("expected timestamp-only name (no underscore), got %q", name)
 	}
 }
 
 func TestOpen_ReturnsErrorOnBadDir(t *testing.T) {
-	l, err := runlog.Open("test", filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"))
+	l, err := runlog.Open("test", filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"), 10)
 	// MkdirAll creates all intermediate directories, so Open should succeed.
 	if err != nil {
 		// If the OS refuses, that's acceptable; just log it.
@@ -47,12 +140,11 @@ func TestClose_NilLogger(t *testing.T) {
 	}
 }
 
-func readLogEntries(t *testing.T, dir, runID string) []runlog.Entry {
+func readLogEntries(t *testing.T, logPath string) []runlog.Entry {
 	t.Helper()
-	logPath := filepath.Join(dir, ".maggus", "runs", runID, "run.log")
 	f, err := os.Open(logPath)
 	if err != nil {
-		t.Fatalf("open run.log: %v", err)
+		t.Fatalf("open log file: %v", err)
 	}
 	defer f.Close()
 
@@ -79,12 +171,12 @@ func assertEntryTimestamp(t *testing.T, e runlog.Entry) {
 
 func TestFeatureStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -103,12 +195,12 @@ func TestFeatureStart(t *testing.T) {
 
 func TestFeatureComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.FeatureComplete("feature_001")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -122,12 +214,12 @@ func TestFeatureComplete(t *testing.T) {
 
 func TestTaskStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -145,12 +237,12 @@ func TestTaskStart(t *testing.T) {
 
 func TestTaskComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.TaskComplete("TASK-001-001", "abc1234")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -165,12 +257,12 @@ func TestTaskComplete(t *testing.T) {
 
 func TestTaskFailed(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.TaskFailed("TASK-001-001", "agent error")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -188,12 +280,12 @@ func TestTaskFailed(t *testing.T) {
 
 func TestToolUse(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.ToolUse("TASK-001-001", "Read", "src/main.go")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -211,7 +303,7 @@ func TestToolUse(t *testing.T) {
 
 func TestMultipleEventsOrdered(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
@@ -220,7 +312,7 @@ func TestMultipleEventsOrdered(t *testing.T) {
 	l.TaskComplete("TASK-001-001", "deadbeef")
 	l.FeatureComplete("feature_001")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 5 {
 		t.Fatalf("expected 5 entries, got %d", len(entries))
 	}
@@ -241,12 +333,12 @@ func TestMultipleEventsOrdered(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.Output("TASK-003-001", "Hello from the agent")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -268,13 +360,13 @@ func TestOutput(t *testing.T) {
 
 func TestOutput_LongText(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	longText := strings.Repeat("x", 10000)
 	l.Output("TASK-001-001", longText)
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -285,12 +377,12 @@ func TestOutput_LongText(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.Info("something happened")
 
-	entries := readLogEntries(t, dir, "run1")
+	entries := readLogEntries(t, findLogFile(t, dir))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -322,7 +414,7 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 
 func TestClose_Idempotent(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	if err := l.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
 	}
@@ -331,16 +423,15 @@ func TestClose_Idempotent(t *testing.T) {
 
 func TestJSONLFormat(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
+	l, _ := runlog.Open("run1", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")
 
-	// Read raw line and verify it's valid JSON
-	logPath := filepath.Join(dir, ".maggus", "runs", "run1", "run.log")
+	logPath := findLogFile(t, dir)
 	data, err := os.ReadFile(logPath)
 	if err != nil {
-		t.Fatalf("read run.log: %v", err)
+		t.Fatalf("read log file: %v", err)
 	}
 	line := strings.TrimSpace(string(data))
 	if !json.Valid([]byte(line)) {
@@ -354,5 +445,111 @@ func TestJSONLFormat(t *testing.T) {
 		if _, ok := raw[absent]; ok {
 			t.Errorf("field %q should be omitted but is present", absent)
 		}
+	}
+}
+
+func TestPruning_RemovesOldestFiles(t *testing.T) {
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	if err := os.MkdirAll(runsDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Pre-create 5 old log files with ascending timestamps.
+	oldFiles := []string{
+		"20260101-100000_uuid1.log",
+		"20260101-110000_uuid2.log",
+		"20260101-120000_uuid3.log",
+		"20260101-130000_uuid4.log",
+		"20260101-140000_uuid5.log",
+	}
+	for _, name := range oldFiles {
+		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
+	}
+
+	// Open with maxFiles=5: opening creates a 6th file, so oldest is pruned.
+	l, err := runlog.Open("new-uuid", dir, 5)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer l.Close()
+
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var logs []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logs = append(logs, e.Name())
+		}
+	}
+
+	if len(logs) != 5 {
+		t.Errorf("expected 5 log files after pruning, got %d: %v", len(logs), logs)
+	}
+	// The oldest file should have been removed.
+	for _, name := range logs {
+		if name == oldFiles[0] {
+			t.Errorf("oldest file %q should have been pruned but still exists", oldFiles[0])
+		}
+	}
+}
+
+func TestPruning_DaemonLogNeverPruned(t *testing.T) {
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	if err := os.MkdirAll(runsDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Create daemon.log and enough old files to trigger pruning.
+	os.WriteFile(filepath.Join(runsDir, "daemon.log"), []byte("daemon"), 0644)
+	for i := 0; i < 5; i++ {
+		name := strings.Replace("20260101-1X0000_uuid.log", "X", string(rune('0'+i)), 1)
+		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
+	}
+
+	// Open with maxFiles=3 — will prune task logs but never daemon.log.
+	l, err := runlog.Open("new-uuid", dir, 3)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer l.Close()
+
+	// daemon.log must still exist.
+	if _, err := os.Stat(filepath.Join(runsDir, "daemon.log")); err != nil {
+		t.Errorf("daemon.log was pruned: %v", err)
+	}
+}
+
+func TestPruning_NoPruneWhenUnderLimit(t *testing.T) {
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	if err := os.MkdirAll(runsDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Pre-create 2 old log files.
+	for _, name := range []string{"20260101-100000_a.log", "20260101-110000_b.log"} {
+		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
+	}
+
+	// Open with maxFiles=10: 3 total files, well under limit — nothing pruned.
+	l, err := runlog.Open("new", dir, 10)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer l.Close()
+
+	entries, _ := os.ReadDir(runsDir)
+	var logs []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logs = append(logs, e.Name())
+		}
+	}
+	if len(logs) != 3 {
+		t.Errorf("expected 3 log files (no pruning), got %d", len(logs))
 	}
 }
