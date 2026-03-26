@@ -42,8 +42,8 @@ The daemon subprocess (`runDaemonLoop`) does call `runlog.Open("", dir, ...)` wh
 **Description:** As a user running `maggus start` for the first time on a new project, I want the daemon to start successfully so that approved features are worked on without requiring a prior `maggus work` run to bootstrap the directory.
 
 **Acceptance Criteria:**
-- [ ] `startCurrentDaemon` calls `os.MkdirAll(filepath.Join(dir, ".maggus", "runs"), 0755)` (or equivalent) before opening `daemon.log`
-- [ ] `startDaemon` has the same fix applied
-- [ ] `maggus start` succeeds on a project where `.maggus/runs/` has never been created
-- [ ] Existing projects with `.maggus/runs/` already present are unaffected
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `startCurrentDaemon` calls `os.MkdirAll(filepath.Join(dir, ".maggus", "runs"), 0755)` (or equivalent) before opening `daemon.log`
+- [x] `startDaemon` has the same fix applied
+- [x] `maggus start` succeeds on a project where `.maggus/runs/` has never been created
+- [x] Existing projects with `.maggus/runs/` already present are unaffected
+- [x] `go vet ./...` and `go test ./...` pass

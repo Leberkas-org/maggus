@@ -92,6 +92,11 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 		removeWorkPID(dir)
 	}
 
+	// Ensure .maggus/runs/ exists before opening daemon.log.
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus", "runs"), 0755); err != nil {
+		return fmt.Errorf("create runs dir: %w", err)
+	}
+
 	// Generate run ID and open daemon.log.
 	runID := generateDaemonRunID()
 	daemonLogPath := daemonLogPath(dir)
@@ -216,6 +221,11 @@ func startDaemon(dir string) error {
 			return nil // work is active — silently skip
 		}
 		removeWorkPID(dir)
+	}
+
+	// Ensure .maggus/runs/ exists before opening daemon.log.
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus", "runs"), 0755); err != nil {
+		return fmt.Errorf("create runs dir: %w", err)
 	}
 
 	// Generate run ID and open daemon.log.
