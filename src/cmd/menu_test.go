@@ -746,7 +746,7 @@ func TestMenuView_DaemonNotRunningRendered(t *testing.T) {
 	}
 }
 
-func TestActivateItem_StatusFromMenu_PassesShowLog(t *testing.T) {
+func TestActivateItem_StatusFromMenu_NoShowLog(t *testing.T) {
 	m := menuModel{
 		items: activeMenuItems(),
 	}
@@ -764,14 +764,10 @@ func TestActivateItem_StatusFromMenu_PassesShowLog(t *testing.T) {
 	if rm.selected != "status" {
 		t.Errorf("expected selected='status', got %q", rm.selected)
 	}
-	found := false
 	for _, arg := range rm.args {
 		if arg == "--show-log" {
-			found = true
+			t.Error("expected --show-log NOT in args when status activated from menu")
 		}
-	}
-	if !found {
-		t.Error("expected --show-log in args when status activated from menu")
 	}
 	if cmd == nil {
 		t.Error("expected tea.Quit cmd")

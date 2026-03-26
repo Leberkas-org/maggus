@@ -263,9 +263,6 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	}
 	// No sub-menu — launch directly
 	m.selected = item.name
-	if item.name == "status" {
-		m.args = []string{"--show-log"}
-	}
 	return m, tea.Quit
 }
 
