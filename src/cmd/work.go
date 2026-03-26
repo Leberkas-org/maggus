@@ -33,13 +33,12 @@ type failedTask struct {
 }
 
 var (
-	countFlag       int
-	noBootstrapFlag bool
-	modelFlag       string
-	agentFlag       string
-	taskFlag        string
-	worktreeFlag    bool
-	noWorktreeFlag  bool
+	countFlag      int
+	modelFlag      string
+	agentFlag      string
+	taskFlag       string
+	worktreeFlag   bool
+	noWorktreeFlag bool
 
 	// Daemon-mode flags (hidden; set by 'maggus start', not users directly).
 	daemonRunFlag   bool
@@ -51,7 +50,6 @@ var (
 // so that flags from a previous invocation do not leak into the next one.
 func resetWorkFlags() {
 	countFlag = defaultTaskCount
-	noBootstrapFlag = false
 	modelFlag = ""
 	agentFlag = ""
 	taskFlag = ""
@@ -331,7 +329,6 @@ Examples:
 
 func init() {
 	workCmd.Flags().IntVarP(&countFlag, "count", "c", defaultTaskCount, "number of features to work on (0 = all or 1 if auto_continue is false)")
-	workCmd.Flags().BoolVar(&noBootstrapFlag, "no-bootstrap", false, "skip reading CLAUDE.md/AGENTS.md/PROJECT_CONTEXT.md/TOOLING.md")
 	workCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	workCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
 	workCmd.Flags().StringVar(&taskFlag, "task", "", "run a specific task by ID (e.g. TASK-001)")

@@ -54,14 +54,14 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** yes — can run alongside TASK-001-004
 
 **Acceptance Criteria:**
-- [ ] Left pane renders at exactly `min(50, terminalWidth/3)` chars wide with a right border `│`
-- [ ] Header row: `Features & Bugs` in muted uppercase label style
-- [ ] Each row shows: cursor indicator (`▶` selected, ` ` otherwise), title truncated to fit with `…`, approval badge right-aligned (`✓` green for approved, `○` orange for pending, `done` muted for completed)
-- [ ] Features listed first, bugs listed below a `───` separator line; bugs rendered in error/red color
-- [ ] Selected row has a highlighted background (`#1f2937` or styles equivalent) and left accent border in primary color
-- [ ] Footer shows key hint lines: `↑↓ navigate  enter inspect`, `alt+p approve  alt+d delete`, `alt+↑↓ reorder`
-- [ ] When `leftFocused = false`, the left pane border dims to muted color
-- [ ] `go build ./...` passes
+- [x] Left pane renders at exactly `min(50, terminalWidth/3)` chars wide with a right border `│`
+- [x] Header row: `Features & Bugs` in muted uppercase label style
+- [x] Each row shows: cursor indicator (`▶` selected, ` ` otherwise), title truncated to fit with `…`, approval badge right-aligned (`✓` green for approved, `○` orange for pending, `done` muted for completed)
+- [x] Features listed first, bugs listed below a `───` separator line; bugs rendered in error/red color
+- [x] Selected row has a highlighted background (`#1f2937` or styles equivalent) and left accent border in primary color
+- [x] Footer shows key hint lines: `↑↓ navigate  enter inspect`, `alt+p approve  alt+d delete`, `alt+↑↓ reorder`
+- [x] When `leftFocused = false`, the left pane border dims to muted color
+- [x] `go build ./...` passes
 
 ---
 

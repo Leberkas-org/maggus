@@ -120,10 +120,9 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 
 	// Build and run the prompt.
 	opts := prompt.Options{
-		NoBootstrap: noBootstrapFlag,
-		Include:     tc.validIncludes,
-		RunID:       tc.runID,
-		Iteration:   i + 1,
+		Include:   tc.validIncludes,
+		RunID:     tc.runID,
+		Iteration: i + 1,
 	}
 
 	tc.logger.TaskStart(next.ID, next.Title)

@@ -1,0 +1,88 @@
+<h2>New Status UI — Left Pane Wider (50 chars)</h2>
+<p class="subtitle">Titles truncated with … if too long.</p>
+
+<div class="mockup" style="max-width:960px;margin:0 auto;">
+  <div class="mockup-header">maggus status — 4 features, 2 bugs — 23 tasks total</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="display:flex;height:420px;font-family:monospace;font-size:13px;">
+
+      <!-- LEFT PANE ~50 chars wide -->
+      <div style="width:320px;min-width:320px;border-right:1px solid #444;display:flex;flex-direction:column;background:#0d1117;">
+        <div style="padding:6px 10px;border-bottom:1px solid #333;color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Features &amp; Bugs</div>
+        <div style="flex:1;overflow:hidden;padding:4px 0;">
+          <!-- Selected -->
+          <div style="padding:4px 10px;background:#1f2937;border-left:2px solid #58a6ff;display:flex;align-items:center;gap:6px;">
+            <span style="color:#58a6ff;">▶</span>
+            <span style="color:#e6edf3;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">Implement user authentication flow</span>
+            <span style="color:#3fb950;font-size:10px;margin-left:auto;white-space:nowrap;">✓</span>
+          </div>
+          <div style="padding:4px 10px;display:flex;align-items:center;gap:6px;color:#8b949e;">
+            <span style="color:transparent;">▶</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Refactor database connection pooling</span>
+            <span style="color:#f0883e;font-size:10px;margin-left:auto;white-space:nowrap;">○</span>
+          </div>
+          <div style="padding:4px 10px;display:flex;align-items:center;gap:6px;color:#8b949e;">
+            <span style="color:transparent;">▶</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Add export to CSV and Excel formats for…</span>
+            <span style="color:#3fb950;font-size:10px;margin-left:auto;white-space:nowrap;">✓</span>
+          </div>
+          <div style="padding:4px 10px;display:flex;align-items:center;gap:6px;color:#484f58;">
+            <span style="color:transparent;">▶</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Migrate legacy API endpoints to v2 ✓</span>
+            <span style="color:#484f58;font-size:10px;margin-left:auto;white-space:nowrap;">done</span>
+          </div>
+          <!-- Bugs section -->
+          <div style="padding:4px 10px;border-top:1px solid #30363d;margin-top:4px;display:flex;align-items:center;gap:6px;color:#8b949e;">
+            <span style="color:transparent;">▶</span>
+            <span style="color:#f85149;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Fix race condition in websocket handler</span>
+            <span style="color:#f0883e;font-size:10px;margin-left:auto;white-space:nowrap;">○</span>
+          </div>
+          <div style="padding:4px 10px;display:flex;align-items:center;gap:6px;color:#8b949e;">
+            <span style="color:transparent;">▶</span>
+            <span style="color:#f85149;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Nil pointer panic on empty config file</span>
+            <span style="color:#3fb950;font-size:10px;margin-left:auto;white-space:nowrap;">✓</span>
+          </div>
+        </div>
+        <div style="padding:5px 10px;border-top:1px solid #333;color:#484f58;font-size:11px;line-height:1.7;">
+          <div>↑↓ navigate  enter inspect</div>
+          <div>alt+p approve  alt+d delete</div>
+          <div>alt+↑↓ reorder</div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANE -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#0d1117;">
+        <div style="display:flex;align-items:center;border-bottom:1px solid #333;padding:0 12px;gap:2px;">
+          <div style="padding:6px 14px;background:#1f2937;border-bottom:2px solid #58a6ff;color:#58a6ff;font-size:12px;">
+            <span style="color:#484f58;margin-right:4px;">1</span>Output
+          </div>
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;">
+            <span style="color:#484f58;margin-right:4px;">2</span>Feature Details
+          </div>
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;">
+            <span style="color:#484f58;margin-right:4px;">3</span>Current Task
+          </div>
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;">
+            <span style="color:#484f58;margin-right:4px;">4</span>Metrics
+          </div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:10px 14px;color:#8b949e;font-size:12px;line-height:1.7;">
+          <div style="color:#3fb950;">⠙ Running — TASK-003: Implement auth middleware</div>
+          <div style="color:#58a6ff;margin-top:6px;">Tool: Read → src/middleware/auth.go</div>
+          <div style="color:#58a6ff;">Tool: Edit → src/middleware/auth.go</div>
+          <div style="color:#58a6ff;">Tool: Bash → go test ./...</div>
+          <div style="margin-top:8px;color:#484f58;">──────────────────────────────────</div>
+          <div style="color:#e6edf3;margin-top:4px;">Elapsed: 1m 23s</div>
+          <div style="margin-top:4px;">Tokens: ↑ 12,400  ↓ 3,200</div>
+          <div>Cost: $0.018</div>
+        </div>
+        <div style="padding:5px 12px;border-top:1px solid #333;color:#484f58;font-size:11px;">
+          1-4 switch tabs  q quit  alt+r run task  tab focus left pane
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="max-width:960px;margin:16px auto 0;">Looking good? Next I'll ask about what each tab should show in detail.</p>

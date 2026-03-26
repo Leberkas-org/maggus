@@ -1,0 +1,110 @@
+<h2>Tab 4 — Metrics</h2>
+<p class="subtitle">Available from usage records + global metrics file. Proposed layout for the right pane.</p>
+
+<div class="mockup" style="max-width:960px;margin:0 auto;">
+  <div class="mockup-header">maggus status — 4 features, 2 bugs — 23 tasks total</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="display:flex;height:480px;font-family:monospace;font-size:13px;">
+
+      <!-- LEFT PANE -->
+      <div style="width:320px;min-width:320px;border-right:1px solid #444;display:flex;flex-direction:column;background:#0d1117;">
+        <div style="padding:6px 10px;border-bottom:1px solid #333;color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Features &amp; Bugs</div>
+        <div style="flex:1;overflow:hidden;padding:4px 0;">
+          <div style="padding:4px 10px;background:#1f2937;border-left:2px solid #58a6ff;display:flex;align-items:center;gap:6px;">
+            <span style="color:#58a6ff;">▶</span>
+            <span style="color:#e6edf3;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Implement user authentication flow</span>
+            <span style="color:#3fb950;font-size:10px;margin-left:auto;">✓</span>
+          </div>
+          <div style="padding:4px 10px;display:flex;align-items:center;gap:6px;color:#8b949e;">
+            <span style="color:transparent;">▶</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">Refactor database connection pooling</span>
+            <span style="color:#f0883e;font-size:10px;margin-left:auto;">○</span>
+          </div>
+        </div>
+        <div style="padding:5px 10px;border-top:1px solid #333;color:#484f58;font-size:11px;line-height:1.7;">
+          <div>↑↓ navigate  enter inspect</div>
+          <div>alt+p approve  alt+d delete</div>
+          <div>alt+↑↓ reorder</div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANE -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#0d1117;">
+        <!-- Tab bar -->
+        <div style="display:flex;align-items:center;border-bottom:1px solid #333;padding:0 12px;gap:2px;">
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;"><span style="color:#484f58;margin-right:4px;">1</span>Output</div>
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;"><span style="color:#484f58;margin-right:4px;">2</span>Feature Details</div>
+          <div style="padding:6px 14px;color:#8b949e;font-size:12px;"><span style="color:#484f58;margin-right:4px;">3</span>Current Task</div>
+          <div style="padding:6px 14px;background:#1f2937;border-bottom:2px solid #58a6ff;color:#58a6ff;font-size:12px;"><span style="color:#484f58;margin-right:4px;">4</span>Metrics</div>
+        </div>
+
+        <!-- Metrics content -->
+        <div style="flex:1;overflow:auto;padding:12px 16px;font-size:12px;line-height:1.8;color:#8b949e;">
+
+          <!-- Section: Selected Feature -->
+          <div style="color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Selected Feature</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;margin-bottom:16px;">
+            <div><span style="color:#484f58;">Tasks done</span></div><div style="color:#e6edf3;">5 / 8  <span style="color:#484f58;font-size:11px;">(62%)</span></div>
+            <div><span style="color:#484f58;">Total cost</span></div><div style="color:#e6edf3;">$4.28</div>
+            <div><span style="color:#484f58;">Total tokens</span></div><div style="color:#e6edf3;">1.8M</div>
+            <div><span style="color:#484f58;">Cache hit rate</span></div><div style="color:#3fb950;">91%  <span style="color:#484f58;font-size:11px;">(saves ~$38)</span></div>
+            <div><span style="color:#484f58;">Avg task duration</span></div><div style="color:#e6edf3;">3m 47s</div>
+            <div><span style="color:#484f58;">Avg task cost</span></div><div style="color:#e6edf3;">$0.86</div>
+          </div>
+
+          <div style="border-top:1px solid #30363d;margin-bottom:14px;"></div>
+
+          <!-- Section: All Features (this repo) -->
+          <div style="color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">This Repository</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;margin-bottom:16px;">
+            <div><span style="color:#484f58;">Features completed</span></div><div style="color:#e6edf3;">2 / 4</div>
+            <div><span style="color:#484f58;">Bugs completed</span></div><div style="color:#e6edf3;">1 / 2</div>
+            <div><span style="color:#484f58;">Tasks completed</span></div><div style="color:#e6edf3;">17</div>
+            <div><span style="color:#484f58;">Total cost</span></div><div style="color:#e6edf3;">$12.44</div>
+            <div><span style="color:#484f58;">Total tokens</span></div><div style="color:#e6edf3;">6.2M</div>
+            <div><span style="color:#484f58;">Git commits</span></div><div style="color:#e6edf3;">21</div>
+          </div>
+
+          <div style="border-top:1px solid #30363d;margin-bottom:14px;"></div>
+
+          <!-- Section: All Time (global) -->
+          <div style="color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">All Time (Global)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;margin-bottom:16px;">
+            <div><span style="color:#484f58;">Total tasks</span></div><div style="color:#e6edf3;">143</div>
+            <div><span style="color:#484f58;">Success rate</span></div><div style="color:#3fb950;">96%  <span style="color:#484f58;font-size:11px;">(6 failed)</span></div>
+            <div><span style="color:#484f58;">Total cost</span></div><div style="color:#e6edf3;">$87.32</div>
+            <div><span style="color:#484f58;">Total tokens</span></div><div style="color:#e6edf3;">48.1M</div>
+            <div><span style="color:#484f58;">Avg cache rate</span></div><div style="color:#3fb950;">88%</div>
+            <div><span style="color:#484f58;">Git commits</span></div><div style="color:#e6edf3;">189</div>
+          </div>
+
+          <!-- Section: Model Breakdown -->
+          <div style="border-top:1px solid #30363d;margin-bottom:14px;"></div>
+          <div style="color:#58a6ff;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Model Breakdown (this feature)</div>
+          <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:2px 16px;">
+            <div style="color:#484f58;">Model</div><div style="color:#484f58;">Tokens</div><div style="color:#484f58;">Cost</div><div style="color:#484f58;">Tasks</div>
+            <div style="color:#e6edf3;">opus-4-6</div><div>1.6M</div><div>$3.91</div><div>4</div>
+            <div style="color:#e6edf3;">sonnet-4-6</div><div>0.2M</div><div>$0.37</div><div>1</div>
+          </div>
+        </div>
+
+        <div style="padding:5px 12px;border-top:1px solid #333;color:#484f58;font-size:11px;">
+          1-4 switch tabs  q quit  tab focus left pane
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:960px;margin:16px auto 0;">
+  <h3>Calculated metrics included</h3>
+  <ul>
+    <li><strong>Cache hit rate</strong> — <code>cacheRead / (input + cacheRead)</code></li>
+    <li><strong>Cache savings</strong> — estimated cost if cache reads were billed as full input tokens</li>
+    <li><strong>Avg task duration</strong> — mean of <code>EndTime - StartTime</code> per task</li>
+    <li><strong>Avg task cost</strong> — <code>totalCost / tasksCompleted</code></li>
+    <li><strong>Success rate</strong> — <code>completed / (completed + failed)</code> from global metrics</li>
+    <li><strong>Per-model breakdown</strong> — from <code>ModelUsage</code> map on each record</li>
+  </ul>
+  <p class="subtitle">Does this look right? Let me know in the terminal.</p>
+</div>
