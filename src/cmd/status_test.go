@@ -1388,3 +1388,47 @@ func TestStatusModel_TabTogglesFocus(t *testing.T) {
 		}
 	})
 }
+
+// TestRenderLeftPane_LineCount verifies that renderLeftPane(w, h) always returns
+// exactly h+1 lines: h content lines plus one bottom-separator line.
+func TestRenderLeftPane_LineCount(t *testing.T) {
+	m := statusModel{}
+	for _, h := range []int{5, 10, 20, 34} {
+		out := m.renderLeftPane(40, h)
+		got := strings.Count(out, "\n") + 1
+		want := h + 1
+		if got != want {
+			t.Errorf("renderLeftPane(40, %d): got %d lines, want %d", h, got, want)
+		}
+	}
+}
+
+// TestRenderRightPane_LineCount verifies that renderRightPane(w, h) returns exactly
+// h+1 lines when h is large enough that tab content fits within contentH = h-2.
+// The plain log tab requires contentH >= 4 (fixed overhead: blank+title+sep+no-active),
+// so the minimum safe h is 6.
+func TestRenderRightPane_LineCount(t *testing.T) {
+	m := statusModel{width: 120, height: 40}
+	for _, h := range []int{6, 10, 20, 34} {
+		out := m.renderRightPane(80, h)
+		got := strings.Count(out, "\n") + 1
+		want := h + 1
+		if got != want {
+			t.Errorf("renderRightPane(80, %d): got %d lines, want %d", h, got, want)
+		}
+	}
+}
+
+// TestRightPaneContentHeight_EqualsInnerHMinus3 verifies that rightPaneContentHeight
+// returns innerH-3, matching the contentH that renderRightPane computes when
+// viewStatusSplit passes innerH-1 as the height argument (height-2 = innerH-3).
+func TestRightPaneContentHeight_EqualsInnerHMinus3(t *testing.T) {
+	m := statusModel{width: 120, height: 40}
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	got := m.rightPaneContentHeight()
+	want := innerH - 3
+	if got != want {
+		t.Errorf("rightPaneContentHeight() = %d, want innerH-3 = %d (innerH=%d, terminal 120x40)",
+			got, want, innerH)
+	}
+}

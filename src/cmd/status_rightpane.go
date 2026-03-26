@@ -80,7 +80,7 @@ func (m *statusModel) rightPaneContentHeight() int {
 		return 20
 	}
 	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
-	h := innerH - 2
+	h := innerH - 3
 	if h < 1 {
 		h = 1
 	}
