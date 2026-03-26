@@ -18,6 +18,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tasklock"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/leberkas-org/maggus/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -93,6 +94,9 @@ Examples:
 
 		repoDir := dir
 		workDir := dir
+
+		// Migrate any legacy per-project usage data to the global store (once, before the loop).
+		_ = usage.MigrateProject(dir)
 
 		// Mutual exclusion: prevent work from running while a daemon is active.
 		daemonPID, pidErr := readDaemonPID(dir)

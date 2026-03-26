@@ -9,6 +9,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/spf13/cobra"
 )
 
@@ -50,6 +51,9 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
+
+	// Migrate any legacy per-project usage data to the global store (once, at startup).
+	_ = usage.MigrateProject(dir)
 
 	// Load config for default model.
 	cfg, err := config.Load(dir)

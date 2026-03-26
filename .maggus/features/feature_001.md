@@ -104,16 +104,16 @@ Rework the usage tracking system to support posting records to a global API for 
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] New function `usage.MigrateProject(projectDir string) error` added
-- [ ] Reads `.maggus/usage_work.jsonl` and appends records to `~/.maggus/usage/work.jsonl` (mapping old `TaskID` to `TaskShort`, dropping `FeatureFile`, setting `Repository` from git remote if available)
-- [ ] Reads `.maggus/usage_plan.jsonl`, `usage_prompt.jsonl`, `usage_bugreport.jsonl`, `usage_vision.jsonl`, `usage_architecture.jsonl`, `usage_bryan_plan.jsonl`, `usage_bryan_bugreport.jsonl` and appends to `~/.maggus/usage/sessions.jsonl` with appropriate `Kind` derived from filename
-- [ ] Skips files that don't exist (no error)
-- [ ] After successful migration, renames old files with `.migrated` suffix (not deletes, for safety)
-- [ ] Migration is idempotent -- skips already-migrated files (checks for `.migrated` suffix)
-- [ ] Migration is called once at startup in the work command (before main loop) and prompt command
-- [ ] Also handles legacy CSV files (`usage.csv`, `usage_v3.csv`) -- skip them (just rename to `.migrated`), they use an incompatible format
-- [ ] Unit tests cover: migration of each file type, skipping missing files, idempotency
-- [ ] `go test ./...` passes
+- [x] New function `usage.MigrateProject(projectDir string) error` added
+- [x] Reads `.maggus/usage_work.jsonl` and appends records to `~/.maggus/usage/work.jsonl` (mapping old `TaskID` to `TaskShort`, dropping `FeatureFile`, setting `Repository` from git remote if available)
+- [x] Reads `.maggus/usage_plan.jsonl`, `usage_prompt.jsonl`, `usage_bugreport.jsonl`, `usage_vision.jsonl`, `usage_architecture.jsonl`, `usage_bryan_plan.jsonl`, `usage_bryan_bugreport.jsonl` and appends to `~/.maggus/usage/sessions.jsonl` with appropriate `Kind` derived from filename
+- [x] Skips files that don't exist (no error)
+- [x] After successful migration, renames old files with `.migrated` suffix (not deletes, for safety)
+- [x] Migration is idempotent -- skips already-migrated files (checks for `.migrated` suffix)
+- [x] Migration is called once at startup in the work command (before main loop) and prompt command
+- [x] Also handles legacy CSV files (`usage.csv`, `usage_v3.csv`) -- skip them (just rename to `.migrated`), they use an incompatible format
+- [x] Unit tests cover: migration of each file type, skipping missing files, idempotency
+- [x] `go test ./...` passes
 
 ### TASK-001-006: Final verification and cleanup
 **Description:** As a developer, I want to verify the entire usage tracking pipeline works end-to-end and clean up any remaining references to the old system.
