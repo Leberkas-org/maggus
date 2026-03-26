@@ -652,7 +652,7 @@ func (m TUIModel) renderProgressTab(w int) string {
 	}
 
 	// Spinner + status color
-	spinner := cyanStyle.Render(spinnerFrames[m.frame])
+	spinner := cyanStyle.Render(styles.SpinnerFrames[m.frame])
 	sColor := statusStyle
 	switch m.status {
 	case "Done":

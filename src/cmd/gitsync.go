@@ -48,8 +48,6 @@ const (
 	syncStateError                         // action failed, returning to menu
 )
 
-var syncSpinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // syncModel is the bubbletea model for the git sync screen.
 type syncModel struct {
 	dir    string
@@ -146,7 +144,7 @@ func (m syncModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case syncTickMsg:
-		m.frame = (m.frame + 1) % len(syncSpinner)
+		m.frame = (m.frame + 1) % len(styles.SpinnerFrames)
 		if m.state == syncStateClean {
 			m.autoTimer++
 			// Auto-proceed after ~1.5 seconds (15 ticks at 100ms)
@@ -386,7 +384,7 @@ func (m syncModel) View() string {
 
 	switch m.state {
 	case syncStateLoading:
-		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(syncSpinner[m.frame])
+		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(styles.SpinnerFrames[m.frame])
 		b.WriteString(fmt.Sprintf("%s Checking remote status...\n", spinner))
 
 	case syncStateClean:
@@ -475,7 +473,7 @@ func (m syncModel) View() string {
 	case syncStateRunning:
 		b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Branch:"), valStyle.Render(m.branch)))
 		b.WriteString("\n")
-		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(syncSpinner[m.frame])
+		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(styles.SpinnerFrames[m.frame])
 		b.WriteString(fmt.Sprintf("%s Running...\n", spinner))
 	}
 

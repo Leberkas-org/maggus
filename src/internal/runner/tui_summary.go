@@ -325,7 +325,7 @@ afterTitle:
 	if s.pushDone {
 		content.WriteString(lipgloss.NewStyle().Foreground(styles.Success).Render(s.pushStatus) + "\n")
 	} else if s.pushStatus != "" {
-		spinner := cyanStyle.Render(spinnerFrames[m.frame])
+		spinner := cyanStyle.Render(styles.SpinnerFrames[m.frame])
 		content.WriteString(fmt.Sprintf("%s %s\n", spinner, s.pushStatus))
 	}
 

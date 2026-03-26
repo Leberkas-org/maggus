@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 func TestSyncActionConstants(t *testing.T) {
@@ -296,12 +297,12 @@ func TestSyncOption_Fields(t *testing.T) {
 }
 
 func TestSyncSpinner(t *testing.T) {
-	if len(syncSpinner) == 0 {
-		t.Error("syncSpinner should not be empty")
+	if len(styles.SpinnerFrames) == 0 {
+		t.Error("styles.SpinnerFrames should not be empty")
 	}
 	// Should have 10 frames (Braille spinner pattern)
-	if len(syncSpinner) != 10 {
-		t.Errorf("syncSpinner has %d frames, want 10", len(syncSpinner))
+	if len(styles.SpinnerFrames) != 10 {
+		t.Errorf("styles.SpinnerFrames has %d frames, want 10", len(styles.SpinnerFrames))
 	}
 }
 

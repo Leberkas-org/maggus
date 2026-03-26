@@ -21,8 +21,6 @@ const (
 	progressBarWidth  = 30
 )
 
-var statusSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // Lipgloss styles for the status command.
 var (
 	statusGreenStyle = lipgloss.NewStyle().Foreground(styles.Success)

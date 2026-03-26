@@ -357,7 +357,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case tickMsg:
-		m.frame = (m.frame + 1) % len(spinnerFrames)
+		m.frame = (m.frame + 1) % len(styles.SpinnerFrames)
 		return m, tickCmd()
 
 	case SummaryMsg, PushStatusMsg, QuitMsg:

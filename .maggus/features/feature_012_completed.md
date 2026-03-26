@@ -25,13 +25,13 @@ spinner frame definitions are never duplicated.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `var SpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}` is added to `src/internal/tui/styles/styles.go`
-- [ ] `src/cmd/gitsync.go` — remove `syncSpinner` local var, replace all usages with `styles.SpinnerFrames`
-- [ ] `src/internal/runner/runner.go` — remove `spinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
-- [ ] `src/cmd/status_model.go` — remove `statusSpinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
-- [ ] `src/cmd/update.go` — remove `spinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
-- [ ] `cd src && go build ./...` passes with no errors
-- [ ] `cd src && go test ./...` passes with no failures
+- [x] `var SpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}` is added to `src/internal/tui/styles/styles.go`
+- [x] `src/cmd/gitsync.go` — remove `syncSpinner` local var, replace all usages with `styles.SpinnerFrames`
+- [x] `src/internal/runner/runner.go` — remove `spinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
+- [x] `src/cmd/status_model.go` — remove `statusSpinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
+- [x] `src/cmd/update.go` — remove `spinnerFrames` local var, replace all usages with `styles.SpinnerFrames`
+- [x] `cd src && go build ./...` passes with no errors
+- [x] `cd src && go test ./...` passes with no failures
 
 ## Task Dependency Graph
 

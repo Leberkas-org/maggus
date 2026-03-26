@@ -28,6 +28,9 @@ var (
 	StatusBar = lipgloss.NewStyle().Foreground(Muted)
 )
 
+// SpinnerFrames is the shared braille spinner animation sequence used across all TUI components.
+var SpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
 // SeparatorChar is the character used for horizontal rules.
 const SeparatorChar = '─'
 

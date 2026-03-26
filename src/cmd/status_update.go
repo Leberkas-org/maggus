@@ -63,7 +63,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinnerTickMsg:
 		if m.daemon.Running && m.snapshot != nil {
-			m.spinnerFrame = (m.spinnerFrame + 1) % len(statusSpinnerFrames)
+			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
 			return m, spinnerTick()
 		}
 		// Keep ticking even when idle so the spinner starts immediately when daemon resumes.

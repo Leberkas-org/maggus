@@ -310,7 +310,7 @@ func (s *syncState) renderSyncView(m *TUIModel) string {
 	b.WriteString(fmt.Sprintf("%s  %s (%s)\n\n", labelStyle.Render("Remote:"), valStyle.Render(s.remoteBranch), strings.Join(statusParts, ", ")))
 
 	if s.running {
-		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(spinnerFrames[m.frame])
+		spinner := lipgloss.NewStyle().Foreground(styles.Primary).Render(styles.SpinnerFrames[m.frame])
 		b.WriteString(fmt.Sprintf("%s Running...\n", spinner))
 	} else if s.confirmForce {
 		b.WriteString(errStyle.Render("⚠ Force Pull Confirmation") + "\n\n")

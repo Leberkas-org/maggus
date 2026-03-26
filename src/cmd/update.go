@@ -76,8 +76,6 @@ type updateModel struct {
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 }
 
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // loadGlobalSettings is injectable for testing.
 var loadGlobalSettings = func() (globalconfig.Settings, error) {
 	return globalconfig.LoadSettings()
@@ -144,7 +142,7 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case updateTickMsg:
-		m.frame = (m.frame + 1) % len(spinnerFrames)
+		m.frame = (m.frame + 1) % len(styles.SpinnerFrames)
 		return m, updateTickCmd()
 
 	case claude2xResultMsg:
@@ -385,7 +383,7 @@ func (m updateModel) renderContent() string {
 
 	switch m.phase {
 	case phaseChecking:
-		spinner := cyanSt.Render(spinnerFrames[m.frame])
+		spinner := cyanSt.Render(styles.SpinnerFrames[m.frame])
 		fmt.Fprintf(&content, "\n%s Checking for updates...\n", spinner)
 
 	case phaseUpToDate:
@@ -405,7 +403,7 @@ func (m updateModel) renderContent() string {
 
 	case phaseDownloading:
 		fmt.Fprintf(&content, "%s  %s\n", labelStyle.Render("Latest:"), successStyle.Render(m.info.TagName))
-		spinner := cyanSt.Render(spinnerFrames[m.frame])
+		spinner := cyanSt.Render(styles.SpinnerFrames[m.frame])
 		fmt.Fprintf(&content, "\n%s Downloading and installing %s...\n", spinner, m.info.TagName)
 
 	case phaseSuccess:
