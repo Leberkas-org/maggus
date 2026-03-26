@@ -27,22 +27,22 @@ func init() {
 	promptCmd.Flags().StringVar(&promptModelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 }
 
-// skillMapping maps picker labels to their Claude skill command and usage file.
+// skillMapping maps picker labels to their Claude skill command and usage kind.
 type skillMapping struct {
-	skill     string // e.g. "/maggus-plan"; empty for Plain
-	usageFile string // e.g. "usage_plan.jsonl"
-	title     string
-	detail    string
+	skill  string // e.g. "/maggus-plan"; empty for Plain
+	kind   string // usage kind: "prompt", "plan", "vision", etc.
+	title  string
+	detail string
 }
 
 var skillMappings = map[string]skillMapping{
-	"open console":         {skill: "", usageFile: "usage_prompt.jsonl", title: "Consulting AI", detail: "Manual Prompting"},
-	"/maggus-plan":         {skill: "/maggus-plan", usageFile: "usage_plan.jsonl", title: "Planning", detail: "Manual Prompting"},
-	"/maggus-vision":       {skill: "/maggus-vision", usageFile: "usage_vision.jsonl", title: "Defining a vision", detail: "Manual Prompting"},
-	"/maggus-architecture": {skill: "/maggus-architecture", usageFile: "usage_architecture.jsonl", title: "Architecture", detail: "Manual Prompting"},
-	"/maggus-bugreport":    {skill: "/maggus-bugreport", usageFile: "usage_bugreport.jsonl", title: "Creating bug ticket", detail: "Manual Prompting"},
-	"/bryan-plan":          {skill: "/bryan-plan", usageFile: "usage_bryan_plan.jsonl", title: "Planning with bryan", detail: "Manual Prompting"},
-	"/bryan-bugreport":     {skill: "/bryan-bugreport", usageFile: "usage_bryan_bugreport.jsonl", title: "Reporting bug to bryan", detail: "Manual Prompting"},
+	"open console":         {skill: "", kind: "prompt", title: "Consulting AI", detail: "Manual Prompting"},
+	"/maggus-plan":         {skill: "/maggus-plan", kind: "plan", title: "Planning", detail: "Manual Prompting"},
+	"/maggus-vision":       {skill: "/maggus-vision", kind: "vision", title: "Defining a vision", detail: "Manual Prompting"},
+	"/maggus-architecture": {skill: "/maggus-architecture", kind: "architecture", title: "Architecture", detail: "Manual Prompting"},
+	"/maggus-bugreport":    {skill: "/maggus-bugreport", kind: "bugreport", title: "Creating bug ticket", detail: "Manual Prompting"},
+	"/bryan-plan":          {skill: "/bryan-plan", kind: "bryan_plan", title: "Planning with bryan", detail: "Manual Prompting"},
+	"/bryan-bugreport":     {skill: "/bryan-bugreport", kind: "bryan_bugreport", title: "Reporting bug to bryan", detail: "Manual Prompting"},
 }
 
 func runPrompt(cmd *cobra.Command, args []string) error {
@@ -129,8 +129,8 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	info, err := launchInteractive(agentName, prompt, dir, result.SkipPermissions, resolvedModel)
 
 	// Extract usage.
-	if mapping.usageFile != "" && info != nil {
-		extractSkillUsage(dir, resolvedModel, agentName, mapping.usageFile, info)
+	if mapping.kind != "" && info != nil {
+		extractSkillUsage(dir, resolvedModel, agentName, mapping.kind, info)
 	}
 
 	return err

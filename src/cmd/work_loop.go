@@ -223,10 +223,15 @@ func firstWorkableTask(plans []parser.Plan) *parser.Task {
 }
 
 // setupUsageCallback configures the TUI model to record per-task usage.
-func setupUsageCallback(m *runner.TUIModel, runID string, modelDisplay, agentName string) {
+func setupUsageCallback(m *runner.TUIModel, runID string, dir, modelDisplay, agentName string) {
+	repoURL := gitutil.RepoURL(dir)
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
+			Repository:               repoURL,
+			ItemID:                   tu.ItemID,
+			ItemShort:                tu.ItemShort,
+			ItemTitle:                tu.ItemTitle,
 			TaskShort:                tu.TaskShort,
 			Model:                    modelDisplay,
 			Agent:                    agentName,
@@ -402,6 +407,12 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 	if countWorkable(groupTasks) == 0 {
 		return result
 	}
+
+	// Ensure the plan file has a MaggusID and update the group with it.
+	if maggusID, err := parser.EnsureMaggusID(group.File); err == nil {
+		group.MaggusID = maggusID
+	}
+	tc.currentPlan = &group
 
 	tc.logger.FeatureStart(group.ID)
 

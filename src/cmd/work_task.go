@@ -66,9 +66,10 @@ type taskContext struct {
 	presence *discord.Presence
 
 	// Feature-centric context (set per-group by runWorkGoroutine).
-	featureSourceFile string // scope parsedTasks to this source file for progress calculation
-	featureCurrent    int    // 1-based index of current feature (for TUI display)
-	featureTotal      int    // total features being processed (for TUI display)
+	currentPlan       *parser.Plan // current plan being worked on (set per-group)
+	featureSourceFile string       // scope parsedTasks to this source file for progress calculation
+	featureCurrent    int          // 1-based index of current feature (for TUI display)
+	featureTotal      int          // total features being processed (for TUI display)
 }
 
 // runTask executes a single task iteration: finds the next task, acquires a
@@ -101,7 +102,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Signal iteration start to the TUI.
-	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal)
+	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal, tc.currentPlan)
 
 	// Update Discord Rich Presence with current task info and progress.
 	if tc.presence != nil {
@@ -305,7 +306,8 @@ func findNextWorkableTask(tasks []parser.Task, useWorktree bool, repoDir string)
 }
 
 // sendIterationStart sends the IterationStartMsg to the TUI with task details.
-func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count, featureCurrent, featureTotal int) {
+// When plan is non-nil, its MaggusID and ID are used to populate item-level fields.
+func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count, featureCurrent, featureTotal int, plan *parser.Plan) {
 	tuiCriteria := make([]runner.TaskCriterion, len(task.Criteria))
 	for ci, c := range task.Criteria {
 		tuiCriteria[ci] = runner.TaskCriterion{
@@ -332,14 +334,21 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		}
 	}
 
+	var itemID, itemShort, itemTitle string
+	if plan != nil {
+		itemID = plan.MaggusID
+		itemShort = plan.ID
+		itemTitle = parser.ParseFileTitle(plan.File)
+	}
+
 	p.Send(runner.IterationStartMsg{
 		Current:         i + 1,
 		Total:           count,
 		TaskID:          task.ID,
 		TaskTitle:       task.Title,
-		ItemID:          "", // populated by TASK-001-004
-		ItemShort:       "", // populated by TASK-001-004
-		ItemTitle:       "", // populated by TASK-001-004
+		ItemID:          itemID,
+		ItemShort:       itemShort,
+		ItemTitle:       itemTitle,
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
 		RemainingTasks:  remaining,

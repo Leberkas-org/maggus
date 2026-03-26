@@ -83,17 +83,17 @@ Rework the usage tracking system to support posting records to a global API for 
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `taskContext` struct gains `currentPlan *parser.Plan` field (`src/cmd/work_task.go`)
-- [ ] `runGroupTasks` calls `parser.EnsureMaggusID(group.File)` and sets `tc.currentPlan = &group` (`src/cmd/work_loop.go`)
-- [ ] `sendIterationStart` accepts Plan info and populates `ItemID` (MaggusID), `ItemShort` (Plan.ID), `ItemTitle` (via `parser.ParseFileTitle`) on `IterationStartMsg` (`src/cmd/work_task.go`)
-- [ ] `setupUsageCallback` gets `repoURL := gitutil.RepoURL(dir)` once, maps new TaskUsage fields to usage.Record, calls `usage.Append(records)` without dir (`src/cmd/work_loop.go`)
-- [ ] Daemon callback in `daemon_keepalive.go` updated identically
-- [ ] `skillMapping.usageFile` replaced with `skillMapping.kind` in `src/cmd/prompt.go`
-- [ ] Kind values: `prompt`, `plan`, `vision`, `architecture`, `bugreport`, `bryan_plan`, `bryan_bugreport`
-- [ ] `extractSkillUsage` in `src/cmd/plan.go` updated: takes `kind` instead of `usageFile`, sets `Repository` and `Kind`, calls `usage.Append()`
-- [ ] All cmd tests updated and passing (`work_loop_test.go`, `daemon_tui_test.go`, `plan_test.go`, `prompt_test.go`)
-- [ ] `go test ./cmd/...` passes
-- [ ] `go vet ./...` passes
+- [x] `taskContext` struct gains `currentPlan *parser.Plan` field (`src/cmd/work_task.go`)
+- [x] `runGroupTasks` calls `parser.EnsureMaggusID(group.File)` and sets `tc.currentPlan = &group` (`src/cmd/work_loop.go`)
+- [x] `sendIterationStart` accepts Plan info and populates `ItemID` (MaggusID), `ItemShort` (Plan.ID), `ItemTitle` (via `parser.ParseFileTitle`) on `IterationStartMsg` (`src/cmd/work_task.go`)
+- [x] `setupUsageCallback` gets `repoURL := gitutil.RepoURL(dir)` once, maps new TaskUsage fields to usage.Record, calls `usage.Append(records)` without dir (`src/cmd/work_loop.go`)
+- [x] Daemon callback in `daemon_keepalive.go` updated identically
+- [x] `skillMapping.usageFile` replaced with `skillMapping.kind` in `src/cmd/prompt.go`
+- [x] Kind values: `prompt`, `plan`, `vision`, `architecture`, `bugreport`, `bryan_plan`, `bryan_bugreport`
+- [x] `extractSkillUsage` in `src/cmd/plan.go` updated: takes `kind` instead of `usageFile`, sets `Repository` and `Kind`, calls `usage.Append()`
+- [x] All cmd tests updated and passing (`work_loop_test.go`, `daemon_tui_test.go`, `plan_test.go`, `prompt_test.go`)
+- [x] `go test ./cmd/...` passes
+- [x] `go vet ./...` passes
 
 ### TASK-001-005: Migrate existing usage data to global directory
 **Description:** As a user, I want my existing per-project usage data migrated to the new global `~/.maggus/usage/` directory so that historical records are available alongside new ones.

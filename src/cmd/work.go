@@ -266,7 +266,7 @@ Examples:
 		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
 		m.SetSyncDir(workDir)
 		m.SetWatcher(workDir)
-		setupUsageCallback(&m, runID, wc.modelDisplay, wc.activeAgent.Name())
+		setupUsageCallback(&m, runID, workDir, wc.modelDisplay, wc.activeAgent.Name())
 		m.SetOnToolUse(func(taskID, toolType, description string) {
 			runLogger.ToolUse(taskID, toolType, description)
 		})

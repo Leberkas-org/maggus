@@ -280,14 +280,12 @@ func TestExtractSkillUsage_Success(t *testing.T) {
 	endTime := time.Now()
 	runID := startTime.Format("20060102-150405")
 
-	maggusDir := filepath.Join(tmpDir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	usagePath := filepath.Join(maggusDir, "usage_plan.jsonl")
+	usagePath := filepath.Join(tmpDir, "sessions.jsonl")
 
 	rec := usage.Record{
 		RunID:                    runID,
+		Repository:               "https://github.com/test/repo.git",
+		Kind:                     "plan",
 		Model:                    "claude-sonnet-4-6",
 		Agent:                    "claude",
 		InputTokens:              summary.InputTokens,
@@ -317,6 +315,12 @@ func TestExtractSkillUsage_Success(t *testing.T) {
 	if written.RunID != runID {
 		t.Errorf("RunID = %q, want %q", written.RunID, runID)
 	}
+	if written.Repository != "https://github.com/test/repo.git" {
+		t.Errorf("Repository = %q, want %q", written.Repository, "https://github.com/test/repo.git")
+	}
+	if written.Kind != "plan" {
+		t.Errorf("Kind = %q, want %q", written.Kind, "plan")
+	}
 	if written.InputTokens != 200 {
 		t.Errorf("InputTokens = %d, want 200", written.InputTokens)
 	}
@@ -327,10 +331,6 @@ func TestExtractSkillUsage_Success(t *testing.T) {
 
 func TestExtractSkillUsage_NoSessionFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	maggusDir := filepath.Join(tmpDir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0755); err != nil {
-		t.Fatal(err)
-	}
 
 	info := &SessionInfo{
 		BeforeSnapshot: make(map[string]bool),
@@ -338,12 +338,9 @@ func TestExtractSkillUsage_NoSessionFile(t *testing.T) {
 		EndTime:        time.Now(),
 	}
 
-	extractSkillUsage(tmpDir, "claude-sonnet-4-6", "claude", "usage_plan.jsonl", info)
-
-	usagePath := filepath.Join(maggusDir, "usage_plan.jsonl")
-	if _, err := os.Stat(usagePath); !os.IsNotExist(err) {
-		t.Error("usage file should not be created when no session file is found")
-	}
+	// Should return early without error when no session file is found.
+	// This exercises the early return path in extractSkillUsage.
+	extractSkillUsage(tmpDir, "claude-sonnet-4-6", "claude", "plan", info)
 }
 
 func TestSessionInfo_Fields(t *testing.T) {

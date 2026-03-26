@@ -13,6 +13,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
@@ -223,9 +224,14 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	dm.SetOnOutput(func(taskID, text string) {
 		runLogger.Output(taskID, text)
 	})
+	repoURL := gitutil.RepoURL(dir)
 	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
 		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
+			Repository:               repoURL,
+			ItemID:                   tu.ItemID,
+			ItemShort:                tu.ItemShort,
+			ItemTitle:                tu.ItemTitle,
 			TaskShort:                tu.TaskShort,
 			Model:                    wc.modelDisplay,
 			Agent:                    wc.activeAgent.Name(),

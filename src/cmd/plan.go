@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"time"
 
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/session"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
@@ -20,9 +20,10 @@ const (
 )
 
 // extractSkillUsage detects the session file created during an interactive skill session,
-// extracts token usage, and appends a record to the specified usage file.
+// extracts token usage, and appends a record to the global usage directory.
+// The kind parameter identifies the session type (e.g. "plan", "bugreport", "prompt").
 // Errors are printed as warnings but never cause a non-zero exit.
-func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInfo) {
+func extractSkillUsage(dir, model, agentName, kind string, info *SessionInfo) {
 	sessionFile, err := session.DetectSessionFile(dir, info.BeforeSnapshot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not detect session file: %v\n", err)
@@ -40,10 +41,12 @@ func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInf
 	}
 
 	runID := info.StartTime.Format("20060102-150405")
-	usagePath := filepath.Join(dir, ".maggus", usageFile)
+	repoURL := gitutil.RepoURL(dir)
 
 	rec := usage.Record{
 		RunID:                    runID,
+		Repository:               repoURL,
+		Kind:                     kind,
 		Model:                    model,
 		Agent:                    agentName,
 		InputTokens:              summary.InputTokens,
@@ -56,7 +59,7 @@ func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInf
 		EndTime:                  info.EndTime,
 	}
 
-	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
+	if err := usage.Append([]usage.Record{rec}); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not write usage record: %v\n", err)
 	}
 }
