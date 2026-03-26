@@ -39,10 +39,6 @@ type daemonStopResultMsg struct {
 	err error
 }
 
-// startupAutoWorkMsg is sent once at startup to auto-dispatch work
-// when workable tasks already exist.
-type startupAutoWorkMsg struct{}
-
 // pollMenuDaemonTick returns a tea.Cmd that fires menuDaemonTickMsg after 500ms.
 func pollMenuDaemonTick() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
@@ -131,13 +127,6 @@ func (m menuModel) Init() tea.Cmd {
 		listenForWatcherUpdate(m.watcherCh),
 		pollMenuDaemonTick(),
 	}
-	// If workable tasks already exist on the very first launch, auto-dispatch work.
-	// Guard on firstLaunch so re-entry after a work run shows the menu normally.
-	if m.firstLaunch && m.summary.workable+m.summary.bugWorkable > 0 {
-		cmds = append(cmds, func() tea.Msg {
-			return startupAutoWorkMsg{}
-		})
-	}
 	return tea.Batch(cmds...)
 }
 
@@ -174,20 +163,8 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case menuDaemonTickMsg:
 		m.daemon = loadDaemonStatus(m.cwd)
 		return m, pollMenuDaemonTick()
-	case startupAutoWorkMsg:
-		// Auto-dispatch work when workable tasks exist at startup.
-		m.selected = "work"
-		m.args = []string{"--count", "0"}
-		return m, tea.Quit
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
-		// When a new file was created and there are workable tasks, dispatch work immediately.
-		workable := m.summary.workable + m.summary.bugWorkable
-		if msg.HasNewFile && workable > 0 {
-			m.selected = "work"
-			m.args = []string{"--count", "0"}
-			return m, tea.Quit
-		}
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case hideShortcutsMsg:

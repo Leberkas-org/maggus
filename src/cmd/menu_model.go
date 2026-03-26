@@ -222,8 +222,6 @@ type menuModel struct {
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer
 
-	firstLaunch bool // true only on the very first menu open; prevents auto-dispatch on re-entry after work
-
 	// File watcher for live summary updates
 	watcher   *filewatcher.Watcher
 	watcherCh chan bool
@@ -242,7 +240,7 @@ type menuModel struct {
 	activeSubDef *subMenuDef // pointer to the active sub-menu definition (with live option state)
 }
 
-func newMenuModel(summary featureSummary, firstLaunch bool) menuModel {
+func newMenuModel(summary featureSummary) menuModel {
 	cwd, _ := os.Getwd()
 
 	// Query actual terminal dimensions before the first render so View() always
@@ -265,7 +263,6 @@ func newMenuModel(summary featureSummary, firstLaunch bool) menuModel {
 		items:        activeMenuItems(),
 		summary:      summary,
 		cwd:          cwd,
-		firstLaunch:  firstLaunch,
 		subMenuDefs:  buildSubMenus(),
 		watcher:      w,
 		watcherCh:    ch,
