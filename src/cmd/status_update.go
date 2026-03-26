@@ -9,6 +9,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/discord"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -117,6 +118,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.daemonStopOverlay {
 			return m.updateStatusDaemonStopOverlay(msg)
+		}
+		if m.exitDaemonOverlay {
+			return m.updateExitDaemonOverlay(msg)
 		}
 		if m.confirmDeleteFeature {
 			return m.updateStatusConfirmDeleteFeature(msg)
@@ -304,6 +308,55 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 	return m, nil
 }
 
+// shouldPromptOnExit returns true when the daemon is running and auto-start is
+// disabled for the current repo — meaning the user started it manually and
+// should be asked before exiting.
+func (m statusModel) shouldPromptOnExit() bool {
+	if !m.daemon.Running {
+		return false
+	}
+	cfg, err := globalconfig.Load()
+	if err != nil {
+		return false
+	}
+	absDir, err := filepath.Abs(m.dir)
+	if err != nil {
+		return false
+	}
+	for _, repo := range cfg.Repositories {
+		if repo.Path == absDir {
+			return !repo.IsAutoStartEnabled()
+		}
+	}
+	return false
+}
+
+// handleQuitRequest either shows the exit daemon overlay or quits immediately,
+// depending on whether the daemon is running with auto-start disabled.
+func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
+	if m.shouldPromptOnExit() {
+		m.exitDaemonOverlay = true
+		return m, nil
+	}
+	return m, tea.Quit
+}
+
+func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "t", "T":
+		_ = stopDaemonGracefully(m.dir)
+		return m, tea.Quit
+	case "k", "K":
+		_ = forceKill(m.daemon.PID)
+		removeDaemonPID(m.dir)
+		return m, tea.Quit
+	case "l", "L", "enter", "esc", "ctrl+c":
+		m.exitDaemonOverlay = false
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
@@ -322,7 +375,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showLog {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
-			return m, tea.Quit
+			return m.handleQuitRequest()
 		case "j", "down":
 			m.logAutoScroll = false
 			m.logScroll++
@@ -384,15 +437,15 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activeTab == 1 {
 			// Allow esc to close detail/confirm without quitting.
 			if key == "esc" && !m.taskListComponent.ShowDetail && !m.taskListComponent.ConfirmDelete {
-				return m, tea.Quit
+				return m.handleQuitRequest()
 			}
 			if key == "q" || key == "ctrl+c" {
-				return m, tea.Quit
+				return m.handleQuitRequest()
 			}
 			cmd, action := m.taskListComponent.Update(msg)
 			switch action {
 			case taskListQuit:
-				return m, tea.Quit
+				return m.handleQuitRequest()
 			case taskListDeleted:
 				m.reloadPlans()
 			}
@@ -406,7 +459,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Tab 1 — Output: log scroll. Tab 3 — Current Task: viewport scroll.
 		switch key {
 		case "q", "esc", "ctrl+c":
-			return m, tea.Quit
+			return m.handleQuitRequest()
 		case "down":
 			if m.activeTab == 0 {
 				m.logAutoScroll = false
@@ -511,7 +564,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
 	case taskListQuit, taskListRun:
-		return m, tea.Quit
+		return m.handleQuitRequest()
 	case taskListDeleted:
 		m.reloadPlans()
 	}

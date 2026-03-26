@@ -73,6 +73,9 @@ type statusModel struct {
 	// Daemon stop-mode selection overlay
 	daemonStopOverlay bool
 
+	// Exit daemon prompt overlay (shown when daemon is running and auto-start is disabled)
+	exitDaemonOverlay bool
+
 	// Live log panel
 	showLog       bool
 	logLines      []string
