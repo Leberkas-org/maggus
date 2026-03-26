@@ -52,11 +52,11 @@ Several polish and usability improvements to the split-pane status view:
 **Parallel:** yes — can run alongside TASK-003-001
 
 **Acceptance Criteria:**
-- [ ] In `src/cmd/status_leftpane.go` `renderLeftPane()`, the header line is changed from `" FEATURES & BUGS"` (all-caps plain text) to the format `<dim>1</dim> <label>Features & Bugs</label>` — matching the number-prefix + label convention used by `renderRightPaneTabBar()`
-- [ ] When `m.leftFocused` is true: the number `1` is rendered faint/dim (matching the right pane's dimmed number prefixes), and `Features & Bugs` is rendered bold + underline + primary color (matching the active tab style in the right pane)
-- [ ] When `m.leftFocused` is false: both the number and label are rendered in `styles.Muted` (matching the right pane's inactive tab style)
-- [ ] The horizontal separator line immediately below the header is unchanged
-- [ ] The `strings.ToUpper` call is removed — the new label is title-case `Features & Bugs`
+- [x] In `src/cmd/status_leftpane.go` `renderLeftPane()`, the header line is changed from `" FEATURES & BUGS"` (all-caps plain text) to the format `<dim>1</dim> <label>Features & Bugs</label>` — matching the number-prefix + label convention used by `renderRightPaneTabBar()`
+- [x] When `m.leftFocused` is true: the number `1` is rendered faint/dim (matching the right pane's dimmed number prefixes), and `Features & Bugs` is rendered bold + underline + primary color (matching the active tab style in the right pane)
+- [x] When `m.leftFocused` is false: both the number and label are rendered in `styles.Muted` (matching the right pane's inactive tab style)
+- [x] The horizontal separator line immediately below the header is unchanged
+- [x] The `strings.ToUpper` call is removed — the new label is title-case `Features & Bugs`
 
 ---
 
