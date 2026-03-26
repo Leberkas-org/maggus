@@ -80,8 +80,8 @@ When `Width(width)` word-wraps a long log line, it becomes multiple visual rows.
 **Description:** As a user, I want the Output tab to stay within its allocated height so long log lines don't push content out of the pane.
 
 **Acceptance Criteria:**
-- [ ] Each log line in `renderPlainLogInPane` is truncated to `width - 2` visible characters before being written to the string builder (using `styles.Truncate`)
-- [ ] The Output tab never renders taller than `contentH` lines regardless of log line length
-- [ ] Long tool descriptions, file paths, and output text are shown with `…` truncation rather than wrapping
-- [ ] No regression in log scrolling behavior
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Each log line in `renderPlainLogInPane` is truncated to `width - 2` visible characters before being written to the string builder (using `styles.Truncate`)
+- [x] The Output tab never renders taller than `contentH` lines regardless of log line length
+- [x] Long tool descriptions, file paths, and output text are shown with `…` truncation rather than wrapping
+- [x] No regression in log scrolling behavior
+- [x] `go vet ./...` and `go test ./...` pass
