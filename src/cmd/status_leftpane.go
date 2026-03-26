@@ -66,7 +66,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	lines = append(lines, padToWidth(headerContent, contentW))
 
 	// Horizontal separator under daemon status line.
-	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))
+	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
 	lines = append(lines, "")
 
 	// Daemon status line immediately below the header.
@@ -90,7 +90,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	lines = append(lines, padToWidth(" "+daemonLine, contentW))
 
 	// Horizontal separator under daemon status line.
-	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))
+	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
 
 	// Plan rows: features first, separator, then bugs.
 	bugSepAdded := false

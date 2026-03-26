@@ -46,7 +46,7 @@ func (m statusModel) renderRightPane(width, height int) string {
 	}
 
 	tabBar := m.renderRightPaneTabBar()
-	sep := " " + styles.Separator(min(42, width-2))
+	sep := " " + styles.Separator(width-1)
 
 	// Content height: total height minus tab bar line and separator line.
 	contentH := height - 2
@@ -130,10 +130,11 @@ func (m statusModel) renderPlainLogInPane(width, height int) string {
 		logTitle += statusDimStyle.Render("  " + m.daemon.RunID + "/run.log")
 	}
 	sb.WriteString(logTitle + "\n")
-	sb.WriteString(" " + styles.Separator(min(42, width-2)))
 
-	// Lines available for scrollable log content (height minus blank+title+separator).
-	available := height - 3
+	sb.WriteString(" " + styles.Separator(width-1))
+
+	// Lines available for scrollable log content (height minus blank+title+separator+scrollindicator).
+	available := height - 4
 	if available < 1 {
 		available = 1
 	}
@@ -423,9 +424,9 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 	bar := buildProgressBar(done, total)
 	count := statusDimStyle.Render(fmt.Sprintf(" %d/%d", done, total))
 
-	sb.WriteString("\n " + styles.Title.Render(titleStr) + "\n")
+	sb.WriteString(" " + styles.Title.Render(titleStr) + "\n")
 	sb.WriteString(" " + bar + count + "\n")
-	sb.WriteString(" " + styles.Separator(min(42, width-2)) + "\n")
+	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	// Header occupies 4 lines
 	headerLines := 4
@@ -471,10 +472,13 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 			line := fmt.Sprintf("%s%s  %s: %s", prefix, icon, t.ID, t.Title)
 			sb.WriteString(style.Render(line) + "\n")
 		}
+
 		// Scroll indicator
 		if len(tasks) > listH {
 			hint := fmt.Sprintf(" [%d-%d of %d]", scrollOffset+1, min(scrollOffset+listH, len(tasks)), len(tasks))
 			sb.WriteString(statusDimStyle.Render(hint) + "\n")
+		} else {
+			sb.WriteString("\n")
 		}
 	}
 

@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -18,7 +18,7 @@ import (
 
 const (
 	statusHeaderLines = 11 // title + daemon line + blank + tab bar (~2) + separator + blank + progress + blank + tasks header + separator
-	progressBarWidth  = 10
+	progressBarWidth  = 30
 )
 
 var statusSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -28,8 +28,8 @@ var (
 	statusGreenStyle = lipgloss.NewStyle().Foreground(styles.Success)
 	statusCyanStyle  = lipgloss.NewStyle().Foreground(styles.Primary)
 	statusRedStyle   = lipgloss.NewStyle().Foreground(styles.Error)
-	statusDimStyle  = lipgloss.NewStyle().Faint(true)
-	statusBoldStyle = lipgloss.NewStyle().Bold(true)
+	statusDimStyle   = lipgloss.NewStyle().Faint(true)
+	statusBoldStyle  = lipgloss.NewStyle().Bold(true)
 	statusBlueStyle  = lipgloss.NewStyle().Foreground(styles.Accent)
 )
 

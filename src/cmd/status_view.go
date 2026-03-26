@@ -199,20 +199,20 @@ func (m statusModel) statusSplitFooter() string {
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		return "↑/↓ navigate  enter: details  alt+p: approve  " + daemonHint + "  1: left  2-5: tabs  q: exit"
+		return "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  " + daemonHint + "  q: exit"
 	}
 	switch m.activeTab {
 	case 0:
-		return "↑/↓ scroll  G: bottom  1: left  2-5: tabs  q: exit"
+		return "1-5: tabs  ↑/↓ navigate/scroll  G: bottom  q: exit"
 	case 1:
 		c := &m.taskListComponent
 		if c.ShowDetail {
 			ds := &c.Detail
 			if ds.criteriaMode {
 				if ds.showActionPicker {
-					return "↑/↓: select action · enter: confirm · esc: cancel"
+					return "↑/↓: navigate/scroll · enter: confirm · esc: cancel"
 				}
-				return "↑/↓: navigate blocked · enter: action · tab: scroll mode · esc: back"
+				return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · esc: back"
 			}
 			scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
 			var parts []string
@@ -224,10 +224,10 @@ func (m statusModel) statusSplitFooter() string {
 			parts = append(parts, "alt+r: run · alt+bksp: delete · esc: back · q: exit")
 			return strings.Join(parts, " · ")
 		}
-		return "↑/↓ navigate  enter: detail  tab: switch pane  1: left  2-5: tabs  q: exit"
+		return "1-5: tabs  ↑/↓ navigate/scroll  enter: detail  q: exit"
 	case 2:
-		return "↑/↓ scroll  1: left  2-5: tabs  q: exit"
+		return "1-5: tabs  ↑/↓ navigate/scroll  q: exit"
 	default:
-		return "1: left  2-5: tabs  q: exit"
+		return "1-5: tabs  q: exit"
 	}
 }
