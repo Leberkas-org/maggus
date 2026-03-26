@@ -58,12 +58,12 @@ This feature:
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] In `renderTab2TaskList` (`status_rightpane.go`): remove `footerStr`, `footerLines := 1`, the `footerLines` deduction from `listH`, and the `+ "\n" + footerStr` at the return
-- [ ] `renderTab2TaskList` returns `lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())` using the full `height` (no footer reservation)
-- [ ] `statusSplitFooter()` (`status_view.go`) case `activeTab == 1` (non-detail mode) now includes a tab-switching hint; the text must include at minimum: navigate hint, enter hint, tab/pane-switch hint, and q: exit — e.g. `"↑/↓ navigate  enter: detail  tab: switch pane  1: left  2-5: tabs  q: exit"`
-- [ ] No duplicate footer appears in the task list area
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] In `renderTab2TaskList` (`status_rightpane.go`): remove `footerStr`, `footerLines := 1`, the `footerLines` deduction from `listH`, and the `+ "\n" + footerStr` at the return
+- [x] `renderTab2TaskList` returns `lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())` using the full `height` (no footer reservation)
+- [x] `statusSplitFooter()` (`status_view.go`) case `activeTab == 1` (non-detail mode) now includes a tab-switching hint; the text must include at minimum: navigate hint, enter hint, tab/pane-switch hint, and q: exit — e.g. `"↑/↓ navigate  enter: detail  tab: switch pane  1: left  2-5: tabs  q: exit"`
+- [x] No duplicate footer appears in the task list area
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

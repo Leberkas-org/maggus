@@ -205,7 +205,7 @@ func (m statusModel) statusSplitFooter() string {
 	case 0:
 		return "↑/↓ scroll  G: bottom  1: left  2-5: tabs  q: exit"
 	case 1:
-		return "↑/↓ navigate  enter: detail  1: left  2-5: tabs  q: exit"
+		return "↑/↓ navigate  enter: detail  tab: switch pane  1: left  2-5: tabs  q: exit"
 	case 2:
 		return "↑/↓ scroll  1: left  2-5: tabs  q: exit"
 	default:

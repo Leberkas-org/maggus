@@ -435,10 +435,9 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 	sb.WriteString(" " + bar + count + "\n")
 	sb.WriteString(" " + styles.Separator(min(42, width-2)) + "\n")
 
-	// Header occupies 4 lines; reserve 1 for footer hint.
+	// Header occupies 4 lines
 	headerLines := 4
-	footerLines := 1
-	listH := height - headerLines - footerLines
+	listH := height - headerLines
 	if listH < 1 {
 		listH = 1
 	}
@@ -487,11 +486,5 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 		}
 	}
 
-	// Footer hint
-	footerStr := styles.StatusBar.Render("↑↓ navigate · enter: detail · tab: switch pane · q: exit")
-	contentH := height - footerLines
-	if contentH < 1 {
-		contentH = 1
-	}
-	return lipgloss.NewStyle().Width(width).Height(contentH).Render(sb.String()) + "\n" + footerStr
+	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
 }
