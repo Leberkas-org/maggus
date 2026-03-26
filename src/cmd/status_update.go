@@ -293,15 +293,6 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
-		case "tab":
-			m.showLog = false
-			if m.presence != nil {
-				_ = m.presence.Update(discord.PresenceState{
-					FeatureTitle: "Viewing Status",
-					StartTime:    time.Now(),
-				})
-			}
-			return m, nil
 		case "j", "down":
 			m.logAutoScroll = false
 			m.logScroll++

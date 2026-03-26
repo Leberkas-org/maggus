@@ -88,10 +88,10 @@ This feature fixes both issues:
 **Parallel:** no — should be done after TASK-002-001 to confirm log view is no longer the default entry point
 
 **Acceptance Criteria:**
-- [ ] In `src/cmd/status_update.go` `updateList()`, the `case "tab": m.showLog = false` block (lines ~296–304) is removed from the `if m.showLog` handler
-- [ ] When in `--show-log` mode, pressing Tab no longer switches to the split pane (Tab is now a no-op or consumed silently)
-- [ ] `q`/`esc` still exits from `--show-log` mode
-- [ ] `j`/`k`/`g`/`G` scroll keys still work in `--show-log` mode
+- [x] In `src/cmd/status_update.go` `updateList()`, the `case "tab": m.showLog = false` block (lines ~296–304) is removed from the `if m.showLog` handler
+- [x] When in `--show-log` mode, pressing Tab no longer switches to the split pane (Tab is now a no-op or consumed silently)
+- [x] `q`/`esc` still exits from `--show-log` mode
+- [x] `j`/`k`/`g`/`G` scroll keys still work in `--show-log` mode
 
 ## Task Dependency Graph
 
