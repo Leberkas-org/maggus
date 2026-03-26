@@ -526,6 +526,38 @@ func TestNewStatusModel(t *testing.T) {
 	})
 }
 
+func TestNewStatusModel_InitialDimensions(t *testing.T) {
+	// In a non-TTY test environment xterm.GetSize returns 0,0 and newStatusModel
+	// initializes to those values. The key invariant is that m.taskListComponent.Width
+	// always mirrors m.width (HandleResize was called in the constructor).
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+	if m.taskListComponent.Width != m.width {
+		t.Errorf("constructor: taskListComponent.Width (%d) != m.width (%d); HandleResize not called", m.taskListComponent.Width, m.width)
+	}
+	if m.taskListComponent.Height != m.height {
+		t.Errorf("constructor: taskListComponent.Height (%d) != m.height (%d); HandleResize not called", m.taskListComponent.Height, m.height)
+	}
+}
+
+func TestStatusModel_WindowSizeMsgUpdatesDimensions(t *testing.T) {
+	// WindowSizeMsg must update m.width/m.height and forward to HandleResize (regression guard).
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	updated := model.(statusModel)
+
+	if updated.width != 100 {
+		t.Errorf("width = %d, want 100", updated.width)
+	}
+	if updated.height != 30 {
+		t.Errorf("height = %d, want 30", updated.height)
+	}
+	if updated.taskListComponent.Width != 100 {
+		t.Errorf("taskListComponent.Width = %d, want 100", updated.taskListComponent.Width)
+	}
+	if updated.taskListComponent.Height != 30 {
+		t.Errorf("taskListComponent.Height = %d, want 30", updated.taskListComponent.Height)
+	}
+}
 
 func TestEnsureCursorVisible(t *testing.T) {
 	m := statusModel{

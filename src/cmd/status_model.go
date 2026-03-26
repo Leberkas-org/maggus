@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -12,6 +13,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
+	xterm "golang.org/x/term"
 )
 
 const (
@@ -110,6 +112,17 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		leftFocused:      true,
 		activeTab:        0,
 	}
+	// Query actual terminal dimensions before the first render so View() always
+	// has a non-zero size and the split-pane is visible on the first frame
+	// (same pattern as newMenuModel).
+	termW, termH, _ := xterm.GetSize(int(os.Stdout.Fd()))
+	m.width = termW
+	m.height = termH
+	if termW > 0 && termH > 0 {
+		m.HandleResize(termW, termH)
+		m.resizeCurrentTaskViewport()
+	}
+
 	visible := m.visiblePlans()
 	if len(visible) > 0 {
 		m.Tasks = buildSelectableTasksForFeature(visible[0], showAll)
