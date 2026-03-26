@@ -17,10 +17,9 @@ git:
         - dev
     check_sync: false
 on_complete:
-    feature: delete
-    bug: delete
+    feature: ""
+    bug: ""
 hooks:
     on_feature_complete: []
     on_bug_complete: []
     on_task_complete: []
-discord_presence: true

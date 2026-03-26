@@ -114,14 +114,12 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 	}
 	// Query actual terminal dimensions before the first render so View() always
 	// has a non-zero size and the split-pane is visible on the first frame
-	// (same pattern as newMenuModel).
+	// (same pattern as newMenuModel). Only set width/height here — HandleResize
+	// and resizeCurrentTaskViewport are called from the WindowSizeMsg handler
+	// where Bubble Tea provides the correct alt-screen dimensions.
 	termW, termH, _ := xterm.GetSize(int(os.Stdout.Fd()))
 	m.width = termW
 	m.height = termH
-	if termW > 0 && termH > 0 {
-		m.HandleResize(termW, termH)
-		m.resizeCurrentTaskViewport()
-	}
 
 	visible := m.visiblePlans()
 	if len(visible) > 0 {
