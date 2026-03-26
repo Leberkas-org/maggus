@@ -67,30 +67,45 @@ func loadDaemonStatus(dir string) daemonStatus {
 	return info
 }
 
-// findLatestRunLog returns the run ID and run.log path of the most recently created
-// run directory under .maggus/runs/. Returns empty strings if none is found.
+// findLatestRunLog returns the run ID (latest snapshot subdirectory containing state.json)
+// and the path to the latest flat .log file under .maggus/runs/.
+// Each is found independently; either may be empty if none exists.
 func findLatestRunLog(dir string) (runID, logPath string) {
 	runsDir := filepath.Join(dir, ".maggus", "runs")
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		return "", ""
 	}
-	var dirs []string
+
+	// Collect flat .log files (excluding daemon.log) for logPath.
+	var logFiles []string
+	// Collect subdirectories that contain state.json for runID.
+	var snapDirs []string
+
 	for _, e := range entries {
 		if e.IsDir() {
-			dirs = append(dirs, e.Name())
+			statePath := filepath.Join(runsDir, e.Name(), "state.json")
+			if _, err := os.Stat(statePath); err == nil {
+				snapDirs = append(snapDirs, e.Name())
+			}
+		} else if strings.HasSuffix(e.Name(), ".log") && e.Name() != "daemon.log" {
+			logFiles = append(logFiles, e.Name())
 		}
 	}
-	if len(dirs) == 0 {
-		return "", ""
+
+	// Latest log file (lexicographic sort — timestamp prefix ensures correct order).
+	if len(logFiles) > 0 {
+		sort.Strings(logFiles)
+		logPath = filepath.Join(runsDir, logFiles[len(logFiles)-1])
 	}
-	sort.Strings(dirs)
-	latest := dirs[len(dirs)-1]
-	candidate := filepath.Join(runsDir, latest, "run.log")
-	if _, err := os.Stat(candidate); err != nil {
-		return "", ""
+
+	// Latest snapshot directory.
+	if len(snapDirs) > 0 {
+		sort.Strings(snapDirs)
+		runID = snapDirs[len(snapDirs)-1]
 	}
-	return latest, candidate
+
+	return runID, logPath
 }
 
 // readLastNLogLines returns the last n lines of the file at path.
@@ -259,8 +274,15 @@ func (m statusModel) renderDaemonStatusLine() string {
 		}
 		return line
 	}
-	if m.daemon.RunID != "" {
-		return statusDimStyle.Render(fmt.Sprintf(" ○ daemon not running · last run: %s", m.daemon.RunID))
+	// Show last run info using whichever identifier is available.
+	lastRun := m.daemon.RunID
+	if lastRun == "" && m.daemon.LogPath != "" {
+		// Fall back to the log filename (without directory and extension).
+		base := filepath.Base(m.daemon.LogPath)
+		lastRun = strings.TrimSuffix(base, ".log")
+	}
+	if lastRun != "" {
+		return statusDimStyle.Render(fmt.Sprintf(" ○ daemon not running · last run: %s", lastRun))
 	}
 	return statusDimStyle.Render(" ○ daemon not running")
 }
