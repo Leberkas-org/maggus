@@ -69,12 +69,12 @@ Several polish and usability improvements to the split-pane status view:
 **Parallel:** no — builds directly on the header layout established in TASK-003-002
 
 **Acceptance Criteria:**
-- [ ] In `src/cmd/status_leftpane.go` `renderLeftPane()`, a second line is added immediately below the tab-style header (before the `─────` separator), showing the daemon status
-- [ ] When `m.daemon.Running` is true: the indicator reads `● Running` rendered in `styles.Success` (green)
-- [ ] When `m.daemon.Running` is false: the indicator reads `○ Stopped` rendered in `styles.Muted`
-- [ ] When `m.daemon.Running` is true and `m.daemon.CurrentTask` is non-empty, the indicator appends the current task in muted text, truncated to fit the available content width: e.g. `● Running  TASK-001-002`
-- [ ] The left pane's content area height calculation accounts for the extra line (the `statusHeaderLines` constant or equivalent height budget is updated if needed to prevent layout overflow)
-- [ ] The `─────` separator line still appears immediately below the daemon status line
+- [x] In `src/cmd/status_leftpane.go` `renderLeftPane()`, a second line is added immediately below the tab-style header (before the `─────` separator), showing the daemon status
+- [x] When `m.daemon.Running` is true: the indicator reads `● Running` rendered in `styles.Success` (green)
+- [x] When `m.daemon.Running` is false: the indicator reads `○ Stopped` rendered in `styles.Muted`
+- [x] When `m.daemon.Running` is true and `m.daemon.CurrentTask` is non-empty, the indicator appends the current task in muted text, truncated to fit the available content width: e.g. `● Running  TASK-001-002`
+- [x] The left pane's content area height calculation accounts for the extra line (the `statusHeaderLines` constant or equivalent height budget is updated if needed to prevent layout overflow)
+- [x] The `─────` separator line still appears immediately below the daemon status line
 
 ---
 

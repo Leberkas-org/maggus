@@ -71,7 +71,27 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	headerContent := " " + dimStyle.Render("1") + " " + labelStyle.Render("Features & Bugs")
 	lines = append(lines, padToWidth(headerContent, contentW))
 
-	// Horizontal separator under header.
+	// Daemon status line immediately below the header.
+	var daemonLine string
+	if m.daemon.Running {
+		indicator := lipgloss.NewStyle().Foreground(styles.Success).Render("●")
+		label := lipgloss.NewStyle().Foreground(styles.Success).Render(" Running")
+		daemonLine = indicator + label
+		if m.daemon.CurrentTask != "" {
+			// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
+			indicatorW := lipgloss.Width(indicator + label)
+			taskMaxW := contentW - indicatorW - 2
+			if taskMaxW > 0 {
+				task := leftPaneTruncate(m.daemon.CurrentTask, taskMaxW)
+				daemonLine += "  " + mutedStyle.Render(task)
+			}
+		}
+	} else {
+		daemonLine = mutedStyle.Render("○ Stopped")
+	}
+	lines = append(lines, padToWidth(" "+daemonLine, contentW))
+
+	// Horizontal separator under daemon status line.
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))
 
 	// Plan rows: features first, separator, then bugs.
