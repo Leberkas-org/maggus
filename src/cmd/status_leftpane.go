@@ -43,13 +43,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	}
 
 	// Border dims when the right pane has focus.
-	var borderColor lipgloss.Color
-	if m.leftFocused {
-		borderColor = styles.ThemeColor(m.is2x)
-	} else {
-		borderColor = styles.Muted
-	}
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	cursorStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 	selectedBg := lipgloss.NewStyle().Background(lipgloss.Color("#1f2937"))
@@ -70,6 +64,10 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	}
 	headerContent := " " + dimStyle.Render("1") + " " + labelStyle.Render("Features & Bugs")
 	lines = append(lines, padToWidth(headerContent, contentW))
+
+	// Horizontal separator under daemon status line.
+	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))
+	lines = append(lines, "")
 
 	// Daemon status line immediately below the header.
 	var daemonLine string
@@ -163,28 +161,6 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 		lines = append(lines, rowLine)
 	}
 
-	// Footer hints pinned to the bottom.
-	daemonHint := "s start"
-	if m.daemon.Running {
-		daemonHint = "s stop"
-	}
-	footerHints := []string{
-		"↑↓ navigate  enter inspect",
-		"alt+p approve  alt+d delete",
-		daemonHint + "  alt+↑↓ reorder",
-	}
-	spacer := height - len(lines) - len(footerHints)
-	if spacer < 0 {
-		spacer = 0
-	}
-	for i := 0; i < spacer; i++ {
-		lines = append(lines, "")
-	}
-	for _, hint := range footerHints {
-		hintLine := " " + leftPaneTruncate(hint, contentW-1)
-		lines = append(lines, mutedStyle.Render(hintLine))
-	}
-
 	// Trim or pad to exact height.
 	if len(lines) > height {
 		lines = lines[:height]
@@ -198,11 +174,16 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	result := make([]string, len(lines))
 	for i, line := range lines {
 		w := lipgloss.Width(line)
+
 		if w < contentW {
 			line += strings.Repeat(" ", contentW-w)
 		}
 		result[i] = line + bChar
 	}
 
+	bChar = borderStyle.Render("─")
+
+	lastLine := strings.Repeat(bChar, contentW) + borderStyle.Render("┴")
+	result = append(result, lastLine)
 	return strings.Join(result, "\n")
 }
