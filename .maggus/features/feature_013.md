@@ -53,13 +53,13 @@ Additionally, the `item_id` field carries the maggus UUID but its name is opaque
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] All `ToolUse(...)` calls in `runlog_test.go` updated to new signature `(taskID, toolType string, params map[string]string)`
-- [ ] All assertions on `entry.Description` replaced with assertions on `entry.Input` map fields
-- [ ] All assertions on `entry.ItemID` / `"item_id"` JSON replaced with `entry.MaggusID` / `"maggus_id"`
-- [ ] All `SetCurrentItem` calls replaced with `SetCurrentMaggusID`
-- [ ] New file `runlog_usage_test.go` created with `TestTaskUsage`: calls `runLogger.TaskUsage(...)` and asserts the emitted JSONL contains `event: "task_usage"` with correct token and cost fields
-- [ ] `runlog_test.go` stays under 500 lines (new test moved to separate file)
-- [ ] `go test ./internal/runlog/...` passes
+- [x] All `ToolUse(...)` calls in `runlog_test.go` updated to new signature `(taskID, toolType string, params map[string]string)`
+- [x] All assertions on `entry.Description` replaced with assertions on `entry.Input` map fields
+- [x] All assertions on `entry.ItemID` / `"item_id"` JSON replaced with `entry.MaggusID` / `"maggus_id"`
+- [x] All `SetCurrentItem` calls replaced with `SetCurrentMaggusID`
+- [x] New file `runlog_usage_test.go` created with `TestTaskUsage`: calls `runLogger.TaskUsage(...)` and asserts the emitted JSONL contains `event: "task_usage"` with correct token and cost fields
+- [x] `runlog_test.go` stays under 500 lines (new test moved to separate file)
+- [x] `go test ./internal/runlog/...` passes
 
 ### TASK-013-003: Wire new callback signatures in runner and cmd layers
 **Description:** As a developer, I want the `onToolUse` callback and all its call sites updated to pass raw `params map[string]string` instead of a human-formatted description string, and to wire the `task_usage` log event at run completion.
