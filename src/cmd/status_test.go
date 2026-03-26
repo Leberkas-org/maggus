@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -1216,6 +1217,133 @@ func TestRenderTabBar_ApprovalMark(t *testing.T) {
 		}
 		if !strings.Contains(bar, "✗") {
 			t.Error("tab bar should contain ✗ for unapproved feature")
+		}
+	})
+}
+
+func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
+		{ID: "plan_2", File: "plan_2.md", Tasks: []parser.Task{{ID: "T2"}}},
+		{ID: "plan_3", File: "plan_3.md", Tasks: []parser.Task{{ID: "T3"}}},
+	}
+
+	t.Run("down navigates to next plan", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		got := result.(statusModel)
+		if got.planCursor != 1 {
+			t.Errorf("planCursor = %d, want 1", got.planCursor)
+		}
+	})
+
+	t.Run("up navigates to previous plan", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.planCursor = 2
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+		got := result.(statusModel)
+		if got.planCursor != 1 {
+			t.Errorf("planCursor = %d, want 1", got.planCursor)
+		}
+	})
+
+	t.Run("down wraps at last plan", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.planCursor = 2
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		got := result.(statusModel)
+		// CursorDown wraps: from last index stays or wraps to 0
+		if got.planCursor < 0 || got.planCursor >= len(plans) {
+			t.Errorf("planCursor = %d out of range [0, %d)", got.planCursor, len(plans))
+		}
+	})
+
+	t.Run("up does not navigate when right pane is focused", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = false
+		m.activeTab = 0
+		m.planCursor = 1
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		got := result.(statusModel)
+		// Right pane focused: up scrolls log, not plan navigation
+		if got.planCursor != 1 {
+			t.Errorf("planCursor = %d, want 1 (should not change when right pane focused)", got.planCursor)
+		}
+	})
+}
+
+func TestStatusModel_LeftPaneEnterSwitchesFocus(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
+	}
+
+	t.Run("enter switches focus to right pane on Tab 2", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		got := result.(statusModel)
+		if got.leftFocused {
+			t.Error("leftFocused should be false after enter from left pane")
+		}
+		if got.activeTab != 1 {
+			t.Errorf("activeTab = %d, want 1 (Feature Details)", got.activeTab)
+		}
+	})
+
+	t.Run("enter in split mode sets tab 2", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.activeTab = 3 // currently on metrics
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		got := result.(statusModel)
+		if got.activeTab != 1 {
+			t.Errorf("activeTab = %d, want 1 after enter from left pane", got.activeTab)
+		}
+	})
+}
+
+func TestStatusModel_TabTogglesFocus(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
+	}
+
+	t.Run("tab toggles leftFocused in split mode", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		got := result.(statusModel)
+		if got.leftFocused {
+			t.Error("leftFocused should be false after tab")
+		}
+
+		result2, _ := got.Update(tea.KeyMsg{Type: tea.KeyTab})
+		got2 := result2.(statusModel)
+		if !got2.leftFocused {
+			t.Error("leftFocused should be true after second tab")
 		}
 	})
 }

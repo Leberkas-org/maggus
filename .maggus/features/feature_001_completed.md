@@ -174,18 +174,18 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `tab` key toggles focus between left pane and right pane; `leftFocused` bool drives border dim/highlight
-- [ ] When left pane is focused, `↑↓` navigates plans; when right pane is focused, `↑↓` scrolls/navigates within the active tab
-- [ ] `enter` from left pane moves focus to right pane (switches to Tab 2 — Feature Details)
-- [ ] Selecting a different plan in the left pane refreshes Tab 2 task list, Tab 3 current task, and Tab 4 metrics in the right pane
-- [ ] File watcher reload (`featureSummaryUpdateMsg`) preserves `planCursor` by matching plan filename; clamps cursor if list shrinks
-- [ ] `q` or `ctrl+c` exits the TUI
-- [ ] `alt+r` runs the next task (existing behavior preserved)
-- [ ] Discord Rich Presence integration preserved
-- [ ] Terminal resize (`WindowSizeMsg`) correctly updates all pane widths, viewport heights, and left pane character budget
-- [ ] `go test ./...` passes
-- [ ] `go vet ./...` passes with no warnings
-- [ ] Manual smoke test: launch `maggus status` with at least one feature file present; navigate left pane, switch tabs, open task detail, verify metrics load
+- [x] `tab` key toggles focus between left pane and right pane; `leftFocused` bool drives border dim/highlight
+- [x] When left pane is focused, `↑↓` navigates plans; when right pane is focused, `↑↓` scrolls/navigates within the active tab
+- [x] `enter` from left pane moves focus to right pane (switches to Tab 2 — Feature Details)
+- [x] Selecting a different plan in the left pane refreshes Tab 2 task list, Tab 3 current task, and Tab 4 metrics in the right pane
+- [x] File watcher reload (`featureSummaryUpdateMsg`) preserves `planCursor` by matching plan filename; clamps cursor if list shrinks
+- [x] `q` or `ctrl+c` exits the TUI
+- [x] `alt+r` runs the next task (existing behavior preserved)
+- [x] Discord Rich Presence integration preserved
+- [x] Terminal resize (`WindowSizeMsg`) correctly updates all pane widths, viewport heights, and left pane character budget
+- [x] `go test ./...` passes
+- [x] `go vet ./...` passes with no warnings
+- [~] ⚠️ BLOCKED: Manual smoke test: launch `maggus status` with at least one feature file present; navigate left pane, switch tabs, open task detail, verify metrics load — requires human interaction in a live terminal; cannot be automated in this session
 
 ## Task Dependency Graph
 

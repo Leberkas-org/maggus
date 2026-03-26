@@ -435,6 +435,25 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Left pane is focused (default): feature navigation.
 	switch key {
+	case "up", "k":
+		visible := m.visiblePlans()
+		if len(visible) > 0 {
+			m.planCursor = styles.CursorUp(m.planCursor, len(visible))
+			m.rebuildForSelectedPlan()
+		}
+		return m, nil
+	case "down", "j":
+		visible := m.visiblePlans()
+		if len(visible) > 0 {
+			m.planCursor = styles.CursorDown(m.planCursor, len(visible))
+			m.rebuildForSelectedPlan()
+		}
+		return m, nil
+	case "enter":
+		// Move focus to right pane and switch to Tab 2 — Feature Details.
+		m.leftFocused = false
+		m.activeTab = 1
+		return m, nil
 	case "right":
 		visible := m.visiblePlans()
 		if len(visible) > 1 {
