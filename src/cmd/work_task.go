@@ -337,7 +337,9 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		Total:           count,
 		TaskID:          task.ID,
 		TaskTitle:       task.Title,
-		FeatureFile:     task.SourceFile,
+		ItemID:          "", // populated by TASK-001-004
+		ItemShort:       "", // populated by TASK-001-004
+		ItemTitle:       "", // populated by TASK-001-004
 		TaskDescription: task.Description,
 		TaskCriteria:    tuiCriteria,
 		RemainingTasks:  remaining,

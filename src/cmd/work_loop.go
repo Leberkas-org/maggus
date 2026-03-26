@@ -227,8 +227,7 @@ func setupUsageCallback(m *runner.TUIModel, runID string, modelDisplay, agentNam
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
 		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
-			TaskShort:                tu.TaskID,
-			TaskTitle:                tu.TaskTitle,
+			TaskShort:                tu.TaskShort,
 			Model:                    modelDisplay,
 			Agent:                    agentName,
 			InputTokens:              tu.InputTokens,

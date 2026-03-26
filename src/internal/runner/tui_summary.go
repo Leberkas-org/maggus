@@ -82,7 +82,7 @@ type summaryState struct {
 func (s *summaryState) handleSummaryMsg(msg tea.Msg, m *TUIModel) (handled bool) {
 	switch msg := msg.(type) {
 	case SummaryMsg:
-		m.tokens.saveAndReset(m.taskID, m.taskTitle, m.taskFeatureFile, m.startTime)
+		m.tokens.saveAndReset(m.taskID, m.itemID, m.itemShort, m.itemTitle, m.startTime)
 		s.show = true
 		s.data = msg.Data
 		s.elapsed = time.Since(msg.Data.StartTime).Truncate(time.Second)
@@ -223,7 +223,7 @@ afterTitle:
 			taskElapsed := tu.EndTime.Sub(tu.StartTime).Truncate(time.Second)
 			content.WriteString(fmt.Sprintf("  %s %s  %s  %s\n",
 				lipgloss.NewStyle().Foreground(styles.Muted).Render("•"),
-				fmt.Sprintf("%-12s", tu.TaskID),
+				fmt.Sprintf("%-12s", tu.TaskShort),
 				valStyle.Render(formatHHMMSS(taskElapsed)),
 				taskTokenStr))
 		}

@@ -55,7 +55,9 @@ type IterationStartMsg struct {
 	Total           int
 	TaskID          string
 	TaskTitle       string
-	FeatureFile     string
+	ItemID          string // stable UUID from <!-- maggus-id: ... -->
+	ItemShort       string // e.g. "feature_001"
+	ItemTitle       string // parsed H1 title from the feature/bug file
 	TaskDescription string
 	TaskCriteria    []TaskCriterion
 	RemainingTasks  []RemainingTask // upcoming workable tasks (excludes current)
@@ -104,7 +106,9 @@ type TUIModel struct {
 	taskCriteria    []TaskCriterion
 	taskID          string
 	taskTitle       string
-	taskFeatureFile string
+	itemID          string // stable UUID from <!-- maggus-id: ... -->
+	itemShort       string // e.g. "feature_001"
+	itemTitle       string // parsed H1 title from the feature/bug file
 
 	// Recent commits
 	commits []string

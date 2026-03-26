@@ -175,12 +175,12 @@ func (m TUIModel) buildStopPickerEntries(maxLabel int) []stopPickerEntry {
 	entries := make([]stopPickerEntry, 0, totalItems+8) // extra capacity for headers
 
 	// Track current group to insert headers on source file change.
-	// The current task's feature file is stored in m.taskFeatureFile.
+	// The current task's item short name is stored in m.itemShort.
 	currentGroup := ""
 
 	// Determine the group for "After current task" item.
-	// Use the basename of the current task's feature file.
-	currentTaskGroup := m.taskFeatureFile
+	// Use the item short name (e.g. "feature_001").
+	currentTaskGroup := m.itemShort
 	if currentTaskGroup != "" {
 		// Insert header for the current task's group
 		entries = append(entries, stopPickerEntry{isHeader: true, itemIdx: -1, label: currentTaskGroup})
@@ -591,7 +591,7 @@ func (m TUIModel) renderTaskTab(w int) string {
 	labelStyle := styles.Label.Width(12).Align(lipgloss.Right)
 	valStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
-	b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Feature:"), valStyle.Render(m.taskFeatureFile)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", labelStyle.Render("Feature:"), valStyle.Render(m.itemTitle)))
 
 	done := 0
 	for _, c := range m.taskCriteria {

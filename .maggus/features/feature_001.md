@@ -62,16 +62,16 @@ Rework the usage tracking system to support posting records to a global API for 
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `runner.TaskUsage` struct replaces `TaskID`/`FeatureFile` with `ItemID`, `ItemShort`, `ItemTitle`, `TaskShort`
-- [ ] `tokenState.saveAndReset` signature updated to accept new item-level fields
-- [ ] `runner.IterationStartMsg` replaces `FeatureFile` with `ItemID`, `ItemShort`, `ItemTitle`
-- [ ] `TUIModel` fields `taskFeatureFile` replaced with `itemID`, `itemShort`, `itemTitle`
-- [ ] `handleIterationStart` maps new IterationStartMsg fields to TUIModel and passes them to saveAndReset
-- [ ] TUI render code updated: `m.taskFeatureFile` references changed to `m.itemTitle` or `m.itemShort`
-- [ ] `nullTUIModel` (daemon_tui.go) updated with matching field changes
-- [ ] All runner tests updated and passing (`tui_tokens_test.go`, `tui_render_test.go`, `tui_active_elapsed_test.go`)
-- [ ] `go test ./internal/runner/...` passes
-- [ ] `go vet ./...` passes
+- [x] `runner.TaskUsage` struct replaces `TaskID`/`FeatureFile` with `ItemID`, `ItemShort`, `ItemTitle`, `TaskShort`
+- [x] `tokenState.saveAndReset` signature updated to accept new item-level fields
+- [x] `runner.IterationStartMsg` replaces `FeatureFile` with `ItemID`, `ItemShort`, `ItemTitle`
+- [x] `TUIModel` fields `taskFeatureFile` replaced with `itemID`, `itemShort`, `itemTitle`
+- [x] `handleIterationStart` maps new IterationStartMsg fields to TUIModel and passes them to saveAndReset
+- [x] TUI render code updated: `m.taskFeatureFile` references changed to `m.itemTitle` or `m.itemShort`
+- [x] `nullTUIModel` (daemon_tui.go) updated with matching field changes
+- [x] All runner tests updated and passing (`tui_tokens_test.go`, `tui_render_test.go`, `tui_active_elapsed_test.go`)
+- [x] `go test ./internal/runner/...` passes
+- [x] `go vet ./...` passes
 
 ### TASK-001-004: Update work loop and daemon callers
 **Description:** As a developer, I want the work loop, daemon, and skill/prompt callers to populate the new usage fields so that every record written contains full item context, repository, and kind.

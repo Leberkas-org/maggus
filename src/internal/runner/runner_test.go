@@ -130,8 +130,8 @@ func TestUsageAccumulation(t *testing.T) {
 	if len(m.tokens.usages) != 1 {
 		t.Fatalf("expected 1 task usage entry, got %d", len(m.tokens.usages))
 	}
-	if m.tokens.usages[0].TaskID != "TASK-001" {
-		t.Errorf("expected task ID TASK-001, got %s", m.tokens.usages[0].TaskID)
+	if m.tokens.usages[0].TaskShort != "TASK-001" {
+		t.Errorf("expected task ID TASK-001, got %s", m.tokens.usages[0].TaskShort)
 	}
 	if m.tokens.usages[0].InputTokens != 1000 || m.tokens.usages[0].OutputTokens != 500 {
 		t.Errorf("task usage: got %d/%d, want 1000/500", m.tokens.usages[0].InputTokens, m.tokens.usages[0].OutputTokens)
@@ -153,8 +153,8 @@ func TestUsageAccumulation(t *testing.T) {
 	if len(m.tokens.usages) != 2 {
 		t.Fatalf("expected 2 task usage entries after summary, got %d", len(m.tokens.usages))
 	}
-	if m.tokens.usages[1].TaskID != "TASK-002" {
-		t.Errorf("expected task ID TASK-002, got %s", m.tokens.usages[1].TaskID)
+	if m.tokens.usages[1].TaskShort != "TASK-002" {
+		t.Errorf("expected task ID TASK-002, got %s", m.tokens.usages[1].TaskShort)
 	}
 }
 

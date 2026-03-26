@@ -21,9 +21,11 @@ func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
 
 	// Start an iteration.
 	updated, _ := dm.Update(runner.IterationStartMsg{
-		TaskID:      "TASK-001-004",
-		TaskTitle:   "Fix daemon-mode token usage tracking",
-		FeatureFile: "feature_001.md",
+		TaskID:    "TASK-001-004",
+		TaskTitle: "Fix daemon-mode token usage tracking",
+		ItemID:    "uuid-001",
+		ItemShort: "feature_001",
+		ItemTitle: "Feature 001",
 	})
 	dm = updated.(nullTUIModel)
 
@@ -56,11 +58,11 @@ func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
 	updated, _ = dm.Update(runner.QuitMsg{})
 	_ = updated
 
-	if captured.TaskID != "TASK-001-004" {
-		t.Errorf("TaskID = %q, want %q", captured.TaskID, "TASK-001-004")
+	if captured.TaskShort != "TASK-001-004" {
+		t.Errorf("TaskShort = %q, want %q", captured.TaskShort, "TASK-001-004")
 	}
-	if captured.TaskTitle != "Fix daemon-mode token usage tracking" {
-		t.Errorf("TaskTitle = %q, want %q", captured.TaskTitle, "Fix daemon-mode token usage tracking")
+	if captured.ItemTitle != "Feature 001" {
+		t.Errorf("ItemTitle = %q, want %q", captured.ItemTitle, "Feature 001")
 	}
 	if captured.InputTokens != 1200 {
 		t.Errorf("InputTokens = %d, want 1200", captured.InputTokens)
@@ -80,8 +82,8 @@ func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
 	if len(captured.ModelUsage) != 1 {
 		t.Errorf("ModelUsage length = %d, want 1", len(captured.ModelUsage))
 	}
-	if captured.FeatureFile != "feature_001.md" {
-		t.Errorf("FeatureFile = %q, want %q", captured.FeatureFile, "feature_001.md")
+	if captured.ItemShort != "feature_001" {
+		t.Errorf("ItemShort = %q, want %q", captured.ItemShort, "feature_001")
 	}
 }
 
@@ -112,8 +114,8 @@ func TestNullTUIModel_FlushOnIterationStart(t *testing.T) {
 	if len(usages) != 1 {
 		t.Fatalf("expected 1 usage after second IterationStartMsg, got %d", len(usages))
 	}
-	if usages[0].TaskID != "TASK-001" {
-		t.Errorf("flushed TaskID = %q, want %q", usages[0].TaskID, "TASK-001")
+	if usages[0].TaskShort != "TASK-001" {
+		t.Errorf("flushed TaskShort = %q, want %q", usages[0].TaskShort, "TASK-001")
 	}
 	if usages[0].InputTokens != 100 {
 		t.Errorf("flushed InputTokens = %d, want 100", usages[0].InputTokens)

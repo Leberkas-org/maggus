@@ -19,9 +19,11 @@ import (
 // Additionally, it writes a state.json snapshot on each significant event
 // so the status view can render a rich live TUI.
 type nullTUIModel struct {
-	taskID          string
-	taskTitle       string
-	taskFeatureFile string
+	taskID    string
+	taskTitle string
+	itemID    string // stable UUID from <!-- maggus-id: ... -->
+	itemShort string // e.g. "feature_001"
+	itemTitle string // parsed H1 title from the feature/bug file
 	startTime       time.Time
 	runStartedAt    time.Time
 	status          string
@@ -79,7 +81,9 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.flushUsage()
 		m.taskID = msg.TaskID
 		m.taskTitle = msg.TaskTitle
-		m.taskFeatureFile = msg.FeatureFile
+		m.itemID = msg.ItemID
+		m.itemShort = msg.ItemShort
+		m.itemTitle = msg.ItemTitle
 		m.startTime = time.Now()
 		m.status = "Starting"
 		m.toolEntries = nil
@@ -138,7 +142,7 @@ func (m *nullTUIModel) writeSnapshot() {
 	snap := runlog.StateSnapshot{
 		TaskID:         m.taskID,
 		TaskTitle:      m.taskTitle,
-		FeatureFile:    m.taskFeatureFile,
+		FeatureFile:    m.itemTitle,
 		Status:         m.status,
 		ToolEntries:    m.toolEntries,
 		TokenInput:     m.iterInput,
@@ -159,9 +163,10 @@ func (m *nullTUIModel) flushUsage() {
 		return
 	}
 	tu := runner.TaskUsage{
-		TaskID:                   m.taskID,
-		TaskTitle:                m.taskTitle,
-		FeatureFile:              m.taskFeatureFile,
+		ItemID:                   m.itemID,
+		ItemShort:                m.itemShort,
+		ItemTitle:                m.itemTitle,
+		TaskShort:                m.taskID,
 		InputTokens:              m.iterInput,
 		OutputTokens:             m.iterOutput,
 		CacheCreationInputTokens: m.iterCacheCreation,

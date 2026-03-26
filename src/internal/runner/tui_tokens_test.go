@@ -88,21 +88,24 @@ func TestSaveAndResetCreatesTaskUsageAndResetsIterCounters(t *testing.T) {
 	ts.addUsage(agent.UsageMsg{InputTokens: 100, OutputTokens: 50, CacheCreationInputTokens: 1000, CacheReadInputTokens: 500, CostUSD: 0.02})
 
 	start := time.Now().Add(-time.Minute)
-	ts.saveAndReset("TASK-001", "Test Task", "feature.md", start)
+	ts.saveAndReset("TASK-001", "uuid-001", "feature_001", "Test Feature", start)
 
 	if len(ts.usages) != 1 {
 		t.Fatalf("expected 1 TaskUsage record, got %d", len(ts.usages))
 	}
 
 	tu := ts.usages[0]
-	if tu.TaskID != "TASK-001" {
-		t.Errorf("TaskID = %q, want %q", tu.TaskID, "TASK-001")
+	if tu.TaskShort != "TASK-001" {
+		t.Errorf("TaskShort = %q, want %q", tu.TaskShort, "TASK-001")
 	}
-	if tu.TaskTitle != "Test Task" {
-		t.Errorf("TaskTitle = %q, want %q", tu.TaskTitle, "Test Task")
+	if tu.ItemID != "uuid-001" {
+		t.Errorf("ItemID = %q, want %q", tu.ItemID, "uuid-001")
 	}
-	if tu.FeatureFile != "feature.md" {
-		t.Errorf("PlanFile = %q, want %q", tu.FeatureFile, "feature.md")
+	if tu.ItemShort != "feature_001" {
+		t.Errorf("ItemShort = %q, want %q", tu.ItemShort, "feature_001")
+	}
+	if tu.ItemTitle != "Test Feature" {
+		t.Errorf("ItemTitle = %q, want %q", tu.ItemTitle, "Test Feature")
 	}
 	if tu.InputTokens != 600 {
 		t.Errorf("InputTokens = %d, want 600", tu.InputTokens)
@@ -161,7 +164,7 @@ func TestSaveAndResetCreatesTaskUsageAndResetsIterCounters(t *testing.T) {
 func TestSaveAndResetSkipsEmptyTaskID(t *testing.T) {
 	ts := tokenState{}
 	ts.addUsage(agent.UsageMsg{InputTokens: 100, OutputTokens: 50})
-	ts.saveAndReset("", "Title", "feature.md", time.Now())
+	ts.saveAndReset("", "uuid", "feature_001", "Title", time.Now())
 
 	if len(ts.usages) != 0 {
 		t.Error("expected no TaskUsage when taskID is empty")
@@ -170,7 +173,7 @@ func TestSaveAndResetSkipsEmptyTaskID(t *testing.T) {
 
 func TestSaveAndResetSkipsZeroTokens(t *testing.T) {
 	ts := tokenState{}
-	ts.saveAndReset("TASK-001", "Title", "feature.md", time.Now())
+	ts.saveAndReset("TASK-001", "uuid", "feature_001", "Title", time.Now())
 
 	if len(ts.usages) != 0 {
 		t.Error("expected no TaskUsage when all token counts are zero")
@@ -180,7 +183,7 @@ func TestSaveAndResetSkipsZeroTokens(t *testing.T) {
 func TestSaveAndResetWithCacheOnlyTokens(t *testing.T) {
 	ts := tokenState{}
 	ts.addUsage(agent.UsageMsg{CacheCreationInputTokens: 5000, CacheReadInputTokens: 3000, CostUSD: 0.05})
-	ts.saveAndReset("TASK-002", "Cache Only", "feature.md", time.Now())
+	ts.saveAndReset("TASK-002", "uuid", "feature_001", "Cache Only", time.Now())
 
 	if len(ts.usages) != 1 {
 		t.Fatalf("expected 1 TaskUsage record, got %d", len(ts.usages))
@@ -204,10 +207,10 @@ func TestSaveAndResetCallsOnUsageCallback(t *testing.T) {
 		onUsage: func(tu TaskUsage) { called = tu },
 	}
 	ts.addUsage(agent.UsageMsg{InputTokens: 10, OutputTokens: 5, CacheCreationInputTokens: 100, CostUSD: 0.01})
-	ts.saveAndReset("TASK-X", "CB Test", "p.md", time.Now())
+	ts.saveAndReset("TASK-X", "uuid-x", "feature_x", "CB Test", time.Now())
 
-	if called.TaskID != "TASK-X" {
-		t.Errorf("onUsage callback not called or wrong TaskID: %q", called.TaskID)
+	if called.TaskShort != "TASK-X" {
+		t.Errorf("onUsage callback not called or wrong TaskShort: %q", called.TaskShort)
 	}
 	if called.CacheCreationInputTokens != 100 {
 		t.Errorf("onUsage callback CacheCreationInputTokens = %d, want 100", called.CacheCreationInputTokens)
@@ -281,7 +284,7 @@ func TestSaveAndResetStoresModelUsageAndResetsIter(t *testing.T) {
 	})
 
 	start := time.Now().Add(-time.Minute)
-	ts.saveAndReset("TASK-010", "Model Test", "feature.md", start)
+	ts.saveAndReset("TASK-010", "uuid-010", "feature_001", "Model Test", start)
 
 	if len(ts.usages) != 1 {
 		t.Fatalf("expected 1 TaskUsage, got %d", len(ts.usages))
@@ -324,7 +327,7 @@ func TestSaveAndResetPreservesTotalModelUsageAcrossIterations(t *testing.T) {
 			"claude-sonnet": {InputTokens: 100, OutputTokens: 50},
 		},
 	})
-	ts.saveAndReset("TASK-011", "Iter 1", "feature.md", time.Now().Add(-time.Minute))
+	ts.saveAndReset("TASK-011", "uuid-011", "feature_001", "Iter 1", time.Now().Add(-time.Minute))
 
 	// Second iteration
 	ts.addUsage(agent.UsageMsg{InputTokens: 200, OutputTokens: 100})
@@ -334,7 +337,7 @@ func TestSaveAndResetPreservesTotalModelUsageAcrossIterations(t *testing.T) {
 			"claude-haiku":  {InputTokens: 50, OutputTokens: 25},
 		},
 	})
-	ts.saveAndReset("TASK-012", "Iter 2", "feature.md", time.Now().Add(-30*time.Second))
+	ts.saveAndReset("TASK-012", "uuid-012", "feature_001", "Iter 2", time.Now().Add(-30*time.Second))
 
 	// Verify totals accumulated across both iterations
 	totalSonnet := ts.totalModelUsage["claude-sonnet"]
