@@ -1046,6 +1046,45 @@ func TestParseFile_ModelField(t *testing.T) {
 `,
 			wantModel: "claude-opus-4-6",
 		},
+		{
+			name: "model with dash comment",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with comment
+**Description:** A task.
+**Model:** haiku — fast enough for this
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "haiku",
+		},
+		{
+			name: "model with space comment",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with space comment
+**Description:** A task.
+**Model:** opus straightforward
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "opus",
+		},
+		{
+			name: "model full ID with dash comment",
+			content: `# Feature 001: Test
+
+### TASK-001: Task with full ID and comment
+**Description:** A task.
+**Model:** claude-sonnet-4-6 — fast
+
+**Acceptance Criteria:**
+- [ ] Something
+`,
+			wantModel: "claude-sonnet-4-6",
+		},
 	}
 
 	for _, tt := range tests {

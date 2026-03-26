@@ -202,7 +202,11 @@ func ParseFile(path string) ([]Task, error) {
 		if strings.HasPrefix(line, "**Model:**") {
 			inDescription = false
 			value := strings.TrimPrefix(line, "**Model:**")
-			current.Model = strings.TrimSpace(value)
+			value = strings.TrimSpace(value)
+			if idx := strings.IndexAny(value, " \t"); idx >= 0 {
+				value = value[:idx]
+			}
+			current.Model = value
 			continue
 		}
 
