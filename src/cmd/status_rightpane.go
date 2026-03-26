@@ -143,7 +143,7 @@ func (m statusModel) renderPlainLogInPane(width, height int) string {
 		start := max(m.logScroll, 0)
 		for _, line := range m.logLines[start:end] {
 			sb.WriteString("\n ")
-			sb.WriteString(formatLogLine(styles.Truncate(line, width-2)))
+			sb.WriteString(styles.Truncate(formatLogLine(line), width-2))
 		}
 		if len(m.logLines) > available {
 			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))

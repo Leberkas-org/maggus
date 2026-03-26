@@ -10,9 +10,6 @@ import (
 )
 
 func (m statusModel) View() string {
-	if len(m.plans) == 0 {
-		return m.viewEmpty()
-	}
 	if m.confirmDeleteFeature {
 		return m.viewConfirmDeleteFeature()
 	}
@@ -46,25 +43,6 @@ func (m statusModel) viewConfirmDeleteFeature() string {
 		return styles.FullScreenColor(sb.String(), "", m.Width, m.Height, bc)
 	}
 	return styles.Box.BorderForeground(bc).Render(sb.String()) + "\n"
-}
-
-func (m statusModel) viewEmpty() string {
-	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-
-	var sb strings.Builder
-	sb.WriteString(styles.Title.Render("Status") + "\n\n")
-	sb.WriteString(mutedStyle.Render("No features found.") + "\n\n")
-	sb.WriteString(mutedStyle.Render("Create a feature with ") +
-		lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render("maggus plan") +
-		mutedStyle.Render(" to get started.") + "\n")
-
-	footer := styles.StatusBar.Render("q/esc: exit")
-
-	borderColor := styles.ThemeColor(m.is2x)
-	if m.Width > 0 && m.Height > 0 {
-		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
-	}
-	return styles.Box.BorderForeground(borderColor).Render(sb.String()) + "\n"
 }
 
 // renderTabBar renders the horizontal feature tab bar.
@@ -199,7 +177,7 @@ func (m statusModel) statusSplitFooter() string {
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  " + daemonHint + "  q: exit"
+		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  alt+d delete  " + daemonHint + "  q: exit"
 		if m.hasCompletedPlans() {
 			if m.showAll {
 				footer += "  alt+a: hide done"

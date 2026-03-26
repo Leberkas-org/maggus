@@ -94,10 +94,15 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 	// Plan rows: features first, separator, then bugs.
 	bugSepAdded := false
+	bugAdded := false
 	for i, plan := range visible {
-		if plan.IsBug && !bugSepAdded {
+		if !plan.IsBug && bugAdded && !bugSepAdded {
 			bugSepAdded = true
-			lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))
+			lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
+		}
+
+		if plan.IsBug && !bugAdded {
+			bugAdded = true
 		}
 
 		isSelected := i == m.planCursor
@@ -113,7 +118,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 		// Right-aligned approval badge.
 		var badge string
 		if plan.Completed {
-			badge = mutedStyle.Render("done")
+			badge = mutedStyle.Render("✓")
 		} else if isPlanApproved(plan, m.approvals, m.approvalRequired) {
 			badge = greenStyle.Render("✓")
 		} else {
