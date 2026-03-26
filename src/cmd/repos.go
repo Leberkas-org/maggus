@@ -14,7 +14,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/filebrowser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
-	"github.com/spf13/cobra"
 )
 
 // reposState represents the current state of the repos TUI.
@@ -537,9 +536,7 @@ func isGitRepoCheck(dir string) bool {
 	return cmd.Run() == nil
 }
 
-// runRepos is the cobra RunE for the repos command. It is a package-level var
-// so it can be replaced in tests.
-var runRepos = func(_ *cobra.Command, _ []string) error {
+func runRepos() error {
 	m := newReposModel()
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := p.Run()
@@ -548,14 +545,4 @@ var runRepos = func(_ *cobra.Command, _ []string) error {
 	}
 	_ = result.(reposModel)
 	return nil
-}
-
-var reposCmd = &cobra.Command{
-	Use:   "repos",
-	Short: "Manage configured repositories",
-	RunE:  func(cmd *cobra.Command, args []string) error { return runRepos(cmd, args) },
-}
-
-func init() {
-	rootCmd.AddCommand(reposCmd)
 }

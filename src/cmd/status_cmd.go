@@ -12,7 +12,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/spf13/cobra"
 )
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
@@ -152,96 +151,58 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 	}
 }
 
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show a compact summary of feature progress",
-	Long:  `Reads all feature files in .maggus/ and displays a compact progress summary.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		plain, err := cmd.Flags().GetBool("plain")
-		if err != nil {
-			return err
-		}
-		all, err := cmd.Flags().GetBool("all")
-		if err != nil {
-			return err
-		}
-		showLog, err := cmd.Flags().GetBool("show-log")
-		if err != nil {
-			return err
-		}
+func runStatus() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
 
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working directory: %w", err)
-		}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	agentName := cfg.Agent
+	approvalRequired := cfg.IsApprovalRequired()
 
-		cfg, err := config.Load(dir)
-		if err != nil {
-			return err
-		}
-		agentName := cfg.Agent
-		approvalRequired := cfg.IsApprovalRequired()
+	features, approvals, err := loadPlansWithApprovals(dir, true)
+	if err != nil {
+		return err
+	}
+	pruneStaleApprovals(dir, features)
 
-		features, approvals, err := loadPlansWithApprovals(dir, true)
-		if err != nil {
-			return err
-		}
-		pruneStaleApprovals(dir, features)
+	if len(features) == 0 {
+		features = []parser.Plan{}
+	}
 
-		if len(features) == 0 {
-			if plain {
-				fmt.Fprintln(cmd.OutOrStdout(), "No features found.")
-				return nil
-			}
-			// TUI mode: show empty status view
-			features = []parser.Plan{}
-		}
+	nextTaskID, nextTaskFile := findNextTask(features)
 
-		nextTaskID, nextTaskFile := findNextTask(features)
-
-		if plain {
-			var sb strings.Builder
-			renderStatusPlain(&sb, features, all, nextTaskID, nextTaskFile, agentName, approvals, approvalRequired)
-			fmt.Fprint(cmd.OutOrStdout(), sb.String())
-			return nil
+	watcherCh := make(chan bool, 1)
+	w, _ := filewatcher.New(dir, func(msg any) {
+		hasNew := false
+		if u, ok := msg.(filewatcher.UpdateMsg); ok {
+			hasNew = u.HasNewFile
 		}
-
-		// TUI mode: interactive status with detail view
-		watcherCh := make(chan bool, 1)
-		w, _ := filewatcher.New(dir, func(msg any) {
-			hasNew := false
-			if u, ok := msg.(filewatcher.UpdateMsg); ok {
-				hasNew = u.HasNewFile
-			}
-			select {
-			case watcherCh <- hasNew:
-			default: // don't block if channel already has a pending update
-			}
-		}, 300*time.Millisecond)
-
-		m := newStatusModel(features, all, nextTaskID, nextTaskFile, agentName, dir, showLog, approvalRequired, approvals)
-		m.presence = sharedPresence
-		m.watcherCh = watcherCh
-		m.watcher = w
-		prog := tea.NewProgram(m, tea.WithAltScreen())
-		result, err := prog.Run()
-		if w != nil {
-			w.Close()
+		select {
+		case watcherCh <- hasNew:
+		default: // don't block if channel already has a pending update
 		}
-		if err != nil {
-			return err
-		}
-		if final, ok := result.(statusModel); ok && final.RunTaskID != "" {
-			return dispatchWork(final.RunTaskID)
-		}
-		return nil
-	},
-}
+	}, 300*time.Millisecond)
 
-func init() {
-	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().Bool("plain", false, "Strip colors and use ASCII characters for scripting/piping")
-	statusCmd.Flags().Bool("all", false, "Show completed features in task sections and Features table")
-	statusCmd.Flags().Bool("show-log", false, "Open the live log panel immediately on startup")
+	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals)
+	m.presence = sharedPresence
+	m.watcherCh = watcherCh
+	m.watcher = w
+	prog := tea.NewProgram(m, tea.WithAltScreen())
+	result, err := prog.Run()
+	if w != nil {
+		w.Close()
+	}
+	if err != nil {
+		return err
+	}
+	if final, ok := result.(statusModel); ok && final.RunTaskID != "" {
+		return dispatchWork(final.RunTaskID)
+	}
+	return nil
 }
 

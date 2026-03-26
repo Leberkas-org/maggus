@@ -78,11 +78,11 @@ Maggus currently exposes several commands that are only meaningful in an interac
 **Parallel:** yes — can run alongside TASK-006-001
 
 **Acceptance Criteria:**
-- [ ] `cmd/config.go`: `var configCmd = &cobra.Command{...}` struct and `func init() { rootCmd.AddCommand(configCmd) }` removed; the existing `runConfig(cmd *cobra.Command, args []string) error` function signature simplified to `runConfig() error` (no cobra args needed — it already ignores them); cobra import removed if unused.
-- [ ] `cmd/prompt.go`: same pattern — remove `promptCmd` struct and its `init()` registration; simplify run function to no-cobra signature.
-- [ ] `cmd/repos.go`: same pattern — remove `reposCmd` struct and its `init()` registration; simplify run function.
-- [ ] `cmd/status_cmd.go`: remove `var statusCmd = &cobra.Command{...}` struct and `func init() { rootCmd.AddCommand(statusCmd) ... }` block; extract the RunE body into `runStatus() error` that always uses default flag values (`plain=false`, `all=false`, `showLog=false`) — the plain/all/show-log flags only mattered for CLI piping which is no longer supported.
-- [ ] `cmd/root.go` (`runMenu` function): add a direct dispatch map **before** the `rootCmd.Find(cmdArgs)` call:
+- [x] `cmd/config.go`: `var configCmd = &cobra.Command{...}` struct and `func init() { rootCmd.AddCommand(configCmd) }` removed; the existing `runConfig(cmd *cobra.Command, args []string) error` function signature simplified to `runConfig() error` (no cobra args needed — it already ignores them); cobra import removed if unused.
+- [x] `cmd/prompt.go`: same pattern — remove `promptCmd` struct and its `init()` registration; simplify run function to no-cobra signature.
+- [x] `cmd/repos.go`: same pattern — remove `reposCmd` struct and its `init()` registration; simplify run function.
+- [x] `cmd/status_cmd.go`: remove `var statusCmd = &cobra.Command{...}` struct and `func init() { rootCmd.AddCommand(statusCmd) ... }` block; extract the RunE body into `runStatus() error` that always uses default flag values (`plain=false`, `all=false`, `showLog=false`) — the plain/all/show-log flags only mattered for CLI piping which is no longer supported.
+- [x] `cmd/root.go` (`runMenu` function): add a direct dispatch map **before** the `rootCmd.Find(cmdArgs)` call:
   ```go
   directCmds := map[string]func() error{
       "config": runConfig,
@@ -95,10 +95,10 @@ Maggus currently exposes several commands that are only meaningful in an interac
       continue
   }
   ```
-- [ ] `maggus --help` no longer lists `config`, `prompt`, `repos`, or `status`.
-- [ ] Running `maggus` → menu → selecting `status` still opens the status TUI.
-- [ ] Running `maggus` → menu → selecting `config` still opens the config TUI.
-- [ ] `go build ./...` and `go test ./...` pass from `src/`.
+- [x] `maggus --help` no longer lists `config`, `prompt`, `repos`, or `status`.
+- [x] Running `maggus` → menu → selecting `status` still opens the status TUI.
+- [x] Running `maggus` → menu → selecting `config` still opens the config TUI.
+- [x] `go build ./...` and `go test ./...` pass from `src/`.
 
 ## Task Dependency Graph
 

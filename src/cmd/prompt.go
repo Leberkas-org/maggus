@@ -10,23 +10,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/usage"
-	"github.com/spf13/cobra"
 )
-
-var promptModelFlag string
-
-var promptCmd = &cobra.Command{
-	Use:   "prompt",
-	Short: "Launch an interactive Claude Code session with usage tracking",
-	Long: `Opens a TUI picker to select a prompt mode (plain or skill), then
-launches Claude Code interactively. Usage data is extracted after the
-session ends.`,
-	RunE: runPrompt,
-}
-
-func init() {
-	promptCmd.Flags().StringVar(&promptModelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
-}
 
 // skillMapping maps picker labels to their Claude skill command and usage kind.
 type skillMapping struct {
@@ -46,7 +30,7 @@ var skillMappings = map[string]skillMapping{
 	"/bryan-bugreport":     {skill: "/bryan-bugreport", kind: "bryan_bugreport", title: "Reporting bug to bryan", detail: "Manual Prompting"},
 }
 
-func runPrompt(cmd *cobra.Command, args []string) error {
+func runPrompt() error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -61,12 +45,7 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	// Resolve model: CLI flag overrides config file.
-	modelInput := cfg.Model
-	if promptModelFlag != "" {
-		modelInput = promptModelFlag
-	}
-	resolvedModel := config.ResolveModel(modelInput)
+	resolvedModel := config.ResolveModel(cfg.Model)
 
 	// Show the prompt picker TUI.
 	picker := newPromptPickerModel()

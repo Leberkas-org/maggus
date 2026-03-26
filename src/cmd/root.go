@@ -121,6 +121,27 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 
 		cmdArgs := append([]string{final.selected}, final.args...)
+
+		// Direct dispatch for TUI commands no longer registered with cobra.
+		directDispatch := map[string]func() error{
+			"config": runConfig,
+			"prompt": runPrompt,
+			"repos":  runRepos,
+			"status": runStatus,
+		}
+		if fn, ok := directDispatch[final.selected]; ok {
+			if presence != nil {
+				select {
+				case <-presenceReady:
+					sharedPresence = presence
+				default:
+				}
+			}
+			_ = fn()
+			sharedPresence = nil
+			continue
+		}
+
 		sub, remaining, err := rootCmd.Find(cmdArgs)
 		if err != nil {
 			return err
@@ -206,11 +227,6 @@ func Execute() {
 	// Skip resolution for commands that should operate on the literal cwd.
 	if !shouldSkipResolver() {
 		resolveWorkingDirectory()
-	}
-
-	// Register skill commands only when claude is available.
-	if caps.HasClaude {
-		rootCmd.AddCommand(promptCmd)
 	}
 
 	if err := rootCmd.Execute(); err != nil {

@@ -13,23 +13,10 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
-	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
-var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Edit project settings interactively",
-	Long:  `Opens an interactive editor for .maggus/config.yml settings.`,
-	Args:  cobra.NoArgs,
-	RunE:  runConfig,
-}
-
-func init() {
-	rootCmd.AddCommand(configCmd)
-}
-
-func runConfig(cmd *cobra.Command, args []string) error {
+func runConfig() error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
