@@ -31,12 +31,12 @@ This feature adds `alt+a: show done` to the left-pane footer hint, but only when
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `cmd/status_model.go`: a helper method `func (m statusModel) hasCompletedPlans() bool` is added that returns `true` if any plan in `m.plans` has `Completed == true`.
-- [ ] `cmd/status_view.go`: in `statusSplitFooter()`, the `m.leftFocused` branch appends `  alt+a: show done` to the footer string when `m.hasCompletedPlans()` returns `true` AND `m.showAll` is `false`.
-- [ ] When `m.showAll` is `true` (completed items are already visible), the hint changes to `  alt+a: hide done` so the user knows they can toggle back.
-- [ ] When `m.hasCompletedPlans()` returns `false`, neither hint appears.
-- [ ] `cmd/status_test.go`: unit tests cover the three states: no completed plans (no hint), completed plans with `showAll=false` (`show done` hint), completed plans with `showAll=true` (`hide done` hint).
-- [ ] `go build ./...` and `go test ./...` pass from `src/`.
+- [x] `cmd/status_model.go`: a helper method `func (m statusModel) hasCompletedPlans() bool` is added that returns `true` if any plan in `m.plans` has `Completed == true`.
+- [x] `cmd/status_view.go`: in `statusSplitFooter()`, the `m.leftFocused` branch appends `  alt+a: show done` to the footer string when `m.hasCompletedPlans()` returns `true` AND `m.showAll` is `false`.
+- [x] When `m.showAll` is `true` (completed items are already visible), the hint changes to `  alt+a: hide done` so the user knows they can toggle back.
+- [x] When `m.hasCompletedPlans()` returns `false`, neither hint appears.
+- [x] `cmd/status_test.go`: unit tests cover the three states: no completed plans (no hint), completed plans with `showAll=false` (`show done` hint), completed plans with `showAll=true` (`hide done` hint).
+- [x] `go build ./...` and `go test ./...` pass from `src/`.
 
 ## Task Dependency Graph
 

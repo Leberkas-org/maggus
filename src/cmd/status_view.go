@@ -199,7 +199,15 @@ func (m statusModel) statusSplitFooter() string {
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		return "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  " + daemonHint + "  q: exit"
+		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  " + daemonHint + "  q: exit"
+		if m.hasCompletedPlans() {
+			if m.showAll {
+				footer += "  alt+a: hide done"
+			} else {
+				footer += "  alt+a: show done"
+			}
+		}
+		return footer
 	}
 	switch m.activeTab {
 	case 0:

@@ -135,6 +135,16 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 	return m
 }
 
+// hasCompletedPlans returns true if any plan in m.plans has Completed == true.
+func (m statusModel) hasCompletedPlans() bool {
+	for _, p := range m.plans {
+		if p.Completed {
+			return true
+		}
+	}
+	return false
+}
+
 // visiblePlans returns the plans that should be shown based on the showAll flag.
 func (m statusModel) visiblePlans() []parser.Plan {
 	var visible []parser.Plan

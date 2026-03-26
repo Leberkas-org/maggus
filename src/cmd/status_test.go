@@ -1432,3 +1432,73 @@ func TestRightPaneContentHeight_EqualsInnerHMinus3(t *testing.T) {
 			got, want, innerH)
 	}
 }
+
+func TestHasCompletedPlans(t *testing.T) {
+	t.Run("no plans", func(t *testing.T) {
+		m := statusModel{}
+		if m.hasCompletedPlans() {
+			t.Error("expected false for empty plans")
+		}
+	})
+
+	t.Run("no completed plans", func(t *testing.T) {
+		m := statusModel{plans: []parser.Plan{
+			{ID: "feature_001", Completed: false},
+			{ID: "feature_002", Completed: false},
+		}}
+		if m.hasCompletedPlans() {
+			t.Error("expected false when no plans are completed")
+		}
+	})
+
+	t.Run("has completed plan", func(t *testing.T) {
+		m := statusModel{plans: []parser.Plan{
+			{ID: "feature_001", Completed: false},
+			{ID: "feature_002", Completed: true},
+		}}
+		if !m.hasCompletedPlans() {
+			t.Error("expected true when at least one plan is completed")
+		}
+	})
+}
+
+func TestStatusSplitFooter_AltAHint(t *testing.T) {
+	completedPlan := parser.Plan{ID: "feature_001", Completed: true}
+	activePlan := parser.Plan{ID: "feature_002", Completed: false}
+
+	t.Run("no completed plans — no hint", func(t *testing.T) {
+		m := statusModel{
+			plans:       []parser.Plan{activePlan},
+			leftFocused: true,
+			showAll:     false,
+		}
+		footer := m.statusSplitFooter()
+		if strings.Contains(footer, "alt+a") {
+			t.Errorf("expected no alt+a hint when no completed plans, got: %q", footer)
+		}
+	})
+
+	t.Run("completed plans with showAll=false — show done hint", func(t *testing.T) {
+		m := statusModel{
+			plans:       []parser.Plan{activePlan, completedPlan},
+			leftFocused: true,
+			showAll:     false,
+		}
+		footer := m.statusSplitFooter()
+		if !strings.Contains(footer, "alt+a: show done") {
+			t.Errorf("expected 'alt+a: show done' hint, got: %q", footer)
+		}
+	})
+
+	t.Run("completed plans with showAll=true — hide done hint", func(t *testing.T) {
+		m := statusModel{
+			plans:       []parser.Plan{activePlan, completedPlan},
+			leftFocused: true,
+			showAll:     true,
+		}
+		footer := m.statusSplitFooter()
+		if !strings.Contains(footer, "alt+a: hide done") {
+			t.Errorf("expected 'alt+a: hide done' hint, got: %q", footer)
+		}
+	})
+}
