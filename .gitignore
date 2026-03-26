@@ -5,6 +5,8 @@
 .maggus/usage*.csv
 .maggus/usage_*.jsonl
 
+.superpowers/
+
 *.exe
 
 COMMIT.md
