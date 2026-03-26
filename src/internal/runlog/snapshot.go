@@ -23,7 +23,7 @@ type SnapshotToolEntry struct {
 type StateSnapshot struct {
 	TaskID         string                      `json:"task_id"`
 	TaskTitle      string                      `json:"task_title"`
-	FeatureFile    string                      `json:"feature_file"`
+	ItemTitle      string                      `json:"item_title"`
 	Status         string                      `json:"status"`
 	ToolEntries    []SnapshotToolEntry         `json:"tool_entries"`
 	TokenInput     int                         `json:"token_input"`

@@ -142,7 +142,7 @@ func (m *nullTUIModel) writeSnapshot() {
 	snap := runlog.StateSnapshot{
 		TaskID:         m.taskID,
 		TaskTitle:      m.taskTitle,
-		FeatureFile:    m.itemTitle,
+		ItemTitle:      m.itemTitle,
 		Status:         m.status,
 		ToolEntries:    m.toolEntries,
 		TokenInput:     m.iterInput,

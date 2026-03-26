@@ -17,7 +17,7 @@ func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 	snap := StateSnapshot{
 		TaskID:      "TASK-001",
 		TaskTitle:   "Test task",
-		FeatureFile: "feature_001.md",
+		ItemTitle: "feature_001.md",
 		Status:      "Running tool",
 		ToolEntries: []SnapshotToolEntry{
 			{Type: "Read", Icon: "📖", Description: "Read: foo.go", Timestamp: "2026-01-01T00:00:00Z"},
