@@ -51,20 +51,20 @@ Maggus currently exposes several commands that are only meaningful in an interac
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/internal/worktree/` directory and all its files deleted.
-- [ ] `src/internal/tasklock/` directory and all its files deleted.
-- [ ] `cmd/worktree.go` deleted.
-- [ ] `cmd/worktree_test.go` deleted.
-- [ ] `cmd/menu_model.go`: `{name: "worktree", ...}` entry removed from `allMenuItems`; `"worktree"` key removed from `buildSubMenus()` return value (if it was the only key, return an empty map); `case "worktree":` removed from `buildArgs()`; keyboard shortcut `'t'` freed.
-- [ ] `cmd/menu_test.go`: test assertions about the worktree sub-menu removed.
-- [ ] `internal/config/config.go`: `Worktree bool \`yaml:"worktree"\`` field removed from the `Config` struct.
-- [ ] `internal/config/config_test.go`: all test cases that set `worktree: true` or `worktree: false` in YAML fixtures and assert on `cfg.Worktree` removed.
-- [ ] `cmd/init.go`: `# worktree: false` line (or equivalent) removed from the embedded config template.
-- [ ] `cmd/config.go`: `worktreeValues`, `worktreeIdx` variables removed; the worktree toggle row removed from the config builder; the `worktree:` write-back removed from the YAML serialisation block.
-- [ ] `cmd/config_test.go`: all test assertions referencing the worktree row or `worktree` YAML key removed.
-- [ ] `internal/prompt/prompt.go`: `Worktree bool` and `WorktreeDir string` fields removed from `Options`; the `if opts.Worktree { ... }` block removed from `writeMetadata()`; the `if opts.Worktree { ... }` block removed from `writeInstructions()`.
-- [ ] `internal/prompt/prompt_test.go`: test cases that set `opts.Worktree = true` or assert worktree strings in prompt output removed.
-- [ ] `go build ./...` and `go test ./...` pass from `src/`.
+- [x] `src/internal/worktree/` directory and all its files deleted.
+- [x] `src/internal/tasklock/` directory and all its files deleted.
+- [x] `cmd/worktree.go` deleted.
+- [x] `cmd/worktree_test.go` deleted.
+- [x] `cmd/menu_model.go`: `{name: "worktree", ...}` entry removed from `allMenuItems`; `"worktree"` key removed from `buildSubMenus()` return value (if it was the only key, return an empty map); `case "worktree":` removed from `buildArgs()`; keyboard shortcut `'t'` freed.
+- [x] `cmd/menu_test.go`: test assertions about the worktree sub-menu removed.
+- [x] `internal/config/config.go`: `Worktree bool \`yaml:"worktree"\`` field removed from the `Config` struct.
+- [x] `internal/config/config_test.go`: all test cases that set `worktree: true` or `worktree: false` in YAML fixtures and assert on `cfg.Worktree` removed.
+- [x] `cmd/init.go`: `# worktree: false` line (or equivalent) removed from the embedded config template.
+- [x] `cmd/config.go`: `worktreeValues`, `worktreeIdx` variables removed; the worktree toggle row removed from the config builder; the `worktree:` write-back removed from the YAML serialisation block.
+- [x] `cmd/config_test.go`: all test assertions referencing the worktree row or `worktree` YAML key removed.
+- [x] `internal/prompt/prompt.go`: `Worktree bool` and `WorktreeDir string` fields removed from `Options`; the `if opts.Worktree { ... }` block removed from `writeMetadata()`; the `if opts.Worktree { ... }` block removed from `writeInstructions()`.
+- [x] `internal/prompt/prompt_test.go`: test cases that set `opts.Worktree = true` or assert worktree strings in prompt output removed.
+- [x] `go build ./...` and `go test ./...` pass from `src/`.
 
 ---
 

@@ -117,51 +117,8 @@ func TestActiveMenuItems_AlwaysIncludesExit(t *testing.T) {
 
 func TestBuildSubMenus(t *testing.T) {
 	subs := buildSubMenus()
-
-	// "worktree" should have 1 option.
-	wtDef, ok := subs["worktree"]
-	if !ok {
-		t.Fatal("expected sub-menu definition for 'worktree'")
-	}
-	if len(wtDef.options) != 1 {
-		t.Errorf("worktree sub-menu: got %d options, want 1", len(wtDef.options))
-	}
-}
-
-func TestBuildArgs_Worktree(t *testing.T) {
-	tests := []struct {
-		name     string
-		opts     []subMenuOption
-		wantArgs []string
-	}{
-		{
-			name: "list action",
-			opts: []subMenuOption{
-				{label: "Action", values: []string{"list", "clean"}, current: 0},
-			},
-			wantArgs: []string{"list"},
-		},
-		{
-			name: "clean action",
-			opts: []subMenuOption{
-				{label: "Action", values: []string{"list", "clean"}, current: 1},
-			},
-			wantArgs: []string{"clean"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := buildArgs("worktree", tt.opts)
-			if len(got) != len(tt.wantArgs) {
-				t.Fatalf("got %v, want %v", got, tt.wantArgs)
-			}
-			for i := range got {
-				if got[i] != tt.wantArgs[i] {
-					t.Errorf("arg[%d]: got %q, want %q", i, got[i], tt.wantArgs[i])
-				}
-			}
-		})
+	if len(subs) != 0 {
+		t.Errorf("expected empty sub-menu map, got %d entries", len(subs))
 	}
 }
 

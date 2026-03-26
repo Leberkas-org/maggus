@@ -124,12 +124,8 @@ func (m statusModel) renderOutputTab(width, contentH int) string {
 func (m statusModel) renderPlainLogInPane(width, height int) string {
 	var sb strings.Builder
 
-	sb.WriteString("\n")
-	logTitle := styles.Title.Render(" Live Log")
-	if m.daemon.LogPath != "" {
-		logTitle += statusDimStyle.Render("  " + m.daemon.RunID + "/run.log")
-	}
-	sb.WriteString(logTitle + "\n")
+	sb.WriteString(" " + statusBoldStyle.Render("Status:") + " waiting...")
+	sb.WriteString("\n " + statusBoldStyle.Render("Task:") + "   ---")
 
 	sb.WriteString(" " + styles.Separator(width-1))
 
@@ -274,7 +270,7 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	}
 
 	// ── Bottom zone (fixed): separator + tokens + cost + run + task elapsed ──
-	sb.WriteString(" " + styles.Separator(min(42, width-2)) + "\n")
+	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	totalIn := snap.TokenInput
 	if totalIn > 0 || snap.TokenOutput > 0 {
@@ -305,7 +301,7 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 			taskElapsed = formatHumanDuration(time.Since(t))
 		}
 	}
-	sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
+	sb.WriteString(fmt.Sprintf("  %s    %s", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
 
 	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
 }

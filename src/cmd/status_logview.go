@@ -60,12 +60,7 @@ func (m statusModel) viewLog() string {
 		sb.WriteString("\n")
 	}
 
-	// Decide: rich snapshot view or plain log fallback
-	if m.snapshot != nil && m.daemon.Running {
-		sb.WriteString(m.renderSnapshotPanel())
-	} else {
-		sb.WriteString(m.renderPlainLogPanel())
-	}
+	sb.WriteString(m.renderSnapshotPanel())
 
 	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · tab: features · q/esc: exit")
 	borderColor := styles.ThemeColor(m.is2x)
@@ -73,44 +68,6 @@ func (m statusModel) viewLog() string {
 		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
 	}
 	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
-}
-
-// renderPlainLogPanel renders the original plain JSONL log view.
-func (m statusModel) renderPlainLogPanel() string {
-	var sb strings.Builder
-
-	sb.WriteString("\n")
-	logTitle := styles.Title.Render(" Live Log")
-	if m.daemon.LogPath != "" {
-		logTitle += statusDimStyle.Render("  " + m.daemon.RunID + "/run.log")
-	}
-	sb.WriteString(logTitle)
-	sb.WriteString("\n")
-	sb.WriteString(" " + styles.Separator(42))
-
-	visibleLines := m.visibleTaskLines()
-
-	if len(m.logLines) == 0 {
-		sb.WriteString("\n")
-		sb.WriteString(statusDimStyle.Render("  No active run"))
-	} else {
-		end := min(m.logScroll+visibleLines, len(m.logLines))
-		start := max(m.logScroll, 0)
-		for _, line := range m.logLines[start:end] {
-			sb.WriteString("\n ")
-			sb.WriteString(formatLogLine(line))
-		}
-		if len(m.logLines) > visibleLines {
-			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))
-			if m.logAutoScroll {
-				scrollHint += " (auto)"
-			}
-			sb.WriteString("\n")
-			sb.WriteString(statusDimStyle.Render(scrollHint))
-		}
-	}
-
-	return sb.String()
 }
 
 // renderSnapshotPanel renders the rich live TUI from a state.json snapshot,
@@ -125,7 +82,6 @@ func (m statusModel) renderSnapshotPanel() string {
 	}
 
 	// ── Top zone (fixed): spinner + status, task ID + title ──
-	sb.WriteString("\n")
 	spinnerStr := statusCyanStyle.Render(statusSpinnerFrames[m.spinnerFrame])
 	sColor := lipgloss.NewStyle().Foreground(styles.Warning)
 	switch snap.Status {

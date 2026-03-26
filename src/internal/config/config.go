@@ -137,7 +137,6 @@ type Config struct {
 	Agent              string              `yaml:"agent"`
 	Model              string              `yaml:"model"`
 	Include            []string            `yaml:"include"`
-	Worktree           bool                `yaml:"worktree"`
 	ApprovalMode       string              `yaml:"approval_mode"`
 	AutoContinue  *bool               `yaml:"auto_continue"`
 	Notifications NotificationsConfig `yaml:"notifications"`

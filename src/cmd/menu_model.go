@@ -42,7 +42,6 @@ var allMenuItems = []menuItem{
 	{name: "update", desc: "Check for and install updates", shortcut: 'u', shortcutLabel: "u"},
 	// Group 5: Confguration
 	{name: "config", desc: "Edit project settings", separator: true, shortcut: 'c', shortcutLabel: "c"},
-	{name: "worktree", desc: "Manage Maggus worktrees", shortcut: 't', shortcutLabel: "t"},
 	{name: "init", desc: "Initialize a .maggus project", hideIfInitialized: true, shortcut: 'i', shortcutLabel: "i"},
 	// Exit
 	{name: "exit", desc: "Exit Maggus", separator: true, isExit: true},
@@ -85,19 +84,11 @@ type subMenuDef struct {
 
 // buildSubMenus returns sub-menu definitions keyed by command name.
 func buildSubMenus() map[string]subMenuDef {
-	return map[string]subMenuDef{
-		"worktree": {options: []subMenuOption{
-			{label: "Action", values: []string{"list", "clean"}, current: 0},
-		}},
-	}
+	return map[string]subMenuDef{}
 }
 
 // buildArgs converts the sub-menu selections into CLI args for the command.
 func buildArgs(cmdName string, opts []subMenuOption) []string {
-	switch cmdName {
-	case "worktree":
-		return []string{opts[0].values[opts[0].current]}
-	}
 	return nil
 }
 

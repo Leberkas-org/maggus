@@ -19,9 +19,6 @@ func TestLoad_MissingFile(t *testing.T) {
 	if len(cfg.Include) != 0 {
 		t.Errorf("expected empty Include, got %v", cfg.Include)
 	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to be false, got true")
-	}
 }
 
 func TestLoad_ValidYAML(t *testing.T) {
@@ -123,79 +120,6 @@ func TestValidateIncludes_AllMissing(t *testing.T) {
 	result := ValidateIncludes([]string{"nope.md", "also-nope.md"}, dir)
 	if len(result) != 0 {
 		t.Errorf("expected empty result, got %v", result)
-	}
-}
-
-func TestLoad_WithWorktreeTrue(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: opus
-worktree: true
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Model != "opus" {
-		t.Errorf("Model = %q, want %q", cfg.Model, "opus")
-	}
-	if !cfg.Worktree {
-		t.Errorf("expected Worktree to be true, got false")
-	}
-}
-
-func TestLoad_WithWorktreeFalse(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: sonnet
-worktree: false
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to be false, got true")
-	}
-}
-
-func TestLoad_WithoutWorktreeKey(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: haiku
-include:
-  - README.md
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to default to false when key is absent, got true")
 	}
 }
 

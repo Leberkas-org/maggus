@@ -110,12 +110,6 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	modelValues := []string{"(default)", "sonnet", "opus", "haiku"}
 	modelIdx := indexOf(modelValues, cfg.Model)
 
-	worktreeValues := []string{"on", "off"}
-	worktreeIdx := 1
-	if cfg.Worktree {
-		worktreeIdx = 0
-	}
-
 	autoApproveValues := []string{"disabled", "enabled"}
 	autoApproveIdx := 0
 	if cfg.ApprovalMode == config.ApprovalModeOptOut {
@@ -183,7 +177,6 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	projectRows := []configRow{
 		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
-		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
 		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
@@ -242,8 +235,7 @@ func (m configModel) optionByLabel(label string) configRow {
 
 func (m configModel) buildConfig() config.Config {
 	cfg := config.Config{
-		Agent:    m.optionByLabel("Agent").values[m.optionByLabel("Agent").current],
-		Worktree: m.optionByLabel("Worktree").values[m.optionByLabel("Worktree").current] == "on",
+		Agent: m.optionByLabel("Agent").values[m.optionByLabel("Agent").current],
 	}
 
 	modelRow := m.optionByLabel("Model")

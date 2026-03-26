@@ -18,9 +18,6 @@ const defaultConfig = `# Maggus configuration
 # Model alias or full model ID (e.g. sonnet, opus, haiku)
 # model: sonnet
 
-# Run tasks in isolated git worktrees
-# worktree: false
-
 # Additional context files to include in prompts
 # include:
 #   - docs/ARCHITECTURE.md
