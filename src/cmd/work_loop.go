@@ -223,9 +223,9 @@ func firstWorkableTask(plans []parser.Plan) *parser.Task {
 }
 
 // setupUsageCallback configures the TUI model to record per-task usage.
-func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDisplay, agentName string) {
+func setupUsageCallback(m *runner.TUIModel, runID string, modelDisplay, agentName string) {
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		_ = usage.Append(dir, []usage.Record{{
+		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
 			TaskShort:                tu.TaskID,
 			TaskTitle:                tu.TaskTitle,

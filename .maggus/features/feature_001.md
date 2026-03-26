@@ -42,15 +42,15 @@ Rework the usage tracking system to support posting records to a global API for 
 **Parallel:** yes -- can run alongside TASK-001-001
 
 **Acceptance Criteria:**
-- [ ] `usage.Record` struct has fields: `Repository`, `ItemID`, `ItemShort`, `ItemTitle`, `TaskShort`, `Kind` (with `json:"kind,omitempty"`)
-- [ ] Old fields `TaskID` and `FeatureFile` are removed from the struct
-- [ ] `Append(records []Record) error` no longer takes a `dir` parameter -- writes to `~/.maggus/usage/`
-- [ ] Work records (Kind empty) go to `~/.maggus/usage/work.jsonl`
-- [ ] Session records (Kind set) go to `~/.maggus/usage/sessions.jsonl`
-- [ ] `~/.maggus/usage/` directory is auto-created if missing
-- [ ] `AppendTo` function remains unchanged for backward compatibility and test use
-- [ ] Unit tests updated and passing
-- [ ] `go vet ./...` passes
+- [x] `usage.Record` struct has fields: `Repository`, `ItemID`, `ItemShort`, `ItemTitle`, `TaskShort`, `Kind` (with `json:"kind,omitempty"`)
+- [x] Old fields `TaskID` and `FeatureFile` are removed from the struct
+- [x] `Append(records []Record) error` no longer takes a `dir` parameter -- writes to `~/.maggus/usage/`
+- [x] Work records (Kind empty) go to `~/.maggus/usage/work.jsonl`
+- [x] Session records (Kind set) go to `~/.maggus/usage/sessions.jsonl`
+- [x] `~/.maggus/usage/` directory is auto-created if missing
+- [x] `AppendTo` function remains unchanged for backward compatibility and test use
+- [x] Unit tests updated and passing
+- [x] `go vet ./...` passes
 
 ### TASK-001-003: Update runner pipeline (TaskUsage, IterationStartMsg, TUIModel)
 **Description:** As a developer, I want the runner pipeline to carry item-level metadata through TaskUsage, IterationStartMsg, and TUIModel so that usage callbacks can populate the enriched Record fields.

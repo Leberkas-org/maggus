@@ -224,7 +224,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		runLogger.Output(taskID, text)
 	})
 	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		_ = usage.Append(dir, []usage.Record{{
+		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
 			TaskShort:                tu.TaskID,
 			TaskTitle:                tu.TaskTitle,
