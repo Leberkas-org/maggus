@@ -74,13 +74,13 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `alt+p` toggles approval of the selected plan (calls existing approval toggle logic); left pane badge updates immediately
-- [ ] `alt+d` opens an inline confirmation dialog ("Delete feature_001? [y/n]"); `y` deletes the file and removes the plan from the list; `n` or `esc` cancels
-- [ ] `alt+↑` moves selected plan one position up in the `plans` slice (memory only, no file writes); cursor follows the moved item
-- [ ] `alt+↓` moves selected plan one position down; cursor follows
-- [ ] Reorder does not cross the features/bugs separator — features stay with features, bugs with bugs
-- [ ] `alt+a` toggles `showAll` (show/hide completed plans); cursor is clamped after toggle
-- [ ] `go build ./...` passes
+- [x] `alt+p` toggles approval of the selected plan (calls existing approval toggle logic); left pane badge updates immediately
+- [x] `alt+d` opens an inline confirmation dialog ("Delete feature_001? [y/n]"); `y` deletes the file and removes the plan from the list; `n` or `esc` cancels
+- [x] `alt+↑` moves selected plan one position up in the `plans` slice (memory only, no file writes); cursor follows the moved item
+- [x] `alt+↓` moves selected plan one position down; cursor follows
+- [x] Reorder does not cross the features/bugs separator — features stay with features, bugs with bugs
+- [x] `alt+a` toggles `showAll` (show/hide completed plans); cursor is clamped after toggle
+- [x] `go build ./...` passes
 
 ---
 

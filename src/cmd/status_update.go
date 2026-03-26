@@ -364,6 +364,10 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmDeleteFeature = true
 		}
 		return m, nil
+	case "alt+up":
+		return m.movePlanUp()
+	case "alt+down":
+		return m.movePlanDown()
 	}
 
 	// Delegate to component for shared navigation
@@ -375,6 +379,56 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.reloadPlans()
 	}
 	return m, cmd
+}
+
+// movePlanUp moves the selected plan one position up among visible plans of the same type.
+// Reorder is memory-only (no file writes). cursor follows the moved item.
+func (m statusModel) movePlanUp() (tea.Model, tea.Cmd) {
+	visible := m.visiblePlans()
+	if m.planCursor <= 0 || len(visible) == 0 {
+		return m, nil
+	}
+	current := visible[m.planCursor]
+	target := visible[m.planCursor-1]
+	if current.IsBug != target.IsBug {
+		return m, nil
+	}
+	swapPlansByFile(m.plans, current.File, target.File)
+	m.planCursor--
+	return m, nil
+}
+
+// movePlanDown moves the selected plan one position down among visible plans of the same type.
+// Reorder is memory-only (no file writes). cursor follows the moved item.
+func (m statusModel) movePlanDown() (tea.Model, tea.Cmd) {
+	visible := m.visiblePlans()
+	if m.planCursor >= len(visible)-1 || len(visible) == 0 {
+		return m, nil
+	}
+	current := visible[m.planCursor]
+	target := visible[m.planCursor+1]
+	if current.IsBug != target.IsBug {
+		return m, nil
+	}
+	swapPlansByFile(m.plans, current.File, target.File)
+	m.planCursor++
+	return m, nil
+}
+
+// swapPlansByFile swaps two plans in the slice by their file paths.
+func swapPlansByFile(plans []parser.Plan, fileA, fileB string) {
+	idxA, idxB := -1, -1
+	for i, p := range plans {
+		if p.File == fileA {
+			idxA = i
+		}
+		if p.File == fileB {
+			idxB = i
+		}
+	}
+	if idxA >= 0 && idxB >= 0 {
+		plans[idxA], plans[idxB] = plans[idxB], plans[idxA]
+	}
 }
 
 func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
