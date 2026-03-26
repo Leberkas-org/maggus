@@ -60,9 +60,15 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	visible := m.visiblePlans()
 	var lines []string
 
-	// Header row: "FEATURES & BUGS" in muted uppercase.
+	// Header row: primary color when left pane is focused, muted when right pane is focused.
 	headerText := leftPaneTruncate(" "+strings.ToUpper("Features & Bugs"), contentW)
-	lines = append(lines, padToWidth(mutedStyle.Render(headerText), contentW))
+	var headerStyle lipgloss.Style
+	if m.leftFocused {
+		headerStyle = lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
+	} else {
+		headerStyle = mutedStyle
+	}
+	lines = append(lines, padToWidth(headerStyle.Render(headerText), contentW))
 
 	// Horizontal separator under header.
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW)))

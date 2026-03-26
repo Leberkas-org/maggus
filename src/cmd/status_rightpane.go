@@ -27,7 +27,9 @@ func (m statusModel) renderRightPaneTabBar() string {
 	for i, name := range rightPaneTabNames {
 		numStr := dimStyle.Render(fmt.Sprintf("%d", i+1))
 		var nameStr string
-		if i == m.activeTab {
+		if m.leftFocused {
+			nameStr = inactiveStyle.Render(name)
+		} else if i == m.activeTab {
 			nameStr = activeStyle.Render(name)
 		} else {
 			nameStr = inactiveStyle.Render(name)

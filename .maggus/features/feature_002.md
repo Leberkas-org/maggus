@@ -51,11 +51,11 @@ This feature fixes both issues:
 **Parallel:** yes — can run alongside TASK-002-001
 
 **Acceptance Criteria:**
-- [ ] In `src/cmd/status_leftpane.go`: the "FEATURES & BUGS" header text renders in `styles.ThemeColor(m.is2x)` (primary color) when `m.leftFocused` is true, and in `styles.Muted` when false
-- [ ] In `src/cmd/status_rightpane.go`: `renderRightPaneTabBar()` dims all tab labels (faint/muted) when `m.leftFocused` is true; renders normally (active tab bold+underline+primary, inactive muted) when `m.leftFocused` is false
-- [ ] With left pane focused: left header is primary color, right tab bar is all-muted
-- [ ] With right pane focused: left header is muted, right tab bar is normal
-- [ ] The `│` divider color behavior is unchanged (it can stay as a secondary indicator)
+- [x] In `src/cmd/status_leftpane.go`: the "FEATURES & BUGS" header text renders in `styles.ThemeColor(m.is2x)` (primary color) when `m.leftFocused` is true, and in `styles.Muted` when false
+- [x] In `src/cmd/status_rightpane.go`: `renderRightPaneTabBar()` dims all tab labels (faint/muted) when `m.leftFocused` is true; renders normally (active tab bold+underline+primary, inactive muted) when `m.leftFocused` is false
+- [x] With left pane focused: left header is primary color, right tab bar is all-muted
+- [x] With right pane focused: left header is muted, right tab bar is normal
+- [x] The `│` divider color behavior is unchanged (it can stay as a secondary indicator)
 
 ---
 
