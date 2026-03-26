@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/updater"
 )
@@ -1110,5 +1111,51 @@ func TestMenuInit_NoStartupAutoWorkMsg_WithWorkableTasks(t *testing.T) {
 	}
 	if m.quitting {
 		t.Error("expected quitting=false at startup")
+	}
+}
+
+// TestLoadFeatureSummary_ApprovalsFilter verifies that loadFeatureSummary only
+// counts workable tasks from approved plans.
+func TestLoadFeatureSummary_ApprovalsFilter(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	// Create .maggus/features with two feature files.
+	featDir := filepath.Join(dir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	const approvedID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	const unapprovedID = "11111111-2222-3333-4444-555555555555"
+
+	// feature_001 — approved
+	f1 := "<!-- maggus-id: " + approvedID + " -->\n# Feature 1\n### TASK-001: Do thing\n- [ ] criterion\n"
+	if err := os.WriteFile(filepath.Join(featDir, "feature_001.md"), []byte(f1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// feature_002 — NOT approved (explicitly unapproved in opt-out mode)
+	f2 := "<!-- maggus-id: " + unapprovedID + " -->\n# Feature 2\n### TASK-001: Do thing\n- [ ] criterion\n"
+	if err := os.WriteFile(filepath.Join(featDir, "feature_002.md"), []byte(f2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write approvals: feature_001 approved, feature_002 explicitly unapproved.
+	if err := approval.Save(dir, approval.Approvals{
+		approvedID:   true,
+		unapprovedID: false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	s := loadFeatureSummary()
+
+	// Both features should be counted in total.
+	if s.features != 2 {
+		t.Errorf("expected 2 features, got %d", s.features)
+	}
+	// Only the approved feature contributes a workable task.
+	if s.workable != 1 {
+		t.Errorf("expected 1 workable task (approved only), got %d", s.workable)
 	}
 }

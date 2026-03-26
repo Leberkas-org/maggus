@@ -8,6 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -123,6 +125,7 @@ type featureSummary struct {
 }
 
 // loadFeatureSummary computes feature and bug statistics from the current working directory.
+// Only plans that are approved (per the project's approval mode) contribute to workable counts.
 func loadFeatureSummary() featureSummary {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -136,16 +139,27 @@ func loadFeatureSummary() featureSummary {
 
 	pruneStaleApprovals(dir, plans)
 
+	approvals, err := approval.Load(dir)
+	if err != nil {
+		approvals = approval.Approvals{}
+	}
+
+	cfg, err := config.Load(dir)
+	approvalRequired := err == nil && cfg.IsApprovalRequired()
+
 	var s featureSummary
 	for _, p := range plans {
+		approved := isPlanApproved(p, approvals, approvalRequired)
 		if p.IsBug {
 			s.bugs++
 			s.bugTasks += len(p.Tasks)
 			s.bugDone += p.DoneCount()
 			s.bugBlocked += p.BlockedCount()
-			for _, t := range p.Tasks {
-				if t.IsWorkable() {
-					s.bugWorkable++
+			if approved {
+				for _, t := range p.Tasks {
+					if t.IsWorkable() {
+						s.bugWorkable++
+					}
 				}
 			}
 		} else {
@@ -153,9 +167,11 @@ func loadFeatureSummary() featureSummary {
 			s.tasks += len(p.Tasks)
 			s.done += p.DoneCount()
 			s.blocked += p.BlockedCount()
-			for _, t := range p.Tasks {
-				if t.IsWorkable() {
-					s.workable++
+			if approved {
+				for _, t := range p.Tasks {
+					if t.IsWorkable() {
+						s.workable++
+					}
 				}
 			}
 		}
