@@ -1375,7 +1375,7 @@ func TestStatusModel_TabTogglesFocus(t *testing.T) {
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
 	}
 
-	t.Run("tab toggles leftFocused in split mode", func(t *testing.T) {
+	t.Run("tab is a no-op in split mode", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
 		m.width = 120
 		m.height = 40
@@ -1383,14 +1383,8 @@ func TestStatusModel_TabTogglesFocus(t *testing.T) {
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		got := result.(statusModel)
-		if got.leftFocused {
-			t.Error("leftFocused should be false after tab")
-		}
-
-		result2, _ := got.Update(tea.KeyMsg{Type: tea.KeyTab})
-		got2 := result2.(statusModel)
-		if !got2.leftFocused {
-			t.Error("leftFocused should be true after second tab")
+		if !got.leftFocused {
+			t.Error("leftFocused should remain true after tab (tab is a no-op)")
 		}
 	})
 }

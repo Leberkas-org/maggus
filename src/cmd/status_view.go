@@ -188,8 +188,15 @@ func (m statusModel) viewStatusSplit() string {
 
 // statusSplitFooter returns the contextual key hint string for the current split-pane focus state.
 func (m statusModel) statusSplitFooter() string {
+	if m.daemonStopOverlay {
+		return "Stop daemon:  t stop after task  k kill now  esc cancel"
+	}
 	if m.leftFocused {
-		return "↑/↓ navigate  enter: details  alt+p: approve  1: left  2-5: tabs  q: exit"
+		daemonHint := "s: start"
+		if m.daemon.Running {
+			daemonHint = "s: stop"
+		}
+		return "↑/↓ navigate  enter: details  alt+p: approve  " + daemonHint + "  1: left  2-5: tabs  q: exit"
 	}
 	switch m.activeTab {
 	case 0:

@@ -88,17 +88,17 @@ Several polish and usability improvements to the split-pane status view:
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] A new boolean field `daemonStopOverlay bool` is added to `statusModel` in `src/cmd/status_model.go`
-- [ ] In `src/cmd/status_update.go` `updateList()`, pressing `s` when `m.daemon.Running` is false invokes the daemon start logic (reuse or call the same path as `daemon_start.go`) and returns; the daemon status indicator updates on the next poll tick
-- [ ] In `src/cmd/status_update.go` `updateList()`, pressing `s` when `m.daemon.Running` is true sets `m.daemonStopOverlay = true` and returns — this opens the stop-mode chooser
-- [ ] A new key handler `updateStatusDaemonStopOverlay(msg tea.KeyMsg)` (or equivalent inline) handles keys while `m.daemonStopOverlay` is true:
+- [x] A new boolean field `daemonStopOverlay bool` is added to `statusModel` in `src/cmd/status_model.go`
+- [x] In `src/cmd/status_update.go` `updateList()`, pressing `s` when `m.daemon.Running` is false invokes the daemon start logic (reuse or call the same path as `daemon_start.go`) and returns; the daemon status indicator updates on the next poll tick
+- [x] In `src/cmd/status_update.go` `updateList()`, pressing `s` when `m.daemon.Running` is true sets `m.daemonStopOverlay = true` and returns — this opens the stop-mode chooser
+- [x] A new key handler `updateStatusDaemonStopOverlay(msg tea.KeyMsg)` (or equivalent inline) handles keys while `m.daemonStopOverlay` is true:
   - `t` or `T` — graceful stop (stop after current task): invokes the graceful stop path from `daemon_stop.go`, sets `m.daemonStopOverlay = false`
   - `k` or `K` — immediate kill: invokes the forceful stop/kill path from `daemon_stop.go`, sets `m.daemonStopOverlay = false`
   - `esc` or `ctrl+c` — cancel: sets `m.daemonStopOverlay = false`, no daemon action taken
-- [ ] The overlay is checked before the normal key dispatch in `Update()`, similar to how `m.confirmDeleteFeature` is checked today
-- [ ] In `src/cmd/status_view.go`, the overlay is rendered as a one- or two-line prompt in the footer when `m.daemonStopOverlay` is true: e.g. `Stop daemon:  t stop after task  k kill now  esc cancel` using `styles.StatusBar`
-- [ ] Footer hints for the left pane focused state (when overlay is not shown) are updated to include `s: start` or `s: stop` depending on `m.daemon.Running`
-- [ ] All existing keys (`q`, `esc`, `alt+p`, etc.) continue to work normally when the overlay is not open
+- [x] The overlay is checked before the normal key dispatch in `Update()`, similar to how `m.confirmDeleteFeature` is checked today
+- [x] In `src/cmd/status_view.go`, the overlay is rendered as a one- or two-line prompt in the footer when `m.daemonStopOverlay` is true: e.g. `Stop daemon:  t stop after task  k kill now  esc cancel` using `styles.StatusBar`
+- [x] Footer hints for the left pane focused state (when overlay is not shown) are updated to include `s: start` or `s: stop` depending on `m.daemon.Running`
+- [x] All existing keys (`q`, `esc`, `alt+p`, etc.) continue to work normally when the overlay is not open
 
 ## Task Dependency Graph
 

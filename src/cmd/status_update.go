@@ -115,6 +115,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case tea.KeyMsg:
+		if m.daemonStopOverlay {
+			return m.updateStatusDaemonStopOverlay(msg)
+		}
 		if m.confirmDeleteFeature {
 			return m.updateStatusConfirmDeleteFeature(msg)
 		}
@@ -269,6 +272,33 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 		return m, nil
 	case "n", "N", "esc", "ctrl+c":
 		m.confirmDeleteFeature = false
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "t", "T":
+		// Graceful stop (stop after current task).
+		m.daemonStopOverlay = false
+		dir := m.dir
+		return m, func() tea.Msg {
+			_ = stopDaemonGracefully(dir)
+			return nil
+		}
+	case "k", "K":
+		// Immediate kill.
+		m.daemonStopOverlay = false
+		dir := m.dir
+		pid := m.daemon.PID
+		return m, func() tea.Msg {
+			_ = forceKill(pid)
+			removeDaemonPID(dir)
+			return nil
+		}
+	case "esc", "ctrl+c":
+		m.daemonStopOverlay = false
 		return m, nil
 	}
 	return m, nil
@@ -457,6 +487,18 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		visible := m.visiblePlans()
 		if len(visible) > 0 && m.planCursor < len(visible) && !m.ConfirmDelete {
 			m.confirmDeleteFeature = true
+		}
+		return m, nil
+	case "s":
+		if m.daemon.Running {
+			m.daemonStopOverlay = true
+		} else {
+			// Start the daemon asynchronously.
+			dir := m.dir
+			return m, func() tea.Msg {
+				_ = startDaemon(dir)
+				return nil
+			}
 		}
 		return m, nil
 	case "alt+up":

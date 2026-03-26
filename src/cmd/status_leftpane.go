@@ -164,10 +164,14 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	}
 
 	// Footer hints pinned to the bottom.
+	daemonHint := "s start"
+	if m.daemon.Running {
+		daemonHint = "s stop"
+	}
 	footerHints := []string{
 		"↑↓ navigate  enter inspect",
 		"alt+p approve  alt+d delete",
-		"alt+↑↓ reorder",
+		daemonHint + "  alt+↑↓ reorder",
 	}
 	spacer := height - len(lines) - len(footerHints)
 	if spacer < 0 {

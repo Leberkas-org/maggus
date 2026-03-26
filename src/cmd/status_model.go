@@ -70,6 +70,9 @@ type statusModel struct {
 	confirmDeleteFeature bool
 	deleteFeatureErr     string
 
+	// Daemon stop-mode selection overlay
+	daemonStopOverlay bool
+
 	// Live log panel
 	showLog       bool
 	logLines      []string
