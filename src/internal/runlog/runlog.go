@@ -3,7 +3,6 @@ package runlog
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -55,21 +54,6 @@ func (l *Logger) Close() error {
 		return nil
 	}
 	return l.w.Close()
-}
-
-// OpenDaemonLog opens daemon.log in the run directory for writing full agent output.
-// It is intended for use in daemon mode; the caller is responsible for closing the writer.
-func (l *Logger) OpenDaemonLog() (io.WriteCloser, error) {
-	if l == nil {
-		return nil, fmt.Errorf("logger is nil")
-	}
-	runDir := filepath.Join(l.dir, ".maggus", "runs", l.runID)
-	logPath := filepath.Join(runDir, "daemon.log")
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("open daemon.log: %w", err)
-	}
-	return f, nil
 }
 
 // SetCurrentItem sets the item ID that will be injected into all subsequent log entries.

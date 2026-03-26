@@ -14,9 +14,9 @@ func daemonPIDPath(dir string) string {
 	return filepath.Join(dir, ".maggus", "daemon.pid")
 }
 
-// daemonLogPathFor returns the path to the daemon log for a given run.
-func daemonLogPathFor(dir, runID string) string {
-	return filepath.Join(dir, ".maggus", "runs", runID, "daemon.log")
+// daemonLogPath returns the path to the shared daemon log.
+func daemonLogPath(dir string) string {
+	return filepath.Join(dir, ".maggus", "runs", "daemon.log")
 }
 
 // readDaemonPID reads the PID from the daemon PID file.

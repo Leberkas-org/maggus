@@ -3,7 +3,6 @@ package runlog_test
 import (
 	"bufio"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -319,42 +318,6 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	l.Output("x", "text")
 	l.Info("msg")
 	_ = l.Close()
-}
-
-func TestOpenDaemonLog_CreatesFile(t *testing.T) {
-	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir)
-	defer l.Close()
-
-	wc, err := l.OpenDaemonLog()
-	if err != nil {
-		t.Fatalf("OpenDaemonLog: %v", err)
-	}
-	defer wc.Close()
-
-	// Write some content.
-	_, err = io.WriteString(wc, "daemon output line\n")
-	if err != nil {
-		t.Fatalf("write daemon.log: %v", err)
-	}
-	_ = wc.Close()
-
-	daemonPath := filepath.Join(dir, ".maggus", "runs", "run1", "daemon.log")
-	data, err := os.ReadFile(daemonPath)
-	if err != nil {
-		t.Fatalf("read daemon.log: %v", err)
-	}
-	if !strings.Contains(string(data), "daemon output line") {
-		t.Errorf("daemon.log content: %q", string(data))
-	}
-}
-
-func TestOpenDaemonLog_NilLogger(t *testing.T) {
-	var l *runlog.Logger
-	_, err := l.OpenDaemonLog()
-	if err == nil {
-		t.Fatal("expected error on nil logger")
-	}
 }
 
 func TestClose_Idempotent(t *testing.T) {

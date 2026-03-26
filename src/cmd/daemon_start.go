@@ -20,7 +20,7 @@ var startCmd = &cobra.Command{
 	Short: "Launch the work loop as a background daemon",
 	Long: `Starts maggus in daemon mode, running the feature-centric work loop
 unattended in the background. Agent output is logged to
-.maggus/runs/<RUN_ID>/daemon.log.
+.maggus/runs/daemon.log.
 
 Use --all to start daemons for all registered repositories that have
 auto-start enabled.
@@ -98,7 +98,7 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 	if err := os.MkdirAll(runDir, 0755); err != nil {
 		return fmt.Errorf("create run directory: %w", err)
 	}
-	daemonLogPath := daemonLogPathFor(dir, runID)
+	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("create daemon log: %w", err)
@@ -228,7 +228,7 @@ func startDaemon(dir string) error {
 	if err := os.MkdirAll(runDir, 0755); err != nil {
 		return fmt.Errorf("create run directory: %w", err)
 	}
-	daemonLogPath := daemonLogPathFor(dir, runID)
+	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("create daemon log: %w", err)
