@@ -1,0 +1,70 @@
+run_id,task_id,task_title,plan_file,model,agent,input_tokens,output_tokens,start_time,end_time,elapsed
+20260313-212757,TASK-008,Update VitePress docs — Configuration reference,.maggus\plan_13.md,default,claude,17,5599,2026-03-13T21:27:57+01:00,2026-03-13T21:29:58+01:00,2m1s
+20260313-212757,TASK-009,Update VitePress docs — Getting Started guide,.maggus\plan_13.md,default,claude,16,3620,2026-03-13T21:29:58+01:00,2026-03-13T21:31:27+01:00,1m28s
+20260313-212757,TASK-010,Update VitePress docs — CLI Commands reference,.maggus\plan_13.md,default,claude,2511,4501,2026-03-13T21:31:27+01:00,2026-03-13T21:33:20+01:00,1m52s
+20260313-212757,TASK-011,Update VitePress docs — Concepts page,.maggus\plan_13.md,default,claude,21,4130,2026-03-13T21:33:20+01:00,2026-03-13T21:34:59+01:00,1m39s
+20260313-212757,TASK-012,Create VitePress docs page for the `maggus-plan` skill,.maggus\plan_13.md,default,claude,27,6298,2026-03-13T21:34:59+01:00,2026-03-13T21:37:37+01:00,2m37s
+20260313-214055,TASK-013,Update VitePress site description and homepage,.maggus\plan_13.md,default,claude,15,2966,2026-03-13T21:40:55+01:00,2026-03-13T21:42:08+01:00,1m13s
+20260314-110556,TASK-001,Remove sub-menu dialogs for list and status,.maggus\plan_1.md,default,claude,12,3075,2026-03-14T11:05:56+01:00,2026-03-14T11:07:11+01:00,1m15s
+20260314-110556,TASK-002,List command shows all incomplete tasks with scrollable viewport,.maggus\plan_1.md,default,claude,36,12438,2026-03-14T11:07:11+01:00,2026-03-14T11:11:40+01:00,4m28s
+20260314-110556,TASK-003,Status command defaults to unfinished plans with alt+a toggle,.maggus\plan_1.md,default,claude,67,4147,2026-03-14T11:11:40+01:00,2026-03-14T11:13:37+01:00,1m57s
+20260314-110556,TASK-004,Integrate blocked-task management into the detail view,.maggus\plan_1.md,default,claude,58,21776,2026-03-14T11:13:37+01:00,2026-03-14T11:21:03+01:00,7m26s
+20260314-185827,TASK-001,Plan tab bar at the top of the status view,.maggus\plan_2.md,default,claude,50,18076,2026-03-14T18:58:27+01:00,2026-03-14T19:05:20+01:00,6m52s
+20260314-185827,TASK-002,Progress bar for the selected plan,.maggus\plan_2.md,default,claude,15,3470,2026-03-14T19:05:20+01:00,2026-03-14T19:06:56+01:00,1m35s
+20260314-185827,TASK-003,Scoped task list for the selected plan,.maggus\plan_2.md,default,claude,24,7693,2026-03-14T19:06:56+01:00,2026-03-14T19:10:09+01:00,3m12s
+20260314-185827,TASK-004,Preserve existing interactions in new layout,.maggus\plan_2.md,default,claude,12,3853,2026-03-14T19:10:09+01:00,2026-03-14T19:11:39+01:00,1m29s
+20260314-185827,TASK-005,Remove old status layout,.maggus\plan_2.md,default,claude,13,3944,2026-03-14T19:11:39+01:00,2026-03-14T19:14:06+01:00,2m27s
+20260315-172351,TASK-001,Wrap work view in bordered full-screen box,.maggus\plan_1.md,default,claude,424,15094,2026-03-15T17:23:52+01:00,2026-03-15T17:28:29+01:00,4m36s
+20260315-172351,TASK-002,Add tab bar with Progress and Commits tabs,.maggus\plan_1.md,default,claude,29,8720,2026-03-15T17:28:29+01:00,2026-03-15T17:32:13+01:00,3m44s
+20260315-172351,TASK-003,"Add tool detail panel (right side, toggleable with Alt+I)",.maggus\plan_1.md,default,claude,47,16011,2026-03-15T17:32:13+01:00,2026-03-15T17:37:52+01:00,5m39s
+20260315-172351,TASK-004,Enrich tool messages with structured metadata,.maggus\plan_1.md,default,claude,23,5973,2026-03-15T17:37:52+01:00,2026-03-15T17:40:22+01:00,2m29s
+20260315-172351,TASK-005,Make detail panel scrollable,.maggus\plan_1.md,default,claude,27,12363,2026-03-15T17:40:22+01:00,2026-03-15T17:44:14+01:00,3m52s
+20260315-172351,TASK-006,Integration testing and polish,.maggus\plan_1.md,default,claude,14,5685,2026-03-15T17:44:14+01:00,2026-03-15T17:46:24+01:00,2m9s
+20260318-100431,TASK-001,Create `gitsync` internal package with remote status detection,.maggus\plan_2.md,default,claude,23,6800,2026-03-18T10:04:31+01:00,2026-03-18T10:07:04+01:00,2m32s
+20260318-100431,TASK-002,Add local working tree status detection to `gitsync`,.maggus\plan_2.md,default,claude,23,7105,2026-03-18T10:07:04+01:00,2026-03-18T10:09:34+01:00,2m29s
+20260318-100431,TASK-003,Implement pull resolution actions in `gitsync`,.maggus\plan_2.md,default,claude,24,10185,2026-03-18T10:09:34+01:00,2026-03-18T10:13:08+01:00,3m33s
+20260318-100431,TASK-004,Add git sync TUI screen to the Bubbletea work flow,.maggus\plan_2.md,default,claude,38,15080,2026-03-18T10:13:08+01:00,2026-03-18T10:18:25+01:00,5m17s
+20260318-100431,TASK-005,Integrate sync check at the start of `maggus work`,.maggus\plan_2.md,default,claude,18,5319,2026-03-18T10:18:25+01:00,2026-03-18T10:20:28+01:00,2m2s
+20260318-100431,TASK-006,Integrate sync check between task iterations,.maggus\plan_2.md,default,claude,50,17043,2026-03-18T10:20:28+01:00,2026-03-18T10:26:39+01:00,6m10s
+20260318-151225,TASK-001,Parser recognizes ignored plan files,.maggus\plan_3.md,default,claude,20,7474,2026-03-18T15:12:25+01:00,2026-03-18T15:15:41+01:00,3m15s
+20260318-151225,TASK-002,Parser recognizes ignored tasks within a plan,.maggus\plan_3.md,default,claude,5470,5497,2026-03-18T15:15:41+01:00,2026-03-18T15:17:56+01:00,2m14s
+20260318-151225,TASK-003,Work loop skips ignored plans and tasks,.maggus\plan_3.md,default,claude,34,8382,2026-03-18T15:17:56+01:00,2026-03-18T15:21:43+01:00,3m46s
+20260318-151225,TASK-004,Status and list commands show ignored items with [~] marker,.maggus\plan_3.md,default,claude,4508,15107,2026-03-18T15:21:43+01:00,2026-03-18T15:27:11+01:00,5m28s
+20260318-151225,TASK-005,`maggus ignore` command for plans,.maggus\plan_3.md,default,claude,429,5907,2026-03-18T15:27:11+01:00,2026-03-18T15:29:55+01:00,2m44s
+20260318-151225,TASK-006,`maggus unignore` command for plans,.maggus\plan_3.md,default,claude,17,4346,2026-03-18T15:29:55+01:00,2026-03-18T15:31:42+01:00,1m46s
+20260318-151225,TASK-007,`maggus ignore` command for tasks,.maggus\plan_3.md,default,claude,1388,5272,2026-03-18T15:31:42+01:00,2026-03-18T15:34:02+01:00,2m19s
+20260318-151225,TASK-008,`maggus unignore` command for tasks,.maggus\plan_3.md,default,claude,17,3711,2026-03-18T15:34:02+01:00,2026-03-18T15:35:40+01:00,1m38s
+20260318-151225,TASK-009,Wire up ignore/unignore commands in CLI root,.maggus\plan_3.md,default,claude,23,6005,2026-03-18T15:35:40+01:00,2026-03-18T15:38:19+01:00,2m38s
+20260318-151225,TASK-010,TUI list view — toggle task ignore with `alt+i`,.maggus\plan_3.md,default,claude,31,7279,2026-03-18T15:38:19+01:00,2026-03-18T15:41:47+01:00,3m28s
+20260318-151225,TASK-011,TUI detail view — show ignored status and toggle with `alt+i`,.maggus\plan_3.md,default,claude,22,5486,2026-03-18T15:41:47+01:00,2026-03-18T15:44:20+01:00,2m32s
+20260318-151225,TASK-012,TUI list view — toggle plan ignore with `alt+p`,.maggus\plan_3.md,default,claude,28,6876,2026-03-18T15:44:20+01:00,2026-03-18T15:47:39+01:00,3m18s
+20260319-191542,TASK-001,Create an API client package for isclaude2x,.maggus\plan_5.md,default,claude,25,5329,2026-03-19T19:15:42+01:00,2026-03-19T19:18:01+01:00,2m19s
+20260319-191542,TASK-002,Make logo and box border colors dynamic based on 2x status,.maggus\plan_5.md,default,claude,26,7748,2026-03-19T19:18:01+01:00,2026-03-19T19:22:27+01:00,4m25s
+20260319-191542,TASK-003,Display 2x remaining time in the main menu,.maggus\plan_5.md,default,claude,19,3331,2026-03-19T19:22:27+01:00,2026-03-19T19:24:07+01:00,1m39s
+20260319-191542,TASK-004,Display 2x remaining time in the work view,.maggus\plan_5.md,default,claude,23,5122,2026-03-19T19:24:07+01:00,2026-03-19T19:26:23+01:00,2m16s
+20260319-200301,TASK-001,Global repositories config file,.maggus\plan_6.md,default,claude,17,6138,2026-03-19T20:03:01+01:00,2026-03-19T20:05:03+01:00,2m1s
+20260319-200301,TASK-002,Startup working directory resolution,.maggus\plan_6.md,default,claude,125,15371,2026-03-19T20:05:03+01:00,2026-03-19T20:10:17+01:00,5m13s
+20260319-200301,TASK-003,TUI file browser for directory selection,.maggus\plan_6.md,default,claude,28,15378,2026-03-19T20:10:17+01:00,2026-03-19T20:15:45+01:00,5m28s
+20260319-200301,TASK-004,Repository menu item with sub-menu,.maggus\plan_6.md,default,claude,42,12754,2026-03-19T20:15:45+01:00,2026-03-19T20:20:49+01:00,5m3s
+20260319-200301,TASK-005,Display active repository in menu header,.maggus\plan_6.md,default,claude,2714,4512,2026-03-19T20:20:49+01:00,2026-03-19T20:22:57+01:00,2m7s
+20260319-204409,TASK-001,Add update check package,.maggus\plan_7.md,default,claude,29,9310,2026-03-19T20:44:09+01:00,2026-03-19T20:47:18+01:00,3m9s
+20260319-204409,TASK-002,Add binary self-replacement logic,.maggus\plan_7.md,default,claude,21,9178,2026-03-19T20:47:18+01:00,2026-03-19T20:50:15+01:00,2m57s
+20260319-204409,TASK-003,Add `maggus update` command,.maggus\plan_7.md,default,claude,34,8856,2026-03-19T20:50:15+01:00,2026-03-19T20:53:45+01:00,3m29s
+20260319-204409,TASK-004,Add auto-update config option,.maggus\plan_7.md,default,claude,25,8315,2026-03-19T20:53:45+01:00,2026-03-19T20:56:51+01:00,3m5s
+20260319-204409,TASK-005,Integrate update check into startup,.maggus\plan_7.md,default,claude,40,12065,2026-03-19T20:56:51+01:00,2026-03-19T21:01:37+01:00,4m45s
+20260319-204409,TASK-006,Add drive letter navigation to file browser (Windows),.maggus\plan_7.md,default,claude,34,17213,2026-03-19T21:01:37+01:00,2026-03-19T21:07:57+01:00,6m20s
+20260319-204409,TASK-007,Rewrite getting-started guide,.maggus\plan_7.md,default,claude,20,6377,2026-03-19T21:07:57+01:00,2026-03-19T21:10:40+01:00,2m42s
+20260319-204409,TASK-008,Add first-project tutorial page,.maggus\plan_7.md,default,claude,20,5758,2026-03-19T21:10:40+01:00,2026-03-19T21:12:59+01:00,2m19s
+20260319-204409,TASK-009,Update configuration reference docs,.maggus\plan_7.md,default,claude,25,11583,2026-03-19T21:12:59+01:00,2026-03-19T21:17:05+01:00,4m5s
+20260319-204409,TASK-010,Update VitePress sidebar and navigation,.maggus\plan_7.md,default,claude,12,2632,2026-03-19T21:17:05+01:00,2026-03-19T21:18:22+01:00,1m16s
+20260319-212634,TASK-001,Remove dev guard from CheckLatestVersion,.maggus\plan_8.md,default,claude,18,4268,2026-03-19T21:26:34+01:00,2026-03-19T21:28:22+01:00,1m48s
+20260319-212634,TASK-002,Remove dev guard from manual update command,.maggus\plan_8.md,default,claude,22,5765,2026-03-19T21:28:22+01:00,2026-03-19T21:30:47+01:00,2m25s
+20260321-103126,TASK-001,Extract sync state and logic from TUIModel into tui_sync.go,.maggus\plan_codebase_refactoring.md,default,claude,90,15350,2026-03-21T10:31:27+01:00,2026-03-21T10:36:04+01:00,4m37s
+20260321-115233,TASK-001,Add Cache Token Fields to Stream Parsing and Message Types,.maggus\plan_token_usage_tracking.md,default,claude,27,6922,2026-03-21T11:52:34+01:00,2026-03-21T11:55:16+01:00,2m41s
+20260321-115233,TASK-002,Add Cost Field to Stream Parsing and Message Types,.maggus\plan_token_usage_tracking.md,default,claude,33,6888,2026-03-21T11:55:16+01:00,2026-03-21T11:57:54+01:00,2m38s
+20260321-115233,TASK-003,Add Per-Model Usage Parsing from Result Events,.maggus\plan_token_usage_tracking.md,default,claude,25,8518,2026-03-21T11:57:54+01:00,2026-03-21T12:00:31+01:00,2m37s
+20260321-115233,TASK-004,Update Token State to Track Cache Tokens and Cost,.maggus\plan_token_usage_tracking.md,default,claude,26,9231,2026-03-21T12:00:31+01:00,2026-03-21T12:03:20+01:00,2m49s
+20260321-115233,TASK-005,Track Per-Model Usage in Token State,.maggus\plan_token_usage_tracking.md,default,claude,40,11565,2026-03-21T12:03:20+01:00,2026-03-21T12:07:08+01:00,3m47s
+20260321-115233,TASK-006,Update Live Progress Token Display,.maggus\plan_token_usage_tracking.md,default,claude,66,4074,2026-03-21T12:07:08+01:00,2026-03-21T12:08:56+01:00,1m48s
+20260321-115233,TASK-007,Update Summary View Token Display,.maggus\plan_token_usage_tracking.md,default,claude,66,5138,2026-03-21T12:08:56+01:00,2026-03-21T12:10:52+01:00,1m55s
+20260321-115233,TASK-008,Migrate Usage CSV to v2 Format,.maggus\plan_token_usage_tracking.md,default,claude,34,12259,2026-03-21T12:10:52+01:00,2026-03-21T12:14:36+01:00,3m44s

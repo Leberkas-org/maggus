@@ -34,7 +34,11 @@ func (m statusModel) Init() tea.Cmd {
 func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.HandleResize(msg.Width, msg.Height)
+		m.currentTaskViewport.Width = msg.Width
+		m.currentTaskViewport.Height = msg.Height
 		return m, nil
 
 	case claude2xResultMsg:
@@ -79,19 +83,19 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case featureSummaryUpdateMsg:
 		// Preserve selected feature, cursor, and scroll across reload
-		visible := m.visibleFeatures()
+		visible := m.visiblePlans()
 		var selectedFilename string
-		if m.selectedFeature < len(visible) {
-			selectedFilename = filepath.Base(visible[m.selectedFeature].File)
+		if m.planCursor < len(visible) {
+			selectedFilename = filepath.Base(visible[m.planCursor].File)
 		}
 		prevCursor := m.Cursor
 		prevScroll := m.ScrollOffset
-		m.reloadFeatures()
+		m.reloadPlans()
 		// Restore selection by filename
 		if selectedFilename != "" {
-			for i, f := range m.visibleFeatures() {
+			for i, f := range m.visiblePlans() {
 				if filepath.Base(f.File) == selectedFilename {
-					m.selectedFeature = i
+					m.planCursor = i
 					m.Tasks = buildSelectableTasksForFeature(f, m.showAll)
 					// Clamp cursor and scroll to new bounds
 					if prevCursor < len(m.Tasks) {
@@ -190,7 +194,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 			m.ConfirmDelete = false
 			return m, nil
 		}
-		m.reloadFeatures()
+		m.reloadPlans()
 		if m.Cursor >= len(m.Tasks) && m.Cursor > 0 {
 			m.Cursor--
 		}
@@ -210,12 +214,12 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y", "enter":
-		visible := m.visibleFeatures()
-		if m.selectedFeature >= len(visible) {
+		visible := m.visiblePlans()
+		if m.planCursor >= len(visible) {
 			m.confirmDeleteFeature = false
 			return m, nil
 		}
-		f := visible[m.selectedFeature]
+		f := visible[m.planCursor]
 		fullPath := m.featureFilePath(f)
 		if err := os.Remove(fullPath); err != nil {
 			m.deleteFeatureErr = err.Error()
@@ -223,16 +227,16 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 			return m, nil
 		}
 		m.confirmDeleteFeature = false
-		m.reloadFeatures()
-		// Clamp selectedFeature to valid range
-		newVisible := m.visibleFeatures()
-		if m.selectedFeature >= len(newVisible) {
-			m.selectedFeature = len(newVisible) - 1
+		m.reloadPlans()
+		// Clamp planCursor to valid range
+		newVisible := m.visiblePlans()
+		if m.planCursor >= len(newVisible) {
+			m.planCursor = len(newVisible) - 1
 		}
-		if m.selectedFeature < 0 {
-			m.selectedFeature = 0
+		if m.planCursor < 0 {
+			m.planCursor = 0
 		}
-		m.rebuildForSelectedFeature()
+		m.rebuildForSelectedPlan()
 		if len(newVisible) == 0 {
 			return m, tea.Quit
 		}
@@ -328,17 +332,17 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "right":
-		visible := m.visibleFeatures()
+		visible := m.visiblePlans()
 		if len(visible) > 1 {
-			m.selectedFeature = styles.CursorDown(m.selectedFeature, len(visible))
-			m.rebuildForSelectedFeature()
+			m.planCursor = styles.CursorDown(m.planCursor, len(visible))
+			m.rebuildForSelectedPlan()
 		}
 		return m, nil
 	case "shift+tab", "left":
-		visible := m.visibleFeatures()
+		visible := m.visiblePlans()
 		if len(visible) > 1 {
-			m.selectedFeature = styles.CursorUp(m.selectedFeature, len(visible))
-			m.rebuildForSelectedFeature()
+			m.planCursor = styles.CursorUp(m.planCursor, len(visible))
+			m.rebuildForSelectedPlan()
 		}
 		return m, nil
 	case "alt+a":
@@ -346,17 +350,17 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		plans, a, err := loadPlansWithApprovals(m.dir, true)
 		if err == nil {
 			m.approvals = a
-			m.features = plans
+			m.plans = plans
 			pruneStaleApprovals(m.dir, plans)
 		}
-		m.nextTaskID, m.nextTaskFile = findNextTask(m.features)
-		m.rebuildForSelectedFeature()
+		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
+		m.rebuildForSelectedPlan()
 		return m, nil
 	case "alt+p":
 		return m.handleApproveToggle()
 	case "alt+d":
-		visible := m.visibleFeatures()
-		if len(visible) > 0 && m.selectedFeature < len(visible) && !m.ConfirmDelete {
+		visible := m.visiblePlans()
+		if len(visible) > 0 && m.planCursor < len(visible) && !m.ConfirmDelete {
 			m.confirmDeleteFeature = true
 		}
 		return m, nil
@@ -368,18 +372,18 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case taskListQuit, taskListRun:
 		return m, tea.Quit
 	case taskListDeleted:
-		m.reloadFeatures()
+		m.reloadPlans()
 	}
 	return m, cmd
 }
 
 func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 	m.statusNote = ""
-	visible := m.visibleFeatures()
-	if m.selectedFeature >= len(visible) {
+	visible := m.visiblePlans()
+	if m.planCursor >= len(visible) {
 		return m, nil
 	}
-	f := visible[m.selectedFeature]
+	f := visible[m.planCursor]
 	if f.Completed {
 		m.statusNote = "cannot approve a completed feature"
 		return m, nil
@@ -402,6 +406,6 @@ func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 		m.statusNote = "error: " + err.Error()
 		return m, nil
 	}
-	m.reloadFeatures()
+	m.reloadPlans()
 	return m, nil
 }

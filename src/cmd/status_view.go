@@ -12,7 +12,7 @@ import (
 )
 
 func (m statusModel) View() string {
-	if len(m.features) == 0 {
+	if len(m.plans) == 0 {
 		return m.viewEmpty()
 	}
 	if m.confirmDeleteFeature {
@@ -29,11 +29,11 @@ func (m statusModel) View() string {
 
 // viewConfirmDeleteFeature renders the feature-level delete confirmation dialog.
 func (m statusModel) viewConfirmDeleteFeature() string {
-	visible := m.visibleFeatures()
-	if m.selectedFeature >= len(visible) {
+	visible := m.visiblePlans()
+	if m.planCursor >= len(visible) {
 		return ""
 	}
-	f := visible[m.selectedFeature]
+	f := visible[m.planCursor]
 
 	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
@@ -74,7 +74,7 @@ func (m statusModel) viewEmpty() string {
 
 // renderTabBar renders the horizontal feature tab bar.
 func (m statusModel) renderTabBar() string {
-	visible := m.visibleFeatures()
+	visible := m.visiblePlans()
 	if len(visible) == 0 {
 		return ""
 	}
@@ -105,7 +105,7 @@ func (m statusModel) renderTabBar() string {
 			approvalMark = "✗"
 		}
 		label := fmt.Sprintf(" %s %s %d/%d ", approvalMark, name, done, total)
-		if i == m.selectedFeature {
+		if i == m.planCursor {
 			if !isApproved {
 				tabs = append(tabs, unapprovedTabStyle.Bold(true).Render(label))
 			} else if p.IsBug {
@@ -169,7 +169,7 @@ func (m statusModel) viewLog() string {
 	var sb strings.Builder
 
 	// Re-use the same header structure as viewStatus (title + daemon line + tabs + progress).
-	visible := m.visibleFeatures()
+	visible := m.visiblePlans()
 
 	totalTasks := 0
 	totalDone := 0
@@ -177,7 +177,7 @@ func (m statusModel) viewLog() string {
 	activeFeatures := 0
 	totalBugs := 0
 	activeBugs := 0
-	for _, f := range m.features {
+	for _, f := range m.plans {
 		totalTasks += len(f.Tasks)
 		totalDone += f.DoneCount()
 		totalBlocked += f.BlockedCount()
@@ -192,7 +192,7 @@ func (m statusModel) viewLog() string {
 			}
 		}
 	}
-	featureCount := len(m.features) - totalBugs
+	featureCount := len(m.plans) - totalBugs
 
 	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
 	if totalBugs > 0 {
@@ -421,7 +421,7 @@ func (m statusModel) renderSnapshotPanel() string {
 func (m statusModel) viewStatus() string {
 	var sb strings.Builder
 
-	visible := m.visibleFeatures()
+	visible := m.visiblePlans()
 
 	// Compute totals
 	totalTasks := 0
@@ -430,7 +430,7 @@ func (m statusModel) viewStatus() string {
 	activeFeatures := 0
 	totalBugs := 0
 	activeBugs := 0
-	for _, f := range m.features {
+	for _, f := range m.plans {
 		totalTasks += len(f.Tasks)
 		totalDone += f.DoneCount()
 		totalBlocked += f.BlockedCount()
@@ -446,7 +446,7 @@ func (m statusModel) viewStatus() string {
 		}
 	}
 	totalPending := totalTasks - totalDone - totalBlocked
-	featureCount := len(m.features) - totalBugs
+	featureCount := len(m.plans) - totalBugs
 
 	// Header
 	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
@@ -469,8 +469,8 @@ func (m statusModel) viewStatus() string {
 	}
 
 	// Progress bar and summary for selected feature
-	if m.selectedFeature < len(visible) {
-		p := visible[m.selectedFeature]
+	if m.planCursor < len(visible) {
+		p := visible[m.planCursor]
 		done := p.DoneCount()
 		total := len(p.Tasks)
 		blocked := p.BlockedCount()
@@ -487,8 +487,8 @@ func (m statusModel) viewStatus() string {
 	}
 
 	// Task list for selected feature
-	if m.selectedFeature < len(visible) {
-		p := visible[m.selectedFeature]
+	if m.planCursor < len(visible) {
+		p := visible[m.planCursor]
 
 		sb.WriteString("\n\n")
 		if p.Completed {

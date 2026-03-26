@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/discord"
@@ -34,19 +35,29 @@ var (
 type statusModel struct {
 	taskListComponent
 
-	features     []parser.Plan
+	// Split-pane layout fields
+	plans       []parser.Plan
+	planCursor  int
+	leftFocused bool
+	activeTab   int // 0–3: Output, Feature Details, Current Task, Metrics
+
+	// Right-pane tab 3 viewport
+	currentTaskViewport viewport.Model
+	currentTaskDetail   detailState
+
+	// Terminal dimensions
+	width  int
+	height int
+
 	showAll      bool
 	nextTaskID   string
 	nextTaskFile string
 	agentName    string
 
-	// Feature tab selection
-	selectedFeature int // index into visibleFeatures()
-
 	dir       string             // working directory for file operations
-	approvals approval.Approvals // cached approvals; reloaded on reloadFeatures
+	approvals approval.Approvals // cached approvals; reloaded on reloadPlans
 
-	approvalRequired bool // from config; used when reloading features
+	approvalRequired bool // from config; used when reloading plans
 
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
@@ -81,7 +92,7 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		taskListComponent: taskListComponent{
 			HeaderLines: statusHeaderLines,
 		},
-		features:         features,
+		plans:            features,
 		showAll:          showAll,
 		nextTaskID:       nextTaskID,
 		nextTaskFile:     nextTaskFile,
@@ -90,35 +101,47 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		showLog:          showLog,
 		approvalRequired: approvalRequired,
 		logAutoScroll:    true,
+		leftFocused:      true,
+		activeTab:        0,
 	}
-	visible := m.visibleFeatures()
+	visible := m.visiblePlans()
 	if len(visible) > 0 {
 		m.Tasks = buildSelectableTasksForFeature(visible[0], showAll)
 	}
 	return m
 }
 
-// visibleFeatures returns the features that should be shown based on the showAll flag.
-func (m statusModel) visibleFeatures() []parser.Plan {
+// visiblePlans returns the plans that should be shown based on the showAll flag.
+func (m statusModel) visiblePlans() []parser.Plan {
 	var visible []parser.Plan
-	for _, f := range m.features {
-		if f.Completed && !m.showAll {
+	for _, p := range m.plans {
+		if p.Completed && !m.showAll {
 			continue
 		}
-		visible = append(visible, f)
+		visible = append(visible, p)
 	}
 	return visible
 }
 
-// rebuildForSelectedFeature rebuilds the selectable tasks and resets the cursor
-// for the currently selected feature.
-func (m *statusModel) rebuildForSelectedFeature() {
-	visible := m.visibleFeatures()
-	if m.selectedFeature >= len(visible) {
-		m.selectedFeature = 0
+// selectedPlan returns the plan at planCursor from visiblePlans.
+// Returns a zero-value Plan if planCursor is out of range.
+func (m statusModel) selectedPlan() parser.Plan {
+	visible := m.visiblePlans()
+	if m.planCursor < 0 || m.planCursor >= len(visible) {
+		return parser.Plan{}
+	}
+	return visible[m.planCursor]
+}
+
+// rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
+// for the currently selected plan.
+func (m *statusModel) rebuildForSelectedPlan() {
+	visible := m.visiblePlans()
+	if m.planCursor >= len(visible) {
+		m.planCursor = 0
 	}
 	if len(visible) > 0 {
-		m.Tasks = buildSelectableTasksForFeature(visible[m.selectedFeature], m.showAll)
+		m.Tasks = buildSelectableTasksForFeature(visible[m.planCursor], m.showAll)
 	} else {
 		m.Tasks = nil
 	}
@@ -126,18 +149,18 @@ func (m *statusModel) rebuildForSelectedFeature() {
 	m.ScrollOffset = 0
 }
 
-// reloadFeatures reloads all features, bugs, and approvals from disk and rebuilds the current view.
-func (m *statusModel) reloadFeatures() {
+// reloadPlans reloads all plans and approvals from disk and rebuilds the current view.
+func (m *statusModel) reloadPlans() {
 	plans, a, err := loadPlansWithApprovals(m.dir, true)
 	if err != nil {
-		m.rebuildForSelectedFeature()
+		m.rebuildForSelectedPlan()
 		return
 	}
 	m.approvals = a
-	m.features = plans
+	m.plans = plans
 	pruneStaleApprovals(m.dir, plans)
 	m.nextTaskID, m.nextTaskFile = findNextTask(plans)
-	m.rebuildForSelectedFeature()
+	m.rebuildForSelectedPlan()
 }
 
 // syncDetailSuffix updates the component's DetailSuffix from statusNote.
