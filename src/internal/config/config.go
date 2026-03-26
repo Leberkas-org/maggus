@@ -134,15 +134,16 @@ const (
 
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Agent              string              `yaml:"agent"`
-	Model              string              `yaml:"model"`
-	Include            []string            `yaml:"include"`
-	ApprovalMode       string              `yaml:"approval_mode"`
+	Agent         string              `yaml:"agent"`
+	Model         string              `yaml:"model"`
+	Include       []string            `yaml:"include"`
+	ApprovalMode  string              `yaml:"approval_mode"`
 	AutoContinue  *bool               `yaml:"auto_continue"`
+	MaxLogFiles   int                 `yaml:"max_log_files"`
 	Notifications NotificationsConfig `yaml:"notifications"`
-	Git                GitConfig           `yaml:"git"`
-	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
-	Hooks              HooksConfig         `yaml:"hooks"`
+	Git           GitConfig           `yaml:"git"`
+	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
+	Hooks         HooksConfig         `yaml:"hooks"`
 }
 
 // IsApprovalRequired returns true when approval_mode is opt-in (the default).
@@ -155,6 +156,15 @@ func (c Config) IsApprovalRequired() bool {
 // Default is false: maggus stops after each feature completes.
 func (c Config) IsAutoContinueEnabled() bool {
 	return c.AutoContinue != nil && *c.AutoContinue
+}
+
+// LogMaxFiles returns the maximum number of log files to retain in .maggus/runs/.
+// Defaults to 50 if max_log_files is zero or negative.
+func (c Config) LogMaxFiles() int {
+	if c.MaxLogFiles <= 0 {
+		return 50
+	}
+	return c.MaxLogFiles
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,
