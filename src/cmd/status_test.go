@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -1044,6 +1045,123 @@ func TestRenderTabBar_BugSeparator(t *testing.T) {
 	if !strings.Contains(bar, "┃") {
 		t.Error("tab bar should contain ┃ separator between features and bugs")
 	}
+}
+
+func TestRenderCurrentTaskContent(t *testing.T) {
+	t.Run("empty task ID returns empty string", func(t *testing.T) {
+		content := renderCurrentTaskContent("", "")
+		if content != "" {
+			t.Errorf("expected empty content for empty task ID, got %q", content)
+		}
+	})
+
+	t.Run("missing file returns empty string", func(t *testing.T) {
+		content := renderCurrentTaskContent("TASK-001-001", "/nonexistent/path/feature.md")
+		if content != "" {
+			t.Errorf("expected empty content for missing file, got %q", content)
+		}
+	})
+
+	t.Run("valid task file returns content with task ID and title", func(t *testing.T) {
+		dir := t.TempDir()
+		taskFile := dir + "/feature_001.md"
+		fileContent := `# Feature 001
+
+## Tasks
+
+### TASK-001-001: My Example Task
+
+**Description:** Do something important
+
+**Acceptance Criteria:**
+- [ ] Some criterion
+`
+		if err := os.WriteFile(taskFile, []byte(fileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		result := renderCurrentTaskContent("TASK-001-001", taskFile)
+		if !strings.Contains(result, "TASK-001-001") {
+			t.Errorf("expected task ID in content, got %q", result)
+		}
+		if !strings.Contains(result, "My Example Task") {
+			t.Errorf("expected task title in content, got %q", result)
+		}
+	})
+
+	t.Run("task not found in file returns empty string", func(t *testing.T) {
+		dir := t.TempDir()
+		taskFile := dir + "/feature_001.md"
+		fileContent := `# Feature 001
+
+## Tasks
+
+### TASK-001-001: Some Task
+
+**Acceptance Criteria:**
+- [ ] Criterion
+`
+		if err := os.WriteFile(taskFile, []byte(fileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		result := renderCurrentTaskContent("TASK-999-999", taskFile)
+		if result != "" {
+			t.Errorf("expected empty content for missing task ID, got %q", result)
+		}
+	})
+}
+
+func TestRenderCurrentTaskTab(t *testing.T) {
+	t.Run("no pending task shows No pending tasks message", func(t *testing.T) {
+		m := statusModel{nextTaskID: "", nextTaskFile: ""}
+		content := m.renderCurrentTaskTab(80, 20)
+		if !strings.Contains(content, "No pending tasks") {
+			t.Errorf("expected 'No pending tasks', got %q", content)
+		}
+	})
+
+	t.Run("with pending task renders viewport content", func(t *testing.T) {
+		dir := t.TempDir()
+		taskFile := dir + "/feature_001.md"
+		fileContent := `# Feature 001
+
+## Tasks
+
+### TASK-001-001: My Example Task
+
+**Description:** Do something
+
+**Acceptance Criteria:**
+- [ ] Some criterion
+`
+		if err := os.WriteFile(taskFile, []byte(fileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		m := statusModel{nextTaskID: "TASK-001-001", nextTaskFile: taskFile}
+		m.currentTaskViewport.Width = 80
+		m.currentTaskViewport.Height = 20
+		m.loadCurrentTaskDetail()
+		content := m.renderCurrentTaskTab(80, 20)
+		if !strings.Contains(content, "TASK-001-001") {
+			t.Errorf("expected task ID in Tab 3 output, got %q", content)
+		}
+	})
+}
+
+func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
+	t.Run("Tab 3 is wired into renderRightPane", func(t *testing.T) {
+		m := statusModel{nextTaskID: "", nextTaskFile: "", activeTab: 2, width: 120, height: 30}
+		// Should render "No pending tasks" not "(coming soon)"
+		content := m.renderRightPane(80, 20)
+		if strings.Contains(content, "coming soon") {
+			t.Error("Tab 3 should not show 'coming soon' placeholder")
+		}
+		if !strings.Contains(content, "No pending tasks") {
+			t.Errorf("Tab 3 with no task should show 'No pending tasks', got %q", content)
+		}
+	})
 }
 
 func TestRenderTabBar_ApprovalMark(t *testing.T) {

@@ -58,6 +58,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 		content = m.renderOutputTab(width, contentH)
 	case 1:
 		content = m.renderFeatureDetailsTab(width, contentH)
+	case 2:
+		content = m.renderCurrentTaskTab(width, contentH)
 	default:
 		placeholder := statusDimStyle.Render("\n  (coming soon)")
 		content = lipgloss.NewStyle().Width(width).Height(contentH).Render(placeholder)
@@ -301,6 +303,59 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
 
 	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+}
+
+// renderCurrentTaskContent returns the rendered detail content for the next workable task.
+// Returns an empty string when nextTaskID is empty or the task cannot be found.
+func renderCurrentTaskContent(nextTaskID, nextTaskFile string) string {
+	if nextTaskID == "" {
+		return ""
+	}
+	t := reloadTask(nextTaskFile, nextTaskID)
+	if t == nil {
+		return ""
+	}
+	return renderDetailContent(*t, nil)
+}
+
+// loadCurrentTaskDetail loads the next workable task into the currentTaskViewport.
+func (m *statusModel) loadCurrentTaskDetail() {
+	content := renderCurrentTaskContent(m.nextTaskID, m.nextTaskFile)
+	m.currentTaskViewport.SetContent(content)
+}
+
+// renderCurrentTaskTab renders Tab 3: a read-only detail view of the next workable task.
+// When no task is pending, shows a centered "No pending tasks" message.
+func (m statusModel) renderCurrentTaskTab(width, height int) string {
+	if m.nextTaskID == "" {
+		mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+		msg := mutedStyle.Render("No pending tasks")
+		return lipgloss.NewStyle().Width(width).Height(height).
+			Align(lipgloss.Center, lipgloss.Center).Render(msg)
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Render(m.currentTaskViewport.View())
+}
+
+// resizeCurrentTaskViewport resizes the currentTaskViewport to the right pane content area.
+func (m *statusModel) resizeCurrentTaskViewport() {
+	if m.width == 0 || m.height == 0 {
+		return
+	}
+	innerW, _ := styles.FullScreenInnerSize(m.width, m.height)
+	leftW := m.width / 3
+	if leftW > 50 {
+		leftW = 50
+	}
+	rightW := innerW - leftW
+	if rightW < 1 {
+		rightW = 1
+	}
+	contentH := m.rightPaneContentHeight()
+	if contentH < 1 {
+		contentH = 1
+	}
+	m.currentTaskViewport.Width = rightW
+	m.currentTaskViewport.Height = contentH
 }
 
 // renderFeatureDetailsTab renders Tab 2 content: task list or inline detail view.

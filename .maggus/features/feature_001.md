@@ -133,12 +133,12 @@ Redesign the `maggus status` command from a flat feature-tab layout into a two-p
 **Parallel:** yes — can run alongside TASK-001-005 and TASK-001-007
 
 **Acceptance Criteria:**
-- [ ] Tab 3 renders the detail view of the task identified by `nextTaskID`/`nextTaskFile` using existing `detail.go` rendering logic
-- [ ] View is read-only — no criteria editing, no action picker
-- [ ] `↑↓` scrolls the viewport when right pane is focused and Tab 3 is active
-- [ ] If no workable task exists, shows a centered message: `No pending tasks` in muted color
-- [ ] Detail content updates when `featureSummaryUpdateMsg` fires (file watcher reload)
-- [ ] `go build ./...` passes
+- [x] Tab 3 renders the detail view of the task identified by `nextTaskID`/`nextTaskFile` using existing `detail.go` rendering logic
+- [x] View is read-only — no criteria editing, no action picker
+- [x] `↑↓` scrolls the viewport when right pane is focused and Tab 3 is active
+- [x] If no workable task exists, shows a centered message: `No pending tasks` in muted color
+- [x] Detail content updates when `featureSummaryUpdateMsg` fires (file watcher reload)
+- [x] `go build ./...` passes
 
 ---
 

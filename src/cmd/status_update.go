@@ -37,8 +37,8 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.HandleResize(msg.Width, msg.Height)
-		m.currentTaskViewport.Width = msg.Width
-		m.currentTaskViewport.Height = msg.Height
+		m.resizeCurrentTaskViewport()
+		m.loadCurrentTaskDetail()
 		// Keep Tab 2 detail viewport sized to the right pane if it's open.
 		if m.taskListComponent.ShowDetail && m.taskListComponent.detailReady {
 			m.resizeTab2DetailViewport()
@@ -401,7 +401,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-		// Tab 1 — Output: log scroll.
+		// Tab 1 — Output: log scroll. Tab 3 — Current Task: viewport scroll.
 		switch key {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
@@ -409,11 +409,15 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.activeTab == 0 {
 				m.logAutoScroll = false
 				m.logScroll = min(m.logScroll+1, m.maxLogScroll())
+			} else if m.activeTab == 2 {
+				m.currentTaskViewport.ScrollDown(1)
 			}
 		case "up":
 			if m.activeTab == 0 {
 				m.logAutoScroll = false
 				m.logScroll = max(m.logScroll-1, 0)
+			} else if m.activeTab == 2 {
+				m.currentTaskViewport.ScrollUp(1)
 			}
 		case "G":
 			if m.activeTab == 0 {

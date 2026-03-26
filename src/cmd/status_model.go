@@ -161,6 +161,7 @@ func (m *statusModel) reloadPlans() {
 	pruneStaleApprovals(m.dir, plans)
 	m.nextTaskID, m.nextTaskFile = findNextTask(plans)
 	m.rebuildForSelectedPlan()
+	m.loadCurrentTaskDetail()
 }
 
 // syncDetailSuffix updates the component's DetailSuffix from statusNote.
