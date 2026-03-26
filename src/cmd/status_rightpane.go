@@ -15,7 +15,7 @@ import (
 var rightPaneTabNames = []string{"Output", "Feature Details", "Current Task", "Metrics"}
 
 // renderRightPaneTabBar renders the tab bar at the top of the right pane.
-// Format: `1 Output  2 Feature Details  3 Current Task  4 Metrics`
+// Format: `2 Output  3 Feature Details  4 Current Task  5 Metrics`
 // The active tab has bold text and underline in primary color; inactive tabs are muted.
 // Number prefixes are always dimmed.
 func (m statusModel) renderRightPaneTabBar() string {
@@ -25,7 +25,7 @@ func (m statusModel) renderRightPaneTabBar() string {
 
 	var parts []string
 	for i, name := range rightPaneTabNames {
-		numStr := dimStyle.Render(fmt.Sprintf("%d", i+1))
+		numStr := dimStyle.Render(fmt.Sprintf("%d", i+2))
 		var nameStr string
 		if m.leftFocused {
 			nameStr = inactiveStyle.Render(name)

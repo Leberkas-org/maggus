@@ -333,10 +333,14 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 
-	// Keys 1–4 switch the right-pane active tab regardless of pane focus.
+	// Key 1 focuses the left pane; keys 2–5 focus the right pane and switch tabs.
 	switch key {
-	case "1", "2", "3", "4":
-		m.activeTab = int(key[0] - '1')
+	case "1":
+		m.leftFocused = true
+		return m, nil
+	case "2", "3", "4", "5":
+		m.leftFocused = false
+		m.activeTab = int(key[0] - '2')
 		if m.activeTab == 0 {
 			m.logAutoScroll = true
 			m.logScroll = m.maxLogScroll()
