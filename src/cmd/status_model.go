@@ -26,9 +26,8 @@ var (
 	statusGreenStyle = lipgloss.NewStyle().Foreground(styles.Success)
 	statusCyanStyle  = lipgloss.NewStyle().Foreground(styles.Primary)
 	statusRedStyle   = lipgloss.NewStyle().Foreground(styles.Error)
-	statusDimStyle   = lipgloss.NewStyle().Faint(true)
-	statusDimGreen   = lipgloss.NewStyle().Faint(true).Foreground(styles.Success)
-	statusBoldStyle  = lipgloss.NewStyle().Bold(true)
+	statusDimStyle  = lipgloss.NewStyle().Faint(true)
+	statusBoldStyle = lipgloss.NewStyle().Bold(true)
 	statusBlueStyle  = lipgloss.NewStyle().Foreground(styles.Accent)
 )
 

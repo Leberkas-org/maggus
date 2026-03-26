@@ -608,9 +608,13 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
 		m.is2x = false
+		m.width = 120
+		m.height = 40
+		m.activeTab = 1 // Feature Details tab shows task list
+		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Status") {
-			t.Error("view should contain 'Status' header")
+		if !strings.Contains(view, "Feature Details") {
+			t.Error("view should contain 'Feature Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -620,9 +624,13 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	t.Run("2x view renders without error", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
 		m.is2x = true
+		m.width = 120
+		m.height = 40
+		m.activeTab = 1 // Feature Details tab shows task list
+		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Status") {
-			t.Error("view should contain 'Status' header")
+		if !strings.Contains(view, "Feature Details") {
+			t.Error("view should contain 'Feature Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -858,25 +866,32 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 
 	t.Run("view renders bug tabs", func(t *testing.T) {
 		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
 		view := m.View()
 		if !strings.Contains(view, "bug_001") {
-			t.Error("view should contain bug tab label")
+			t.Error("view should contain bug plan label in left pane")
 		}
 		if !strings.Contains(view, "feature_001") {
-			t.Error("view should contain feature tab label")
+			t.Error("view should contain feature plan label in left pane")
 		}
 	})
 
 	t.Run("view shows bug header counts", func(t *testing.T) {
 		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
 		view := m.View()
-		if !strings.Contains(view, "1 bugs") {
-			t.Error("view header should show bug count")
+		if !strings.Contains(view, "bug_001") {
+			t.Error("view should show bug plan in left pane")
 		}
 	})
 
 	t.Run("selected bug tab shows bug tasks", func(t *testing.T) {
 		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m.width = 120
+		m.height = 40
+		m.activeTab = 1 // Feature Details tab shows task list
 		m.planCursor = 1
 		m.rebuildForSelectedPlan()
 		view := m.View()

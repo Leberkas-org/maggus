@@ -16,13 +16,6 @@ func (m statusModel) View() string {
 	if m.confirmDeleteFeature {
 		return m.viewConfirmDeleteFeature()
 	}
-	// Full-screen component takeover only in compact (non-split) mode.
-	// In split mode, task detail and confirm-delete are rendered inline in Tab 2.
-	if m.width == 0 || m.height == 0 {
-		if v := m.taskListComponent.View(); v != "" {
-			return v
-		}
-	}
 	if m.showLog {
 		return m.viewLog()
 	}
@@ -163,177 +156,12 @@ func (m statusModel) renderTabBar() string {
 }
 
 func (m statusModel) viewStatus() string {
-	// New: split-pane layout when terminal dimensions are known.
+	// Split-pane layout when terminal dimensions are known.
 	if m.width > 0 && m.height > 0 {
 		return m.viewStatusSplit()
 	}
-
-	// Fallback: compact rendering without known terminal dimensions.
-	var sb strings.Builder
-	visible := m.visiblePlans()
-
-	// Compute totals
-	totalTasks := 0
-	totalDone := 0
-	totalBlocked := 0
-	activeFeatures := 0
-	totalBugs := 0
-	activeBugs := 0
-	for _, f := range m.plans {
-		totalTasks += len(f.Tasks)
-		totalDone += f.DoneCount()
-		totalBlocked += f.BlockedCount()
-		if f.IsBug {
-			totalBugs++
-			if !f.Completed {
-				activeBugs++
-			}
-		} else {
-			if !f.Completed {
-				activeFeatures++
-			}
-		}
-	}
-	totalPending := totalTasks - totalDone - totalBlocked
-	featureCount := len(m.plans) - totalBugs
-
-	// Header
-	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
-	if totalBugs > 0 {
-		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
-	}
-	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %s, %d tasks total",
-		headerParts, totalTasks))
-	sb.WriteString(header)
-	sb.WriteString("\n")
-	sb.WriteString(m.renderDaemonStatusLine())
-	sb.WriteString("\n")
-
-	// Tab bar
-	if len(visible) > 0 {
-		sb.WriteString(m.renderTabBar())
-		sb.WriteString("\n")
-		sb.WriteString(" " + styles.Separator(42))
-		sb.WriteString("\n")
-	}
-
-	// Progress bar and summary for selected feature
-	if m.planCursor < len(visible) {
-		p := visible[m.planCursor]
-		done := p.DoneCount()
-		total := len(p.Tasks)
-		blocked := p.BlockedCount()
-		pending := total - done - blocked
-		sb.WriteString("\n " + buildProgressBar(done, total))
-		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
-			done, total, pending, blocked)
-		sb.WriteString(statusDimStyle.Render(summary))
-	} else {
-		sb.WriteString("\n " + buildProgressBar(totalDone, totalTasks))
-		summary := fmt.Sprintf("  %d/%d tasks · %d pending · %d blocked",
-			totalDone, totalTasks, totalPending, totalBlocked)
-		sb.WriteString(statusDimStyle.Render(summary))
-	}
-
-	// Task list for selected feature
-	if m.planCursor < len(visible) {
-		p := visible[m.planCursor]
-
-		sb.WriteString("\n\n")
-		if p.Completed {
-			sb.WriteString(statusDimGreen.Render(fmt.Sprintf(" Tasks — %s (archived)", filepath.Base(p.File))))
-		} else {
-			fmt.Fprintf(&sb, " Tasks — %s", filepath.Base(p.File))
-		}
-		sb.WriteString("\n")
-		sb.WriteString(" " + styles.Separator(42))
-
-		// Determine visible window for scrolling
-		visibleLines := m.visibleTaskLines()
-		end := min(m.ScrollOffset+visibleLines, len(m.Tasks))
-
-		for taskIdx := m.ScrollOffset; taskIdx < end; taskIdx++ {
-			t := m.Tasks[taskIdx]
-
-			var icon string
-			var style lipgloss.Style
-
-			if t.IsComplete() {
-				icon = "✓"
-				if p.Completed {
-					style = statusDimGreen
-				} else {
-					style = statusGreenStyle
-				}
-			} else if t.IsBlocked() {
-				icon = "⚠"
-				style = statusRedStyle
-			} else if t.ID == m.nextTaskID && t.SourceFile == m.nextTaskFile {
-				icon = "→"
-				style = statusCyanStyle
-			} else {
-				icon = "○"
-				style = lipgloss.NewStyle().Foreground(styles.Muted)
-			}
-
-			if p.Completed {
-				style = statusDimStyle
-			}
-
-			// Cursor indicator
-			var prefix string
-			if taskIdx == m.Cursor {
-				prefix = " ▸ "
-				if !p.Completed {
-					style = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-				}
-			} else {
-				prefix = "   "
-			}
-
-			line := fmt.Sprintf("%s%s  %s: %s", prefix, icon, t.ID, t.Title)
-			sb.WriteString("\n")
-			sb.WriteString(style.Render(line))
-
-			if t.IsBlocked() && !p.Completed {
-				for _, c := range t.Criteria {
-					if !c.Blocked {
-						continue
-					}
-					reason := strings.TrimPrefix(c.Text, "⚠️ BLOCKED: ")
-					reason = strings.TrimPrefix(reason, "BLOCKED: ")
-					blockedLine := fmt.Sprintf("         BLOCKED: %s", reason)
-					sb.WriteString("\n")
-					sb.WriteString(statusRedStyle.Render(blockedLine))
-				}
-			}
-		}
-
-		// Scroll indicator
-		if len(m.Tasks) > visibleLines {
-			scrollHint := fmt.Sprintf(" [%d-%d of %d]", m.ScrollOffset+1, end, len(m.Tasks))
-			sb.WriteString("\n")
-			sb.WriteString(statusDimStyle.Render(scrollHint))
-		}
-	}
-
-	// Status note (e.g. "feature approved") or delete error
-	if m.deleteFeatureErr != "" {
-		sb.WriteString("\n")
-		sb.WriteString(statusRedStyle.Render("  Error: " + m.deleteFeatureErr))
-	} else if m.statusNote != "" {
-		sb.WriteString("\n")
-		sb.WriteString(statusDimStyle.Render("  " + m.statusNote))
-	}
-
-	toggleHint := "alt+a: show all"
-	if m.showAll {
-		toggleHint = "alt+a: hide completed"
-	}
-	footer := styles.StatusBar.Render("←/→: switch feature · ↑/↓: navigate · enter: details · " + toggleHint + " · alt+p: approve/unapprove feature · alt+d: delete feature · alt+r: run · alt+bksp: delete · tab: live log · q/esc: exit")
-
-	borderColor := styles.ThemeColor(m.is2x)
-	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
+	// Dimensions not yet known (before first WindowSizeMsg) — render empty frame.
+	return ""
 }
 
 // viewStatusSplit renders the split-pane status view (left plan list + right content area).
