@@ -82,13 +82,13 @@ run-directory creation code to be removed.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `cmd/work.go`: the `runlog.Open(runID, dir)` call is replaced with `runlog.Open(plan.MaggusID, dir, cfg.LogMaxFiles())`, where `plan` is the currently selected plan and `cfg` is the loaded config
-- [ ] `cmd/daemon_keepalive.go`: the `runlog.Open(runID, dir)` call is replaced similarly — passing the active plan's `MaggusID` and `cfg.LogMaxFiles()`; if the plan is not yet known at open-time, open the logger lazily once the plan is selected, or use an empty string for `maggusID`
-- [ ] `cmd/daemon_start.go`: the `runDir` variable and its `os.MkdirAll(runDir, 0755)` call are removed from both `startCurrentDaemon` and `startDaemon`; the `runID` variable is also removed from `startCurrentDaemon` if it is no longer used
-- [ ] `cmd/daemon.go`: `generateDaemonRunID()` is removed if it has no remaining callers; `daemonLogPath()` is unchanged (daemon.log stays at `.maggus/runs/daemon.log`)
-- [ ] No remaining caller passes a bare `runID` string (e.g. `"20060102-150405"`) as the first argument to `runlog.Open`
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] `cmd/work.go`: the `runlog.Open(runID, dir)` call is replaced with `runlog.Open(plan.MaggusID, dir, cfg.LogMaxFiles())`, where `plan` is the currently selected plan and `cfg` is the loaded config
+- [x] `cmd/daemon_keepalive.go`: the `runlog.Open(runID, dir)` call is replaced similarly — passing the active plan's `MaggusID` and `cfg.LogMaxFiles()`; if the plan is not yet known at open-time, open the logger lazily once the plan is selected, or use an empty string for `maggusID`
+- [x] `cmd/daemon_start.go`: the `runDir` variable and its `os.MkdirAll(runDir, 0755)` call are removed from both `startCurrentDaemon` and `startDaemon`; the `runID` variable is also removed from `startCurrentDaemon` if it is no longer used
+- [x] `cmd/daemon.go`: `generateDaemonRunID()` is removed if it has no remaining callers; `daemonLogPath()` is unchanged (daemon.log stays at `.maggus/runs/daemon.log`)
+- [x] No remaining caller passes a bare `runID` string (e.g. `"20060102-150405"`) as the first argument to `runlog.Open`
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 

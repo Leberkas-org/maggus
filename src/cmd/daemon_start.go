@@ -92,12 +92,8 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 		removeWorkPID(dir)
 	}
 
-	// Generate run ID and create the run directory + daemon.log.
+	// Generate run ID and open daemon.log.
 	runID := generateDaemonRunID()
-	runDir := filepath.Join(dir, ".maggus", "runs", runID)
-	if err := os.MkdirAll(runDir, 0755); err != nil {
-		return fmt.Errorf("create run directory: %w", err)
-	}
 	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -222,12 +218,8 @@ func startDaemon(dir string) error {
 		removeWorkPID(dir)
 	}
 
-	// Generate run ID and create the run directory + daemon.log.
+	// Generate run ID and open daemon.log.
 	runID := generateDaemonRunID()
-	runDir := filepath.Join(dir, ".maggus", "runs", runID)
-	if err := os.MkdirAll(runDir, 0755); err != nil {
-		return fmt.Errorf("create run directory: %w", err)
-	}
 	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {

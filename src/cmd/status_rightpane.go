@@ -170,7 +170,6 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	}
 
 	// ── Top zone (fixed): blank + spinner/status + task ID/title + separator ──
-	sb.WriteString("\n")
 	spinnerStr := statusCyanStyle.Render(statusSpinnerFrames[m.spinnerFrame])
 	sColor := lipgloss.NewStyle().Foreground(styles.Warning)
 	switch snap.Status {
