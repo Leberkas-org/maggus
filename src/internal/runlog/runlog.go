@@ -12,9 +12,10 @@ import (
 // Logger writes structured run events to .maggus/runs/<runID>/run.log.
 // All methods are safe to call on a nil Logger (no-op).
 type Logger struct {
-	w     *os.File
-	runID string
-	dir   string
+	w             *os.File
+	runID         string
+	dir           string
+	currentItemID string
 }
 
 // Entry represents a single JSONL log entry written to run.log.
@@ -22,6 +23,7 @@ type Entry struct {
 	Ts          string `json:"ts"`
 	Level       string `json:"level"`
 	Event       string `json:"event"`
+	ItemID      string `json:"item_id,omitempty"`
 	FeatureID   string `json:"feature_id,omitempty"`
 	TaskID      string `json:"task_id,omitempty"`
 	Title       string `json:"title,omitempty"`
@@ -70,10 +72,23 @@ func (l *Logger) OpenDaemonLog() (io.WriteCloser, error) {
 	return f, nil
 }
 
+// SetCurrentItem sets the item ID that will be injected into all subsequent log entries.
+// Pass an empty string to clear the current item (entries outside any active plan).
+// Safe to call on a nil Logger (no-op).
+func (l *Logger) SetCurrentItem(itemID string) {
+	if l == nil {
+		return
+	}
+	l.currentItemID = itemID
+}
+
 // emit writes a single JSONL entry to run.log.
 func (l *Logger) emit(entry Entry) {
 	if l == nil || l.w == nil {
 		return
+	}
+	if entry.ItemID == "" {
+		entry.ItemID = l.currentItemID
 	}
 	entry.Ts = time.Now().UTC().Format(time.RFC3339)
 	data, err := json.Marshal(entry)

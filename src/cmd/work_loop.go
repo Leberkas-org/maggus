@@ -414,7 +414,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 		group.MaggusID = maggusID
 	}
 	tc.currentPlan = &group
-
+	tc.logger.SetCurrentItem(group.MaggusID)
 	tc.logger.FeatureStart(group.ID)
 
 	var lastCompletedTaskID string
@@ -486,6 +486,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 	}
 
 	tc.logger.FeatureComplete(group.ID)
+	tc.logger.SetCurrentItem("")
 	return result
 }
 
