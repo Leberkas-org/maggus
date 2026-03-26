@@ -218,8 +218,8 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		snapshotRunID: runID,
 		runStartedAt:  setup.startTime,
 	}
-	dm.SetOnToolUse(func(taskID, toolType, description string) {
-		runLogger.ToolUse(taskID, toolType, map[string]string{"description": description})
+	dm.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
+		runLogger.ToolUse(taskID, toolType, params)
 	})
 	dm.SetOnOutput(func(taskID, text string) {
 		runLogger.Output(taskID, text)
@@ -248,6 +248,24 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		if totalTokens > 0 {
 			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
 		}
+		modelUsage := make(map[string]runlog.ModelTokensEntry, len(tu.ModelUsage))
+		for name, mt := range tu.ModelUsage {
+			modelUsage[name] = runlog.ModelTokensEntry{
+				InputTokens:              mt.InputTokens,
+				OutputTokens:             mt.OutputTokens,
+				CacheCreationInputTokens: mt.CacheCreationInputTokens,
+				CacheReadInputTokens:     mt.CacheReadInputTokens,
+				CostUSD:                  mt.CostUSD,
+			}
+		}
+		runLogger.TaskUsage(runlog.TaskUsageData{
+			InputTokens:              tu.InputTokens,
+			OutputTokens:             tu.OutputTokens,
+			CacheCreationInputTokens: tu.CacheCreationInputTokens,
+			CacheReadInputTokens:     tu.CacheReadInputTokens,
+			CostUSD:                  tu.CostUSD,
+			ModelUsage:               modelUsage,
+		})
 	})
 
 	var p *tea.Program

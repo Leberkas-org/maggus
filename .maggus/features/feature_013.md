@@ -70,14 +70,14 @@ Additionally, the `item_id` field carries the maggus UUID but its name is opaque
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `runner/tui.go`: `onToolUse` field type changed to `func(taskID, toolType string, params map[string]string)`; `SetOnToolUse` setter updated to match
-- [ ] `runner/tui_messages.go`: `handleToolMsg` passes `msg.Params` (not `msg.Description`) to `onToolUse` callback; TUI display of `msg.Description` is unchanged
-- [ ] `cmd/daemon_tui.go`: `onToolUse` field type and `SetOnToolUse` updated; `nullTUIModel.Update` passes `msg.Params` to callback; `SnapshotToolEntry.Description` still uses `msg.Description`
-- [ ] `cmd/work.go`: `SetOnToolUse` lambda updated to `func(taskID, toolType string, params map[string]string)` calling `runLogger.ToolUse(taskID, toolType, params)`; `setupUsageCallback` call updated to pass `runLogger`
-- [ ] `cmd/work_loop.go`: `setupUsageCallback` gains `runLogger *runlog.Logger` parameter; inside `SetOnTaskUsage` callback, converts `runner.TaskUsage` model-usage map to `map[string]runlog.ModelTokensEntry` and calls `runLogger.TaskUsage(...)`
-- [ ] `cmd/daemon_keepalive.go`: `SetOnToolUse` lambda updated same as work.go; existing `SetOnTaskUsage` callback augmented to also call `runLogger.TaskUsage(...)`
-- [ ] All `SetCurrentItem` call sites updated to `SetCurrentMaggusID`
-- [ ] `go build ./...` passes
+- [x] `runner/tui.go`: `onToolUse` field type changed to `func(taskID, toolType string, params map[string]string)`; `SetOnToolUse` setter updated to match
+- [x] `runner/tui_messages.go`: `handleToolMsg` passes `msg.Params` (not `msg.Description`) to `onToolUse` callback; TUI display of `msg.Description` is unchanged
+- [x] `cmd/daemon_tui.go`: `onToolUse` field type and `SetOnToolUse` updated; `nullTUIModel.Update` passes `msg.Params` to callback; `SnapshotToolEntry.Description` still uses `msg.Description`
+- [x] `cmd/work.go`: `SetOnToolUse` lambda updated to `func(taskID, toolType string, params map[string]string)` calling `runLogger.ToolUse(taskID, toolType, params)`; `setupUsageCallback` call updated to pass `runLogger`
+- [x] `cmd/work_loop.go`: `setupUsageCallback` gains `runLogger *runlog.Logger` parameter; inside `SetOnTaskUsage` callback, converts `runner.TaskUsage` model-usage map to `map[string]runlog.ModelTokensEntry` and calls `runLogger.TaskUsage(...)`
+- [x] `cmd/daemon_keepalive.go`: `SetOnToolUse` lambda updated same as work.go; existing `SetOnTaskUsage` callback augmented to also call `runLogger.TaskUsage(...)`
+- [x] All `SetCurrentItem` call sites updated to `SetCurrentMaggusID`
+- [x] `go build ./...` passes
 
 ### TASK-013-004: Update status_runlog.go renderer and run final verification
 **Description:** As a developer, I want the log renderer updated to display `input` map data for `tool_use` entries and to render the new `task_usage` event, so that `maggus status` still works correctly.

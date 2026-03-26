@@ -27,7 +27,7 @@ type nullTUIModel struct {
 	startTime       time.Time
 	runStartedAt    time.Time
 	status          string
-	onToolUse       func(taskID, toolType, description string)
+	onToolUse       func(taskID, toolType string, params map[string]string)
 	onOutput        func(taskID, text string)
 	onTaskUsage     func(runner.TaskUsage)
 
@@ -47,7 +47,7 @@ type nullTUIModel struct {
 }
 
 // SetOnToolUse sets a callback invoked on each tool use event.
-func (m *nullTUIModel) SetOnToolUse(fn func(taskID, toolType, description string)) {
+func (m *nullTUIModel) SetOnToolUse(fn func(taskID, toolType string, params map[string]string)) {
 	m.onToolUse = fn
 }
 
@@ -123,7 +123,7 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Timestamp:   msg.Timestamp.UTC().Format(time.RFC3339),
 		})
 		if m.onToolUse != nil {
-			m.onToolUse(m.taskID, msg.Type, msg.Description)
+			m.onToolUse(m.taskID, msg.Type, msg.Params)
 		}
 		m.writeSnapshot()
 	case agent.OutputMsg:

@@ -98,7 +98,7 @@ func (m *TUIModel) handleToolMsg(msg agent.ToolMsg) {
 	}
 	clampProgressScroll(m)
 	if m.onToolUse != nil {
-		m.onToolUse(m.taskID, msg.Type, msg.Description)
+		m.onToolUse(m.taskID, msg.Type, msg.Params)
 	}
 }
 

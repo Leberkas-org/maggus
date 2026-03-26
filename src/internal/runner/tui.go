@@ -173,8 +173,8 @@ type TUIModel struct {
 	prevWorkableBugs     int    // previous workable bug count for delta detection
 	prevWorkableFeatures int    // previous workable feature count for delta detection
 
-	// Tool use callback: invoked with (taskID, toolType, description) on each tool event.
-	onToolUse func(taskID, toolType, description string)
+	// Tool use callback: invoked with (taskID, toolType, params) on each tool event.
+	onToolUse func(taskID, toolType string, params map[string]string)
 	// Output callback: invoked with (taskID, text) on each agent output event.
 	onOutput func(taskID, text string)
 }
@@ -265,8 +265,8 @@ func (m *TUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
 }
 
 // SetOnToolUse sets a callback that is invoked each time a tool use event is received.
-// The callback receives the current task ID, tool type, and tool description.
-func (m *TUIModel) SetOnToolUse(fn func(taskID, toolType, description string)) {
+// The callback receives the current task ID, tool type, and raw params map.
+func (m *TUIModel) SetOnToolUse(fn func(taskID, toolType string, params map[string]string)) {
 	m.onToolUse = fn
 }
 
