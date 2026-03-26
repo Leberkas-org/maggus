@@ -30,15 +30,15 @@ The Output tab's plain log view in the status right panel renders each log entry
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] In `renderPlainLogInPane` (status_rightpane.go), after calling `formatLogLine(line)`, split the result on `\n` to obtain sub-lines
-- [ ] Each sub-line is individually passed through `styles.Truncate(subLine, width-2)` before writing
-- [ ] A `remaining` counter (initialized to `available`) tracks visual lines consumed; it is decremented once per sub-line rendered; rendering stops when `remaining <= 0`
-- [ ] Log entries that begin at `m.logScroll` are rendered starting from sub-line 0 of that entry (no partial-entry mid-scroll; the scroll granularity stays at entry level)
-- [ ] Empty sub-lines produced by a trailing `\n` are skipped (not rendered as blank lines)
-- [ ] The scroll indicator line `[start+1 – end of total]` still counts in terms of log entries, not visual lines, and is only shown when `len(m.logLines) > available` (available in terms of entries, capped at visual budget)
-- [ ] `go build ./...` passes
-- [ ] `go vet ./...` passes
-- [ ] Existing tests in `cmd/` pass (`go test ./cmd/...`)
+- [x] In `renderPlainLogInPane` (status_rightpane.go), after calling `formatLogLine(line)`, split the result on `\n` to obtain sub-lines
+- [x] Each sub-line is individually passed through `styles.Truncate(subLine, width-2)` before writing
+- [x] A `remaining` counter (initialized to `available`) tracks visual lines consumed; it is decremented once per sub-line rendered; rendering stops when `remaining <= 0`
+- [x] Log entries that begin at `m.logScroll` are rendered starting from sub-line 0 of that entry (no partial-entry mid-scroll; the scroll granularity stays at entry level)
+- [x] Empty sub-lines produced by a trailing `\n` are skipped (not rendered as blank lines)
+- [x] The scroll indicator line `[start+1 – end of total]` still counts in terms of log entries, not visual lines, and is only shown when `len(m.logLines) > available` (available in terms of entries, capped at visual budget)
+- [x] `go build ./...` passes
+- [x] `go vet ./...` passes
+- [x] Existing tests in `cmd/` pass (`go test ./cmd/...`)
 
 ## Task Dependency Graph
 

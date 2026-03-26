@@ -139,11 +139,23 @@ func (m statusModel) renderPlainLogInPane(width, height int) string {
 		sb.WriteString("\n")
 		sb.WriteString(statusDimStyle.Render("  No active run"))
 	} else {
-		end := min(m.logScroll+available, len(m.logLines))
 		start := max(m.logScroll, 0)
-		for _, line := range m.logLines[start:end] {
-			sb.WriteString("\n ")
-			sb.WriteString(styles.Truncate(formatLogLine(line), width-2))
+		remaining := available
+		end := start
+		for i := start; i < len(m.logLines) && remaining > 0; i++ {
+			subLines := strings.Split(formatLogLine(m.logLines[i]), "\n")
+			for _, subLine := range subLines {
+				if subLine == "" {
+					continue
+				}
+				if remaining <= 0 {
+					break
+				}
+				sb.WriteString("\n ")
+				sb.WriteString(styles.Truncate(subLine, width-2))
+				remaining--
+			}
+			end = i + 1
 		}
 		if len(m.logLines) > available {
 			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))
