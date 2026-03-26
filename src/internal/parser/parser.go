@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,47 @@ var taskHeadingRe = regexp.MustCompile(`^###\s+((?:TASK|BUG)-[\w-]+?):\s+(.+)$`)
 
 // maggusIDRe matches the first-line HTML comment containing a maggus-id UUID.
 var maggusIDRe = regexp.MustCompile(`^<!--\s*maggus-id:\s*([0-9a-fA-F-]+)\s*-->$`)
+
+// generateUUID produces a UUID v4 using crypto/rand.
+func generateUUID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+}
+
+// EnsureMaggusID returns the maggus-id UUID for the file at path.
+// If the file already has a <!-- maggus-id: ... --> first line, it returns the
+// existing UUID without modifying the file. Otherwise it generates a new UUID v4,
+// prepends <!-- maggus-id: <uuid> --> as the first line, writes the file back,
+// and returns the new UUID.
+func EnsureMaggusID(path string) (string, error) {
+	if id := ParseMaggusID(path); id != "" {
+		return id, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+
+	id, err := generateUUID()
+	if err != nil {
+		return "", fmt.Errorf("generate UUID: %w", err)
+	}
+
+	header := fmt.Sprintf("<!-- maggus-id: %s -->\n", id)
+	newData := append([]byte(header), data...)
+	if err := os.WriteFile(path, newData, 0o644); err != nil {
+		return "", fmt.Errorf("write %s: %w", path, err)
+	}
+
+	return id, nil
+}
 
 // ParseMaggusID reads only the first line of the file at path and extracts the
 // maggus-id UUID from an HTML comment of the form <!-- maggus-id: <uuid> -->.

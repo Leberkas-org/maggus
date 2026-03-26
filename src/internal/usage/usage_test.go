@@ -16,10 +16,9 @@ func TestAppendCreatesFileWithJSONL(t *testing.T) {
 	records := []Record{
 		{
 			RunID:        "run-1",
-			TaskID:       "TASK-001",
+			TaskShort:       "TASK-001",
 			TaskTitle:    "First task",
-			FeatureFile:  "plan_1.md",
-			Model:        "opus",
+				Model:        "opus",
 			Agent:        "claude",
 			InputTokens:  100,
 			OutputTokens: 200,
@@ -44,8 +43,8 @@ func TestAppendCreatesFileWithJSONL(t *testing.T) {
 	if rec.RunID != "run-1" {
 		t.Errorf("RunID = %q, want %q", rec.RunID, "run-1")
 	}
-	if rec.TaskID != "TASK-001" {
-		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-001")
+	if rec.TaskShort != "TASK-001" {
+		t.Errorf("TaskShort = %q, want %q", rec.TaskShort, "TASK-001")
 	}
 }
 
@@ -53,9 +52,8 @@ func TestAppendMultipleCallsAppendsLines(t *testing.T) {
 	dir := setupDir(t)
 	rec := Record{
 		RunID:        "run-1",
-		TaskID:       "TASK-001",
+		TaskShort:       "TASK-001",
 		TaskTitle:    "Task",
-		FeatureFile:  "plan.md",
 		Model:        "sonnet",
 		Agent:        "claude",
 		InputTokens:  10,
@@ -119,10 +117,9 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 	records := []Record{
 		{
 			RunID:        "run-42",
-			TaskID:       "TASK-007",
+			TaskShort:       "TASK-007",
 			TaskTitle:    "Secret task",
-			FeatureFile:  "plan_3.md",
-			Model:        "claude-opus-4-6",
+				Model:        "claude-opus-4-6",
 			Agent:        "claude",
 			InputTokens:  5000,
 			OutputTokens: 3000,
@@ -148,8 +145,8 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 	if rec.RunID != "run-42" {
 		t.Errorf("RunID = %q, want %q", rec.RunID, "run-42")
 	}
-	if rec.TaskID != "TASK-007" {
-		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-007")
+	if rec.TaskShort != "TASK-007" {
+		t.Errorf("TaskShort = %q, want %q", rec.TaskShort, "TASK-007")
 	}
 	if rec.TaskTitle != "Secret task" {
 		t.Errorf("TaskTitle = %q, want %q", rec.TaskTitle, "Secret task")
@@ -168,7 +165,7 @@ func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
 	records := []Record{
 		{
 			RunID:     "run-1",
-			TaskID:    "TASK-001",
+			TaskShort:    "TASK-001",
 			StartTime: time.Now(),
 			EndTime:   time.Now(),
 		},
@@ -198,9 +195,8 @@ func TestAppendWritesCacheAndModelUsage(t *testing.T) {
 	records := []Record{
 		{
 			RunID:                    "run-99",
-			TaskID:                   "TASK-008",
+			TaskShort:                   "TASK-008",
 			TaskTitle:                "Cache test",
-			FeatureFile:              "plan_2.md",
 			Model:                    "claude-opus-4-6",
 			Agent:                    "claude",
 			InputTokens:              3,
@@ -264,7 +260,7 @@ func TestAppendWritesEmptyModelUsage(t *testing.T) {
 	records := []Record{
 		{
 			RunID:     "run-1",
-			TaskID:    "TASK-001",
+			TaskShort:    "TASK-001",
 			StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			EndTime:   time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
 		},
@@ -288,9 +284,9 @@ func TestAppendWritesEmptyModelUsage(t *testing.T) {
 func TestEachLineIsIndependentlyParseable(t *testing.T) {
 	dir := setupDir(t)
 	records := []Record{
-		{RunID: "run-1", TaskID: "TASK-001", StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)},
-		{RunID: "run-2", TaskID: "TASK-002", StartTime: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 1, 2, 0, 0, time.UTC)},
-		{RunID: "run-3", TaskID: "TASK-003", StartTime: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 2, 3, 0, 0, time.UTC)},
+		{RunID: "run-1", TaskShort: "TASK-001", StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)},
+		{RunID: "run-2", TaskShort: "TASK-002", StartTime: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 1, 2, 0, 0, time.UTC)},
+		{RunID: "run-3", TaskShort: "TASK-003", StartTime: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 2, 3, 0, 0, time.UTC)},
 	}
 
 	if err := Append(dir, records); err != nil {

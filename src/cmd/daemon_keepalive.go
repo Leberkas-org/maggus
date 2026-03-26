@@ -224,15 +224,10 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		runLogger.Output(taskID, text)
 	})
 	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		featureRel := tu.FeatureFile
-		if rel, err := filepath.Rel(dir, tu.FeatureFile); err == nil {
-			featureRel = rel
-		}
 		_ = usage.Append(dir, []usage.Record{{
 			RunID:                    runID,
-			TaskID:                   tu.TaskID,
+			TaskShort:                tu.TaskID,
 			TaskTitle:                tu.TaskTitle,
-			FeatureFile:              featureRel,
 			Model:                    wc.modelDisplay,
 			Agent:                    wc.activeAgent.Name(),
 			InputTokens:              tu.InputTokens,

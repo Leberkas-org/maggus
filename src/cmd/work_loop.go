@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -226,15 +225,10 @@ func firstWorkableTask(plans []parser.Plan) *parser.Task {
 // setupUsageCallback configures the TUI model to record per-task usage.
 func setupUsageCallback(m *runner.TUIModel, dir string, runID string, modelDisplay, agentName string) {
 	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		featureRel := tu.FeatureFile
-		if rel, err := filepath.Rel(dir, tu.FeatureFile); err == nil {
-			featureRel = rel
-		}
 		_ = usage.Append(dir, []usage.Record{{
 			RunID:                    runID,
-			TaskID:                   tu.TaskID,
+			TaskShort:                tu.TaskID,
 			TaskTitle:                tu.TaskTitle,
-			FeatureFile:              featureRel,
 			Model:                    modelDisplay,
 			Agent:                    agentName,
 			InputTokens:              tu.InputTokens,
