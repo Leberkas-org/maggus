@@ -10,66 +10,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-// viewLog renders the live log panel, replacing the task list content area.
-// When the daemon is running and a state.json snapshot exists, it renders a rich
-// TUI with spinner, tool list, and token stats. Otherwise it falls back to the
-// plain JSONL log reader.
-func (m statusModel) viewLog() string {
-	var sb strings.Builder
-
-	// Re-use the same header structure as viewStatus (title + daemon line + tabs + progress).
-	visible := m.visiblePlans()
-
-	totalTasks := 0
-	totalDone := 0
-	totalBlocked := 0
-	activeFeatures := 0
-	totalBugs := 0
-	activeBugs := 0
-	for _, f := range m.plans {
-		totalTasks += len(f.Tasks)
-		totalDone += f.DoneCount()
-		totalBlocked += f.BlockedCount()
-		if f.IsBug {
-			totalBugs++
-			if !f.Completed {
-				activeBugs++
-			}
-		} else {
-			if !f.Completed {
-				activeFeatures++
-			}
-		}
-	}
-	featureCount := len(m.plans) - totalBugs
-
-	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
-	if totalBugs > 0 {
-		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
-	}
-	header := styles.Title.Render(fmt.Sprintf("Maggus Status — %s, %d tasks total", headerParts, totalTasks))
-	sb.WriteString(header)
-	sb.WriteString("\n")
-	sb.WriteString(m.renderDaemonStatusLine())
-	sb.WriteString("\n")
-
-	if len(visible) > 0 {
-		sb.WriteString(m.renderTabBar())
-		sb.WriteString("\n")
-		sb.WriteString(" " + styles.Separator(42))
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString(m.renderSnapshotPanel())
-
-	footer := styles.StatusBar.Render("j/↓: scroll down · k/↑: scroll up · g: top · G: bottom (auto) · tab: features · q/esc: exit")
-	borderColor := styles.ThemeColor(m.is2x)
-	if m.Width > 0 && m.Height > 0 {
-		return styles.FullScreenColor(sb.String(), footer, m.Width, m.Height, borderColor)
-	}
-	return styles.Box.BorderForeground(borderColor).Render(sb.String()+"\n\n"+footer) + "\n"
-}
-
 // renderSnapshotPanel renders the rich live TUI from a state.json snapshot,
 // matching the layout of renderProgressTab in the work TUI.
 func (m statusModel) renderSnapshotPanel() string {

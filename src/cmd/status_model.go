@@ -75,7 +75,6 @@ type statusModel struct {
 	exitDaemonOverlay bool
 
 	// Live log panel
-	showLog       bool
 	logLines      []string
 	logScroll     int
 	logAutoScroll bool
@@ -109,7 +108,6 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		nextTaskFile:     nextTaskFile,
 		agentName:        agentName,
 		dir:              dir,
-		showLog:          showLog,
 		approvalRequired: approvalRequired,
 		approvals:        approvals,
 		logAutoScroll:    true,

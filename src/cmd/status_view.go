@@ -13,9 +13,7 @@ func (m statusModel) View() string {
 	if m.confirmDeleteFeature {
 		return m.viewConfirmDeleteFeature()
 	}
-	if m.showLog {
-		return m.viewLog()
-	}
+
 	return m.viewStatus()
 }
 
@@ -177,7 +175,7 @@ func (m statusModel) statusSplitFooter() string {
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  alt+p: approve  alt+d delete  " + daemonHint + "  q: exit"
+		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
 		if m.hasCompletedPlans() {
 			if m.showAll {
 				footer += "  alt+a: hide done"

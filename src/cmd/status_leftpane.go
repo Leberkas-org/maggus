@@ -44,9 +44,11 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 	// Border dims when the right pane has focus.
 	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
+
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	cursorStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 	selectedBg := lipgloss.NewStyle().Background(lipgloss.Color("#1f2937"))
+
+	cursorStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 	greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	orangeStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
@@ -114,7 +116,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 		// Cursor indicator (1 visual char).
 		var cursorChar string
-		if isSelected {
+		if isSelected && m.leftFocused {
 			cursorChar = cursorStyle.Render("▸")
 		} else {
 			cursorChar = " "

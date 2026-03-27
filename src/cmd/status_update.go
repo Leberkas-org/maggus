@@ -348,11 +348,11 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "t", "T":
 		_ = stopDaemonGracefully(m.dir)
 		return m, tea.Quit
-	case "k", "K":
+	case "k", "K", "ctrl+c":
 		_ = forceKill(m.daemon.PID)
 		removeDaemonPID(m.dir)
 		return m, tea.Quit
-	case "l", "L", "enter", "esc", "ctrl+c":
+	case "l", "L", "enter", "esc":
 		m.exitDaemonOverlay = false
 		return m, tea.Quit
 	}
@@ -373,37 +373,6 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Legacy compact mode: log panel is open (non-split view only).
-	if m.showLog {
-		switch msg.String() {
-		case "q", "esc", "ctrl+c":
-			return m.handleQuitRequest()
-		case "j", "down":
-			m.logAutoScroll = false
-			m.logScroll++
-			if m.logScroll > m.maxLogScroll() {
-				m.logScroll = m.maxLogScroll()
-			}
-			return m, nil
-		case "k", "up":
-			m.logAutoScroll = false
-			m.logScroll--
-			if m.logScroll < 0 {
-				m.logScroll = 0
-			}
-			return m, nil
-		case "G":
-			m.logAutoScroll = true
-			m.logScroll = m.maxLogScroll()
-			return m, nil
-		case "g":
-			m.logAutoScroll = false
-			m.logScroll = 0
-			return m, nil
-		}
-		return m, nil
-	}
-
 	// Clear deleteFeatureErr on any key press
 	if m.deleteFeatureErr != "" {
 		m.deleteFeatureErr = ""
@@ -536,7 +505,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
 		m.rebuildForSelectedPlan()
 		return m, nil
-	case "alt+p":
+	case "a":
 		return m.handleApproveToggle()
 	case "alt+d":
 		visible := m.visiblePlans()
