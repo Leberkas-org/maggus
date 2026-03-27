@@ -12,7 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-var rightPaneTabNames = []string{"Output", "Feature Details", "Current Task", "Metrics"}
+var rightPaneTabNames = []string{"Output", "Item Details", "Current Task", "Metrics"}
 
 // renderRightPaneTabBar renders the tab bar at the top of the right pane.
 // Format: `2 Output  3 Feature Details  4 Current Task  5 Metrics`
@@ -25,7 +25,7 @@ func (m statusModel) renderRightPaneTabBar() string {
 
 	var parts []string
 	for i, name := range rightPaneTabNames {
-		numStr := dimStyle.Render(fmt.Sprintf("%d", i+2))
+		numStr := dimStyle.Render(fmt.Sprintf("[%d]", i+2))
 		var nameStr string
 		if m.leftFocused {
 			nameStr = inactiveStyle.Render(name)

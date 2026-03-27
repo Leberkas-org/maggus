@@ -608,12 +608,16 @@ func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	key := f.ApprovalKey()
-	approved := isPlanApproved(f, m.approvals, m.approvalRequired)
+	// Additive-only toggle: the toggle never writes an explicit false entry.
+	// If there is an explicit true, remove the entry (back to default).
+	// Otherwise (no entry or explicit false), write explicit true.
+	// This prevents accidental unapproval in opt-out mode where the user presses
+	// 'a' expecting to confirm approval of an already-default-approved plan.
 	var err error
-	if approved {
-		err = approval.Unapprove(m.dir, key)
+	if val, ok := m.approvals[key]; ok && val {
+		err = approval.Remove(m.dir, key)
 		if err == nil {
-			m.statusNote = "feature unapproved"
+			m.statusNote = "feature approval removed"
 		}
 	} else {
 		err = approval.Approve(m.dir, key)

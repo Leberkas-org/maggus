@@ -64,7 +64,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	} else {
 		labelStyle = mutedStyle
 	}
-	headerContent := " " + dimStyle.Render("1") + " " + labelStyle.Render("Features & Bugs")
+	headerContent := " " + dimStyle.Render("[1]") + " " + labelStyle.Render("Items")
 	lines = append(lines, padToWidth(headerContent, contentW))
 
 	// Horizontal separator under daemon status line.

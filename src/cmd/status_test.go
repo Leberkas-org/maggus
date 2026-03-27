@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -642,11 +643,11 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.is2x = false
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Feature Details tab shows task list
+		m.activeTab = 1 // Item Details tab shows task list
 		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Feature Details") {
-			t.Error("view should contain 'Feature Details' tab")
+		if !strings.Contains(view, "Item Details") {
+			t.Error("view should contain 'Item Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -658,11 +659,11 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.is2x = true
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Feature Details tab shows task list
+		m.activeTab = 1 // Item Details tab shows task list
 		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Feature Details") {
-			t.Error("view should contain 'Feature Details' tab")
+		if !strings.Contains(view, "Item Details") {
+			t.Error("view should contain 'Item Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -1462,6 +1463,221 @@ func TestHasCompletedPlans(t *testing.T) {
 			t.Error("expected true when at least one plan is completed")
 		}
 	})
+}
+
+func TestMigrateApprovalKeys_MigratesFilenameToUUID(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "feature_001", MaggusID: "uuid-abc"},
+	}
+	a := approval.Approvals{"feature_001": true}
+
+	migrated := migrateApprovalKeys(plans, a)
+
+	if !migrated {
+		t.Error("expected migrated=true")
+	}
+	if _, ok := a["feature_001"]; ok {
+		t.Error("expected filename key to be removed after migration")
+	}
+	if !a["uuid-abc"] {
+		t.Error("expected UUID key to be approved after migration")
+	}
+}
+
+func TestMigrateApprovalKeys_NoMaggusID(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "feature_001"}, // no MaggusID
+	}
+	a := approval.Approvals{"feature_001": true}
+
+	migrated := migrateApprovalKeys(plans, a)
+
+	if migrated {
+		t.Error("expected migrated=false when plan has no MaggusID")
+	}
+	if !a["feature_001"] {
+		t.Error("expected filename key to remain unchanged")
+	}
+}
+
+func TestMigrateApprovalKeys_AlreadyUnderUUID(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "feature_001", MaggusID: "uuid-abc"},
+	}
+	a := approval.Approvals{"uuid-abc": true} // already under UUID key
+
+	migrated := migrateApprovalKeys(plans, a)
+
+	if migrated {
+		t.Error("expected migrated=false when UUID key already exists")
+	}
+}
+
+func TestMigrateApprovalKeys_BothKeysPresent_NoOverwrite(t *testing.T) {
+	// When both filename and UUID keys exist, do not overwrite the UUID entry.
+	plans := []parser.Plan{
+		{ID: "feature_001", MaggusID: "uuid-abc"},
+	}
+	a := approval.Approvals{
+		"feature_001": true,
+		"uuid-abc":    false, // UUID key already present with different value
+	}
+
+	migrated := migrateApprovalKeys(plans, a)
+
+	if migrated {
+		t.Error("expected migrated=false when UUID key already present")
+	}
+	if a["uuid-abc"] {
+		t.Error("expected UUID key value to remain false")
+	}
+}
+
+func TestMigrateApprovalKeys_PreventsStalePrune(t *testing.T) {
+	// After migration, pruneStaleApprovals should find the UUID key and NOT remove it.
+	dir := setupApproveDir(t)
+
+	const uuid = "migrate-prune-uuid"
+	// Simulate: approval stored under filename key before maggus-id was added.
+	if err := approval.Save(dir, approval.Approvals{"feature_001": true}); err != nil {
+		t.Fatal(err)
+	}
+
+	plans := []parser.Plan{
+		{ID: "feature_001", MaggusID: uuid, File: filepath.Join(dir, ".maggus", "features", "feature_001.md")},
+	}
+
+	// Migration step: move filename key to UUID key.
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if migrateApprovalKeys(plans, a) {
+		if err := approval.Save(dir, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// After migration, prune should NOT remove the UUID entry.
+	pruneStaleApprovals(dir, plans)
+
+	loaded, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val, ok := loaded[uuid]; !ok || !val {
+		t.Errorf("expected UUID approval to survive prune after migration, got: %v", loaded)
+	}
+}
+
+func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
+	// In opt-out mode, plan with no approval entry is approved by default.
+	// Pressing 'a' must write explicit true, NOT false (additive-only toggle).
+	dir := setupApproveDir(t)
+	// UUID must use hex characters only ([0-9a-f-]) so ParseMaggusID can parse it.
+	const uuid = "00000001-0000-4000-8000-000000000001"
+	writeApproveFeature(t, dir, "feature_001.md", uuid)
+
+	plan := parser.Plan{
+		ID:       "feature_001",
+		MaggusID: uuid,
+		File:     filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+	}
+	m := statusModel{
+		dir:              dir,
+		plans:            []parser.Plan{plan},
+		approvals:        approval.Approvals{}, // no entry
+		approvalRequired: false,                // opt-out mode
+		leftFocused:      true,
+	}
+
+	result, _ := m.handleApproveToggle()
+	newM := result.(statusModel)
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val, ok := a[uuid]; !ok || !val {
+		t.Errorf("expected explicit true written (not false), got approvals: %v", a)
+	}
+	if newM.statusNote != "feature approved" {
+		t.Errorf("expected 'feature approved' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleApproveToggle_ExplicitTrue_RemovesEntry(t *testing.T) {
+	// When an explicit true entry exists, pressing 'a' removes it (back to default).
+	dir := setupApproveDir(t)
+	const uuid = "00000002-0000-4000-8000-000000000002"
+	writeApproveFeature(t, dir, "feature_001.md", uuid)
+	if err := approval.Approve(dir, uuid); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := parser.Plan{
+		ID:       "feature_001",
+		MaggusID: uuid,
+		File:     filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+	}
+	m := statusModel{
+		dir:              dir,
+		plans:            []parser.Plan{plan},
+		approvals:        approval.Approvals{uuid: true},
+		approvalRequired: false,
+		leftFocused:      true,
+	}
+
+	result, _ := m.handleApproveToggle()
+	newM := result.(statusModel)
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a[uuid]; ok {
+		t.Errorf("expected entry to be removed, got: %v", a)
+	}
+	if newM.statusNote != "feature approval removed" {
+		t.Errorf("expected 'feature approval removed' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleApproveToggle_ExplicitFalse_ReapprovesWithTrue(t *testing.T) {
+	// When an explicit false entry exists, pressing 'a' writes explicit true.
+	dir := setupApproveDir(t)
+	const uuid = "00000003-0000-4000-8000-000000000003"
+	writeApproveFeature(t, dir, "feature_001.md", uuid)
+	if err := approval.Unapprove(dir, uuid); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := parser.Plan{
+		ID:       "feature_001",
+		MaggusID: uuid,
+		File:     filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+	}
+	m := statusModel{
+		dir:              dir,
+		plans:            []parser.Plan{plan},
+		approvals:        approval.Approvals{uuid: false},
+		approvalRequired: false,
+		leftFocused:      true,
+	}
+
+	result, _ := m.handleApproveToggle()
+	newM := result.(statusModel)
+
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val, ok := a[uuid]; !ok || !val {
+		t.Errorf("expected explicit true written, got: %v", a)
+	}
+	if newM.statusNote != "feature approved" {
+		t.Errorf("expected 'feature approved' note, got: %q", newM.statusNote)
+	}
 }
 
 func TestStatusSplitFooter_AltAHint(t *testing.T) {

@@ -123,6 +123,66 @@ func TestUnapprove(t *testing.T) {
 	}
 }
 
+func TestRemove_ExistingEntry(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := approval.Approvals{"feature_001": true, "feature_002": false}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := approval.Remove(dir, "feature_001"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := loaded["feature_001"]; ok {
+		t.Error("expected feature_001 to be removed")
+	}
+	if !loaded["feature_002"] || loaded["feature_002"] {
+		// feature_002 is explicitly false — check it still exists
+		if _, ok := loaded["feature_002"]; !ok {
+			t.Error("expected feature_002 to still be present")
+		}
+	}
+}
+
+func TestRemove_AbsentEntryIsNoOp(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	a := approval.Approvals{"feature_001": true}
+	if err := approval.Save(dir, a); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(dir, ".maggus", "feature_approvals.yml")
+	infoBefore, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := approval.Remove(dir, "feature_002"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	infoAfter, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !infoBefore.ModTime().Equal(infoAfter.ModTime()) {
+		t.Error("expected file to not be rewritten when entry was absent")
+	}
+}
+
 func TestPrune_RemovesStaleEntries(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

@@ -184,6 +184,9 @@ func (m *statusModel) rebuildForSelectedPlan() {
 func (m *statusModel) reloadPlans() {
 	plans, a, err := loadPlansWithApprovals(m.dir, true)
 	if err != nil {
+		// Surface the error so it is visible rather than silently leaving stale data.
+		m.statusNote = "reload error: " + err.Error()
+		m.syncDetailSuffix()
 		m.rebuildForSelectedPlan()
 		return
 	}
@@ -234,6 +237,9 @@ func buildSelectableTasksForFeature(plan parser.Plan, showAll bool) []parser.Tas
 }
 
 // loadPlansWithApprovals loads all plans and the current approval map.
+// It also migrates any filename-based approval keys to MaggusID-based keys,
+// preventing stale-prune badge regression when a plan gains a maggus-id after
+// its approval was first saved.
 func loadPlansWithApprovals(dir string, includeCompleted bool) ([]parser.Plan, approval.Approvals, error) {
 	plans, err := parser.LoadPlans(dir, includeCompleted)
 	if err != nil {
@@ -243,7 +249,36 @@ func loadPlansWithApprovals(dir string, includeCompleted bool) ([]parser.Plan, a
 	if err != nil {
 		return nil, nil, fmt.Errorf("load approvals: %w", err)
 	}
+	if migrateApprovalKeys(plans, a) {
+		// Best-effort persist; in-memory map is already correct even if save fails.
+		_ = approval.Save(dir, a)
+	}
 	return plans, a, nil
+}
+
+// migrateApprovalKeys rewrites any filename-based approval entries to their
+// corresponding MaggusID keys, in place. Returns true when at least one entry
+// was migrated so the caller can persist the updated map.
+//
+// Migration applies when a plan has a MaggusID AND the approval map contains
+// an entry under the filename-based ID but NOT under the UUID.  This covers
+// the case where a plan was approved before the <!-- maggus-id: ... --> comment
+// was added, causing pruneStaleApprovals to delete the legitimate entry.
+func migrateApprovalKeys(plans []parser.Plan, a approval.Approvals) bool {
+	migrated := false
+	for _, p := range plans {
+		if p.MaggusID == "" {
+			continue
+		}
+		if val, ok := a[p.ID]; ok {
+			if _, hasUUID := a[p.MaggusID]; !hasUUID {
+				a[p.MaggusID] = val
+				delete(a, p.ID)
+				migrated = true
+			}
+		}
+	}
+	return migrated
 }
 
 // isPlanApproved checks whether a plan is approved given the approval map and mode.

@@ -76,6 +76,20 @@ func Unapprove(dir, featureID string) error {
 	return Save(dir, a)
 }
 
+// Remove deletes the entry for featureID from feature_approvals.yml in dir.
+// If the entry does not exist, the function is a no-op and the file is not rewritten.
+func Remove(dir, featureID string) error {
+	a, err := Load(dir)
+	if err != nil {
+		return err
+	}
+	if _, ok := a[featureID]; !ok {
+		return nil
+	}
+	delete(a, featureID)
+	return Save(dir, a)
+}
+
 // Prune removes entries from feature_approvals.yml whose key is not in knownIDs.
 // If knownIDs is empty, the function is a no-op to prevent accidentally wiping the file.
 // If no entries are removed, the file is not rewritten.
