@@ -61,9 +61,9 @@ The `RunID` (currently inferred from the directory name) is moved into the `Stat
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/internal/runlog/snapshot_test.go`: 5 hardcoded path assertions updated to use `.maggus/runs/state.json` (no runID subdirectory)
-- [ ] `src/cmd/daemon_tui_test.go`: 1 hardcoded path assertion (~line 189) updated to the new fixed path
-- [ ] `go test ./...` passes with no failures
+- [x] `src/internal/runlog/snapshot_test.go`: 5 hardcoded path assertions updated to use `.maggus/runs/state.json` (no runID subdirectory)
+- [x] `src/cmd/daemon_tui_test.go`: 1 hardcoded path assertion (~line 189) updated to the new fixed path
+- [x] `go test ./...` passes with no failures
 
 ## Task Dependency Graph
 

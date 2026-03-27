@@ -186,7 +186,7 @@ func TestNullTUIModel_SnapshotContainsTimestamps(t *testing.T) {
 	dm = updated.(nullTUIModel)
 
 	// Read the snapshot written by IterationStartMsg.
-	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	target := filepath.Join(dir, ".maggus", "runs", "state.json")
 	data, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatalf("state.json not found: %v", err)
