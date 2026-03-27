@@ -67,7 +67,7 @@ func loadDaemonStatus(dir string) daemonStatus {
 	return info
 }
 
-// findLatestRunLog returns the run ID (latest snapshot subdirectory containing state.json)
+// findLatestRunLog returns the run ID (from the fixed-path state.json snapshot)
 // and the path to the latest flat .log file under .maggus/runs/.
 // Each is found independently; either may be empty if none exists.
 func findLatestRunLog(dir string) (runID, logPath string) {
@@ -79,16 +79,8 @@ func findLatestRunLog(dir string) (runID, logPath string) {
 
 	// Collect flat .log files (excluding daemon.log) for logPath.
 	var logFiles []string
-	// Collect subdirectories that contain state.json for runID.
-	var snapDirs []string
-
 	for _, e := range entries {
-		if e.IsDir() {
-			statePath := filepath.Join(runsDir, e.Name(), "state.json")
-			if _, err := os.Stat(statePath); err == nil {
-				snapDirs = append(snapDirs, e.Name())
-			}
-		} else if strings.HasSuffix(e.Name(), ".log") && e.Name() != "daemon.log" {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".log") && e.Name() != "daemon.log" {
 			logFiles = append(logFiles, e.Name())
 		}
 	}
@@ -99,10 +91,18 @@ func findLatestRunLog(dir string) (runID, logPath string) {
 		logPath = filepath.Join(runsDir, logFiles[len(logFiles)-1])
 	}
 
-	// Latest snapshot directory.
-	if len(snapDirs) > 0 {
-		sort.Strings(snapDirs)
-		runID = snapDirs[len(snapDirs)-1]
+	// Check the fixed-path state.json directly instead of scanning subdirectories.
+	statePath := filepath.Join(runsDir, "state.json")
+	if _, err := os.Stat(statePath); err == nil {
+		// Extract RunID from the snapshot struct for log-file lookup.
+		if snap, err := runlog.ReadSnapshot(dir); err == nil && snap.RunID != "" {
+			runID = snap.RunID
+			// If the run-specific log file exists, prefer it over the latest scanned log.
+			candidate := filepath.Join(runsDir, runID+".log")
+			if _, err := os.Stat(candidate); err == nil {
+				logPath = candidate
+			}
+		}
 	}
 
 	return runID, logPath

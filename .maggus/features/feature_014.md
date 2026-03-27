@@ -46,11 +46,11 @@ The `RunID` (currently inferred from the directory name) is moved into the `Stat
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `daemon_tui.go`: `writeSnapshot()` sets `snap.RunID = m.snapshotRunID` and calls `WriteSnapshot(m.snapshotDir, snap)` (no runID arg)
-- [ ] `daemon_keepalive.go`: `RemoveSnapshot(dir, runID)` call updated to `RemoveSnapshot(dir)`
-- [ ] `status_runlog.go`: subdirectory-scan logic replaced with a direct `os.Stat` check on `.maggus/runs/state.json`; `RunID` extracted from the snapshot struct for log-file lookup
-- [ ] `status_update.go`: `ReadSnapshot(m.dir, m.daemon.RunID)` updated to `ReadSnapshot(m.dir)`
-- [ ] `go build ./...` passes
+- [x] `daemon_tui.go`: `writeSnapshot()` sets `snap.RunID = m.snapshotRunID` and calls `WriteSnapshot(m.snapshotDir, snap)` (no runID arg)
+- [x] `daemon_keepalive.go`: `RemoveSnapshot(dir, runID)` call updated to `RemoveSnapshot(dir)`
+- [x] `status_runlog.go`: subdirectory-scan logic replaced with a direct `os.Stat` check on `.maggus/runs/state.json`; `RunID` extracted from the snapshot struct for log-file lookup
+- [x] `status_update.go`: `ReadSnapshot(m.dir, m.daemon.RunID)` updated to `ReadSnapshot(m.dir)`
+- [x] `go build ./...` passes
 
 ### TASK-014-003: Update tests
 **Description:** As a developer, I want all tests updated to reflect the new fixed path so that the test suite stays green.
