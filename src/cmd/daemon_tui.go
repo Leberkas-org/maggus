@@ -140,6 +140,7 @@ func (m *nullTUIModel) writeSnapshot() {
 		return
 	}
 	snap := runlog.StateSnapshot{
+		RunID:          m.snapshotRunID,
 		TaskID:         m.taskID,
 		TaskTitle:      m.taskTitle,
 		ItemTitle:      m.itemTitle,
@@ -154,7 +155,7 @@ func (m *nullTUIModel) writeSnapshot() {
 		TaskStartedAt:  m.startTime.UTC().Format(time.RFC3339),
 	}
 	// Best-effort write; errors are not fatal for the daemon.
-	_ = runlog.WriteSnapshot(m.snapshotDir, m.snapshotRunID, snap)
+	_ = runlog.WriteSnapshot(m.snapshotDir, snap)
 }
 
 // flushUsage saves accumulated token usage for the current task and resets counters.

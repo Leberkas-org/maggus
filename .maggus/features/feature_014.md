@@ -31,11 +31,11 @@ The `RunID` (currently inferred from the directory name) is moved into the `Stat
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `snapshotPath()` in `src/internal/runlog/snapshot.go` changed from `filepath.Join(dir, ".maggus", "runs", runID, "state.json")` to `filepath.Join(dir, ".maggus", "runs", "state.json")`
-- [ ] `runID` parameter removed from `WriteSnapshot`, `ReadSnapshot`, and `RemoveSnapshot` function signatures
-- [ ] `RunID string \`json:"run_id"\`` field added to `StateSnapshot` struct
-- [ ] All snapshot functions compile and behave correctly with the new signatures
-- [ ] `go build ./...` passes
+- [x] `snapshotPath()` in `src/internal/runlog/snapshot.go` changed from `filepath.Join(dir, ".maggus", "runs", runID, "state.json")` to `filepath.Join(dir, ".maggus", "runs", "state.json")`
+- [x] `runID` parameter removed from `WriteSnapshot`, `ReadSnapshot`, and `RemoveSnapshot` function signatures
+- [x] `RunID string \`json:"run_id"\`` field added to `StateSnapshot` struct
+- [x] All snapshot functions compile and behave correctly with the new signatures
+- [x] `go build ./...` passes
 
 ### TASK-014-002: Update callers and status discovery
 **Description:** As a developer, I want all callers of the snapshot functions updated so that the daemon writes to the new path and the status command reads from it correctly.

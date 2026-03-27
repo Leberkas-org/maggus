@@ -72,7 +72,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logPollTickMsg:
 		m.daemon = loadDaemonStatus(m.dir)
 		if m.daemon.Running && m.daemon.RunID != "" {
-			snap, err := runlog.ReadSnapshot(m.dir, m.daemon.RunID)
+			snap, err := runlog.ReadSnapshot(m.dir)
 			if err == nil {
 				m.snapshot = snap
 			}

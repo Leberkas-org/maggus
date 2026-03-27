@@ -78,7 +78,7 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		cmd.Printf("Warning: could not open run log: %v\n", logErr)
 	}
 	defer func() { _ = runLogger.Close() }()
-	defer runlog.RemoveSnapshot(dir, runID)
+	defer runlog.RemoveSnapshot(dir)
 
 	// Create filesystem watcher once and reuse across all wait cycles.
 	fw, fwErr := filewatcher.New(dir, nil, 500*time.Millisecond)

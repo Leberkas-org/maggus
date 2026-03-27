@@ -12,9 +12,9 @@ import (
 
 func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-run-001"
 
 	snap := StateSnapshot{
+		RunID:       "test-run-001",
 		TaskID:      "TASK-001",
 		TaskTitle:   "Test task",
 		ItemTitle: "feature_001.md",
@@ -32,12 +32,12 @@ func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 		Commits: []string{"feat: add snapshot"},
 	}
 
-	if err := WriteSnapshot(dir, runID, snap); err != nil {
+	if err := WriteSnapshot(dir, snap); err != nil {
 		t.Fatalf("WriteSnapshot failed: %v", err)
 	}
 
 	// Verify file exists.
-	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	target := filepath.Join(dir, ".maggus", "runs", "state.json")
 	data, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatalf("state.json not found: %v", err)
@@ -72,22 +72,21 @@ func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 
 func TestWriteSnapshot_Atomic_OverwritesExisting(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-run-002"
 
 	// Write initial snapshot.
 	snap1 := StateSnapshot{TaskID: "TASK-001", Status: "Thinking..."}
-	if err := WriteSnapshot(dir, runID, snap1); err != nil {
+	if err := WriteSnapshot(dir, snap1); err != nil {
 		t.Fatalf("first WriteSnapshot failed: %v", err)
 	}
 
 	// Overwrite with updated snapshot.
 	snap2 := StateSnapshot{TaskID: "TASK-001", Status: "Done"}
-	if err := WriteSnapshot(dir, runID, snap2); err != nil {
+	if err := WriteSnapshot(dir, snap2); err != nil {
 		t.Fatalf("second WriteSnapshot failed: %v", err)
 	}
 
 	// Verify the file contains the second snapshot.
-	parsed, err := ReadSnapshot(dir, runID)
+	parsed, err := ReadSnapshot(dir)
 	if err != nil {
 		t.Fatalf("ReadSnapshot failed: %v", err)
 	}
@@ -98,16 +97,15 @@ func TestWriteSnapshot_Atomic_OverwritesExisting(t *testing.T) {
 
 func TestRemoveSnapshot_CleansUp(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-run-003"
 
 	snap := StateSnapshot{TaskID: "TASK-001", Status: "Running"}
-	if err := WriteSnapshot(dir, runID, snap); err != nil {
+	if err := WriteSnapshot(dir, snap); err != nil {
 		t.Fatalf("WriteSnapshot failed: %v", err)
 	}
 
-	RemoveSnapshot(dir, runID)
+	RemoveSnapshot(dir)
 
-	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	target := filepath.Join(dir, ".maggus", "runs", "state.json")
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
 		t.Error("state.json should have been removed")
 	}
@@ -116,12 +114,12 @@ func TestRemoveSnapshot_CleansUp(t *testing.T) {
 func TestRemoveSnapshot_NoErrorWhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	// Should not panic or error on missing file.
-	RemoveSnapshot(dir, "nonexistent-run")
+	RemoveSnapshot(dir)
 }
 
 func TestReadSnapshot_ReturnsErrorWhenMissing(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ReadSnapshot(dir, "nonexistent-run")
+	_, err := ReadSnapshot(dir)
 	if err == nil {
 		t.Error("expected error when reading missing snapshot")
 	}
@@ -129,7 +127,6 @@ func TestReadSnapshot_ReturnsErrorWhenMissing(t *testing.T) {
 
 func TestWriteSnapshot_TimestampsPresent(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-run-timestamps"
 
 	snap := StateSnapshot{
 		TaskID:        "TASK-006",
@@ -138,11 +135,11 @@ func TestWriteSnapshot_TimestampsPresent(t *testing.T) {
 		TaskStartedAt: "2026-01-01T00:05:00Z",
 	}
 
-	if err := WriteSnapshot(dir, runID, snap); err != nil {
+	if err := WriteSnapshot(dir, snap); err != nil {
 		t.Fatalf("WriteSnapshot failed: %v", err)
 	}
 
-	target := filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+	target := filepath.Join(dir, ".maggus", "runs", "state.json")
 	data, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatalf("state.json not found: %v", err)
@@ -172,15 +169,14 @@ func TestWriteSnapshot_TimestampsPresent(t *testing.T) {
 
 func TestWriteSnapshot_NoTempFileLeftBehind(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-run-004"
 
 	snap := StateSnapshot{TaskID: "TASK-001"}
-	if err := WriteSnapshot(dir, runID, snap); err != nil {
+	if err := WriteSnapshot(dir, snap); err != nil {
 		t.Fatalf("WriteSnapshot failed: %v", err)
 	}
 
-	runDir := filepath.Join(dir, ".maggus", "runs", runID)
-	entries, err := os.ReadDir(runDir)
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		t.Fatalf("ReadDir failed: %v", err)
 	}

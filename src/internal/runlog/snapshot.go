@@ -21,6 +21,7 @@ type SnapshotToolEntry struct {
 // StateSnapshot is the live state written to state.json by the daemon work loop.
 // The status view reads this file to render a rich TUI without IPC.
 type StateSnapshot struct {
+	RunID          string                      `json:"run_id"`
 	TaskID         string                      `json:"task_id"`
 	TaskTitle      string                      `json:"task_title"`
 	ItemTitle      string                      `json:"item_title"`
@@ -36,15 +37,15 @@ type StateSnapshot struct {
 	UpdatedAt      string                      `json:"updated_at"`
 }
 
-// snapshotPath returns the path to state.json for the given run.
-func snapshotPath(dir, runID string) string {
-	return filepath.Join(dir, ".maggus", "runs", runID, "state.json")
+// snapshotPath returns the fixed path to state.json.
+func snapshotPath(dir string) string {
+	return filepath.Join(dir, ".maggus", "runs", "state.json")
 }
 
 // WriteSnapshot atomically writes the state snapshot to state.json.
 // It writes to a temporary file first, then renames it into place.
-func WriteSnapshot(dir, runID string, snap StateSnapshot) error {
-	target := snapshotPath(dir, runID)
+func WriteSnapshot(dir string, snap StateSnapshot) error {
+	target := snapshotPath(dir)
 
 	// Ensure the directory exists.
 	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
@@ -75,15 +76,15 @@ func WriteSnapshot(dir, runID string, snap StateSnapshot) error {
 }
 
 // RemoveSnapshot removes the state.json file for a clean daemon exit.
-func RemoveSnapshot(dir, runID string) {
-	target := snapshotPath(dir, runID)
+func RemoveSnapshot(dir string) {
+	target := snapshotPath(dir)
 	os.Remove(target)
 	os.Remove(target + ".tmp") // clean up any leftover temp file
 }
 
-// ReadSnapshot reads and parses the state.json snapshot for the given run.
-func ReadSnapshot(dir, runID string) (*StateSnapshot, error) {
-	target := snapshotPath(dir, runID)
+// ReadSnapshot reads and parses the state.json snapshot.
+func ReadSnapshot(dir string) (*StateSnapshot, error) {
+	target := snapshotPath(dir)
 	data, err := os.ReadFile(target)
 	if err != nil {
 		return nil, err
