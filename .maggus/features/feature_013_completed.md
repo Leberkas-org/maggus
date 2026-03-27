@@ -88,12 +88,12 @@ Additionally, the `item_id` field carries the maggus UUID but its name is opaque
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `cmd/status_runlog.go` `tool_use` case updated: uses a new private `formatToolInput(tool string, input map[string]string) string` helper that returns the most meaningful value (priority: `file` → `command` → `pattern` → `skill` → `description` → first value → tool name)
-- [ ] `cmd/status_runlog.go` `default` case updated: uses `entry.Input` instead of `entry.Description`
-- [ ] New `case "task_usage":` renders token counts and cost (e.g. `usage: 12000 in / 800 out  $0.042`)
-- [ ] All references to `entry.Description` and `entry.ItemID` removed from `status_runlog.go`
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes (all packages)
+- [x] `cmd/status_runlog.go` `tool_use` case updated: uses a new private `formatToolInput(tool string, input map[string]string) string` helper that returns the most meaningful value (priority: `file` → `command` → `pattern` → `skill` → `description` → first value → tool name)
+- [x] `cmd/status_runlog.go` `default` case updated: uses `entry.Input` instead of `entry.Description`
+- [x] New `case "task_usage":` renders token counts and cost (e.g. `usage: 12000 in / 800 out  $0.042`)
+- [x] All references to `entry.Description` and `entry.ItemID` removed from `status_runlog.go`
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes (all packages)
 
 ## Task Dependency Graph
 

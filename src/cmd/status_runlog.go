@@ -162,14 +162,7 @@ func formatLogLine(raw string) string {
 	switch entry.Event {
 	case "tool_use":
 		toolTag := logToolStyle.Render(fmt.Sprintf("[%s]", entry.Tool))
-		desc := entry.Tool
-		for _, key := range []string{"file", "command", "pattern", "skill", "description"} {
-			if v, ok := entry.Input[key]; ok && v != "" {
-				desc = v
-				break
-			}
-		}
-		return fmt.Sprintf("%s%s %s %s", tsStr, taskID, toolTag, logInfoStyle.Render(desc))
+		return fmt.Sprintf("%s%s %s %s", tsStr, taskID, toolTag, logInfoStyle.Render(formatToolInput(entry.Tool, entry.Input)))
 
 	case "output":
 		// Output is the most important content — render at full contrast (default).
@@ -226,17 +219,39 @@ func formatLogLine(raw string) string {
 		}
 		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(text))
 
+	case "task_usage":
+		totalIn := entry.InputTokens + entry.CacheCreationInputTokens + entry.CacheReadInputTokens
+		line := fmt.Sprintf("usage: %s in / %s out  %s",
+			runner.FormatTokens(totalIn), runner.FormatTokens(entry.OutputTokens), runner.FormatCost(entry.CostUSD))
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(line))
+
 	default:
 		// Unknown event — render the whole line muted with whatever fields are available
-		var parts []string
-		if entry.Text != "" {
-			parts = append(parts, entry.Text)
+		desc := entry.Text
+		if desc == "" && len(entry.Input) > 0 {
+			desc = formatToolInput(entry.Event, entry.Input)
 		}
-		if len(parts) == 0 {
-			parts = append(parts, entry.Event)
+		if desc == "" {
+			desc = entry.Event
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(strings.Join(parts, " ")))
+		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(desc))
 	}
+}
+
+// formatToolInput returns the most meaningful display value from a tool's input map.
+// Priority: file → command → pattern → skill → description → first value → tool name.
+func formatToolInput(tool string, input map[string]string) string {
+	for _, key := range []string{"file", "command", "pattern", "skill", "description"} {
+		if v, ok := input[key]; ok && v != "" {
+			return v
+		}
+	}
+	for _, v := range input {
+		if v != "" {
+			return v
+		}
+	}
+	return tool
 }
 
 // parseLogForCurrentState scans log lines from newest to oldest to find the most
