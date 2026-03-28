@@ -14,6 +14,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/hooks"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 func skipIfNoShell(t *testing.T) {
@@ -194,7 +195,7 @@ func TestIntegration_FeatureCompleteHook(t *testing.T) {
 	}
 
 	// Mark completed (renames the file)
-	completed, err := parser.MarkCompletedFeatures(dir, "rename")
+	completed, err := stores.NewFileFeatureStore(dir).MarkCompleted("rename")
 	if err != nil {
 		t.Fatalf("MarkCompletedFeatures failed: %v", err)
 	}

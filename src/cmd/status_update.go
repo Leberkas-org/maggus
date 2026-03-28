@@ -224,7 +224,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 	switch msg.String() {
 	case "y", "Y", "enter":
 		t := m.Tasks[m.Cursor]
-		if err := parser.DeleteTask(t.SourceFile, t.ID); err != nil {
+		if err := m.storeForFile(t.SourceFile).DeleteTask(t.SourceFile, t.ID); err != nil {
 			m.DeleteErr = err.Error()
 			m.ConfirmDelete = false
 			return m, nil
@@ -493,7 +493,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "alt+a":
 		m.showAll = !m.showAll
-		plans, a, err := loadPlansWithApprovals(m.dir, true)
+		plans, a, err := loadPlansWithApprovals(m.dir, m.featureStore, m.bugStore, true)
 		if err == nil {
 			m.approvals = a
 			m.plans = plans

@@ -122,20 +122,20 @@ This resolves two structural problems:
 **Parallel:** no — depends on both store implementations
 
 **Acceptance Criteria:**
-- [ ] All 9 call sites migrated (listed below)
-- [ ] `cmd/approve.go` — replace `parser.LoadPlans` with store calls
-- [ ] `cmd/detail.go` — replace `parser.UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`
-- [ ] `cmd/menu_model.go` — replace `parser.LoadPlans`
-- [ ] `cmd/status_model.go` — replace `parser.LoadPlans`
-- [ ] `cmd/status_update.go` — replace `parser.DeleteTask`
-- [ ] `cmd/tasklist.go` — replace `parser.DeleteTask`
-- [ ] `cmd/work_loop.go` — replace `parser.ParseBugs`, `ParseFeatures`, `MarkCompletedFeatures`, `MarkCompletedBugs`, `LoadPlans`
-- [ ] `cmd/work_task.go` — replace `parser.MarkCompletedFeatures`, `MarkCompletedBugs`, `GlobFeatureFiles`, `GlobBugFiles`
-- [ ] `internal/runner/tui_messages.go` — replace `parser.ParseBugs`, `ParseFeatures`
-- [ ] Store instances are constructed once and passed down (not re-created per call)
-- [ ] No direct `parser.*` file I/O calls remain outside `internal/parser` and `internal/stores`
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] All 9 call sites migrated (listed below)
+- [x] `cmd/approve.go` — replace `parser.LoadPlans` with store calls
+- [x] `cmd/detail.go` — replace `parser.UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`
+- [x] `cmd/menu_model.go` — replace `parser.LoadPlans`
+- [x] `cmd/status_model.go` — replace `parser.LoadPlans`
+- [x] `cmd/status_update.go` — replace `parser.DeleteTask`
+- [x] `cmd/tasklist.go` — replace `parser.DeleteTask`
+- [x] `cmd/work_loop.go` — replace `parser.ParseBugs`, `ParseFeatures`, `MarkCompletedFeatures`, `MarkCompletedBugs`, `LoadPlans`
+- [x] `cmd/work_task.go` — replace `parser.MarkCompletedFeatures`, `MarkCompletedBugs`, `GlobFeatureFiles`, `GlobBugFiles`
+- [x] `internal/runner/tui_messages.go` — replace `parser.ParseBugs`, `ParseFeatures`
+- [x] Store instances are constructed once and passed down (not re-created per call)
+- [x] No direct `parser.*` file I/O calls remain outside `internal/parser` and `internal/stores`
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 

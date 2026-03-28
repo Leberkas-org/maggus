@@ -9,14 +9,28 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 )
 
+// loadAllPlans loads all plans from both stores (bugs first, then features).
+func loadAllPlans(featureStore stores.FeatureStore, bugStore stores.BugStore) ([]parser.Plan, error) {
+	bugPlans, err := bugStore.LoadAll(false)
+	if err != nil {
+		return nil, err
+	}
+	featurePlans, err := featureStore.LoadAll(false)
+	if err != nil {
+		return nil, err
+	}
+	return append(bugPlans, featurePlans...), nil
+}
+
 // resolveFeature finds an active plan by display name (ID) and returns it.
 // Returns the plan and true if found, or zero value and false otherwise.
-func resolveFeature(dir, featureID string) (parser.Plan, bool, error) {
-	plans, err := parser.LoadPlans(dir, false)
+func resolveFeature(featureStore stores.FeatureStore, bugStore stores.BugStore, featureID string) (parser.Plan, bool, error) {
+	plans, err := loadAllPlans(featureStore, bugStore)
 	if err != nil {
 		return parser.Plan{}, false, err
 	}
@@ -39,15 +53,17 @@ var approveCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
+		featureStore := stores.NewFileFeatureStore(dir)
+		bugStore := stores.NewFileBugStore(dir)
 		if len(args) == 1 {
-			return runApprove(cmd, dir, args[0])
+			return runApprove(cmd, dir, featureStore, bugStore, args[0])
 		}
-		return runApproveInteractive(cmd, dir)
+		return runApproveInteractive(cmd, dir, featureStore, bugStore)
 	},
 }
 
-func runApprove(cmd *cobra.Command, dir, featureID string) error {
-	plan, found, err := resolveFeature(dir, featureID)
+func runApprove(cmd *cobra.Command, dir string, featureStore stores.FeatureStore, bugStore stores.BugStore, featureID string) error {
+	plan, found, err := resolveFeature(featureStore, bugStore, featureID)
 	if err != nil {
 		return err
 	}
@@ -74,8 +90,8 @@ func runApprove(cmd *cobra.Command, dir, featureID string) error {
 }
 
 // runApproveInteractive shows an interactive picker of unapproved features.
-func runApproveInteractive(cmd *cobra.Command, dir string) error {
-	plans, err := parser.LoadPlans(dir, false)
+func runApproveInteractive(cmd *cobra.Command, dir string, featureStore stores.FeatureStore, bugStore stores.BugStore) error {
+	plans, err := loadAllPlans(featureStore, bugStore)
 	if err != nil {
 		return err
 	}
@@ -111,7 +127,7 @@ func runApproveInteractive(cmd *cobra.Command, dir string) error {
 		cmd.Println("Cancelled.")
 		return nil
 	}
-	return runApprove(cmd, dir, selected)
+	return runApprove(cmd, dir, featureStore, bugStore, selected)
 }
 
 var unapproveCmd = &cobra.Command{
@@ -125,15 +141,17 @@ var unapproveCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
+		featureStore := stores.NewFileFeatureStore(dir)
+		bugStore := stores.NewFileBugStore(dir)
 		if len(args) == 1 {
-			return runUnapprove(cmd, dir, args[0])
+			return runUnapprove(cmd, dir, featureStore, bugStore, args[0])
 		}
-		return runUnapproveInteractive(cmd, dir)
+		return runUnapproveInteractive(cmd, dir, featureStore, bugStore)
 	},
 }
 
-func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
-	plan, found, err := resolveFeature(dir, featureID)
+func runUnapprove(cmd *cobra.Command, dir string, featureStore stores.FeatureStore, bugStore stores.BugStore, featureID string) error {
+	plan, found, err := resolveFeature(featureStore, bugStore, featureID)
 	if err != nil {
 		return err
 	}
@@ -160,8 +178,8 @@ func runUnapprove(cmd *cobra.Command, dir, featureID string) error {
 }
 
 // runUnapproveInteractive shows an interactive picker of approved features.
-func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
-	plans, err := parser.LoadPlans(dir, false)
+func runUnapproveInteractive(cmd *cobra.Command, dir string, featureStore stores.FeatureStore, bugStore stores.BugStore) error {
+	plans, err := loadAllPlans(featureStore, bugStore)
 	if err != nil {
 		return err
 	}
@@ -197,7 +215,7 @@ func runUnapproveInteractive(cmd *cobra.Command, dir string) error {
 		cmd.Println("Cancelled.")
 		return nil
 	}
-	return runUnapprove(cmd, dir, selected)
+	return runUnapprove(cmd, dir, featureStore, bugStore, selected)
 }
 
 // --- Interactive picker using bubbletea ---

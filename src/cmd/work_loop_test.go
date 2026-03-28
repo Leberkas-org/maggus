@@ -8,6 +8,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 // mockPrinter captures Println/Printf calls for testing.
@@ -233,7 +234,7 @@ func TestInitIteration_MergedBugsAndFeatures(t *testing.T) {
 	}
 
 	mp := &mockPrinter{}
-	setup, err := initIteration(mp, dir, "test-model", 0)
+	setup, err := initIteration(mp, dir, "test-model", 0, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("initIteration error: %v", err)
 	}
@@ -300,7 +301,7 @@ func TestInitIteration_BugTaskTargeting(t *testing.T) {
 	}
 
 	mp := &mockPrinter{}
-	setup, err := initIteration(mp, dir, "test-model", 0)
+	setup, err := initIteration(mp, dir, "test-model", 0, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("initIteration error: %v", err)
 	}
@@ -339,7 +340,7 @@ func TestInitIteration_OnlyFeaturesNoBugs(t *testing.T) {
 	}
 
 	mp := &mockPrinter{}
-	setup, err := initIteration(mp, dir, "test-model", 0)
+	setup, err := initIteration(mp, dir, "test-model", 0, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("initIteration error: %v", err)
 	}
@@ -360,7 +361,7 @@ func TestInitIteration_EmptyNoBugsNoFeatures(t *testing.T) {
 	dir := t.TempDir()
 
 	mp := &mockPrinter{}
-	setup, err := initIteration(mp, dir, "test-model", 0)
+	setup, err := initIteration(mp, dir, "test-model", 0, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -540,7 +541,7 @@ func TestParseAllTasksPicksUpNewFile(t *testing.T) {
 	}
 
 	// First parse: no workable tasks.
-	tasks, err := parseAllTasks(dir)
+	tasks, err := parseAllTasks(stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("parseAllTasks error: %v", err)
 	}
@@ -560,7 +561,7 @@ func TestParseAllTasksPicksUpNewFile(t *testing.T) {
 	}
 
 	// Second parse: should find the new workable task.
-	freshTasks, err := parseAllTasks(dir)
+	freshTasks, err := parseAllTasks(stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("parseAllTasks (fresh) error: %v", err)
 	}
@@ -662,7 +663,7 @@ func TestBuildApprovedPlans_OptOutAllApproved(t *testing.T) {
 	writeFeatureFile(t, dir, "feature_002.md", incompleteTaskContent("TASK-002-001", "Add another"))
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -678,7 +679,7 @@ func TestBuildApprovedPlans_OptInNoApprovals(t *testing.T) {
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -696,7 +697,7 @@ func TestBuildApprovedPlans_OptInPartialApproval(t *testing.T) {
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -718,7 +719,7 @@ func TestBuildApprovedPlans_BugsFirst(t *testing.T) {
 	writeApprovals(t, dir, "feature_001", "bug_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -738,7 +739,7 @@ func TestBuildApprovedPlans_BugsFirst(t *testing.T) {
 func TestBuildApprovedPlans_EmptyDir(t *testing.T) {
 	dir := setupCleanDir(t)
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -888,7 +889,7 @@ func TestBuildApprovedPlans_UUIDApprovalKey(t *testing.T) {
 	writeApprovals(t, dir, "aaa0bbb0-cccc-dddd-eeee-fff000111222")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -911,7 +912,7 @@ func TestBuildApprovedPlans_UUIDFallbackToFilename(t *testing.T) {
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -933,7 +934,7 @@ func TestBuildApprovedPlans_UUIDNotApprovedByFilename(t *testing.T) {
 	writeApprovals(t, dir, "feature_001")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -957,7 +958,7 @@ func TestBuildApprovedPlans_PruneStaleEntries(t *testing.T) {
 	}
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	_, err := buildApprovedPlans(dir, cfg)
+	_, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -983,7 +984,7 @@ func TestBuildApprovedPlans_BugUUIDApproval(t *testing.T) {
 	writeApprovals(t, dir, "b0b0b0b0-1111-2222-3333-444444444444")
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1011,7 +1012,7 @@ func TestBuildApprovedPlans_CompletedFileExcluded(t *testing.T) {
 	}
 
 	cfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
-	groups, err := buildApprovedPlans(dir, cfg)
+	groups, err := buildApprovedPlans(dir, cfg, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

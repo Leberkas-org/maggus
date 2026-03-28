@@ -16,6 +16,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
 
@@ -29,21 +30,32 @@ type iterationSetup struct {
 	workDir   string
 }
 
+// plansToTasks extracts the flat task list from a slice of plans.
+func plansToTasks(plans []parser.Plan) []parser.Task {
+	var tasks []parser.Task
+	for _, p := range plans {
+		tasks = append(tasks, p.Tasks...)
+	}
+	return tasks
+}
+
 // initIteration parses features and bugs, merges them into a single task list
 // (bugs first, then features), finds the next workable task, caps the count,
 // and creates a run tracker. Returns nil setup with no error when there is
 // nothing to do (e.g. all tasks complete/blocked).
-func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay string, count int) (*iterationSetup, error) {
+func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay string, count int, featureStore stores.FeatureStore, bugStore stores.BugStore) (*iterationSetup, error) {
 	// Parse bugs first — they take priority over features.
-	bugTasks, bugErr := parser.ParseBugs(dir)
+	bugPlans, bugErr := bugStore.LoadAll(false)
 	if bugErr != nil {
 		return nil, fmt.Errorf("parse bugs: %w", bugErr)
 	}
+	bugTasks := plansToTasks(bugPlans)
 
-	featureTasks, featureErr := parser.ParseFeatures(dir)
+	featurePlans, featureErr := featureStore.LoadAll(false)
 	if featureErr != nil {
 		return nil, fmt.Errorf("parse features: %w", featureErr)
 	}
+	featureTasks := plansToTasks(featurePlans)
 
 	// Merge: bugs first, then features.
 	tasks := mergeBugAndFeatureTasks(bugTasks, featureTasks)
@@ -53,8 +65,8 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 		return nil, nil
 	}
 
-	_, _ = parser.MarkCompletedFeatures(dir, "")
-	_, _ = parser.MarkCompletedBugs(dir, "")
+	_, _ = featureStore.MarkCompleted("")
+	_, _ = bugStore.MarkCompleted("")
 
 	next, done := findInitialTask(cmd, tasks)
 	if done {
@@ -84,17 +96,17 @@ func mergeBugAndFeatureTasks(bugs, features []parser.Task) []parser.Task {
 	return tasks
 }
 
-// parseAllTasks parses both bugs and features and returns a merged task list (bugs first).
-func parseAllTasks(dir string) ([]parser.Task, error) {
-	bugTasks, bugErr := parser.ParseBugs(dir)
+// parseAllTasks loads all plans from both stores and returns a merged task list (bugs first).
+func parseAllTasks(featureStore stores.FeatureStore, bugStore stores.BugStore) ([]parser.Task, error) {
+	bugPlans, bugErr := bugStore.LoadAll(false)
 	if bugErr != nil {
 		return nil, fmt.Errorf("parse bugs: %w", bugErr)
 	}
-	featureTasks, featureErr := parser.ParseFeatures(dir)
+	featurePlans, featureErr := featureStore.LoadAll(false)
 	if featureErr != nil {
 		return nil, fmt.Errorf("parse features: %w", featureErr)
 	}
-	return mergeBugAndFeatureTasks(bugTasks, featureTasks), nil
+	return mergeBugAndFeatureTasks(plansToTasks(bugPlans), plansToTasks(featurePlans)), nil
 }
 
 // printer is satisfied by cobra.Command.
@@ -159,8 +171,8 @@ func countWorkable(tasks []parser.Task) int {
 
 // buildApprovedPlans loads all plans (bugs first, then features), filters by
 // approval state, prunes stale approvals, and returns the ordered list.
-func buildApprovedPlans(dir string, cfg config.Config) ([]parser.Plan, error) {
-	plans, err := parser.LoadPlans(dir, false)
+func buildApprovedPlans(dir string, cfg config.Config, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]parser.Plan, error) {
+	plans, err := loadAllPlans(featureStore, bugStore)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +302,8 @@ type workLoopParams struct {
 	startHash     string
 	modelDisplay  string
 	dir           string
+	featureStore  stores.FeatureStore
+	bugStore      stores.BugStore
 }
 
 // runWorkGoroutine runs the feature-centric work loop in a goroutine, sending TUI events.
@@ -522,7 +536,7 @@ func buildSummaryData(params workLoopParams, completed int, failedTasks []failed
 	currentBranch := strings.TrimSpace(string(branchNameOut))
 
 	var remaining []runner.RemainingTask
-	latestTasks, _ := parseAllTasks(params.tc.workDir)
+	latestTasks, _ := parseAllTasks(params.featureStore, params.bugStore)
 	for _, t := range latestTasks {
 		if t.IsWorkable() {
 			remaining = append(remaining, runner.RemainingTask{ID: t.ID, Title: t.Title})

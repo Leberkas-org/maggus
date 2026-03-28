@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -167,6 +168,10 @@ type TUIModel struct {
 	workDir    string // directory used for re-parsing features/bugs on file changes
 	activeBugs int    // count of workable bug tasks (for hint line)
 
+	// Stores for re-parsing on file change events.
+	featureStore taskStoreReader
+	bugStore     taskStoreReader
+
 	// Inline notification for new file detection
 	notification         string // current notification text (empty = hidden)
 	notificationTimerID  int    // monotonic ID to avoid stale timers hiding newer notifications
@@ -177,6 +182,19 @@ type TUIModel struct {
 	onToolUse func(taskID, toolType string, params map[string]string)
 	// Output callback: invoked with (taskID, text) on each agent output event.
 	onOutput func(taskID, text string)
+}
+
+// taskStoreReader is a minimal interface for loading plans from a store.
+// Defined locally so the runner package does not need to import internal/stores.
+type taskStoreReader interface {
+	LoadAll(includeCompleted bool) ([]parser.Plan, error)
+}
+
+// SetStores configures the feature and bug stores used by handleFileChange
+// to re-parse task counts when the file watcher fires.
+func (m *TUIModel) SetStores(featureStore, bugStore taskStoreReader) {
+	m.featureStore = featureStore
+	m.bugStore = bugStore
 }
 
 // SetSyncDir sets the directory used for git sync operations between tasks.

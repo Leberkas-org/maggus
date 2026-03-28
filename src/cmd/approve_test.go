@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +54,7 @@ func TestRunApprove_ApprovesByID(t *testing.T) {
 	writeApproveFeature(t, dir, "feature_001.md", testUUID)
 
 	cmd, stdout, _ := newTestCmd(t)
-	if err := runApprove(cmd, dir, "feature_001"); err != nil {
+	if err := runApprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -78,7 +79,7 @@ func TestRunApprove_AlreadyApproved(t *testing.T) {
 	}
 
 	cmd, stdout, _ := newTestCmd(t)
-	if err := runApprove(cmd, dir, "feature_001"); err != nil {
+	if err := runApprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "already approved") {
@@ -90,7 +91,7 @@ func TestRunApprove_FeatureNotFound(t *testing.T) {
 	dir := setupApproveDir(t)
 
 	cmd, _, _ := newTestCmd(t)
-	err := runApprove(cmd, dir, "feature_099")
+	err := runApprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_099")
 	if err == nil {
 		t.Fatal("expected error for non-existent feature")
 	}
@@ -104,7 +105,7 @@ func TestRunApprove_FallbackToFilename(t *testing.T) {
 	writeApproveFeature(t, dir, "feature_001.md", "") // no maggus-id
 
 	cmd, stdout, _ := newTestCmd(t)
-	if err := runApprove(cmd, dir, "feature_001"); err != nil {
+	if err := runApprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -128,7 +129,7 @@ func TestRunUnapprove_UnapprovesID(t *testing.T) {
 	}
 
 	cmd, stdout, _ := newTestCmd(t)
-	if err := runUnapprove(cmd, dir, "feature_001"); err != nil {
+	if err := runUnapprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -149,7 +150,7 @@ func TestRunUnapprove_NotApproved(t *testing.T) {
 	writeApproveFeature(t, dir, "feature_001.md", testUUID)
 
 	cmd, stdout, _ := newTestCmd(t)
-	if err := runUnapprove(cmd, dir, "feature_001"); err != nil {
+	if err := runUnapprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_001"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "not approved") {
@@ -161,7 +162,7 @@ func TestRunUnapprove_FeatureNotFound(t *testing.T) {
 	dir := setupApproveDir(t)
 
 	cmd, _, _ := newTestCmd(t)
-	err := runUnapprove(cmd, dir, "feature_099")
+	err := runUnapprove(cmd, dir, stores.NewFileFeatureStore(dir), stores.NewFileBugStore(dir), "feature_099")
 	if err == nil {
 		t.Fatal("expected error for non-existent feature")
 	}

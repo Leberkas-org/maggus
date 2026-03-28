@@ -22,6 +22,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 // taskAction indicates what the work loop should do after a task iteration.
@@ -59,6 +60,8 @@ type taskContext struct {
 	onComplete    config.OnCompleteConfig
 	hooks         config.HooksConfig
 	logger        *runlog.Logger // structured run log; nil-safe
+	featureStore  stores.FeatureStore
+	bugStore      stores.BugStore
 
 	// Discord Rich Presence (nil when disabled).
 	presence *discord.Presence
@@ -132,7 +135,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	}
 
 	// Re-parse to pick up any changes the agent made (bugs + features).
-	parsedTasks, parseErr := parseAllTasks(tc.workDir)
+	parsedTasks, parseErr := parseAllTasks(tc.featureStore, tc.bugStore)
 	if parseErr != nil {
 		reason := fmt.Sprintf("re-parse tasks: %v", parseErr)
 		return taskResult{
@@ -149,14 +152,14 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	bugAction := tc.onComplete.BugAction()
 	var featureSnapshots, bugSnapshots []completionSnapshot
 	if len(tc.hooks.OnFeatureComplete) > 0 {
-		featureSnapshots = snapshotForHooks(tc.workDir, true)
+		featureSnapshots = snapshotForHooks(tc.featureStore)
 	}
 	if len(tc.hooks.OnBugComplete) > 0 {
-		bugSnapshots = snapshotForHooks(tc.workDir, false)
+		bugSnapshots = snapshotForHooks(tc.bugStore)
 	}
 
-	completedFeatures, _ := parser.MarkCompletedFeatures(tc.workDir, featureAction)
-	completedBugs, _ := parser.MarkCompletedBugs(tc.workDir, bugAction)
+	completedFeatures, _ := tc.featureStore.MarkCompleted(featureAction)
+	completedBugs, _ := tc.bugStore.MarkCompleted(bugAction)
 	if len(completedFeatures) > 0 || len(completedBugs) > 0 {
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{
 			FeaturesCompleted: int64(len(completedFeatures)),
@@ -398,16 +401,15 @@ type completionSnapshot struct {
 	tasks    []hooks.TaskInfo
 }
 
+// fileGlober is satisfied by FeatureStore and BugStore for snapshotForHooks.
+type fileGlober interface {
+	GlobFiles(includeCompleted bool) ([]string, error)
+}
+
 // snapshotForHooks pre-reads metadata from files that are candidates for completion.
 // Only called when hooks are configured, so there is zero overhead otherwise.
-// isFeature selects feature vs bug file globbing.
-func snapshotForHooks(workDir string, isFeature bool) []completionSnapshot {
-	var files []string
-	if isFeature {
-		files, _ = parser.GlobFeatureFiles(workDir, false)
-	} else {
-		files, _ = parser.GlobBugFiles(workDir, false)
-	}
+func snapshotForHooks(store fileGlober) []completionSnapshot {
+	files, _ := store.GlobFiles(false)
 
 	snapshots := make([]completionSnapshot, 0, len(files))
 	for _, f := range files {

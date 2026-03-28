@@ -12,6 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
@@ -164,7 +165,10 @@ func runStatus() error {
 	agentName := cfg.Agent
 	approvalRequired := cfg.IsApprovalRequired()
 
-	features, approvals, err := loadPlansWithApprovals(dir, true)
+	featureStore := stores.NewFileFeatureStore(dir)
+	bugStore := stores.NewFileBugStore(dir)
+
+	features, approvals, err := loadPlansWithApprovals(dir, featureStore, bugStore, true)
 	if err != nil {
 		return err
 	}
@@ -188,7 +192,7 @@ func runStatus() error {
 		}
 	}, 300*time.Millisecond)
 
-	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals)
+	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals, featureStore, bugStore)
 	m.presence = sharedPresence
 	m.watcherCh = watcherCh
 	m.watcher = w

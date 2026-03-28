@@ -12,6 +12,15 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
+// planStore is the subset of FeatureStore/BugStore needed by taskListComponent
+// for deleting tasks and mutating criteria.
+type planStore interface {
+	DeleteTask(filePath, taskID string) error
+	UnblockCriterion(filePath string, c parser.Criterion) error
+	ResolveCriterion(filePath string, c parser.Criterion) error
+	DeleteCriterion(filePath string, c parser.Criterion) error
+}
+
 // taskListAction signals what happened after an Update call.
 type taskListAction int
 
@@ -54,6 +63,19 @@ type taskListComponent struct {
 
 	// Run action — set when user presses Alt+R
 	RunTaskID string
+
+	// Stores for task/criterion mutations. Set by the parent model at construction.
+	featureStore planStore
+	bugStore     planStore
+}
+
+// storeForFile returns the appropriate store for the given source file path.
+// Bug files (containing /bugs/ or \bugs\) use bugStore; all others use featureStore.
+func (c *taskListComponent) storeForFile(sourceFile string) planStore {
+	if strings.Contains(sourceFile, "/bugs/") || strings.Contains(sourceFile, `\bugs\`) {
+		return c.bugStore
+	}
+	return c.featureStore
 }
 
 // effectiveBorderColor returns the border color to use, defaulting to Primary.
@@ -300,7 +322,7 @@ func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskLis
 		c.refreshDetailViewport()
 	case "enter":
 		action := criteriaActions[c.Detail.actionCursor]
-		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action)
+		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action, c.storeForFile(c.Tasks[c.Cursor].SourceFile))
 		c.Detail.showActionPicker = false
 		if modified {
 			// Reload task from disk
@@ -327,7 +349,7 @@ func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskLi
 	switch msg.String() {
 	case "y", "Y", "enter":
 		t := c.Tasks[c.Cursor]
-		if err := parser.DeleteTask(t.SourceFile, t.ID); err != nil {
+		if err := c.storeForFile(t.SourceFile).DeleteTask(t.SourceFile, t.ID); err != nil {
 			c.DeleteErr = err.Error()
 			c.ConfirmDelete = false
 			return nil, taskListNone

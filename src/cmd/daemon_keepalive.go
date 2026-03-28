@@ -11,12 +11,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
-	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/gitsync"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
 
@@ -170,8 +171,11 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, s
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
 func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+	featureStore := stores.NewFileFeatureStore(dir)
+	bugStore := stores.NewFileBugStore(dir)
+
 	// Parse tasks and check for work.
-	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0)
+	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0, featureStore, bugStore)
 	if err != nil {
 		return false, err
 	}
@@ -180,7 +184,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	}
 
 	// Build approved plans with approval filtering.
-	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg)
+	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg, featureStore, bugStore)
 	if fgErr != nil {
 		return false, fmt.Errorf("build approved plans: %w", fgErr)
 	}
@@ -294,6 +298,8 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		onComplete:    wc.cfg.OnComplete,
 		hooks:         wc.cfg.Hooks,
 		logger:        runLogger,
+		featureStore:  featureStore,
+		bugStore:      bugStore,
 	}
 
 	runWorkGoroutine(workLoopParams{
@@ -312,6 +318,8 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		startHash:     captureStartHash(workDir),
 		modelDisplay:  wc.modelDisplay,
 		dir:           dir,
+		featureStore:  featureStore,
+		bugStore:      bugStore,
 	})
 
 	_, tuiErr := p.Run()

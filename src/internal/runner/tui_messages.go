@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
-	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 // handleIterationStart resets per-iteration state when a new task begins.
@@ -151,26 +151,36 @@ func (m *TUIModel) handleFileChange() tea.Cmd {
 	if m.workDir == "" {
 		return nil
 	}
+	featureStore := m.featureStore
+	bugStore := m.bugStore
+	if featureStore == nil || bugStore == nil {
+		featureStore = stores.NewFileFeatureStore(m.workDir)
+		bugStore = stores.NewFileBugStore(m.workDir)
+	}
 
-	bugTasks, bugErr := parser.ParseBugs(m.workDir)
+	bugPlans, bugErr := bugStore.LoadAll(false)
 	if bugErr != nil {
 		return nil
 	}
-	featureTasks, featureErr := parser.ParseFeatures(m.workDir)
+	featurePlans, featureErr := featureStore.LoadAll(false)
 	if featureErr != nil {
 		return nil
 	}
 
 	workableBugs := 0
 	workableFeatures := 0
-	for i := range bugTasks {
-		if bugTasks[i].IsWorkable() {
-			workableBugs++
+	for _, p := range bugPlans {
+		for i := range p.Tasks {
+			if p.Tasks[i].IsWorkable() {
+				workableBugs++
+			}
 		}
 	}
-	for i := range featureTasks {
-		if featureTasks[i].IsWorkable() {
-			workableFeatures++
+	for _, p := range featurePlans {
+		for i := range p.Tasks {
+			if p.Tasks[i].IsWorkable() {
+				workableFeatures++
+			}
 		}
 	}
 

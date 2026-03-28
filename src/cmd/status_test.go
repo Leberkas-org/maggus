@@ -10,6 +10,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -494,7 +495,7 @@ func TestNewStatusModel(t *testing.T) {
 	}
 
 	t.Run("initializes with correct fields", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-002", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-002", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if m.nextTaskID != "TASK-002" {
 			t.Errorf("nextTaskID = %q, want TASK-002", m.nextTaskID)
 		}
@@ -513,14 +514,14 @@ func TestNewStatusModel(t *testing.T) {
 	})
 
 	t.Run("showAll includes complete tasks", func(t *testing.T) {
-		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, true, "TASK-002", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if len(m.Tasks) != 2 {
 			t.Errorf("Tasks len = %d, want 2", len(m.Tasks))
 		}
 	})
 
 	t.Run("empty plans", func(t *testing.T) {
-		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		if len(m.Tasks) != 0 {
 			t.Errorf("Tasks len = %d, want 0", len(m.Tasks))
 		}
@@ -531,7 +532,7 @@ func TestNewStatusModel_InitialDimensions(t *testing.T) {
 	// In a non-TTY test environment xterm.GetSize returns 0,0 and newStatusModel
 	// initializes to those values. The key invariant is that m.taskListComponent.Width
 	// always mirrors m.width (HandleResize was called in the constructor).
-	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 	if m.taskListComponent.Width != m.width {
 		t.Errorf("constructor: taskListComponent.Width (%d) != m.width (%d); HandleResize not called", m.taskListComponent.Width, m.width)
 	}
@@ -542,7 +543,7 @@ func TestNewStatusModel_InitialDimensions(t *testing.T) {
 
 func TestStatusModel_WindowSizeMsgUpdatesDimensions(t *testing.T) {
 	// WindowSizeMsg must update m.width/m.height and forward to HandleResize (regression guard).
-	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 	model, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	updated := model.(statusModel)
 
@@ -590,7 +591,7 @@ func TestEnsureCursorVisible(t *testing.T) {
 }
 
 func TestStatusModel_InitReturnsCmd(t *testing.T) {
-	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+	m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Error("Init() should return a non-nil Cmd for async 2x fetch")
@@ -605,7 +606,7 @@ func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
 	}
 
 	t.Run("2x active sets is2x and BorderColor to Warning", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		msg := claude2xResultMsg{status: claude2x.Status{Is2x: true, TwoXWindowExpiresIn: "5h"}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
@@ -618,7 +619,7 @@ func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
 	})
 
 	t.Run("2x inactive keeps is2x false and BorderColor Primary", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		msg := claude2xResultMsg{status: claude2x.Status{Is2x: false}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
@@ -639,7 +640,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	}
 
 	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.is2x = false
 		m.width = 120
 		m.height = 40
@@ -655,7 +656,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	})
 
 	t.Run("2x view renders without error", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.is2x = true
 		m.width = 120
 		m.height = 40
@@ -671,7 +672,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 	})
 
 	t.Run("empty features view renders with 2x", func(t *testing.T) {
-		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.is2x = true
 		m.width = 120
 		m.height = 40
@@ -857,7 +858,7 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 	}
 
 	t.Run("tabs include bugs", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		visible := m.visiblePlans()
 		if len(visible) != 2 {
 			t.Fatalf("visible features = %d, want 2", len(visible))
@@ -868,7 +869,7 @@ func TestNewStatusModel_WithBugs(t *testing.T) {
 	})
 
 	t.Run("navigation to bug tab", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.planCursor = 1
 		m.rebuildForSelectedPlan()
 		if len(m.Tasks) != 1 {
@@ -900,7 +901,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	}
 
 	t.Run("view renders bug tabs", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		view := m.View()
@@ -913,7 +914,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	})
 
 	t.Run("view shows bug header counts", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		view := m.View()
@@ -923,7 +924,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 	})
 
 	t.Run("selected bug tab shows bug tasks", func(t *testing.T) {
-		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.activeTab = 1 // Feature Details tab shows task list
@@ -1012,21 +1013,21 @@ func TestNewStatusModel_Defaults(t *testing.T) {
 	}
 
 	t.Run("leftFocused is true by default", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if !m.leftFocused {
 			t.Error("leftFocused should be true after newStatusModel")
 		}
 	})
 
 	t.Run("activeTab is 0 by default", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if m.activeTab != 0 {
 			t.Errorf("activeTab = %d, want 0", m.activeTab)
 		}
 	})
 
 	t.Run("plans field is populated", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if len(m.plans) != 1 {
 			t.Errorf("plans len = %d, want 1", len(m.plans))
 		}
@@ -1279,7 +1280,7 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 	}
 
 	t.Run("down navigates to next plan", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1292,7 +1293,7 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 	})
 
 	t.Run("up navigates to previous plan", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1306,7 +1307,7 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 	})
 
 	t.Run("down wraps at last plan", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1321,7 +1322,7 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 	})
 
 	t.Run("up does not navigate when right pane is focused", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = false
@@ -1343,7 +1344,7 @@ func TestStatusModel_LeftPaneEnterSwitchesFocus(t *testing.T) {
 	}
 
 	t.Run("enter switches focus to right pane on Tab 2", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1359,7 +1360,7 @@ func TestStatusModel_LeftPaneEnterSwitchesFocus(t *testing.T) {
 	})
 
 	t.Run("enter in split mode sets tab 2", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1379,7 +1380,7 @@ func TestStatusModel_TabTogglesFocus(t *testing.T) {
 	}
 
 	t.Run("tab is a no-op in split mode", func(t *testing.T) {
-		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil)
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 		m.leftFocused = true
@@ -1589,6 +1590,8 @@ func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
 		approvals:        approval.Approvals{}, // no entry
 		approvalRequired: false,                // opt-out mode
 		leftFocused:      true,
+		featureStore:     stores.NewFileFeatureStore(dir),
+		bugStore:         stores.NewFileBugStore(dir),
 	}
 
 	result, _ := m.handleApproveToggle()
@@ -1626,6 +1629,8 @@ func TestHandleApproveToggle_ExplicitTrue_RemovesEntry(t *testing.T) {
 		approvals:        approval.Approvals{uuid: true},
 		approvalRequired: false,
 		leftFocused:      true,
+		featureStore:     stores.NewFileFeatureStore(dir),
+		bugStore:         stores.NewFileBugStore(dir),
 	}
 
 	result, _ := m.handleApproveToggle()
@@ -1663,6 +1668,8 @@ func TestHandleApproveToggle_ExplicitFalse_ReapprovesWithTrue(t *testing.T) {
 		approvals:        approval.Approvals{uuid: false},
 		approvalRequired: false,
 		leftFocused:      true,
+		featureStore:     stores.NewFileFeatureStore(dir),
+		bugStore:         stores.NewFileBugStore(dir),
 	}
 
 	result, _ := m.handleApproveToggle()

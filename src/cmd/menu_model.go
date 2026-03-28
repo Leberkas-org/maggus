@@ -11,7 +11,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
-	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	xterm "golang.org/x/term"
 )
@@ -123,10 +123,17 @@ func loadFeatureSummary() featureSummary {
 		return featureSummary{}
 	}
 
-	plans, err := parser.LoadPlans(dir, true)
+	featureStore := stores.NewFileFeatureStore(dir)
+	bugStore := stores.NewFileBugStore(dir)
+	bugPlans, err := bugStore.LoadAll(true)
 	if err != nil {
 		return featureSummary{}
 	}
+	featurePlans, err := featureStore.LoadAll(true)
+	if err != nil {
+		return featureSummary{}
+	}
+	plans := append(bugPlans, featurePlans...)
 
 	pruneStaleApprovals(dir, plans)
 

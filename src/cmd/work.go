@@ -16,6 +16,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/runner"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 	"github.com/spf13/cobra"
 )
@@ -124,7 +125,10 @@ Examples:
 
 		count := wc.count
 
-		setup, err := initIteration(cmd, dir, wc.modelDisplay, count)
+		featureStore := stores.NewFileFeatureStore(dir)
+		bugStore := stores.NewFileBugStore(dir)
+
+		setup, err := initIteration(cmd, dir, wc.modelDisplay, count, featureStore, bugStore)
 		if err != nil {
 			return err
 		}
@@ -134,7 +138,7 @@ Examples:
 		runID := setup.runID
 
 		// Build approved plans with approval filtering (bugs first, then features).
-		featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg)
+		featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg, featureStore, bugStore)
 		if fgErr != nil {
 			return fmt.Errorf("build approved plans: %w", fgErr)
 		}
@@ -252,6 +256,7 @@ Examples:
 		m := runner.NewTUIModel(wc.resolvedModel, Version, wc.hostFingerprint, tuiCancel, banner)
 		m.SetSyncDir(workDir)
 		m.SetWatcher(workDir)
+		m.SetStores(featureStore, bugStore)
 		setupUsageCallback(&m, runID, workDir, wc.modelDisplay, wc.activeAgent.Name(), runLogger)
 		m.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
 			runLogger.ToolUse(taskID, toolType, params)
@@ -278,6 +283,8 @@ Examples:
 			hooks:         wc.cfg.Hooks,
 			logger:        runLogger,
 			presence:      presence,
+			featureStore:  featureStore,
+			bugStore:      bugStore,
 		}
 
 		runWorkGoroutine(workLoopParams{
@@ -298,6 +305,8 @@ Examples:
 			startHash:     captureStartHash(workDir),
 			modelDisplay:  wc.modelDisplay,
 			dir:           dir,
+			featureStore:  featureStore,
+			bugStore:      bugStore,
 		})
 
 		_, tuiErr := p.Run()

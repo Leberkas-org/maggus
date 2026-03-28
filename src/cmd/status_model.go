@@ -12,6 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	xterm "golang.org/x/term"
 )
@@ -54,8 +55,10 @@ type statusModel struct {
 	nextTaskFile string
 	agentName    string
 
-	dir       string             // working directory for file operations
-	approvals approval.Approvals // cached approvals; reloaded on reloadPlans
+	dir          string                // working directory for file operations
+	approvals    approval.Approvals    // cached approvals; reloaded on reloadPlans
+	featureStore stores.FeatureStore   // store for feature plan file operations
+	bugStore     stores.BugStore       // store for bug plan file operations
 
 	approvalRequired bool // from config; used when reloading plans
 
@@ -97,10 +100,12 @@ type statusModel struct {
 	watcherCh <-chan bool
 }
 
-func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals) statusModel {
+func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {
 	m := statusModel{
 		taskListComponent: taskListComponent{
-			HeaderLines: statusHeaderLines,
+			HeaderLines:  statusHeaderLines,
+			featureStore: featureStore,
+			bugStore:     bugStore,
 		},
 		plans:            features,
 		showAll:          showAll,
@@ -110,6 +115,8 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		dir:              dir,
 		approvalRequired: approvalRequired,
 		approvals:        approvals,
+		featureStore:     featureStore,
+		bugStore:         bugStore,
 		logAutoScroll:    true,
 		leftFocused:      true,
 		activeTab:        0,
@@ -182,7 +189,7 @@ func (m *statusModel) rebuildForSelectedPlan() {
 
 // reloadPlans reloads all plans and approvals from disk and rebuilds the current view.
 func (m *statusModel) reloadPlans() {
-	plans, a, err := loadPlansWithApprovals(m.dir, true)
+	plans, a, err := loadPlansWithApprovals(m.dir, m.featureStore, m.bugStore, true)
 	if err != nil {
 		// Surface the error so it is visible rather than silently leaving stale data.
 		m.statusNote = "reload error: " + err.Error()
@@ -240,11 +247,16 @@ func buildSelectableTasksForFeature(plan parser.Plan, showAll bool) []parser.Tas
 // It also migrates any filename-based approval keys to MaggusID-based keys,
 // preventing stale-prune badge regression when a plan gains a maggus-id after
 // its approval was first saved.
-func loadPlansWithApprovals(dir string, includeCompleted bool) ([]parser.Plan, approval.Approvals, error) {
-	plans, err := parser.LoadPlans(dir, includeCompleted)
+func loadPlansWithApprovals(dir string, featureStore stores.FeatureStore, bugStore stores.BugStore, includeCompleted bool) ([]parser.Plan, approval.Approvals, error) {
+	bugPlans, err := bugStore.LoadAll(includeCompleted)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("load bug plans: %w", err)
 	}
+	featurePlans, err := featureStore.LoadAll(includeCompleted)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load feature plans: %w", err)
+	}
+	plans := append(bugPlans, featurePlans...)
 	a, err := approval.Load(dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load approvals: %w", err)
