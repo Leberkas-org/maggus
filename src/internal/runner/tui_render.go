@@ -359,7 +359,7 @@ func toolIcon(toolType string) string {
 		if strings.HasPrefix(toolType, "mcp__") {
 			return "🔌"
 		}
-		return "▶️"
+		return "🥚"
 	}
 }
 

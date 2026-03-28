@@ -19,17 +19,17 @@ import (
 // Additionally, it writes a state.json snapshot on each significant event
 // so the status view can render a rich live TUI.
 type nullTUIModel struct {
-	taskID    string
-	taskTitle string
-	itemID    string // stable UUID from <!-- maggus-id: ... -->
-	itemShort string // e.g. "feature_001"
-	itemTitle string // parsed H1 title from the feature/bug file
-	startTime       time.Time
-	runStartedAt    time.Time
-	status          string
-	onToolUse       func(taskID, toolType string, params map[string]string)
-	onOutput        func(taskID, text string)
-	onTaskUsage     func(runner.TaskUsage)
+	taskID       string
+	taskTitle    string
+	itemID       string // stable UUID from <!-- maggus-id: ... -->
+	itemShort    string // e.g. "feature_001"
+	itemTitle    string // parsed H1 title from the feature/bug file
+	startTime    time.Time
+	runStartedAt time.Time
+	status       string
+	onToolUse    func(taskID, toolType string, params map[string]string)
+	onOutput     func(taskID, text string)
+	onTaskUsage  func(runner.TaskUsage)
 
 	// Snapshot state — written to state.json on each event.
 	snapshotDir   string // project root directory
@@ -213,6 +213,6 @@ func toolIconForSnapshot(toolType string) string {
 		if strings.HasPrefix(toolType, "mcp__") {
 			return "🔌"
 		}
-		return "▶️"
+		return "🥚"
 	}
 }

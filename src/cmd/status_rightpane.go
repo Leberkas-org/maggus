@@ -223,7 +223,7 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 			}
 			icon := entry.Icon
 			if icon == "" {
-				icon = "▶️"
+				icon = "🥚"
 			}
 			desc := styles.Truncate(entry.Description, contentWidth-2)
 			toolLines[i] = fmt.Sprintf("  %s %s: %s  %s",
