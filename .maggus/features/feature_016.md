@@ -59,15 +59,15 @@ This resolves two structural problems:
 **Parallel:** yes — can run alongside TASK-016-003 and TASK-016-004
 
 **Acceptance Criteria:**
-- [ ] `FileFeatureStore` struct created in `internal/stores/feature_store.go`
-- [ ] Struct holds `dir string` (the project root, passed at construction via `NewFileFeatureStore(dir string) *FileFeatureStore`)
-- [ ] All `FeatureStore` interface methods implemented by delegating to existing `parser` functions
-- [ ] `LoadAll` delegates to `parser.GlobFeatureFiles` + `parser.ParseFile` (mirroring `parser.LoadPlans` but features only)
-- [ ] `MarkCompleted` delegates to `parser.MarkCompletedFeatures`
-- [ ] Mutation methods (`DeleteTask`, `UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`) delegate to the corresponding `parser.*` functions
-- [ ] Unit tests in `feature_store_test.go` use a temp directory with fixture `.md` files
-- [ ] Tests cover: `LoadAll`, `MarkCompleted` (rename), `DeleteTask`, `UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`
-- [ ] `go test ./internal/stores` passes
+- [x] `FileFeatureStore` struct created in `internal/stores/feature_store.go`
+- [x] Struct holds `dir string` (the project root, passed at construction via `NewFileFeatureStore(dir string) *FileFeatureStore`)
+- [x] All `FeatureStore` interface methods implemented by delegating to existing `parser` functions
+- [x] `LoadAll` delegates to `parser.GlobFeatureFiles` + `parser.ParseFile` (mirroring `parser.LoadPlans` but features only)
+- [x] `MarkCompleted` delegates to `parser.MarkCompletedFeatures`
+- [x] Mutation methods (`DeleteTask`, `UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`) delegate to the corresponding `parser.*` functions
+- [x] Unit tests in `feature_store_test.go` use a temp directory with fixture `.md` files
+- [x] Tests cover: `LoadAll`, `MarkCompleted` (rename), `DeleteTask`, `UnblockCriterion`, `ResolveCriterion`, `DeleteCriterion`
+- [x] `go test ./internal/stores` passes
 
 ---
 
