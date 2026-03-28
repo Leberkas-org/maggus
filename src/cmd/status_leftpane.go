@@ -69,24 +69,43 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 	// Horizontal separator under daemon status line.
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
-	lines = append(lines, "")
+
+	if m.exitDaemonOverlay || m.daemonStopOverlay {
+		if m.exitDaemonOverlay {
+			lines = append(lines, lipgloss.NewStyle().Foreground(styles.Primary).Render("Daemon still running!!"))
+			lines = append(lines, "")
+			lines = append(lines, lipgloss.NewStyle().Foreground(styles.Success).Render("[d] keep running"))
+		} else {
+			lines = append(lines, lipgloss.NewStyle().Foreground(styles.Primary).Render("Really want to stop daemon?"))
+			lines = append(lines, "")
+		}
+
+		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Warning).Render("[y] stop"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Error).Render("[ctrl+c] kill"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Muted).Render("[esc] no/cancel "))
+	} else {
+		lines = append(lines, "")
+	}
 
 	// Daemon status line immediately below the header.
 	var daemonLine string
-	if m.daemon.Running {
-		daemonLine = lipgloss.NewStyle().Foreground(styles.Success).Render("● Running")
-		if m.daemon.CurrentTask != "" {
-			// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
-			indicatorW := lipgloss.Width(daemonLine)
-			taskMaxW := contentW - indicatorW - 2
-			if taskMaxW > 0 {
-				blub := m.daemon.CurrentFeature + " " + m.daemon.CurrentTask
-				task := leftPaneTruncate(blub, taskMaxW)
-				daemonLine += "  " + mutedStyle.Render(task)
+	if !m.exitDaemonOverlay && !m.daemonStopOverlay {
+		if m.daemon.Running {
+			daemonLine = lipgloss.NewStyle().Foreground(styles.Success).Render("● Running")
+			if m.daemon.CurrentTask != "" {
+				// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
+				indicatorW := lipgloss.Width(daemonLine)
+				taskMaxW := contentW - indicatorW - 2
+				if taskMaxW > 0 {
+					blub := m.daemon.CurrentFeature + " " + m.daemon.CurrentTask
+					task := leftPaneTruncate(blub, taskMaxW)
+					daemonLine += "  " + mutedStyle.Render(task)
+				}
 			}
+		} else {
+
+			daemonLine = mutedStyle.Render("○ Stopped")
 		}
-	} else {
-		daemonLine = mutedStyle.Render("○ Stopped")
 	}
 	lines = append(lines, padToWidth(" "+daemonLine, contentW))
 

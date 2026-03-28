@@ -165,10 +165,12 @@ func (m statusModel) viewStatusSplit() string {
 // statusSplitFooter returns the contextual key hint string for the current split-pane focus state.
 func (m statusModel) statusSplitFooter() string {
 	if m.exitDaemonOverlay {
-		return "Daemon is running:  t stop after task  k kill now  l/esc leave running"
+		hint := lipgloss.NewStyle().Foreground(styles.Warning)
+		return hint.Render("Exiting... Daemon is running:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
 	}
 	if m.daemonStopOverlay {
-		return "Stop daemon:  t stop after task  k kill now  esc cancel"
+		hint := lipgloss.NewStyle().Foreground(styles.Warning)
+		return hint.Render("Stop daemon:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
 	}
 	if m.leftFocused {
 		daemonHint := "s: start"

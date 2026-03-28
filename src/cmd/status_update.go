@@ -285,7 +285,7 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 
 func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "t", "T":
+	case "y", "Y":
 		// Graceful stop (stop after current task).
 		m.daemonStopOverlay = false
 		dir := m.dir
@@ -293,7 +293,7 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 			_ = stopDaemonGracefully(dir)
 			return nil
 		}
-	case "k", "K":
+	case "k", "K", "ctrl+c", "ctrl+C":
 		// Immediate kill.
 		m.daemonStopOverlay = false
 		dir := m.dir
@@ -305,6 +305,24 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 		}
 	case "esc":
 		m.daemonStopOverlay = false
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "d", "D":
+		return m, tea.Quit
+	case "y", "Y":
+		_ = stopDaemonGracefully(m.dir)
+		return m, tea.Quit
+	case "k", "K", "ctrl+c", "ctrl+C":
+		_ = forceKill(m.daemon.PID)
+		removeDaemonPID(m.dir)
+		return m, tea.Quit
+	case "esc", "q", "Q":
+		m.exitDaemonOverlay = false
 		return m, nil
 	}
 	return m, nil
@@ -342,23 +360,6 @@ func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
 	}
 	return m, tea.Quit
 }
-
-func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "t", "T":
-		_ = stopDaemonGracefully(m.dir)
-		return m, tea.Quit
-	case "k", "K":
-		_ = forceKill(m.daemon.PID)
-		removeDaemonPID(m.dir)
-		return m, tea.Quit
-	case "l", "L", "enter", "esc":
-		m.exitDaemonOverlay = false
-		return m, tea.Quit
-	}
-	return m, nil
-}
-
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
