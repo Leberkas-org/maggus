@@ -212,7 +212,7 @@ func (m menuModel) viewMainMenu() (string, string) {
 		}
 	}
 
-	footer := styles.StatusBar.Render("↑/↓ navigate · enter select · hold alt for shortcuts · esc exit")
+	footer := styles.StatusBar.Render("↑/↓ navigate · enter select · hold alt for shortcuts · q: exit")
 	return sb.String(), footer
 }
 
@@ -310,6 +310,6 @@ func (m menuModel) viewSubMenu() (string, string) {
 		)
 	}
 
-	footer := styles.StatusBar.Render("↑/↓: navigate · ←/→: change value · enter: select/run · esc: back")
+	footer := styles.StatusBar.Render("↑/↓: navigate · ←/→: change value · enter: select/run · q: back")
 	return sb.String(), footer
 }

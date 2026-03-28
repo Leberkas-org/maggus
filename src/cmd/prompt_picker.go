@@ -74,7 +74,7 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 
 		switch key {
-		case "q", "esc", "ctrl+c":
+		case "q", "esc":
 			m.result = promptPickerResult{Cancelled: true}
 			return m, tea.Quit
 
@@ -222,7 +222,7 @@ func (m promptPickerModel) View() string {
 	}
 
 	content := sb.String()
-	footer := styles.StatusBar.Render("up/down: navigate | tab: switch focus | enter: confirm | left/right: toggle | q/esc: exit")
+	footer := styles.StatusBar.Render("up/down: navigate | tab: switch focus | enter: confirm | left/right: toggle | q/esc: cancel")
 
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenColor(content, footer, m.width, m.height, styles.Primary)

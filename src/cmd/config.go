@@ -327,7 +327,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		itemCount := len(*rows)
 
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		case "q":
 			return m, tea.Quit
 		case "1":
 			m.activeTab = 0

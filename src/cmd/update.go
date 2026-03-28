@@ -192,13 +192,6 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch m.phase {
-		case phaseChecking, phaseDownloading:
-			// Only allow quit during async phases
-			if msg.Type == tea.KeyCtrlC || msg.Type == tea.KeyEscape {
-				saveAutoUpdateIfDirty(&m)
-				return m, tea.Quit
-			}
-
 		case phaseUpToDate, phaseSuccess, phaseError:
 			// Any key exits (except 'a' which is handled above)
 			saveAutoUpdateIfDirty(&m)
@@ -206,9 +199,6 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case phaseConfirm:
 			switch msg.Type {
-			case tea.KeyCtrlC, tea.KeyEscape:
-				saveAutoUpdateIfDirty(&m)
-				return m, tea.Quit
 			case tea.KeyUp:
 				if m.scrollOffset > 0 {
 					m.scrollOffset--
@@ -450,9 +440,9 @@ func (m updateModel) View() string {
 		vp := m.viewportHeight()
 		var hints string
 		if total > vp {
-			hints = styles.StatusBar.Render("↑/↓: scroll · ←/→: select · a: auto-update · enter: confirm · q/esc: cancel")
+			hints = styles.StatusBar.Render("↑/↓: scroll · ←/→: select · a: auto-update · enter: confirm · q: cancel")
 		} else {
-			hints = styles.StatusBar.Render("←/→: select · a: auto-update · enter: confirm · q/esc: cancel")
+			hints = styles.StatusBar.Render("←/→: select · a: auto-update · enter: confirm · q: cancel")
 		}
 		footer = menu + "\n" + hints
 	case phaseDownloading:

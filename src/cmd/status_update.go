@@ -239,7 +239,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 			return m, tea.Quit
 		}
 		return m, nil
-	case "n", "N", "esc", "ctrl+c":
+	case "n", "N", "esc":
 		m.ConfirmDelete = false
 		return m, nil
 	}
@@ -276,7 +276,7 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 			return m, tea.Quit
 		}
 		return m, nil
-	case "n", "N", "esc", "ctrl+c":
+	case "n", "N", "esc":
 		m.confirmDeleteFeature = false
 		return m, nil
 	}
@@ -303,7 +303,7 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 			removeDaemonPID(dir)
 			return nil
 		}
-	case "esc", "ctrl+c":
+	case "esc":
 		m.daemonStopOverlay = false
 		return m, nil
 	}
@@ -348,7 +348,7 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "t", "T":
 		_ = stopDaemonGracefully(m.dir)
 		return m, tea.Quit
-	case "k", "K", "ctrl+c":
+	case "k", "K":
 		_ = forceKill(m.daemon.PID)
 		removeDaemonPID(m.dir)
 		return m, tea.Quit
@@ -406,11 +406,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !m.leftFocused && m.width > 0 && m.height > 0 {
 		// Tab 2 — Feature Details: delegate to the task list component.
 		if m.activeTab == 1 {
-			// Allow esc to close detail/confirm without quitting.
-			if key == "esc" && !m.taskListComponent.ShowDetail && !m.taskListComponent.ConfirmDelete {
-				return m.handleQuitRequest()
-			}
-			if key == "q" || key == "ctrl+c" {
+			if key == "q" {
 				return m.handleQuitRequest()
 			}
 			cmd, action := m.taskListComponent.Update(msg)
@@ -429,7 +425,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Tab 1 — Output: log scroll. Tab 3 — Current Task: viewport scroll.
 		switch key {
-		case "q", "esc", "ctrl+c":
+		case "q":
 			return m.handleQuitRequest()
 		case "down":
 			if m.activeTab == 0 {

@@ -259,15 +259,15 @@ func TestTaskListComponent_EnterOpensDetail(t *testing.T) {
 	}
 }
 
-func TestTaskListComponent_EscClosesDetail(t *testing.T) {
+func TestTaskListComponent_EscDoesNotCloseDetail(t *testing.T) {
 	c := newTestComponent(sampleTasks(3))
 	c.openDetail()
 
 	key := tea.KeyMsg{Type: tea.KeyEsc}
 	_, action := c.Update(key)
 
-	if c.ShowDetail {
-		t.Error("Esc key should close detail view")
+	if !c.ShowDetail {
+		t.Error("Esc key should not close detail view")
 	}
 	if action != taskListNone {
 		t.Errorf("action = %d, want taskListNone", action)
@@ -396,7 +396,7 @@ func TestTaskListComponent_CriteriaMode_Navigation(t *testing.T) {
 	}
 }
 
-func TestTaskListComponent_CriteriaMode_EscClosesDetail(t *testing.T) {
+func TestTaskListComponent_CriteriaMode_EscDoesNotCloseDetail(t *testing.T) {
 	tasks := []parser.Task{
 		{
 			ID:    "TASK-001",
@@ -415,8 +415,8 @@ func TestTaskListComponent_CriteriaMode_EscClosesDetail(t *testing.T) {
 	escKey := tea.KeyMsg{Type: tea.KeyEsc}
 	c.Update(escKey)
 
-	if c.ShowDetail {
-		t.Error("Esc in criteria mode should close detail view")
+	if !c.ShowDetail {
+		t.Error("Esc in criteria mode should not close detail view")
 	}
 }
 
@@ -425,8 +425,6 @@ func TestTaskListComponent_CriteriaMode_EscClosesDetail(t *testing.T) {
 func TestTaskListComponent_QuitKeys(t *testing.T) {
 	quitKeys := []tea.KeyMsg{
 		{Type: tea.KeyRunes, Runes: []rune{'q'}},
-		{Type: tea.KeyEsc},
-		{Type: tea.KeyCtrlC},
 	}
 
 	for _, key := range quitKeys {

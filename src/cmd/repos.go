@@ -174,7 +174,7 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc", "ctrl+c":
+	case "q":
 		m.quitting = true
 		return m, tea.Quit
 	case "up", "k":
@@ -325,9 +325,6 @@ func (m reposModel) updateConfirmInit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n", "esc":
 		// Add without initializing
 		return m.addRepo(m.pendingDir)
-	case "ctrl+c":
-		m.quitting = true
-		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -496,7 +493,7 @@ func (m reposModel) viewList() string {
 	}
 
 	content := b.String()
-	footer := styles.StatusBar.Render("s start/stop daemon · a toggle auto-start · enter switch · n add · d remove · esc back")
+	footer := styles.StatusBar.Render("s start/stop daemon · a toggle auto-start · enter switch · n add · d remove · q: exit")
 
 	borderColor := styles.ThemeColor(m.is2x)
 	if m.width > 0 && m.height > 0 {

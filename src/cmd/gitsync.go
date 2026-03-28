@@ -270,9 +270,6 @@ func (m syncModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case tea.KeyEnter:
 			return m.selectOption()
-		case tea.KeyEsc:
-			m.result = syncResult{action: syncAbort}
-			return m, tea.Quit
 		}
 		if len(msg.Runes) == 1 {
 			switch msg.Runes[0] {
@@ -285,12 +282,6 @@ func (m syncModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.cursor = styles.ClampCursor(m.cursor+1, len(m.options))
 			}
 		}
-	}
-
-	// Global Ctrl+C
-	if msg.Type == tea.KeyCtrlC {
-		m.result = syncResult{action: syncAbort}
-		return m, tea.Quit
 	}
 
 	return m, nil
@@ -483,7 +474,7 @@ func (m syncModel) View() string {
 	case syncStateDirtyOnly:
 		footer = styles.StatusBar.Render("enter: proceed · q/esc: abort")
 	case syncStateMenu:
-		footer = styles.StatusBar.Render("↑/↓: select · enter: confirm · q/esc: abort")
+		footer = styles.StatusBar.Render("↑/↓: select · enter: confirm · q: abort")
 	case syncStateConfirmForce:
 		footer = styles.StatusBar.Render("y: confirm · n/esc: cancel")
 	default:

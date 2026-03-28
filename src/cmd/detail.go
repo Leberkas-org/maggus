@@ -276,7 +276,7 @@ func detailFooter(ds *detailState, scrollable bool) string {
 		if ds.showActionPicker {
 			return styles.StatusBar.Render("↑/↓: select action · enter: confirm · esc: cancel")
 		}
-		return styles.StatusBar.Render("↑/↓: navigate blocked · enter: action · tab: scroll mode · esc: back")
+		return styles.StatusBar.Render("↑/↓: navigate blocked · enter: action · tab: scroll mode · q: back")
 	}
 
 	var parts []string
@@ -285,6 +285,6 @@ func detailFooter(ds *detailState, scrollable bool) string {
 	}
 	parts = append(parts, "pgup/pgdn: prev/next task")
 	parts = append(parts, "tab: manage blocked")
-	parts = append(parts, "alt+r: run · alt+bksp: delete · esc: back · q: exit")
+	parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
 	return styles.StatusBar.Render(strings.Join(parts, " · "))
 }

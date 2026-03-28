@@ -195,11 +195,11 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 		sColor = statusRedStyle
 		spinnerStr = statusRedStyle.Render("⊘")
 	}
-	sb.WriteString(fmt.Sprintf(" %s %s  %s\n", spinnerStr, statusBoldStyle.Render("Status:"), sColor.Render(snap.Status)))
+	sb.WriteString(fmt.Sprintf(" %s  %s  %s\n", statusBoldStyle.Render("Status:"), spinnerStr, sColor.Render(snap.Status)))
 	if snap.TaskID != "" {
-		sb.WriteString(fmt.Sprintf("   %s  %s: %s\n", statusBoldStyle.Render("Task:"), statusCyanStyle.Render(snap.TaskID), snap.TaskTitle))
+		sb.WriteString(fmt.Sprintf(" %s    %s - %s\n", statusBoldStyle.Render("Task:"), statusCyanStyle.Render(snap.TaskID), snap.TaskTitle))
 	}
-	sb.WriteString(" " + styles.Separator(min(42, width-2)) + "\n")
+	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	// ── Middle zone (scrollable tool list) ──
 	// Fixed overhead consumed by top(4) + bottom(5) zones = 9 lines.

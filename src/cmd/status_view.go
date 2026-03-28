@@ -196,7 +196,7 @@ func (m statusModel) statusSplitFooter() string {
 				if ds.showActionPicker {
 					return "↑/↓: navigate/scroll · enter: confirm · esc: cancel"
 				}
-				return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · esc: back"
+				return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · q: back"
 			}
 			scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
 			var parts []string
@@ -205,7 +205,7 @@ func (m statusModel) statusSplitFooter() string {
 			}
 			parts = append(parts, "pgup/pgdn: prev/next task")
 			parts = append(parts, "tab: manage blocked")
-			parts = append(parts, "alt+r: run · alt+bksp: delete · esc: back · q: exit")
+			parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
 			return strings.Join(parts, " · ")
 		}
 		return "1-5: tabs  ↑/↓ navigate/scroll  enter: detail  q: exit"

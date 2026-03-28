@@ -215,7 +215,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc", "ctrl+c":
+	case "q":
 		if m.daemon.Running {
 			m.confirmStopDaemon = true
 			return m, nil
@@ -270,14 +270,11 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	itemCount := len(m.activeSubDef.options) + 1 // options + Run
 
 	switch msg.String() {
-	case "esc", "q":
+	case "q":
 		m.inSubMenu = false
 		m.activeSubDef = nil
 		m.subCursor = 0
 		return m, nil
-	case "ctrl+c":
-		m.quitting = true
-		return m, tea.Quit
 	case "up", "k":
 		m.subCursor = styles.CursorUp(m.subCursor, itemCount)
 	case "down", "j":

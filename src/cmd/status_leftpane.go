@@ -74,15 +74,14 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	// Daemon status line immediately below the header.
 	var daemonLine string
 	if m.daemon.Running {
-		indicator := lipgloss.NewStyle().Foreground(styles.Success).Render("●")
-		label := lipgloss.NewStyle().Foreground(styles.Success).Render(" Running")
-		daemonLine = indicator + label
+		daemonLine = lipgloss.NewStyle().Foreground(styles.Success).Render("● Running")
 		if m.daemon.CurrentTask != "" {
 			// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
-			indicatorW := lipgloss.Width(indicator + label)
+			indicatorW := lipgloss.Width(daemonLine)
 			taskMaxW := contentW - indicatorW - 2
 			if taskMaxW > 0 {
-				task := leftPaneTruncate(m.daemon.CurrentTask, taskMaxW)
+				blub := m.daemon.CurrentFeature + " " + m.daemon.CurrentTask
+				task := leftPaneTruncate(blub, taskMaxW)
 				daemonLine += "  " + mutedStyle.Render(task)
 			}
 		}

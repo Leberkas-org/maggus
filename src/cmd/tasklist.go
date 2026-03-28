@@ -191,7 +191,7 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 			c.openDetail()
 		}
 		return nil, taskListNone
-	case "q", "esc", "ctrl+c":
+	case "q":
 		return nil, taskListQuit
 	}
 	return nil, taskListUnhandled
@@ -221,13 +221,9 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 		c.ConfirmDelete = true
 		c.DeleteErr = ""
 		return nil, taskListNone
-	case "q":
-		return nil, taskListQuit
-	case "esc", "backspace":
+	case "q", "backspace":
 		c.closeDetail()
 		return nil, taskListNone
-	case "ctrl+c":
-		return nil, taskListQuit
 	case "tab", "b":
 		c.Detail.noBlockedMsg = false
 		if !c.Detail.initCriteriaMode(c.Tasks[c.Cursor]) {
@@ -287,13 +283,9 @@ func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskLis
 	case "tab":
 		c.Detail.exitCriteriaMode()
 		c.refreshDetailViewport()
-	case "esc", "backspace":
+	case "q", "backspace":
 		c.closeDetail()
 		return nil, taskListNone
-	case "q":
-		return nil, taskListQuit
-	case "ctrl+c":
-		return nil, taskListQuit
 	}
 	return nil, taskListNone
 }
@@ -324,8 +316,6 @@ func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskLis
 	case "esc":
 		c.Detail.showActionPicker = false
 		c.refreshDetailViewport()
-	case "ctrl+c":
-		return nil, taskListQuit
 	}
 	return nil, taskListNone
 }
@@ -353,7 +343,7 @@ func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskLi
 			return nil, taskListQuit
 		}
 		return nil, taskListDeleted
-	case "n", "N", "esc", "ctrl+c":
+	case "n", "N", "esc":
 		c.ConfirmDelete = false
 		return nil, taskListNone
 	}

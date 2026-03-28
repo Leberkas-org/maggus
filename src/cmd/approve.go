@@ -233,7 +233,7 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = m.items[m.cursor]
 			m.done = true
 			return m, tea.Quit
-		case "esc", "q", "ctrl+c":
+		case "esc", "q":
 			m.cancelled = true
 			return m, tea.Quit
 		}
