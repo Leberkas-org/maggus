@@ -101,15 +101,15 @@ This resolves two structural problems:
 **Parallel:** yes — can run alongside TASK-016-002 and TASK-016-003
 
 **Acceptance Criteria:**
-- [ ] `MemFeatureStore` and `MemBugStore` structs created in `internal/stores/mem_store.go`
-- [ ] Both satisfy their respective interfaces (verified by compile-time assertion: `var _ FeatureStore = &MemFeatureStore{}`)
-- [ ] `MemFeatureStore` is seeded with `[]parser.Plan` at construction: `NewMemFeatureStore(plans []parser.Plan) *MemFeatureStore`
-- [ ] `LoadAll` returns the seeded plans filtered by `includeCompleted`
-- [ ] `MarkCompleted` marks matching plans as completed in memory (sets `Completed: true`), returns their IDs
-- [ ] Mutation methods (`DeleteTask`, `UnblockCriterion`, etc.) mutate the in-memory plan data
-- [ ] Same constructor + interface pattern for `MemBugStore`
-- [ ] Tests in `mem_store_test.go` verify each method produces the correct in-memory state
-- [ ] `go test ./internal/stores` passes
+- [x] `MemFeatureStore` and `MemBugStore` structs created in `internal/stores/mem_store.go`
+- [x] Both satisfy their respective interfaces (verified by compile-time assertion: `var _ FeatureStore = &MemFeatureStore{}`)
+- [x] `MemFeatureStore` is seeded with `[]parser.Plan` at construction: `NewMemFeatureStore(plans []parser.Plan) *MemFeatureStore`
+- [x] `LoadAll` returns the seeded plans filtered by `includeCompleted`
+- [x] `MarkCompleted` marks matching plans as completed in memory (sets `Completed: true`), returns their IDs
+- [x] Mutation methods (`DeleteTask`, `UnblockCriterion`, etc.) mutate the in-memory plan data
+- [x] Same constructor + interface pattern for `MemBugStore`
+- [x] Tests in `mem_store_test.go` verify each method produces the correct in-memory state
+- [x] `go test ./internal/stores` passes
 
 ---
 
