@@ -80,15 +80,15 @@ This resolves two structural problems:
 **Parallel:** yes — can run alongside TASK-016-002 and TASK-016-004
 
 **Acceptance Criteria:**
-- [ ] `FileBugStore` struct created in `internal/stores/bug_store.go`
-- [ ] Struct holds `dir string`, constructed via `NewFileBugStore(dir string) *FileBugStore`
-- [ ] All `BugStore` interface methods implemented by delegating to existing `parser` functions
-- [ ] `LoadAll` delegates to `parser.GlobBugFiles` + `parser.MigrateLegacyBugIDs` + `parser.ParseFile`
-- [ ] `MarkCompleted` delegates to `parser.MarkCompletedBugs`
-- [ ] Mutation methods delegate to corresponding `parser.*` functions
-- [ ] Unit tests in `bug_store_test.go` use a temp directory with fixture `.md` files
-- [ ] Tests cover the same scenarios as TASK-016-002 plus legacy ID migration
-- [ ] `go test ./internal/stores` passes
+- [x] `FileBugStore` struct created in `internal/stores/bug_store.go`
+- [x] Struct holds `dir string`, constructed via `NewFileBugStore(dir string) *FileBugStore`
+- [x] All `BugStore` interface methods implemented by delegating to existing `parser` functions
+- [x] `LoadAll` delegates to `parser.GlobBugFiles` + `parser.MigrateLegacyBugIDs` + `parser.ParseFile`
+- [x] `MarkCompleted` delegates to `parser.MarkCompletedBugs`
+- [x] Mutation methods delegate to corresponding `parser.*` functions
+- [x] Unit tests in `bug_store_test.go` use a temp directory with fixture `.md` files
+- [x] Tests cover the same scenarios as TASK-016-002 plus legacy ID migration
+- [x] `go test ./internal/stores` passes
 
 ---
 
