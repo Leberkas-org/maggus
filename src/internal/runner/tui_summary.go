@@ -102,10 +102,10 @@ func (s *summaryState) handleSummaryMsg(msg tea.Msg, m *TUIModel) (handled bool)
 }
 
 // handleSummaryKeys processes key events while the summary/done screen is active.
-// Any of Q, Esc, Enter, or Ctrl+C exits.
+// Q or Enter exits.
 func (s *summaryState) handleSummaryKeys(msg tea.KeyMsg) (quitting bool, cmd tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyEscape, tea.KeyCtrlC, tea.KeyEnter:
+	case tea.KeyEnter:
 		return true, tea.Quit
 	default:
 		if len(msg.Runes) == 1 {
@@ -346,5 +346,5 @@ afterTitle:
 // renderSummaryMenu renders the exit hint at the bottom of the summary screen.
 func (s *summaryState) renderSummaryMenu() string {
 	hintStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
-	return fmt.Sprintf("  %s\n", hintStyle.Render("Press q/esc/enter to exit"))
+	return fmt.Sprintf("  %s\n", hintStyle.Render("Press q/enter to exit"))
 }

@@ -76,14 +76,14 @@ Standardize keyboard navigation across all TUI views. Currently ESC is used inco
 | `internal/tui/filebrowser/filebrowser.go` | 187 | `tea.KeyEsc` → cancel browser | Keep — file browser is a modal dialog, ESC cancel is correct |
 
 **Acceptance Criteria:**
-- [ ] In the runner summary screen, ESC does not exit; `q` or Enter exits
-- [ ] In the runner sync screen menu state, ESC does not abort; `q` aborts
-- [ ] ESC still cancels the stop picker overlay (dialog cancel behavior preserved)
-- [ ] ESC still cancels the force-pull confirmation dialog in tui_sync.go
-- [ ] ESC still cancels the file browser
-- [ ] `ctrl+c` is removed from the runner summary quit handler
-- [ ] All hint text in `internal/` reflects the new mappings
-- [ ] `go vet ./internal/...` passes with no errors
+- [x] In the runner summary screen, ESC does not exit; `q` or Enter exits
+- [x] In the runner sync screen menu state, ESC does not abort; `q` aborts
+- [x] ESC still cancels the stop picker overlay (dialog cancel behavior preserved)
+- [x] ESC still cancels the force-pull confirmation dialog in tui_sync.go
+- [x] ESC still cancels the file browser
+- [x] `ctrl+c` is removed from the runner summary quit handler
+- [x] All hint text in `internal/` reflects the new mappings
+- [x] `go vet ./internal/...` passes with no errors
 
 ---
 

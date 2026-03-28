@@ -168,17 +168,6 @@ func (s *syncState) handleSyncKeys(msg tea.KeyMsg, cancelFunc *func()) (tea.Cmd,
 		return nil, false
 	case tea.KeyEnter:
 		return s.selectOption(cancelFunc)
-	case tea.KeyEsc:
-		if s.resultCh != nil {
-			s.resultCh <- SyncCheckResult{Action: SyncAbort}
-			s.resultCh = nil
-		}
-		s.active = false
-		if *cancelFunc != nil {
-			(*cancelFunc)()
-			*cancelFunc = nil
-		}
-		return nil, true
 	}
 
 	if len(msg.Runes) == 1 {
@@ -340,7 +329,7 @@ func (s *syncState) renderSyncView(m *TUIModel) string {
 	if s.confirmForce {
 		footer = styles.StatusBar.Render("y: confirm · n/esc: cancel")
 	} else if !s.running {
-		footer = styles.StatusBar.Render("↑/↓: select · enter: confirm · q/esc: abort")
+		footer = styles.StatusBar.Render("↑/↓: select · enter: confirm · q: abort")
 	}
 
 	if m.width > 0 && m.height > 0 {
