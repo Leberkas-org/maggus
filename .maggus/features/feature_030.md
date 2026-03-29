@@ -113,11 +113,11 @@ clean up its daemon caches via the app model, so it works inside the app router.
 **Parallel:** yes — can run alongside TASK-030-002, TASK-030-003, TASK-030-005, TASK-030-006
 
 **Acceptance Criteria:**
-- [ ] All `tea.Quit` calls in the repos model are replaced with `navigateBackMsg`
-- [ ] Daemon cache cleanup (currently done by iterating `final.daemonCaches` after `prog.Run()`)
+- [x] All `tea.Quit` calls in the repos model are replaced with `navigateBackMsg`
+- [x] Daemon cache cleanup (currently done by iterating `final.daemonCaches` after `prog.Run()`)
   is triggered from `appModel` when it receives `navigateBackMsg` from the repos screen
-- [ ] `runRepos()` no longer calls `tea.NewProgram`; repos initialisation moves to `appModel`
-- [ ] `go build ./...` passes
+- [x] `runRepos()` no longer calls `tea.NewProgram`; repos initialisation moves to `appModel`
+- [x] `go build ./...` passes
 
 ---
 
