@@ -139,7 +139,21 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	}
 	sb.WriteString(fmt.Sprintf(" %s  %s  %s\n", statusBoldStyle.Render("Status:"), spinnerStr, sColor.Render(snap.Status)))
 	if snap.TaskID != "" {
-		sb.WriteString(fmt.Sprintf(" %s    %s - %s\n", statusBoldStyle.Render("Task:"), statusCyanStyle.Render(snap.TaskID), snap.TaskTitle))
+		// Compute max available width for the title
+		taskLabel := statusBoldStyle.Render("Task:")
+		taskLabelW := lipgloss.Width(taskLabel)
+		taskIDRendered := statusCyanStyle.Render(snap.TaskID)
+		taskIDW := lipgloss.Width(taskIDRendered)
+		maxTitleW := width - 1 - taskLabelW - 4 - taskIDW - 3 // 1=leading space, 4=gap, 3=" - "
+
+		if maxTitleW <= 0 {
+			// Width too narrow; omit title, show only TaskID
+			sb.WriteString(fmt.Sprintf(" %s    %s\n", taskLabel, taskIDRendered))
+		} else {
+			// Truncate title to fit available width
+			truncatedTitle := styles.Truncate(snap.TaskTitle, maxTitleW)
+			sb.WriteString(fmt.Sprintf(" %s    %s - %s\n", taskLabel, taskIDRendered, truncatedTitle))
+		}
 	}
 	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 

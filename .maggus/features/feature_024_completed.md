@@ -28,10 +28,10 @@ In the Output tab of the status view, the "Task:" line in the rich snapshot view
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] In `renderSnapshotInPane()` (`status_rightpane.go` line ~142), compute the max available width for the title: `maxTitleW = width - 1 - lipgloss.Width(statusBoldStyle.Render("Task:")) - 4 - lipgloss.Width(statusCyanStyle.Render(snap.TaskID)) - 3` (the constants account for the leading space, 4-space gap, and `" - "` separator)
-- [ ] `snap.TaskTitle` is wrapped with `styles.Truncate(snap.TaskTitle, maxTitleW)` before being written
-- [ ] When `maxTitleW <= 0`, the title is omitted entirely (only `TaskID` is shown) rather than panicking
-- [ ] `go build ./...` passes
+- [x] In `renderSnapshotInPane()` (`status_rightpane.go` line ~142), compute the max available width for the title: `maxTitleW = width - 1 - lipgloss.Width(statusBoldStyle.Render("Task:")) - 4 - lipgloss.Width(statusCyanStyle.Render(snap.TaskID)) - 3` (the constants account for the leading space, 4-space gap, and `" - "` separator)
+- [x] `snap.TaskTitle` is wrapped with `styles.Truncate(snap.TaskTitle, maxTitleW)` before being written
+- [x] When `maxTitleW <= 0`, the title is omitted entirely (only `TaskID` is shown) rather than panicking
+- [x] `go build ./...` passes
 
 ## Task Dependency Graph
 
