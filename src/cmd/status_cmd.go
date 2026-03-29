@@ -2,17 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/approval"
-	"github.com/leberkas-org/maggus/internal/config"
-	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 // renderStatusPlain builds the plain-text status output (no ANSI, no TUI).
@@ -153,83 +148,16 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 }
 
 func runStatus() error {
-	dir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-
-	cfg, err := config.Load(dir)
+	sm, err := buildStatusModel()
 	if err != nil {
 		return err
 	}
-	agentName := cfg.Agent
-	approvalRequired := cfg.IsApprovalRequired()
-
-	featureStore := stores.NewFileFeatureStore(dir)
-	bugStore := stores.NewFileBugStore(dir)
-
-	features, approvals, err := loadPlansWithApprovals(dir, featureStore, bugStore, true)
-	if err != nil {
-		return err
+	app := appModel{
+		active: screenStatus,
+		status: sm,
 	}
-	pruneStaleApprovals(dir, features)
-
-	if len(features) == 0 {
-		features = []parser.Plan{}
-	}
-
-	nextTaskID, nextTaskFile := findNextTask(features)
-
-	watcherCh := make(chan bool, 1)
-	w, _ := filewatcher.New(dir, func(msg any) {
-		hasNew := false
-		if u, ok := msg.(filewatcher.UpdateMsg); ok {
-			hasNew = u.HasNewFile
-		}
-		select {
-		case watcherCh <- hasNew:
-		default: // don't block if channel already has a pending update
-		}
-	}, 300*time.Millisecond)
-
-	var daemonCacheCh chan daemonPIDState
-	if daemonCache != nil {
-		daemonCacheCh = daemonCache.Subscribe()
-	}
-
-	logWatcher, _ := NewLogFileWatcher(dir)
-
-	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals, featureStore, bugStore)
-	m.presence = sharedPresence
-	m.watcherCh = watcherCh
-	m.watcher = w
-	m.daemonCacheCh = daemonCacheCh
-	if logWatcher != nil {
-		m.logWatcher = logWatcher
-		m.logWatcherCh = logWatcher.Chan()
-	}
-	if daemonCache != nil {
-		cached := daemonCache.Get()
-		m.daemon.PID = cached.PID
-		m.daemon.Running = cached.Running
-	}
-	prog := tea.NewProgram(m, tea.WithAltScreen())
-	result, err := prog.Run()
-	if w != nil {
-		w.Close()
-	}
-	if logWatcher != nil {
-		logWatcher.Stop()
-	}
-	if daemonCache != nil {
-		daemonCache.Unsubscribe(daemonCacheCh)
-	}
-	if err != nil {
-		return err
-	}
-	if final, ok := result.(statusModel); ok && final.RunTaskID != "" {
-		return dispatchWork(final.RunTaskID)
-	}
-	return nil
+	prog := tea.NewProgram(app, tea.WithAltScreen())
+	_, err = prog.Run()
+	return err
 }
 

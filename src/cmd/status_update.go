@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -341,7 +342,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 		m.ConfirmDelete = false
 		m.ShowDetail = false
 		if len(m.Tasks) == 0 {
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
 	case "n", "N", "esc":
@@ -378,7 +379,7 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 		}
 		m.rebuildForSelectedPlan()
 		if len(newVisible) == 0 {
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
 	case "n", "N", "esc":
@@ -418,14 +419,14 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "d", "D":
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "y", "Y":
 		_ = stopDaemonGracefully(m.dir)
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "k", "K", "ctrl+c", "ctrl+C":
 		_ = forceKill(m.daemon.PID)
 		removeDaemonPID(m.dir)
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "esc", "q", "Q":
 		m.exitDaemonOverlay = false
 		return m, nil
@@ -463,8 +464,26 @@ func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
 		m.exitDaemonOverlay = true
 		return m, nil
 	}
-	return m, tea.Quit
+	return m, func() tea.Msg { return navigateBackMsg{} }
 }
+
+// buildRunTaskMsg returns a tea.Cmd that emits an execProcessMsg asking the app
+// router to run `maggus work --task <id>` in the foreground via tea.ExecProcess.
+// After the work process exits, the router receives navigateBackMsg to return to
+// the main menu.
+func (m statusModel) buildRunTaskMsg() tea.Cmd {
+	taskID := m.taskListComponent.RunTaskID
+	return func() tea.Msg {
+		execPath, _ := os.Executable()
+		return execProcessMsg{
+			cmd: exec.Command(execPath, "work", "--task", taskID),
+			onDone: func(err error) tea.Msg {
+				return navigateBackMsg{}
+			},
+		}
+	}
+}
+
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
@@ -472,8 +491,10 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
-	case taskListQuit, taskListRun:
-		return m, tea.Quit
+	case taskListQuit:
+		return m, func() tea.Msg { return navigateBackMsg{} }
+	case taskListRun:
+		return m, m.buildRunTaskMsg()
 	}
 	return m, cmd
 }
@@ -519,6 +540,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch action {
 			case taskListQuit:
 				return m.handleQuitRequest()
+			case taskListRun:
+				return m, m.buildRunTaskMsg()
 			case taskListDeleted:
 				m.reloadPlans()
 			}
@@ -705,8 +728,10 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Delegate to component for shared navigation (task list, detail view, etc.)
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
-	case taskListQuit, taskListRun:
+	case taskListQuit:
 		return m.handleQuitRequest()
+	case taskListRun:
+		return m, m.buildRunTaskMsg()
 	case taskListDeleted:
 		m.reloadPlans()
 	}

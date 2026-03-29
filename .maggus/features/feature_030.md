@@ -71,17 +71,17 @@ exiting the program.
 **Parallel:** yes — can run alongside TASK-030-003, TASK-030-004, TASK-030-005, TASK-030-006
 
 **Acceptance Criteria:**
-- [ ] All `tea.Quit` calls in `status_update.go` are replaced with `return m, func() tea.Msg { return navigateBackMsg{} }`
-- [ ] The `RunTaskID` return-value pattern (currently read from the final model after `prog.Run()`)
+- [x] All `tea.Quit` calls in `status_update.go` are replaced with `return m, func() tea.Msg { return navigateBackMsg{} }`
+- [x] The `RunTaskID` return-value pattern (currently read from the final model after `prog.Run()`)
   is replaced: when the user triggers "run task", the model emits
   `execProcessMsg` carrying the work dispatch command and a `navigateBackMsg` callback so
   the router can exec the process then return to menu
-- [ ] `runStatus()` in `status_cmd.go` no longer calls `tea.NewProgram`; it instead builds a
+- [x] `runStatus()` in `status_cmd.go` no longer calls `tea.NewProgram`; it instead builds a
   `statusModel` and returns it so `appModel` can embed it — OR `runStatus()` is removed and
   status initialisation moves to `appModel`
-- [ ] File watchers and log watchers in the status model are still closed when the model is
+- [x] File watchers and log watchers in the status model are still closed when the model is
   torn down (moved to the `navigateBackMsg` handler in `appModel`)
-- [ ] `go build ./...` passes
+- [x] `go build ./...` passes
 
 ---
 

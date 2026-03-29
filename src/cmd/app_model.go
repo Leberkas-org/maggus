@@ -36,9 +36,11 @@ type navigateBackMsg struct{}
 // execProcessMsg asks the app router to suspend the TUI, run cmd in the foreground,
 // and call onDone with the process error when it exits.
 // The router handles this via tea.ExecProcess so the alt-screen is preserved.
+// onDone may return a tea.Msg that is dispatched back to the Update loop after
+// the process exits (e.g. navigateBackMsg{} to return to the menu).
 type execProcessMsg struct {
 	cmd    *exec.Cmd
-	onDone func(error)
+	onDone func(error) tea.Msg
 }
 
 // appModel is the top-level BubbleTea model that acts as a screen router.
@@ -117,7 +119,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case execProcessMsg:
 		return m, tea.ExecProcess(msg.cmd, func(err error) tea.Msg {
 			if msg.onDone != nil {
-				msg.onDone(err)
+				return msg.onDone(err)
 			}
 			return nil
 		})
