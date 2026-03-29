@@ -143,7 +143,7 @@ func (m statusModel) renderPlainLogInPane(width, height int) string {
 		remaining := available
 		end := start
 		for i := start; i < len(m.logLines) && remaining > 0; i++ {
-			subLines := strings.Split(formatLogLine(m.logLines[i]), "\n")
+			subLines := strings.Split(formatLogLine(m.logLines[i], width-2), "\n")
 			for _, subLine := range subLines {
 				if subLine == "" {
 					continue

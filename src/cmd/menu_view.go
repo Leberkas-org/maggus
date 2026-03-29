@@ -140,13 +140,10 @@ func (m menuModel) viewConfirmStopDaemon() string {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 
 	var sb strings.Builder
-	sb.WriteString(warnStyle.Render("Stop daemon?") + " " + mutedStyle.Render("[y/N]"))
-	sb.WriteString("\n\n")
-	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  The daemon is running (PID %d).", m.daemon.PID)))
-	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("  %s / %s / %s",
-		boldStyle.Render("y: stop and exit"),
-		mutedStyle.Render("n/d: exit detached"),
+	sb.WriteString(warnStyle.Render(fmt.Sprintf("Stop daemon? (PID %d)\n\n", m.daemon.PID)))
+	sb.WriteString(fmt.Sprintf("  %s | %s | %s",
+		boldStyle.Render("[y] stop and exit"),
+		mutedStyle.Render("[n] or [d]: exit detached"),
 		mutedStyle.Render("esc: cancel"),
 	))
 	return sb.String()

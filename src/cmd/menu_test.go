@@ -951,8 +951,8 @@ func TestViewConfirmStopDaemon_RendersPrompt(t *testing.T) {
 	if !strings.Contains(view, "Stop daemon?") {
 		t.Error("expected 'Stop daemon?' in confirmation view")
 	}
-	if !strings.Contains(view, "y/N") {
-		t.Error("expected '[y/N]' in confirmation view")
+	if !strings.Contains(view, "[y]") {
+		t.Error("expected '[y]' in confirmation view")
 	}
 	if !strings.Contains(view, "9876") {
 		t.Error("expected daemon PID in confirmation view")

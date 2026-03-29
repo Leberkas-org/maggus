@@ -139,10 +139,12 @@ var (
 
 // formatLogLine parses a JSONL log line and returns a color-coded string.
 // Non-JSON lines are returned as-is in muted style.
-func formatLogLine(raw string) string {
+// When width > 0 the HH:MM:SS timestamp is right-aligned using styles.RightAlign;
+// when width == 0 (unknown) it falls back to the original left-aligned format.
+func formatLogLine(raw string, width int) string {
 	var entry runlog.Entry
 	if err := json.Unmarshal([]byte(raw), &entry); err != nil {
-		// Graceful fallback: render plain text in muted style
+		// Graceful fallback: render plain text in muted style (no timestamp to place)
 		return logInfoStyle.Render(raw)
 	}
 
@@ -159,10 +161,13 @@ func formatLogLine(raw string) string {
 		taskID = " " + logTaskIDStyle.Render(entry.TaskID)
 	}
 
+	// Build the body (everything except the timestamp) then place the timestamp.
+	// body always starts with a space so that tsStr+body reproduces the original format.
+	var body string
 	switch entry.Event {
 	case "tool_use":
 		toolTag := logToolStyle.Render(fmt.Sprintf("[%s]", entry.Tool))
-		return fmt.Sprintf("%s%s %s %s", tsStr, taskID, toolTag, logInfoStyle.Render(formatToolInput(entry.Tool, entry.Input)))
+		body = fmt.Sprintf("%s %s %s", taskID, toolTag, logInfoStyle.Render(formatToolInput(entry.Tool, entry.Input)))
 
 	case "output":
 		// Output is the most important content — render at full contrast (default).
@@ -170,60 +175,62 @@ func formatLogLine(raw string) string {
 		if len(text) > 200 {
 			text = text[:200] + "…"
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, text)
+		body = fmt.Sprintf("%s %s", taskID, text)
 
 	case "task_failed":
 		reason := entry.Reason
 		if reason == "" {
 			reason = "unknown error"
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logErrorStyle.Render("FAILED: "+reason))
+		body = fmt.Sprintf("%s %s", taskID, logErrorStyle.Render("FAILED: "+reason))
 
 	case "error":
 		text := entry.Text
 		if text == "" {
 			text = entry.Reason
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logErrorStyle.Render(text))
+		body = fmt.Sprintf("%s %s", taskID, logErrorStyle.Render(text))
 
 	case "feature_start":
 		if entry.FeatureID != "" {
-			return fmt.Sprintf("%s %s %s %s", tsStr, logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("started"))
+			body = fmt.Sprintf(" %s %s %s", logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("started"))
+		} else {
+			body = fmt.Sprintf(" %s", logInfoStyle.Render("feature started"))
 		}
-		return fmt.Sprintf("%s %s", tsStr, logInfoStyle.Render("feature started"))
 
 	case "feature_complete":
 		if entry.FeatureID != "" {
-			return fmt.Sprintf("%s %s %s %s", tsStr, logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("complete"))
+			body = fmt.Sprintf(" %s %s %s", logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("complete"))
+		} else {
+			body = fmt.Sprintf(" %s", logInfoStyle.Render("feature complete"))
 		}
-		return fmt.Sprintf("%s %s", tsStr, logInfoStyle.Render("feature complete"))
 
 	case "task_start":
 		title := entry.Title
 		if title == "" {
 			title = "started"
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(title))
+		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(title))
 
 	case "task_complete":
 		detail := "complete"
 		if entry.Commit != "" {
 			detail = fmt.Sprintf("complete [%s]", entry.Commit)
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(detail))
+		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(detail))
 
 	case "info":
 		text := entry.Text
 		if text == "" {
 			text = "info"
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(text))
+		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(text))
 
 	case "task_usage":
 		totalIn := entry.InputTokens + entry.CacheCreationInputTokens + entry.CacheReadInputTokens
 		line := fmt.Sprintf("usage: %s in / %s out  %s",
 			runner.FormatTokens(totalIn), runner.FormatTokens(entry.OutputTokens), runner.FormatCost(entry.CostUSD))
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(line))
+		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(line))
 
 	default:
 		// Unknown event — render the whole line muted with whatever fields are available
@@ -234,8 +241,13 @@ func formatLogLine(raw string) string {
 		if desc == "" {
 			desc = entry.Event
 		}
-		return fmt.Sprintf("%s%s %s", tsStr, taskID, logInfoStyle.Render(desc))
+		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(desc))
 	}
+
+	if width == 0 {
+		return tsStr + body
+	}
+	return styles.RightAlign(body, tsStr, width)
 }
 
 // formatToolInput returns the most meaningful display value from a tool's input map.

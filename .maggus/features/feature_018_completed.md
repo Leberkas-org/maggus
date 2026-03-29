@@ -113,13 +113,13 @@ available `width int` and use `styles.RightAlign`. The call sites in
 `renderPlainLogInPane` pass the already-known `width`.
 
 **Acceptance Criteria:**
-- [ ] `formatLogLine` signature changes to `formatLogLine(raw string, width int) string`.
-- [ ] The timestamp is removed from the left and appended right-aligned using
+- [x] `formatLogLine` signature changes to `formatLogLine(raw string, width int) string`.
+- [x] The timestamp is removed from the left and appended right-aligned using
   `styles.RightAlign`.
-- [ ] All call sites of `formatLogLine` are updated to pass the correct width.
-- [ ] When `width == 0` (unknown), the function falls back to the current left-aligned
+- [x] All call sites of `formatLogLine` are updated to pass the correct width.
+- [x] When `width == 0` (unknown), the function falls back to the current left-aligned
   format so nothing breaks in headless / test contexts.
-- [ ] `go build ./...` and `go test ./...` pass.
+- [x] `go build ./...` and `go test ./...` pass.
 
 ---
 
