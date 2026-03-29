@@ -593,6 +593,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.nextTaskID, m.nextTaskFile = findNextTask(m.plans)
 		m.rebuildForSelectedPlan()
+		m.clampTreeScroll()
 		return m, nil
 	case "a":
 		return m.handleApproveToggle()
