@@ -171,8 +171,8 @@ func (m *statusModel) resizeTab2DetailViewport() {
 // Used by both clampTreeScroll and renderLeftPane to keep scroll math consistent.
 func (m *statusModel) treeAvailableHeight() int {
 	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
-	// 4 fixed header lines: "[1] Items" label + separator + daemon status + separator
-	const treeOverhead = 4
+	// innerH-1 (renderLeftPane receives innerH-1) + 5 header lines (label + sep + empty + daemon + sep)
+	const treeOverhead = 6
 	availH := innerH - treeOverhead
 	if availH < 1 {
 		availH = 1

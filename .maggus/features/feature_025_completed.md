@@ -28,10 +28,10 @@
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] In `treeAvailableHeight()` (`status_update.go`), `const treeOverhead` is changed from `4` to `6`
-- [ ] A comment explains the breakdown: `// innerH-1 (renderLeftPane receives innerH-1) + 5 header lines (label + sep + empty + daemon + sep)`
-- [ ] Navigating down through a list longer than the pane height keeps the cursor visible at all times with ~2 rows of context below
-- [ ] `go build ./...` passes
+- [x] In `treeAvailableHeight()` (`status_update.go`), `const treeOverhead` is changed from `4` to `6`
+- [x] A comment explains the breakdown: `// innerH-1 (renderLeftPane receives innerH-1) + 5 header lines (label + sep + empty + daemon + sep)`
+- [x] Navigating down through a list longer than the pane height keeps the cursor visible at all times with ~2 rows of context below
+- [x] `go build ./...` passes
 
 ## Task Dependency Graph
 
