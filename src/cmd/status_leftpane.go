@@ -289,7 +289,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			taskIDStr := leftPaneTruncate(task.ID, taskIDMaxW)
 			taskIDVisW := lipgloss.Width(taskIDStr)
 
-			titleAvail := avail - taskIDVisW - 1
+			titleAvail := avail - taskIDVisW - 4
 			if titleAvail < 0 {
 				titleAvail = 0
 			}
