@@ -34,6 +34,14 @@ func padToWidth(s string, width int) string {
 	return s + strings.Repeat(" ", width-w)
 }
 
+// selectedBgColor is the background color applied to the selected row in the left pane.
+const selectedBgColor lipgloss.Color = "#1f2937"
+
+// withBg returns a copy of style with the given background color applied.
+func withBg(style lipgloss.Style, bg lipgloss.Color) lipgloss.Style {
+	return style.Background(bg)
+}
+
 // renderLeftPane renders the left pane plan list with a right border │.
 // paneWidth is the total width including the │ border character.
 // height is the number of lines the pane must fill.
@@ -47,9 +55,8 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
 
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	selectedBg := lipgloss.NewStyle().Background(lipgloss.Color("#1f2937"))
 
-	cursorStyle := lipgloss.NewStyle().Foreground(styles.Primary)
+	whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff"))
 	greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	orangeStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
@@ -129,6 +136,20 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	for i, item := range items {
 		isSelected := i == m.treeCursor
 
+		// Per-row helpers that embed the selection background into styled strings.
+		addBg := func(s lipgloss.Style) lipgloss.Style {
+			if isSelected {
+				return withBg(s, selectedBgColor)
+			}
+			return s
+		}
+		bgStr := func(s string) string {
+			if isSelected {
+				return lipgloss.NewStyle().Background(selectedBgColor).Render(s)
+			}
+			return s
+		}
+
 		if item.kind == treeItemKindPlan {
 			plan := item.plan
 
@@ -141,40 +162,46 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 				bugAdded = true
 			}
 
-			// Cursor indicator (1 visual char).
-			var cursorChar string
-			if isSelected && m.leftFocused {
-				cursorChar = cursorStyle.Render("▸")
-			} else {
-				cursorChar = " "
-			}
-
 			// Expand/collapse icon (1 visual char).
 			var expandIcon string
 			if len(plan.Tasks) == 0 {
-				expandIcon = " "
-			} else if m.expandedPlans[plan.ID] {
-				expandIcon = mutedStyle.Render("▼")
+				expandIcon = bgStr(" ")
+			} else if isSelected && m.leftFocused {
+				if m.expandedPlans[plan.ID] {
+					expandIcon = addBg(whiteStyle).Render("▼")
+				} else {
+					expandIcon = addBg(whiteStyle).Render("▶")
+				}
+			} else if isSelected {
+				if m.expandedPlans[plan.ID] {
+					expandIcon = addBg(mutedStyle).Render("▼")
+				} else {
+					expandIcon = addBg(mutedStyle).Render("▶")
+				}
 			} else {
-				expandIcon = mutedStyle.Render("▶")
+				if m.expandedPlans[plan.ID] {
+					expandIcon = mutedStyle.Render("▼")
+				} else {
+					expandIcon = mutedStyle.Render("▶")
+				}
 			}
 
 			// Spinner column (1 char, always reserved).
 			var spinStr string
 			if m.daemon.Running && m.daemon.CurrentFeature == plan.ID {
-				spinStr = primaryStyle.Render(spinnerChar)
+				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else {
-				spinStr = " "
+				spinStr = bgStr(" ")
 			}
 
 			// Approval badge.
 			var badge string
 			if plan.Completed {
-				badge = mutedStyle.Render("✓")
+				badge = addBg(mutedStyle).Render("✓")
 			} else if isPlanApproved(plan, m.approvals, m.approvalRequired) {
-				badge = greenStyle.Render("✓")
+				badge = addBg(greenStyle).Render("✓")
 			} else {
-				badge = orangeStyle.Render("○")
+				badge = addBg(orangeStyle).Render("○")
 			}
 			badgeW := lipgloss.Width(badge)
 
@@ -183,13 +210,13 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			progBadgeW := 0
 			if len(plan.Tasks) > 0 {
 				progStr := fmt.Sprintf("%d/%d", plan.DoneCount(), len(plan.Tasks))
-				progBadge = mutedStyle.Render(progStr)
+				progBadge = addBg(mutedStyle).Render(progStr)
 				progBadgeW = len(progStr) + 1 // +1 for the space before it
 			}
 
-			// Layout: cursor(1) + expand(1) + space(1) + spinner(1) + title + space(1) + [progBadge + space(1)] + badge + space(1)
+			// Layout: expand(1) + space(1) + spinner(1) + space(1) + title + space(1) + [progBadge + space(1)] + badge + space(1)
 			// Fixed overhead on right = (progBadgeW) + 1 + badgeW + 1
-			// Fixed overhead on left  = 1 + 1 + 1 + 1 = 4
+			// Fixed overhead on left  = 1 + 1 + 1 = 3
 			titleMaxW := contentW - 4 - progBadgeW - 1 - badgeW - 1
 			if titleMaxW < 0 {
 				titleMaxW = 0
@@ -205,32 +232,34 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			var titleStr string
 			switch {
 			case plan.Completed:
-				titleStr = mutedStyle.Render(title)
+				titleStr = addBg(mutedStyle).Render(title)
 			case plan.IsBug:
-				titleStr = errorStyle.Render(title)
+				titleStr = addBg(errorStyle).Render(title)
 			default:
-				titleStr = title
+				if isSelected && m.leftFocused {
+					titleStr = addBg(whiteStyle).Render(title)
+				} else {
+					titleStr = bgStr(title)
+				}
 			}
 
 			// Pad title to fill its allocated width so badges stay right-aligned.
-			titlePad := titleMaxW - lipgloss.Width(titleStr)
+			titlePad := titleMaxW - lipgloss.Width(title)
 			if titlePad < 0 {
 				titlePad = 0
 			}
 
-			rowContent := cursorChar + expandIcon + " " + spinStr + titleStr + strings.Repeat(" ", titlePad)
+			rowContent := expandIcon + bgStr(" ") + spinStr + bgStr(" ") + titleStr + bgStr(strings.Repeat(" ", titlePad))
 			if progBadgeW > 0 {
-				rowContent += " " + progBadge
+				rowContent += bgStr(" ") + progBadge
 			}
-			rowContent += " " + badge + " "
+			rowContent += bgStr(" ") + badge + bgStr(" ")
 
-			var rowLine string
-			if isSelected {
-				rowLine = selectedBg.Render(padToWidth(rowContent, contentW))
-			} else {
-				rowLine = padToWidth(rowContent, contentW)
+			// Pad any remaining width with bg-aware spaces then emit the row.
+			if rw := lipgloss.Width(rowContent); rw < contentW {
+				rowContent += bgStr(strings.Repeat(" ", contentW-rw))
 			}
-			lines = append(lines, rowLine)
+			lines = append(lines, rowContent)
 
 		} else {
 			// Task row.
@@ -239,9 +268,9 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			// Spinner column (1 char, always reserved).
 			var spinStr string
 			if m.daemon.Running && m.daemon.CurrentTask == task.ID {
-				spinStr = primaryStyle.Render(spinnerChar)
+				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else {
-				spinStr = " "
+				spinStr = bgStr(" ")
 			}
 
 			// Layout: indent(3) + spinner(1) + taskID + space(1) + taskTitle
@@ -263,15 +292,24 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			}
 			taskTitleStr := leftPaneTruncate(task.Title, titleAvail)
 
-			rowContent := "   " + spinStr + mutedStyle.Render(taskIDStr) + " " + mutedStyle.Render(taskTitleStr)
-
-			var rowLine string
-			if isSelected {
-				rowLine = selectedBg.Render(padToWidth(rowContent, contentW))
+			var taskIDRendered, taskTitleRendered string
+			if isSelected && m.leftFocused {
+				taskIDRendered = addBg(whiteStyle).Render(taskIDStr)
+				taskTitleRendered = addBg(whiteStyle).Render(taskTitleStr)
+			} else if isSelected {
+				taskIDRendered = addBg(mutedStyle).Render(taskIDStr)
+				taskTitleRendered = addBg(mutedStyle).Render(taskTitleStr)
 			} else {
-				rowLine = padToWidth(rowContent, contentW)
+				taskIDRendered = mutedStyle.Render(taskIDStr)
+				taskTitleRendered = mutedStyle.Render(taskTitleStr)
 			}
-			lines = append(lines, rowLine)
+			rowContent := bgStr("   ") + spinStr + taskIDRendered + bgStr(" ") + taskTitleRendered
+
+			// Pad any remaining width with bg-aware spaces then emit the row.
+			if rw := lipgloss.Width(rowContent); rw < contentW {
+				rowContent += bgStr(strings.Repeat(" ", contentW-rw))
+			}
+			lines = append(lines, rowContent)
 		}
 	}
 
