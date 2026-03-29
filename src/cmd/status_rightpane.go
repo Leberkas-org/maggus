@@ -12,7 +12,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-var rightPaneTabNames = []string{"Output", "Item Details", "Current Task", "Metrics"}
+var rightPaneTabNames = []string{"Output", "Item Details", "Task Details", "Metrics"}
 
 // renderRightPaneTabBar renders the tab bar at the top of the right pane.
 // Format: `2 Output  3 Feature Details  4 Current Task  5 Metrics`
@@ -260,8 +260,12 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 		sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Cost:"), statusDimStyle.Render("N/A")))
 	}
 
+	isTerminal := snap.Status == "Done" || snap.Status == "Failed" || snap.Status == "Interrupted"
+
 	runElapsed := "—"
-	if snap.RunStartedAt != "" {
+	if isTerminal && m.frozenRunElapsed != "" {
+		runElapsed = m.frozenRunElapsed
+	} else if snap.RunStartedAt != "" {
 		if t, err := time.Parse(time.RFC3339, snap.RunStartedAt); err == nil {
 			runElapsed = formatHumanDuration(time.Since(t))
 		}
@@ -269,7 +273,9 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	sb.WriteString(fmt.Sprintf("  %s     %s\n", statusBoldStyle.Render("Run:"), statusDimStyle.Render(runElapsed)))
 
 	taskElapsed := "—"
-	if snap.TaskStartedAt != "" {
+	if isTerminal && m.frozenTaskElapsed != "" {
+		taskElapsed = m.frozenTaskElapsed
+	} else if snap.TaskStartedAt != "" {
 		if t, err := time.Parse(time.RFC3339, snap.TaskStartedAt); err == nil {
 			taskElapsed = formatHumanDuration(time.Since(t))
 		}

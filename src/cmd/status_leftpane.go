@@ -137,6 +137,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 	// Spinner character — reserved unconditionally (1 char) to prevent layout jitter.
 	spinnerChar := styles.SpinnerFrames[m.spinnerFrame]
+	runIsTerminal := m.snapshot != nil && (m.snapshot.Status == "Done" || m.snapshot.Status == "Failed" || m.snapshot.Status == "Interrupted")
 
 	for i, item := range items {
 		isSelected := (i + scrollOff) == m.treeCursor
@@ -189,7 +190,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 			// Spinner column (1 char, always reserved).
 			var spinStr string
-			if m.daemon.Running && m.daemon.CurrentFeature == plan.ID {
+			if m.daemon.Running && !runIsTerminal && m.daemon.CurrentFeature == plan.ID {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else {
 				spinStr = bgStr(" ")
@@ -268,7 +269,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 			// Spinner column (1 char, always reserved).
 			var spinStr string
-			if m.daemon.Running && m.daemon.CurrentTask == task.ID {
+			if m.daemon.Running && !runIsTerminal && m.daemon.CurrentTask == task.ID {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else if task.IsComplete() {
 				spinStr = addBg(greenStyle).Render("✓")

@@ -54,14 +54,14 @@ Two time-based polling loops remain in the codebase after the `DaemonStateCache`
 **Parallel:** yes — can run alongside TASK-028-001
 
 **Acceptance Criteria:**
-- [ ] A new `LogFileWatcher` struct (or equivalent) is created in `src/cmd/status_runlog.go` (or a new `src/cmd/log_watcher.go` if it keeps the existing file under 500 lines)
-- [ ] `LogFileWatcher` uses `fsnotify` to watch `.maggus/runs/` for Create events (detects new run log files) and the currently active log file for Write events
-- [ ] When a Write event fires on the active log file, a `logFileUpdateMsg` is delivered to the status TUI (same blocking-channel pattern as `listenForDaemonCacheUpdate`)
-- [ ] When a Create event for a new `.log` file arrives in `.maggus/runs/`, `findLatestRunLog` is called, and if the active path changes the watcher swaps to the new file (stop watching old path, add new path)
-- [ ] `logPollTickMsg` and `logPollTick` are deleted; all `case logPollTickMsg:` branches in `status_update.go` are replaced with `case logFileUpdateMsg:`
-- [ ] `LogFileWatcher` has a `Stop()` method that closes the fsnotify watcher and its goroutine cleanly
-- [ ] If fsnotify is unavailable or fails to init, fall back to the existing 200ms poll (keep `logPollTick` reachable as a fallback path, guarded by the error from `NewLogFileWatcher`)
-- [ ] `go test ./cmd/...` passes
+- [x] A new `LogFileWatcher` struct (or equivalent) is created in `src/cmd/status_runlog.go` (or a new `src/cmd/log_watcher.go` if it keeps the existing file under 500 lines)
+- [x] `LogFileWatcher` uses `fsnotify` to watch `.maggus/runs/` for Create events (detects new run log files) and the currently active log file for Write events
+- [x] When a Write event fires on the active log file, a `logFileUpdateMsg` is delivered to the status TUI (same blocking-channel pattern as `listenForDaemonCacheUpdate`)
+- [x] When a Create event for a new `.log` file arrives in `.maggus/runs/`, `findLatestRunLog` is called, and if the active path changes the watcher swaps to the new file (stop watching old path, add new path)
+- [x] `logPollTickMsg` and `logPollTick` are deleted; all `case logPollTickMsg:` branches in `status_update.go` are replaced with `case logFileUpdateMsg:`
+- [x] `LogFileWatcher` has a `Stop()` method that closes the fsnotify watcher and its goroutine cleanly
+- [x] If fsnotify is unavailable or fails to init, fall back to the existing 200ms poll (keep `logPollTick` reachable as a fallback path, guarded by the error from `NewLogFileWatcher`)
+- [x] `go test ./cmd/...` passes
 
 **Key files:**
 - `src/cmd/status_runlog.go` — add `LogFileWatcher`, remove `logPollTick`/`logPollTickMsg`

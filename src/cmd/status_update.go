@@ -22,11 +22,17 @@ func (m statusModel) Init() tea.Cmd {
 			StartTime:    time.Now(),
 		})
 	}
+	var logCmd tea.Cmd
+	if m.logWatcherCh != nil {
+		logCmd = listenForLogFileUpdate(m.logWatcherCh)
+	} else {
+		logCmd = logPollTick()
+	}
 	return tea.Batch(
 		func() tea.Msg {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
 		},
-		logPollTick(),
+		logCmd,
 		spinnerTick(),
 		listenForWatcherUpdate(m.watcherCh),
 		listenForDaemonCacheUpdate(m.daemonCacheCh),
@@ -64,6 +70,12 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinnerTickMsg:
 		if m.daemon.Running && m.snapshot != nil {
+			isTerminal := m.snapshot.Status == "Done" || m.snapshot.Status == "Failed" || m.snapshot.Status == "Interrupted"
+			if isTerminal {
+				// Stop the tick loop; it will be restarted when a new run begins.
+				m.spinnerTicking = false
+				return m, nil
+			}
 			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
 			return m, spinnerTick()
 		}
@@ -79,7 +91,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
 
-	case logPollTickMsg:
+	case logFileUpdateMsg:
 		prevFeature := m.daemon.CurrentFeature
 		runID, logPath := findLatestRunLog(m.dir)
 		m.daemon.RunID = runID
@@ -95,6 +107,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.expandedPlans[m.daemon.CurrentFeature] = true
 		}
+		prevSnapStatus := ""
+		if m.snapshot != nil {
+			prevSnapStatus = m.snapshot.Status
+		}
 		if m.daemon.Running && m.daemon.RunID != "" {
 			snap, err := runlog.ReadSnapshot(m.dir)
 			if err == nil {
@@ -103,6 +119,38 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// else: keep previous snapshot or nil
 		} else if !m.daemon.Running {
 			m.snapshot = nil
+		}
+
+		newSnapStatus := ""
+		if m.snapshot != nil {
+			newSnapStatus = m.snapshot.Status
+		}
+		isTerminalStatus := func(s string) bool {
+			return s == "Done" || s == "Failed" || s == "Interrupted"
+		}
+
+		// Freeze elapsed times the moment a run reaches a terminal state.
+		if m.snapshot != nil && isTerminalStatus(newSnapStatus) && !isTerminalStatus(prevSnapStatus) {
+			if t, err := time.Parse(time.RFC3339, m.snapshot.RunStartedAt); err == nil {
+				m.frozenRunElapsed = formatHumanDuration(time.Since(t))
+			}
+			if t, err := time.Parse(time.RFC3339, m.snapshot.TaskStartedAt); err == nil {
+				m.frozenTaskElapsed = formatHumanDuration(time.Since(t))
+			}
+		}
+		// Clear frozen elapsed and restart the tick loop when a new run begins.
+		if newSnapStatus != "" && !isTerminalStatus(newSnapStatus) && !m.spinnerTicking {
+			m.frozenRunElapsed = ""
+			m.frozenTaskElapsed = ""
+			m.spinnerTicking = true
+			if m.logWatcherCh != nil {
+				return m, tea.Batch(listenForLogFileUpdate(m.logWatcherCh), spinnerTick())
+			}
+			return m, tea.Batch(logPollTick(), spinnerTick())
+		}
+
+		if m.logWatcherCh != nil {
+			return m, listenForLogFileUpdate(m.logWatcherCh)
 		}
 		return m, logPollTick()
 

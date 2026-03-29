@@ -86,8 +86,11 @@ type statusModel struct {
 	daemon        daemonStatus
 
 	// Rich live view from state.json
-	snapshot     *runlog.StateSnapshot // nil when no snapshot available
-	spinnerFrame int
+	snapshot          *runlog.StateSnapshot // nil when no snapshot available
+	spinnerFrame      int
+	spinnerTicking    bool   // true while the 80ms tick loop is live
+	frozenRunElapsed  string // frozen run elapsed when snap reaches a terminal state
+	frozenTaskElapsed string // frozen task elapsed when snap reaches a terminal state
 
 	// Discord Rich Presence (nil when not configured)
 	presence *discord.Presence
@@ -103,6 +106,10 @@ type statusModel struct {
 
 	// Daemon state cache subscription channel
 	daemonCacheCh chan daemonPIDState
+
+	// fsnotify-based log file watcher (nil when fsnotify unavailable — falls back to polling)
+	logWatcher   *LogFileWatcher
+	logWatcherCh <-chan logFileUpdateMsg
 }
 
 func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {
@@ -123,9 +130,10 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		approvals:        approvals,
 		featureStore:     featureStore,
 		bugStore:         bugStore,
-		logAutoScroll:    true,
-		leftFocused:      true,
-		activeTab:        0,
+		logAutoScroll:   true,
+		leftFocused:     true,
+		activeTab:       0,
+		spinnerTicking:  true,
 	}
 	// Query actual terminal dimensions before the first render so View() always
 	// has a non-zero size and the split-pane is visible on the first frame
