@@ -205,6 +205,23 @@ func (m *statusModel) clampTreeScroll() {
 	}
 }
 
+// skipSeparatorUp moves cursor backward (wrapping) past any separator items.
+// Since only one separator exists, a single extra step is sufficient.
+func skipSeparatorUp(cursor int, items []treeItem) int {
+	if cursor >= 0 && cursor < len(items) && items[cursor].kind == treeItemKindSeparator {
+		cursor = styles.CursorUp(cursor, len(items))
+	}
+	return cursor
+}
+
+// skipSeparatorDown moves cursor forward (wrapping) past any separator items.
+func skipSeparatorDown(cursor int, items []treeItem) int {
+	if cursor >= 0 && cursor < len(items) && items[cursor].kind == treeItemKindSeparator {
+		cursor = styles.CursorDown(cursor, len(items))
+	}
+	return cursor
+}
+
 // maxLogScroll returns the maximum valid scroll offset for the log panel.
 // When a snapshot is available, scrolling operates on tool entries.
 func (m *statusModel) maxLogScroll() int {
@@ -486,7 +503,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
-			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.treeCursor = skipSeparatorUp(styles.CursorUp(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
@@ -498,7 +515,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
-			m.treeCursor = styles.CursorDown(m.treeCursor, len(items))
+			m.treeCursor = skipSeparatorDown(styles.CursorDown(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
@@ -534,7 +551,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
-			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.treeCursor = skipSeparatorUp(styles.CursorUp(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {

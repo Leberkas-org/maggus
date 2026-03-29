@@ -138,11 +138,6 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	// Spinner character — reserved unconditionally (1 char) to prevent layout jitter.
 	spinnerChar := styles.SpinnerFrames[m.spinnerFrame]
 
-	// Plan rows: features first, separator, then bugs (or bugs first based on ordering).
-	// Track when we cross the boundary between bugs and non-bugs sections.
-	bugSepAdded := false
-	bugAdded := false
-
 	for i, item := range items {
 		isSelected := (i + scrollOff) == m.treeCursor
 
@@ -160,17 +155,13 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			return s
 		}
 
+		if item.kind == treeItemKindSeparator {
+			lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
+			continue
+		}
+
 		if item.kind == treeItemKindPlan {
 			plan := item.plan
-
-			// Insert separator between bugs section and features section.
-			if !plan.IsBug && bugAdded && !bugSepAdded {
-				bugSepAdded = true
-				lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
-			}
-			if plan.IsBug && !bugAdded {
-				bugAdded = true
-			}
 
 			// Expand/collapse icon (1 visual char).
 			var expandIcon string
