@@ -70,7 +70,15 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, spinnerTick()
 
 	case logPollTickMsg:
+		prevFeature := m.daemon.CurrentFeature
 		m.daemon = loadDaemonStatus(m.dir)
+		// Auto-expand the active plan when CurrentFeature changes so the task row is visible.
+		if m.daemon.Running && m.daemon.CurrentFeature != "" && m.daemon.CurrentFeature != prevFeature {
+			if m.expandedPlans == nil {
+				m.expandedPlans = make(map[string]bool)
+			}
+			m.expandedPlans[m.daemon.CurrentFeature] = true
+		}
 		if m.daemon.Running && m.daemon.RunID != "" {
 			snap, err := runlog.ReadSnapshot(m.dir)
 			if err == nil {

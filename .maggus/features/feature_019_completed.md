@@ -91,14 +91,14 @@ Replace the flat feature/bug list in the left pane with a collapsible tree view.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] On startup, all plans are collapsed (no plan in `expandedPlans`)
-- [ ] When the daemon is running and `m.daemon.CurrentFeature` changes (detected in `logPollTickMsg` handler), the corresponding plan is automatically expanded (added to `expandedPlans`) so the active task row becomes visible
-- [ ] When a plan reload happens (`reloadPlans`), `treeCursor` is clamped to the new tree length so it never goes out of bounds
-- [ ] The daemon status line at the top of the left pane continues to show the running indicator and current feature/task text (existing behavior, no regression)
-- [ ] With the left pane focused, navigating up/down through task rows correctly updates the selected plan in the right pane (right pane shows the parent plan's details, not a blank screen)
-- [ ] No visual artifacts: tree rows have consistent width, approval badge stays right-aligned, selected-row highlight fills the full content width
-- [ ] All existing tests pass: `cd src && go test ./...`
-- [ ] `cd src && go vet ./...` reports no issues
+- [x] On startup, all plans are collapsed (no plan in `expandedPlans`)
+- [x] When the daemon is running and `m.daemon.CurrentFeature` changes (detected in `logPollTickMsg` handler), the corresponding plan is automatically expanded (added to `expandedPlans`) so the active task row becomes visible
+- [x] When a plan reload happens (`reloadPlans`), `treeCursor` is clamped to the new tree length so it never goes out of bounds
+- [x] The daemon status line at the top of the left pane continues to show the running indicator and current feature/task text (existing behavior, no regression)
+- [x] With the left pane focused, navigating up/down through task rows correctly updates the selected plan in the right pane (right pane shows the parent plan's details, not a blank screen)
+- [x] No visual artifacts: tree rows have consistent width, approval badge stays right-aligned, selected-row highlight fills the full content width
+- [x] All existing tests pass: `cd src && go test ./...`
+- [x] `cd src && go vet ./...` reports no issues
 
 ## Task Dependency Graph
 
