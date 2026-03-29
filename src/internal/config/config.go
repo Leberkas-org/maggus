@@ -90,6 +90,18 @@ func (g GitConfig) ProtectedBranchList() []string {
 	return filtered
 }
 
+// HookEntry represents a single hook command to execute.
+type HookEntry struct {
+	Run string `yaml:"run"`
+}
+
+// HooksConfig holds lifecycle hook definitions.
+type HooksConfig struct {
+	OnFeatureComplete []HookEntry `yaml:"on_feature_complete"`
+	OnBugComplete     []HookEntry `yaml:"on_bug_complete"`
+	OnTaskComplete    []HookEntry `yaml:"on_task_complete"`
+}
+
 // OnCompleteConfig holds settings for what happens when a feature or bug file is fully completed.
 type OnCompleteConfig struct {
 	Feature string `yaml:"feature"`
@@ -114,11 +126,10 @@ func (o OnCompleteConfig) BugAction() string {
 	return "rename"
 }
 
-// AutoWork values control when maggus automatically starts working from the main menu.
+// ApprovalMode values control whether features require explicit approval before maggus works on them.
 const (
-	AutoWorkDisabled = "disabled" // Default: no automatic work dispatch.
-	AutoWorkEnabled  = "enabled"  // Dispatch work immediately when workable tasks appear.
-	AutoWorkDelayed  = "delayed"  // Show a 5-second countdown before dispatching.
+	ApprovalModeOptIn  = "opt-in"  // Default: features must be explicitly approved.
+	ApprovalModeOptOut = "opt-out" // All features are worked on unless explicitly unapproved.
 )
 
 // Config holds settings read from .maggus/config.yml.
@@ -126,11 +137,34 @@ type Config struct {
 	Agent         string              `yaml:"agent"`
 	Model         string              `yaml:"model"`
 	Include       []string            `yaml:"include"`
-	Worktree      bool                `yaml:"worktree"`
-	AutoWork      string              `yaml:"auto_work"`
+	ApprovalMode  string              `yaml:"approval_mode"`
+	AutoContinue  *bool               `yaml:"auto_continue"`
+	MaxLogFiles   int                 `yaml:"max_log_files"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Git           GitConfig           `yaml:"git"`
 	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
+	Hooks         HooksConfig         `yaml:"hooks"`
+}
+
+// IsApprovalRequired returns true when approval_mode is opt-in (the default).
+// Features must be explicitly approved before maggus will work on them.
+func (c Config) IsApprovalRequired() bool {
+	return c.ApprovalMode != ApprovalModeOptOut
+}
+
+// IsAutoContinueEnabled returns true when auto_continue is explicitly set to true.
+// Default is false: maggus stops after each feature completes.
+func (c Config) IsAutoContinueEnabled() bool {
+	return c.AutoContinue != nil && *c.AutoContinue
+}
+
+// LogMaxFiles returns the maximum number of log files to retain in .maggus/runs/.
+// Defaults to 50 if max_log_files is zero or negative.
+func (c Config) LogMaxFiles() int {
+	if c.MaxLogFiles <= 0 {
+		return 50
+	}
+	return c.MaxLogFiles
 }
 
 // Load reads .maggus/config.yml from dir. If the file does not exist,
@@ -156,8 +190,8 @@ func Load(dir string) (Config, error) {
 		cfg.Agent = "claude"
 	}
 
-	if cfg.AutoWork == "" {
-		cfg.AutoWork = AutoWorkDisabled
+	if cfg.ApprovalMode == "" {
+		cfg.ApprovalMode = ApprovalModeOptIn
 	}
 
 	return cfg, nil

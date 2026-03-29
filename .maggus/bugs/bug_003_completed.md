@@ -1,0 +1,87 @@
+<!-- maggus-id: 6d2a66de-1dec-4fdc-ac63-8b53ebd34b06 -->
+<!-- maggus-id: 20260326-162610-bug-003 -->
+# Bug: Output tab height 2 lines too large, footer rendering broken
+
+## Summary
+
+The Output tab (Tab 1) in the status split-pane view renders 2 lines taller than the available inner box height, pushing the shared footer out of bounds. The root cause is two compounding issues: a structural +1 line from both pane border appends, and un-truncated log lines that wrap when lipgloss applies word-wrap but does not clip via `.Height()`.
+
+## Steps to Reproduce
+
+1. Run `maggus status`
+2. Observe the split-pane view — the footer key hints at the bottom are missing or garbled
+3. Switch to Tab 1 (Output) via key `2`
+4. Observe the footer is visually displaced / not shown at the correct position
+
+## Expected Behavior
+
+The footer key hints are visible at the bottom of the outer box on all tabs, including the Output tab.
+
+## Root Cause
+
+**Issue A — Structural +1 from both panes (affects all tabs):**
+
+`renderLeftPane` (`src/cmd/status_leftpane.go:186–188`) pads content to exactly `height` lines, then appends `lastLine` (the `─┴─` bottom separator) after those `height` lines:
+
+```go
+result = append(result, lastLine)   // line 187 — appended AFTER height lines
+return strings.Join(result, "\n")   // returns height+1 lines
+```
+
+`renderRightPane` (`src/cmd/status_rightpane.go:69–73`) similarly forces content to `height` lines via `.Height(height)`, then appends `"\n" + borderLine`:
+
+```go
+rendered := lipgloss.NewStyle().Width(width).Height(height).Render(full)
+// ...
+return rendered + "\n" + borderLine   // line 73 — returns height+1 lines
+```
+
+Both panes are called with `height = innerH` from `viewStatusSplit` (`status_view.go:180–181`), so both return `innerH + 1` lines. `JoinHorizontal` produces `innerH + 1` lines of content.
+
+In `FullScreenLeftColor` (`internal/tui/styles/styles.go:156`):
+```go
+gap := innerH - contentLines - footerLineCount
+     = innerH - (innerH+1) - 1 = -2  →  clamped to 0
+body = content + "" + centeredFooter   // footer glued to last content line, no separator
+```
+
+The box `.Height(innerH)` receives `innerH + 1` line body with footer concatenated directly onto the last border line — footer is visually lost.
+
+**Issue B — Unwrapped log lines in Output tab:**
+
+`renderPlainLogInPane` (`src/cmd/status_rightpane.go:124–162`) writes formatted log lines without truncating them to `width`:
+
+```go
+for _, line := range m.logLines[start:end] {
+    sb.WriteString("\n ")
+    sb.WriteString(formatLogLine(line))   // no width truncation
+}
+// ...
+return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+```
+
+When `Width(width)` word-wraps a long log line, it becomes multiple visual rows. `Height(height)` in lipgloss pads but does **not clip** — so the returned block is taller than `contentH`. This compounds Issue A, adding variable extra lines specific to the Output tab.
+
+## User Stories
+
+### BUG-003-001: Fix structural height overflow from pane bottom separator lines
+
+**Description:** As a user, I want the status split-pane footer to always be visible so I can see available key bindings.
+
+**Acceptance Criteria:**
+- [x] `viewStatusSplit` passes `innerH - 1` as `height` to `renderLeftPane` and `renderRightPane` so the appended bottom separator lines land at exactly `innerH` total lines
+- [x] The footer key hints are visible and correctly positioned on all tabs (Output, Feature Details, Current Task, Metrics)
+- [x] The bottom `─┴─` and `─────` separator lines remain visually present
+- [x] No regression in left pane or right pane content clipping
+- [x] `go vet ./...` and `go test ./...` pass
+
+### BUG-003-002: Truncate Output tab log lines to prevent word-wrap height overflow
+
+**Description:** As a user, I want the Output tab to stay within its allocated height so long log lines don't push content out of the pane.
+
+**Acceptance Criteria:**
+- [x] Each log line in `renderPlainLogInPane` is truncated to `width - 2` visible characters before being written to the string builder (using `styles.Truncate`)
+- [x] The Output tab never renders taller than `contentH` lines regardless of log line length
+- [x] Long tool descriptions, file paths, and output text are shown with `…` truncation rather than wrapping
+- [x] No regression in log scrolling behavior
+- [x] `go vet ./...` and `go test ./...` pass

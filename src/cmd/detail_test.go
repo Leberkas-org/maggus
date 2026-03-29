@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
 
 func TestCriteriaAction_String(t *testing.T) {
@@ -167,7 +168,7 @@ func TestDetailState_PerformAction_Skip(t *testing.T) {
 		criteriaCursor: 0,
 	}
 
-	modified, err := ds.performAction(task, criteriaActionSkip)
+	modified, err := ds.performAction(task, criteriaActionSkip, nil)
 	if err != nil {
 		t.Fatalf("performAction(skip) error: %v", err)
 	}
@@ -187,7 +188,7 @@ func TestDetailState_PerformAction_OutOfBounds(t *testing.T) {
 		criteriaCursor: 5, // out of bounds
 	}
 
-	modified, err := ds.performAction(task, criteriaActionUnblock)
+	modified, err := ds.performAction(task, criteriaActionUnblock, nil)
 	if err != nil {
 		t.Fatalf("performAction error: %v", err)
 	}
@@ -229,8 +230,9 @@ func TestDetailState_PerformAction_Unblock(t *testing.T) {
 		blockedIndices: []int{0},
 		criteriaCursor: 0,
 	}
+	store := stores.NewFileFeatureStore(dir)
 
-	modified, err := ds.performAction(task, criteriaActionUnblock)
+	modified, err := ds.performAction(task, criteriaActionUnblock, store)
 	if err != nil {
 		t.Fatalf("performAction(unblock) error: %v", err)
 	}
@@ -264,8 +266,9 @@ func TestDetailState_PerformAction_Resolve(t *testing.T) {
 		blockedIndices: []int{0},
 		criteriaCursor: 0,
 	}
+	store := stores.NewFileFeatureStore(dir)
 
-	modified, err := ds.performAction(task, criteriaActionResolve)
+	modified, err := ds.performAction(task, criteriaActionResolve, store)
 	if err != nil {
 		t.Fatalf("performAction(resolve) error: %v", err)
 	}
@@ -297,8 +300,9 @@ func TestDetailState_PerformAction_Delete(t *testing.T) {
 		blockedIndices: []int{0},
 		criteriaCursor: 0,
 	}
+	store := stores.NewFileFeatureStore(dir)
 
-	modified, err := ds.performAction(task, criteriaActionDelete)
+	modified, err := ds.performAction(task, criteriaActionDelete, store)
 	if err != nil {
 		t.Fatalf("performAction(delete) error: %v", err)
 	}
@@ -466,23 +470,6 @@ func TestRenderDetailContent_BlockedTask(t *testing.T) {
 	content := renderDetailContent(task, nil)
 	if !strings.Contains(content, "Blocked") {
 		t.Error("blocked task should show Blocked status")
-	}
-}
-
-func TestRenderDetailContent_IgnoredTask(t *testing.T) {
-	task := parser.Task{
-		ID:         "TASK-004",
-		Title:      "Ignored task",
-		SourceFile: "/plan_1.md",
-		Ignored:    true,
-		Criteria: []parser.Criterion{
-			{Text: "criterion"},
-		},
-	}
-
-	content := renderDetailContent(task, nil)
-	if !strings.Contains(content, "Ignored") {
-		t.Error("ignored task should show Ignored status")
 	}
 }
 

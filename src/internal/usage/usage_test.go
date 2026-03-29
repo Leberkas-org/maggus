@@ -11,14 +11,31 @@ import (
 	"github.com/leberkas-org/maggus/internal/agent"
 )
 
-func TestAppendCreatesFileWithJSONL(t *testing.T) {
-	dir := setupDir(t)
+// redirectHome sets HOME/USERPROFILE to a temp dir for the duration of the test
+// so that Append writes to a controlled location.
+func redirectHome(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
+	return tmpDir
+}
+
+// usageDir returns ~/.maggus/usage/ relative to the given home dir.
+func usageDir(home string) string {
+	return filepath.Join(home, ".maggus", "usage")
+}
+
+// --- AppendTo tests ---
+
+func TestAppendToCreatesFileWithJSONL(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	records := []Record{
 		{
 			RunID:        "run-1",
-			TaskID:       "TASK-001",
+			TaskShort:    "TASK-001",
 			TaskTitle:    "First task",
-			FeatureFile:  "plan_1.md",
 			Model:        "opus",
 			Agent:        "claude",
 			InputTokens:  100,
@@ -28,11 +45,11 @@ func TestAppendCreatesFileWithJSONL(t *testing.T) {
 		},
 	}
 
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if err := AppendTo(path, records); err != nil {
+		t.Fatalf("AppendTo returned error: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
@@ -44,18 +61,18 @@ func TestAppendCreatesFileWithJSONL(t *testing.T) {
 	if rec.RunID != "run-1" {
 		t.Errorf("RunID = %q, want %q", rec.RunID, "run-1")
 	}
-	if rec.TaskID != "TASK-001" {
-		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-001")
+	if rec.TaskShort != "TASK-001" {
+		t.Errorf("TaskShort = %q, want %q", rec.TaskShort, "TASK-001")
 	}
 }
 
-func TestAppendMultipleCallsAppendsLines(t *testing.T) {
-	dir := setupDir(t)
+func TestAppendToMultipleCallsAppendsLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	rec := Record{
 		RunID:        "run-1",
-		TaskID:       "TASK-001",
+		TaskShort:    "TASK-001",
 		TaskTitle:    "Task",
-		FeatureFile:  "plan.md",
 		Model:        "sonnet",
 		Agent:        "claude",
 		InputTokens:  10,
@@ -64,19 +81,18 @@ func TestAppendMultipleCallsAppendsLines(t *testing.T) {
 		EndTime:      time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
 	}
 
-	if err := Append(dir, []Record{rec}); err != nil {
-		t.Fatalf("first Append: %v", err)
+	if err := AppendTo(path, []Record{rec}); err != nil {
+		t.Fatalf("first AppendTo: %v", err)
 	}
-	if err := Append(dir, []Record{rec}); err != nil {
-		t.Fatalf("second Append: %v", err)
+	if err := AppendTo(path, []Record{rec}); err != nil {
+		t.Fatalf("second AppendTo: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 lines, got %d", len(lines))
 	}
 
-	// Each line must be valid JSON.
 	for i, line := range lines {
 		var r Record
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
@@ -85,43 +101,43 @@ func TestAppendMultipleCallsAppendsLines(t *testing.T) {
 	}
 }
 
-func TestAppendEmptyRecordsIsNoOp(t *testing.T) {
+func TestAppendToEmptyRecordsIsNoOp(t *testing.T) {
 	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 
-	if err := Append(dir, []Record{}); err != nil {
-		t.Fatalf("Append with empty records returned error: %v", err)
+	if err := AppendTo(path, []Record{}); err != nil {
+		t.Fatalf("AppendTo with empty records returned error: %v", err)
 	}
 
-	path := filepath.Join(dir, fileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("expected no file to be created for empty records")
 	}
 }
 
-func TestAppendNilRecordsIsNoOp(t *testing.T) {
+func TestAppendToNilRecordsIsNoOp(t *testing.T) {
 	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 
-	if err := Append(dir, nil); err != nil {
-		t.Fatalf("Append with nil records returned error: %v", err)
+	if err := AppendTo(path, nil); err != nil {
+		t.Fatalf("AppendTo with nil records returned error: %v", err)
 	}
 
-	path := filepath.Join(dir, fileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("expected no file to be created for nil records")
 	}
 }
 
-func TestAppendWritesCorrectFields(t *testing.T) {
-	dir := setupDir(t)
+func TestAppendToWritesCorrectFields(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	start := time.Date(2026, 3, 15, 14, 30, 0, 0, time.UTC)
 	end := time.Date(2026, 3, 15, 14, 35, 45, 0, time.UTC)
 
 	records := []Record{
 		{
 			RunID:        "run-42",
-			TaskID:       "TASK-007",
+			TaskShort:    "TASK-007",
 			TaskTitle:    "Secret task",
-			FeatureFile:  "plan_3.md",
 			Model:        "claude-opus-4-6",
 			Agent:        "claude",
 			InputTokens:  5000,
@@ -131,11 +147,11 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 		},
 	}
 
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if err := AppendTo(path, records); err != nil {
+		t.Fatalf("AppendTo returned error: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
@@ -148,8 +164,8 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 	if rec.RunID != "run-42" {
 		t.Errorf("RunID = %q, want %q", rec.RunID, "run-42")
 	}
-	if rec.TaskID != "TASK-007" {
-		t.Errorf("TaskID = %q, want %q", rec.TaskID, "TASK-007")
+	if rec.TaskShort != "TASK-007" {
+		t.Errorf("TaskShort = %q, want %q", rec.TaskShort, "TASK-007")
 	}
 	if rec.TaskTitle != "Secret task" {
 		t.Errorf("TaskTitle = %q, want %q", rec.TaskTitle, "Secret task")
@@ -162,26 +178,27 @@ func TestAppendWritesCorrectFields(t *testing.T) {
 	}
 }
 
-func TestAppendReturnsErrorForMissingDirectory(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "nonexistent", "deep")
+func TestAppendToReturnsErrorForMissingDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nonexistent", "deep", "test.jsonl")
 
 	records := []Record{
 		{
 			RunID:     "run-1",
-			TaskID:    "TASK-001",
+			TaskShort: "TASK-001",
 			StartTime: time.Now(),
 			EndTime:   time.Now(),
 		},
 	}
 
-	err := Append(dir, records)
+	err := AppendTo(path, records)
 	if err == nil {
 		t.Fatal("expected error for non-existent directory, got nil")
 	}
 }
 
-func TestAppendWritesCacheAndModelUsage(t *testing.T) {
-	dir := setupDir(t)
+func TestAppendToWritesCacheAndModelUsage(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	start := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 3, 20, 10, 5, 0, 0, time.UTC)
 
@@ -198,9 +215,8 @@ func TestAppendWritesCacheAndModelUsage(t *testing.T) {
 	records := []Record{
 		{
 			RunID:                    "run-99",
-			TaskID:                   "TASK-008",
+			TaskShort:                "TASK-008",
 			TaskTitle:                "Cache test",
-			FeatureFile:              "plan_2.md",
 			Model:                    "claude-opus-4-6",
 			Agent:                    "claude",
 			InputTokens:              3,
@@ -214,11 +230,11 @@ func TestAppendWritesCacheAndModelUsage(t *testing.T) {
 		},
 	}
 
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if err := AppendTo(path, records); err != nil {
+		t.Fatalf("AppendTo returned error: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
@@ -259,22 +275,23 @@ func TestAppendWritesCacheAndModelUsage(t *testing.T) {
 	}
 }
 
-func TestAppendWritesEmptyModelUsage(t *testing.T) {
-	dir := setupDir(t)
+func TestAppendToWritesEmptyModelUsage(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	records := []Record{
 		{
 			RunID:     "run-1",
-			TaskID:    "TASK-001",
+			TaskShort: "TASK-001",
 			StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			EndTime:   time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
 		},
 	}
 
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if err := AppendTo(path, records); err != nil {
+		t.Fatalf("AppendTo returned error: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	var rec Record
 	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
 		t.Fatalf("not valid JSON: %v", err)
@@ -286,18 +303,19 @@ func TestAppendWritesEmptyModelUsage(t *testing.T) {
 }
 
 func TestEachLineIsIndependentlyParseable(t *testing.T) {
-	dir := setupDir(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
 	records := []Record{
-		{RunID: "run-1", TaskID: "TASK-001", StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)},
-		{RunID: "run-2", TaskID: "TASK-002", StartTime: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 1, 2, 0, 0, time.UTC)},
-		{RunID: "run-3", TaskID: "TASK-003", StartTime: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 2, 3, 0, 0, time.UTC)},
+		{RunID: "run-1", TaskShort: "TASK-001", StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)},
+		{RunID: "run-2", TaskShort: "TASK-002", StartTime: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 1, 2, 0, 0, time.UTC)},
+		{RunID: "run-3", TaskShort: "TASK-003", StartTime: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC), EndTime: time.Date(2026, 1, 1, 2, 3, 0, 0, time.UTC)},
 	}
 
-	if err := Append(dir, records); err != nil {
-		t.Fatalf("Append returned error: %v", err)
+	if err := AppendTo(path, records); err != nil {
+		t.Fatalf("AppendTo returned error: %v", err)
 	}
 
-	lines := readJSONL(t, filepath.Join(dir, fileName))
+	lines := readJSONL(t, path)
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines, got %d", len(lines))
 	}
@@ -310,14 +328,188 @@ func TestEachLineIsIndependentlyParseable(t *testing.T) {
 	}
 }
 
-// setupDir creates a temp dir with the .maggus subdirectory that Append expects.
-func setupDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0755); err != nil {
-		t.Fatalf("create .maggus dir: %v", err)
+// --- Append tests ---
+
+func TestAppendWorkRecordGoesToWorkJSONL(t *testing.T) {
+	home := redirectHome(t)
+	records := []Record{
+		{
+			RunID:        "run-1",
+			TaskShort:    "TASK-001",
+			InputTokens:  100,
+			OutputTokens: 200,
+			StartTime:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndTime:      time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
+		},
 	}
-	return dir
+
+	if err := Append(records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	workPath := filepath.Join(usageDir(home), "work.jsonl")
+	lines := readJSONL(t, workPath)
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line in work.jsonl, got %d", len(lines))
+	}
+
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("line is not valid JSON: %v", err)
+	}
+	if rec.RunID != "run-1" {
+		t.Errorf("RunID = %q, want %q", rec.RunID, "run-1")
+	}
+
+	// sessions.jsonl should not exist
+	sessionsPath := filepath.Join(usageDir(home), "sessions.jsonl")
+	if _, err := os.Stat(sessionsPath); !os.IsNotExist(err) {
+		t.Error("sessions.jsonl should not exist for work records")
+	}
+}
+
+func TestAppendSessionRecordGoesToSessionsJSONL(t *testing.T) {
+	home := redirectHome(t)
+	records := []Record{
+		{
+			RunID:     "run-1",
+			Kind:      "plan",
+			TaskShort: "TASK-001",
+			StartTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndTime:   time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC),
+		},
+	}
+
+	if err := Append(records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	sessionsPath := filepath.Join(usageDir(home), "sessions.jsonl")
+	lines := readJSONL(t, sessionsPath)
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line in sessions.jsonl, got %d", len(lines))
+	}
+
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("line is not valid JSON: %v", err)
+	}
+	if rec.Kind != "plan" {
+		t.Errorf("Kind = %q, want %q", rec.Kind, "plan")
+	}
+
+	// work.jsonl should not exist
+	workPath := filepath.Join(usageDir(home), "work.jsonl")
+	if _, err := os.Stat(workPath); !os.IsNotExist(err) {
+		t.Error("work.jsonl should not exist for session records")
+	}
+}
+
+func TestAppendMixedRecordsRoutedCorrectly(t *testing.T) {
+	home := redirectHome(t)
+	records := []Record{
+		{RunID: "run-work", Kind: "", StartTime: time.Now(), EndTime: time.Now()},
+		{RunID: "run-session", Kind: "bugreport", StartTime: time.Now(), EndTime: time.Now()},
+	}
+
+	if err := Append(records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	workLines := readJSONL(t, filepath.Join(usageDir(home), "work.jsonl"))
+	if len(workLines) != 1 {
+		t.Fatalf("expected 1 work record, got %d", len(workLines))
+	}
+
+	sessionLines := readJSONL(t, filepath.Join(usageDir(home), "sessions.jsonl"))
+	if len(sessionLines) != 1 {
+		t.Fatalf("expected 1 session record, got %d", len(sessionLines))
+	}
+}
+
+func TestAppendCreatesUsageDirectory(t *testing.T) {
+	home := redirectHome(t)
+	dir := usageDir(home)
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatal("usage dir should not exist yet")
+	}
+
+	records := []Record{
+		{RunID: "run-1", StartTime: time.Now(), EndTime: time.Now()},
+	}
+	if err := Append(records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("usage dir was not created: %v", err)
+	}
+}
+
+func TestAppendEmptyRecordsIsNoOp(t *testing.T) {
+	home := redirectHome(t)
+
+	if err := Append([]Record{}); err != nil {
+		t.Fatalf("Append with empty records returned error: %v", err)
+	}
+
+	// No files should be created.
+	if _, err := os.Stat(usageDir(home)); !os.IsNotExist(err) {
+		t.Error("expected no directory to be created for empty records")
+	}
+}
+
+func TestAppendNilRecordsIsNoOp(t *testing.T) {
+	home := redirectHome(t)
+
+	if err := Append(nil); err != nil {
+		t.Fatalf("Append with nil records returned error: %v", err)
+	}
+
+	if _, err := os.Stat(usageDir(home)); !os.IsNotExist(err) {
+		t.Error("expected no directory to be created for nil records")
+	}
+}
+
+func TestAppendRecordHasRepositoryAndKindFields(t *testing.T) {
+	home := redirectHome(t)
+	records := []Record{
+		{
+			RunID:      "run-1",
+			Repository: "https://github.com/leberkas-org/maggus",
+			Kind:       "prompt",
+			ItemID:     "abc-123",
+			ItemShort:  "feature_001",
+			ItemTitle:  "Global Usage Tracking",
+			TaskShort:  "TASK-001-002",
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+		},
+	}
+
+	if err := Append(records); err != nil {
+		t.Fatalf("Append returned error: %v", err)
+	}
+
+	lines := readJSONL(t, filepath.Join(usageDir(home), "sessions.jsonl"))
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+
+	var rec Record
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	if rec.Repository != "https://github.com/leberkas-org/maggus" {
+		t.Errorf("Repository = %q, want %q", rec.Repository, "https://github.com/leberkas-org/maggus")
+	}
+	if rec.Kind != "prompt" {
+		t.Errorf("Kind = %q, want %q", rec.Kind, "prompt")
+	}
+	if rec.ItemID != "abc-123" {
+		t.Errorf("ItemID = %q, want %q", rec.ItemID, "abc-123")
+	}
 }
 
 // readJSONL reads all non-empty lines from a file.

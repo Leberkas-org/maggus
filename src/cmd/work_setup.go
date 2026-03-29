@@ -8,8 +8,11 @@ import (
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitignore"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -27,13 +30,13 @@ type workConfig struct {
 	count           int
 	dir             string
 	cfg             config.Config
+	globalSettings  globalconfig.Settings
 	validIncludes   []string
 	includeWarnings []string
 	activeAgent     agent.Agent
 	resolvedModel   string
 	modelDisplay    string
 	notifier        *notify.Notifier
-	useWorktree     bool
 	hostFingerprint string
 }
 
@@ -107,15 +110,6 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 	// Create notifier for sound notifications.
 	notifier := notify.New(cfg.Notifications)
 
-	// Resolve worktree mode: --no-worktree > --worktree > config > default (false)
-	useWorktree := cfg.Worktree
-	if worktreeFlag {
-		useWorktree = true
-	}
-	if noWorktreeFlag {
-		useWorktree = false
-	}
-
 	// Ensure .gitignore has required entries
 	if _, err := ensureGitignoreFn(dir); err != nil {
 		return nil, fmt.Errorf("check gitignore: %w", err)
@@ -132,17 +126,33 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 		modelDisplay = "default"
 	}
 
+	globalSettings, _ := globalconfig.LoadSettings()
+
 	return &workConfig{
 		count:           count,
 		dir:             dir,
 		cfg:             cfg,
+		globalSettings:  globalSettings,
 		validIncludes:   validIncludes,
 		includeWarnings: includeWarnings,
 		activeAgent:     activeAgent,
 		resolvedModel:   resolvedModel,
 		modelDisplay:    modelDisplay,
 		notifier:        notifier,
-		useWorktree:     useWorktree,
 		hostFingerprint: hostFingerprint,
 	}, nil
+}
+
+// setupBranch creates or ensures the feature branch for the current run.
+// Returns the branch message or empty string when auto-branch is disabled.
+func setupBranch(repoDir string, nextTask *parser.Task, gitCfg config.GitConfig) (string, error) {
+	if !gitCfg.IsAutoBranchEnabled() {
+		return "Auto-branch disabled, staying on current branch", nil
+	}
+
+	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID, gitCfg.ProtectedBranchList())
+	if err != nil {
+		return "", fmt.Errorf("ensure feature branch: %w", err)
+	}
+	return msg, nil
 }

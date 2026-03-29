@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
 	"github.com/leberkas-org/maggus/internal/capabilities"
+	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
@@ -30,6 +32,15 @@ func init() {
 
 // caps holds the detected tool capabilities for this run.
 var caps capabilities.Capabilities
+
+// daemonCache is a package-level cache for the daemon's PID/running state,
+// shared across menu iterations within a single runMenu invocation.
+var daemonCache *DaemonStateCache
+
+// sharedPresence holds a Discord Presence instance created by the root menu
+// and shared with subcommands (prompt, work). When non-nil, subcommands use
+// this instead of creating their own connection.
+var sharedPresence *discord.Presence
 
 var rootCmd = &cobra.Command{
 	Use:     "maggus",
@@ -53,7 +64,59 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 
+	// Initialise Discord Rich Presence for the menu if enabled.
+	// Connect in the background so the TUI renders instantly.
+	var presence *discord.Presence
+	var presenceReady <-chan struct{}
+	if gs, err := globalconfig.LoadSettings(); err == nil && gs.DiscordPresence {
+		presence = &discord.Presence{}
+		ch := make(chan struct{})
+		presenceReady = ch
+		menuStart := time.Now()
+		go func() {
+			_ = presence.Connect()
+			close(ch)
+			// Send the initial "In Main Menu" update that the main
+			// goroutine may have skipped while we were connecting.
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: "In Main Menu",
+				StartTime:    menuStart,
+			})
+		}()
+	}
+	defer func() {
+		if presence != nil {
+			<-presenceReady // wait for Connect to finish before closing
+			_ = presence.Close()
+		}
+	}()
+
+	// Initialise the daemon state cache once for the lifetime of runMenu.
+	// If it fails (e.g. .maggus/ does not exist yet), daemonCache stays nil
+	// and all call sites handle nil gracefully.
+	cwd, _ := os.Getwd()
+	if cache, err := NewDaemonStateCache(cwd); err == nil {
+		daemonCache = cache
+		defer func() {
+			daemonCache.Stop()
+			daemonCache = nil
+		}()
+	}
+
 	for {
+		// Show idle presence while in the main menu.
+		if presence != nil {
+			select {
+			case <-presenceReady:
+				_ = presence.Update(discord.PresenceState{
+					FeatureTitle: "In Main Menu",
+					StartTime:    time.Now(),
+				})
+			default:
+				// Still connecting in background; the goroutine will
+				// send the initial update once connected.
+			}
+		}
 		m := newMenuModel(loadFeatureSummary())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		result, err := p.Run()
@@ -69,11 +132,39 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 
 		final := result.(menuModel)
+
+		// Unsubscribe the model's daemon cache channel before the next iteration
+		// creates a new model with a fresh subscription.
+		if daemonCache != nil {
+			daemonCache.Unsubscribe(final.daemonCacheCh)
+		}
+
 		if final.quitting || final.selected == "" {
 			return nil
 		}
 
 		cmdArgs := append([]string{final.selected}, final.args...)
+
+		// Direct dispatch for TUI commands no longer registered with cobra.
+		directDispatch := map[string]func() error{
+			"config": runConfig,
+			"prompt": runPrompt,
+			"repos":  runRepos,
+			"status": runStatus,
+		}
+		if fn, ok := directDispatch[final.selected]; ok {
+			if presence != nil {
+				select {
+				case <-presenceReady:
+					sharedPresence = presence
+				default:
+				}
+			}
+			_ = fn()
+			sharedPresence = nil
+			continue
+		}
+
 		sub, remaining, err := rootCmd.Find(cmdArgs)
 		if err != nil {
 			return err
@@ -83,8 +174,21 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		if err := sub.ParseFlags(remaining); err != nil {
 			return err
 		}
+		// Share the menu's Discord presence with the subcommand.
+		if presence != nil {
+			select {
+			case <-presenceReady:
+				sharedPresence = presence
+			default:
+				// Still connecting — subcommand will create its own.
+			}
+		}
+
 		// Run the command; ignore errors so we return to the menu
 		_ = sub.RunE(sub, sub.Flags().Args())
+
+		// Reclaim presence ownership so the next loop iteration resets to "In Main Menu".
+		sharedPresence = nil
 	}
 }
 
@@ -123,19 +227,29 @@ func promptYesNo(question string) bool {
 	return answer == "y" || answer == "yes"
 }
 
+// shouldSkipResolver returns true for subcommands that must operate on the
+// literal current directory (e.g. start, stop) rather than the resolved
+// repository. This prevents the resolver from silently changing to
+// last_opened and making per-directory guards ineffective.
+func shouldSkipResolver() bool {
+	if len(os.Args) < 2 {
+		return false
+	}
+	switch os.Args[1] {
+	case "start", "stop":
+		return true
+	}
+	return false
+}
+
 func Execute() {
 	// Detect and cache available CLI tools on startup.
 	caps = capabilities.Detect()
 
 	// Resolve working directory based on global repository config.
-	resolveWorkingDirectory()
-
-	// Register skill commands only when claude is available.
-	if caps.HasClaude {
-		rootCmd.AddCommand(planCmd)
-		rootCmd.AddCommand(visionCmd)
-		rootCmd.AddCommand(architectureCmd)
-		rootCmd.AddCommand(promptCmd)
+	// Skip resolution for commands that should operate on the literal cwd.
+	if !shouldSkipResolver() {
+		resolveWorkingDirectory()
 	}
 
 	if err := rootCmd.Execute(); err != nil {

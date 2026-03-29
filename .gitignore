@@ -5,10 +5,16 @@
 .maggus/usage*.csv
 .maggus/usage_*.jsonl
 
-maggus.exe
+.superpowers/
+
+*.exe
 
 COMMIT.md
 
 docs/.vitepress/dist
 docs/.vitepress/cache
 docs/node_modules
+.maggus/runs
+.maggus/feature_approvals.yml
+.maggus/daemon.pid
+.maggus/interactive.lock

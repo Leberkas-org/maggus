@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,10 +12,73 @@ import (
 	"strings"
 )
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+(?:(IGNORED)\s+)?((?:TASK|BUG)-[\w-]+?):\s+(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+((?:TASK|BUG)-[\w-]+?):\s+(.+)$`)
 
-// TaskHeadingRe is the exported task heading regex for use by other packages (e.g. ignore/unignore commands).
-var TaskHeadingRe = taskHeadingRe
+// maggusIDRe matches the first-line HTML comment containing a maggus-id UUID.
+var maggusIDRe = regexp.MustCompile(`^<!--\s*maggus-id:\s*([0-9a-fA-F-]+)\s*-->$`)
+
+// generateUUID produces a UUID v4 using crypto/rand.
+func generateUUID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+}
+
+// EnsureMaggusID returns the maggus-id UUID for the file at path.
+// If the file already has a <!-- maggus-id: ... --> first line, it returns the
+// existing UUID without modifying the file. Otherwise it generates a new UUID v4,
+// prepends <!-- maggus-id: <uuid> --> as the first line, writes the file back,
+// and returns the new UUID.
+func EnsureMaggusID(path string) (string, error) {
+	if id := ParseMaggusID(path); id != "" {
+		return id, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+
+	id, err := generateUUID()
+	if err != nil {
+		return "", fmt.Errorf("generate UUID: %w", err)
+	}
+
+	header := fmt.Sprintf("<!-- maggus-id: %s -->\n", id)
+	newData := append([]byte(header), data...)
+	if err := os.WriteFile(path, newData, 0o644); err != nil {
+		return "", fmt.Errorf("write %s: %w", path, err)
+	}
+
+	return id, nil
+}
+
+// ParseMaggusID reads only the first line of the file at path and extracts the
+// maggus-id UUID from an HTML comment of the form <!-- maggus-id: <uuid> -->.
+// Returns the UUID string on match, or "" if the file cannot be read or the
+// first line does not match the expected pattern.
+func ParseMaggusID(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if !scanner.Scan() {
+		return ""
+	}
+	line := strings.TrimSpace(scanner.Text())
+	if m := maggusIDRe.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	return ""
+}
 
 type Criterion struct {
 	Text    string
@@ -26,15 +90,14 @@ type Task struct {
 	ID          string
 	Title       string
 	Description string
+	Model       string
 	Criteria    []Criterion
 	SourceFile  string
-	Ignored     bool
 }
 
 type Feature struct {
-	File    string
-	Ignored bool
-	Tasks   []Task
+	File  string
+	Tasks []Task
 }
 
 func (t *Task) IsComplete() bool {
@@ -59,9 +122,31 @@ func (t *Task) IsBlocked() bool {
 	return false
 }
 
-// IsWorkable returns true if the task is incomplete, not blocked, and not ignored.
+// IsWorkable returns true if the task is incomplete and not blocked.
 func (t *Task) IsWorkable() bool {
-	return !t.IsComplete() && !t.IsBlocked() && !t.Ignored
+	return !t.IsComplete() && !t.IsBlocked()
+}
+
+// featureTitleRe matches the top-level heading in feature/bug files, e.g.
+// "# Feature 001: Discord Rich Presence Integration" or "# Bug 001: Title".
+var featureTitleRe = regexp.MustCompile(`^#\s+(?:Feature|Bug)\s+\d+:\s+(.+)$`)
+
+// ParseFileTitle extracts the title from the top-level heading of a feature or bug file.
+// Returns empty string if no matching heading is found.
+func ParseFileTitle(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if m := featureTitleRe.FindStringSubmatch(scanner.Text()); m != nil {
+			return strings.TrimSpace(m[1])
+		}
+	}
+	return ""
 }
 
 // ParseFile parses a single feature markdown file and returns all tasks found in it.
@@ -88,10 +173,9 @@ func ParseFile(path string) ([]Task, error) {
 				tasks = append(tasks, *current)
 			}
 			current = &Task{
-				ID:         m[2],
-				Title:      strings.TrimSpace(m[3]),
+				ID:         m[1],
+				Title:      strings.TrimSpace(m[2]),
 				SourceFile: path,
-				Ignored:    m[1] == "IGNORED",
 			}
 			inDescription = false
 
@@ -112,6 +196,17 @@ func ParseFile(path string) ([]Task, error) {
 			if text != "" {
 				current.Description = text
 			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Model:**") {
+			inDescription = false
+			value := strings.TrimPrefix(line, "**Model:**")
+			value = strings.TrimSpace(value)
+			if idx := strings.IndexAny(value, " \t"); idx >= 0 {
+				value = value[:idx]
+			}
+			current.Model = value
 			continue
 		}
 
@@ -199,28 +294,20 @@ func GlobFeatureFiles(dir string, includeCompleted bool) ([]string, error) {
 
 	SortFeatureFiles(files)
 
-	if includeCompleted {
-		return files, nil
-	}
-
-	filtered := files[:0]
+	// Filter out _completed.md files unless requested.
+	result := files[:0]
 	for _, f := range files {
-		if !strings.HasSuffix(f, "_completed.md") {
-			filtered = append(filtered, f)
+		if !includeCompleted && strings.HasSuffix(f, "_completed.md") {
+			continue
 		}
+		result = append(result, f)
 	}
-	return filtered, nil
-}
-
-// IsIgnoredFile returns true if the given path is an ignored feature or bug file (ends with _ignored.md).
-func IsIgnoredFile(path string) bool {
-	return strings.HasSuffix(path, "_ignored.md")
+	return result, nil
 }
 
 // ParseFeatures finds all .maggus/features/feature_*.md files in the given directory and parses them.
 // Files ending in _completed.md are excluded.
 // Tasks are returned in order: files sorted by name, tasks in document order within each file.
-// Tasks from _ignored feature files have Ignored set to true.
 func ParseFeatures(dir string) ([]Task, error) {
 	files, err := GlobFeatureFiles(dir, false)
 	if err != nil {
@@ -233,12 +320,6 @@ func ParseFeatures(dir string) ([]Task, error) {
 		if err != nil {
 			return nil, err
 		}
-		ignored := IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		allTasks = append(allTasks, tasks...)
 	}
 
@@ -247,7 +328,6 @@ func ParseFeatures(dir string) ([]Task, error) {
 
 // ParseFeaturesGrouped finds all .maggus/features/feature_*.md files and returns them as Feature structs.
 // Files ending in _completed.md are excluded.
-// Features from _ignored files have Ignored set to true, and all their tasks inherit this flag.
 func ParseFeaturesGrouped(dir string) ([]Feature, error) {
 	files, err := GlobFeatureFiles(dir, false)
 	if err != nil {
@@ -260,16 +340,9 @@ func ParseFeaturesGrouped(dir string) ([]Feature, error) {
 		if err != nil {
 			return nil, err
 		}
-		ignored := IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		features = append(features, Feature{
-			File:    f,
-			Ignored: ignored,
-			Tasks:   tasks,
+			File:  f,
+			Tasks: tasks,
 		})
 	}
 
@@ -304,19 +377,19 @@ func extractFeatureNumber(path string) int {
 // MarkCompletedFeatures marks feature files where all tasks are complete (and none are blocked).
 // When action is "delete", the file is removed; otherwise it is renamed by appending _completed
 // before the .md extension (e.g. feature_001.md → feature_001_completed.md).
-// Returns the number of files actually renamed or deleted.
-func MarkCompletedFeatures(dir, action string) (int, error) {
+// Returns the original file paths of completed files and any error encountered.
+func MarkCompletedFeatures(dir, action string) ([]string, error) {
 	files, err := GlobFeatureFiles(dir, false)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	count := 0
+	var completed []string
 	for _, f := range files {
 
 		tasks, err := ParseFile(f)
 		if err != nil {
-			return count, err
+			return completed, err
 		}
 
 		if len(tasks) == 0 {
@@ -332,21 +405,21 @@ func MarkCompletedFeatures(dir, action string) (int, error) {
 		}
 
 		if allComplete {
+			completed = append(completed, f)
 			if action == "delete" {
 				if err := os.Remove(f); err != nil {
-					return count, fmt.Errorf("delete %s: %w", f, err)
+					return completed, fmt.Errorf("delete %s: %w", f, err)
 				}
 			} else {
 				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
 				if err := os.Rename(f, newName); err != nil {
-					return count, fmt.Errorf("rename %s: %w", f, err)
+					return completed, fmt.Errorf("rename %s: %w", f, err)
 				}
 			}
-			count++
 		}
 	}
 
-	return count, nil
+	return completed, nil
 }
 
 // DeleteTask removes a task section (### TASK-ID: ... up to the next ### or EOF)
@@ -363,7 +436,7 @@ func DeleteTask(filePath string, taskID string) error {
 
 	for i, line := range lines {
 		if m := taskHeadingRe.FindStringSubmatch(line); m != nil {
-			if m[2] == taskID {
+			if m[1] == taskID {
 				// Found the task — also consume blank lines before the heading
 				start = i
 				for start > 0 && strings.TrimSpace(lines[start-1]) == "" {
@@ -470,8 +543,8 @@ func DeleteCriterion(filePath string, c Criterion) error {
 // bugNumberRe extracts the numeric part from bug filenames like "bug_001.md" or "bug_003_completed.md".
 var bugNumberRe = regexp.MustCompile(`bug_(\d+)`)
 
-// legacyBugTaskRe matches legacy TASK-NNN headings (### TASK-NNN: or ### IGNORED TASK-NNN:) in bug files.
-var legacyBugTaskRe = regexp.MustCompile(`^(###\s+(?:IGNORED\s+)?)TASK-(\d+):\s`)
+// legacyBugTaskRe matches legacy TASK-NNN headings (### TASK-NNN:) in bug files.
+var legacyBugTaskRe = regexp.MustCompile(`^(###\s+)TASK-(\d+):\s`)
 
 // GlobBugFiles returns all bug_*.md file paths in .maggus/bugs/, sorted numerically.
 // If includeCompleted is false, files ending in _completed.md are excluded.
@@ -484,17 +557,15 @@ func GlobBugFiles(dir string, includeCompleted bool) ([]string, error) {
 
 	SortBugFiles(files)
 
-	if includeCompleted {
-		return files, nil
-	}
-
-	filtered := files[:0]
+	// Filter out _completed.md files unless requested.
+	result := files[:0]
 	for _, f := range files {
-		if !strings.HasSuffix(f, "_completed.md") {
-			filtered = append(filtered, f)
+		if !includeCompleted && strings.HasSuffix(f, "_completed.md") {
+			continue
 		}
+		result = append(result, f)
 	}
-	return filtered, nil
+	return result, nil
 }
 
 // SortBugFiles sorts bug file paths by their numeric bug number (e.g. bug_001 before bug_010).
@@ -577,12 +648,6 @@ func ParseBugs(dir string) ([]Task, error) {
 		if err != nil {
 			return nil, err
 		}
-		ignored := IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		allTasks = append(allTasks, tasks...)
 	}
 
@@ -606,16 +671,9 @@ func ParseBugsGrouped(dir string) ([]Feature, error) {
 		if err != nil {
 			return nil, err
 		}
-		ignored := IsIgnoredFile(f)
-		if ignored {
-			for i := range tasks {
-				tasks[i].Ignored = true
-			}
-		}
 		bugs = append(bugs, Feature{
-			File:    f,
-			Ignored: ignored,
-			Tasks:   tasks,
+			File:  f,
+			Tasks: tasks,
 		})
 	}
 
@@ -625,18 +683,18 @@ func ParseBugsGrouped(dir string) ([]Feature, error) {
 // MarkCompletedBugs marks bug files where all tasks are complete (and none are blocked).
 // When action is "delete", the file is removed; otherwise it is renamed by appending _completed
 // before the .md extension (e.g. bug_001.md → bug_001_completed.md).
-// Returns the number of files actually renamed or deleted.
-func MarkCompletedBugs(dir, action string) (int, error) {
+// Returns the original file paths of completed files and any error encountered.
+func MarkCompletedBugs(dir, action string) ([]string, error) {
 	files, err := GlobBugFiles(dir, false)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	count := 0
+	var completed []string
 	for _, f := range files {
 		tasks, err := ParseFile(f)
 		if err != nil {
-			return count, err
+			return completed, err
 		}
 
 		if len(tasks) == 0 {
@@ -652,19 +710,19 @@ func MarkCompletedBugs(dir, action string) (int, error) {
 		}
 
 		if allComplete {
+			completed = append(completed, f)
 			if action == "delete" {
 				if err := os.Remove(f); err != nil {
-					return count, fmt.Errorf("delete %s: %w", f, err)
+					return completed, fmt.Errorf("delete %s: %w", f, err)
 				}
 			} else {
 				newName := strings.TrimSuffix(f, ".md") + "_completed.md"
 				if err := os.Rename(f, newName); err != nil {
-					return count, fmt.Errorf("rename %s: %w", f, err)
+					return completed, fmt.Errorf("rename %s: %w", f, err)
 				}
 			}
-			count++
 		}
 	}
 
-	return count, nil
+	return completed, nil
 }

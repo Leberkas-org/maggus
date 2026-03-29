@@ -76,8 +76,6 @@ type updateModel struct {
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 }
 
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // loadGlobalSettings is injectable for testing.
 var loadGlobalSettings = func() (globalconfig.Settings, error) {
 	return globalconfig.LoadSettings()
@@ -144,7 +142,7 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case updateTickMsg:
-		m.frame = (m.frame + 1) % len(spinnerFrames)
+		m.frame = (m.frame + 1) % len(styles.SpinnerFrames)
 		return m, updateTickCmd()
 
 	case claude2xResultMsg:
@@ -194,13 +192,6 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch m.phase {
-		case phaseChecking, phaseDownloading:
-			// Only allow quit during async phases
-			if msg.Type == tea.KeyCtrlC || msg.Type == tea.KeyEscape {
-				saveAutoUpdateIfDirty(&m)
-				return m, tea.Quit
-			}
-
 		case phaseUpToDate, phaseSuccess, phaseError:
 			// Any key exits (except 'a' which is handled above)
 			saveAutoUpdateIfDirty(&m)
@@ -208,9 +199,6 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case phaseConfirm:
 			switch msg.Type {
-			case tea.KeyCtrlC, tea.KeyEscape:
-				saveAutoUpdateIfDirty(&m)
-				return m, tea.Quit
 			case tea.KeyUp:
 				if m.scrollOffset > 0 {
 					m.scrollOffset--
@@ -385,7 +373,7 @@ func (m updateModel) renderContent() string {
 
 	switch m.phase {
 	case phaseChecking:
-		spinner := cyanSt.Render(spinnerFrames[m.frame])
+		spinner := cyanSt.Render(styles.SpinnerFrames[m.frame])
 		fmt.Fprintf(&content, "\n%s Checking for updates...\n", spinner)
 
 	case phaseUpToDate:
@@ -405,7 +393,7 @@ func (m updateModel) renderContent() string {
 
 	case phaseDownloading:
 		fmt.Fprintf(&content, "%s  %s\n", labelStyle.Render("Latest:"), successStyle.Render(m.info.TagName))
-		spinner := cyanSt.Render(spinnerFrames[m.frame])
+		spinner := cyanSt.Render(styles.SpinnerFrames[m.frame])
 		fmt.Fprintf(&content, "\n%s Downloading and installing %s...\n", spinner, m.info.TagName)
 
 	case phaseSuccess:
@@ -452,9 +440,9 @@ func (m updateModel) View() string {
 		vp := m.viewportHeight()
 		var hints string
 		if total > vp {
-			hints = styles.StatusBar.Render("↑/↓: scroll · ←/→: select · a: auto-update · enter: confirm · q/esc: cancel")
+			hints = styles.StatusBar.Render("↑/↓: scroll · ←/→: select · a: auto-update · enter: confirm · q: cancel")
 		} else {
-			hints = styles.StatusBar.Render("←/→: select · a: auto-update · enter: confirm · q/esc: cancel")
+			hints = styles.StatusBar.Render("←/→: select · a: auto-update · enter: confirm · q: cancel")
 		}
 		footer = menu + "\n" + hints
 	case phaseDownloading:

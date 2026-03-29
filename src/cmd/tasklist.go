@@ -12,6 +12,15 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
+// planStore is the subset of FeatureStore/BugStore needed by taskListComponent
+// for deleting tasks and mutating criteria.
+type planStore interface {
+	DeleteTask(filePath, taskID string) error
+	UnblockCriterion(filePath string, c parser.Criterion) error
+	ResolveCriterion(filePath string, c parser.Criterion) error
+	DeleteCriterion(filePath string, c parser.Criterion) error
+}
+
 // taskListAction signals what happened after an Update call.
 type taskListAction int
 
@@ -54,6 +63,19 @@ type taskListComponent struct {
 
 	// Run action — set when user presses Alt+R
 	RunTaskID string
+
+	// Stores for task/criterion mutations. Set by the parent model at construction.
+	featureStore planStore
+	bugStore     planStore
+}
+
+// storeForFile returns the appropriate store for the given source file path.
+// Bug files (containing /bugs/ or \bugs\) use bugStore; all others use featureStore.
+func (c *taskListComponent) storeForFile(sourceFile string) planStore {
+	if strings.Contains(sourceFile, "/bugs/") || strings.Contains(sourceFile, `\bugs\`) {
+		return c.bugStore
+	}
+	return c.featureStore
 }
 
 // effectiveBorderColor returns the border color to use, defaulting to Primary.
@@ -169,24 +191,12 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 		}
 		return nil, taskListNone
 	case "up", "k":
-		if len(c.Tasks) > 0 {
-			if c.Cursor > 0 {
-				c.Cursor--
-			} else {
-				c.Cursor = len(c.Tasks) - 1
-			}
-			c.ensureCursorVisible()
-		}
+		c.Cursor = styles.CursorUp(c.Cursor, len(c.Tasks))
+		c.ensureCursorVisible()
 		return nil, taskListNone
 	case "down", "j":
-		if len(c.Tasks) > 0 {
-			if c.Cursor < len(c.Tasks)-1 {
-				c.Cursor++
-			} else {
-				c.Cursor = 0
-			}
-			c.ensureCursorVisible()
-		}
+		c.Cursor = styles.CursorDown(c.Cursor, len(c.Tasks))
+		c.ensureCursorVisible()
 		return nil, taskListNone
 	case "home":
 		c.Cursor = 0
@@ -203,14 +213,14 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 			c.openDetail()
 		}
 		return nil, taskListNone
-	case "q", "esc", "ctrl+c":
+	case "q":
 		return nil, taskListQuit
 	}
 	return nil, taskListUnhandled
 }
 
 // updateDetail handles keys in the detail view.
-// Returns taskListUnhandled for keys the parent should handle (e.g. alt+i in status).
+// Returns taskListUnhandled for keys the parent should handle.
 func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	// Handle action picker mode
 	if c.Detail.showActionPicker {
@@ -233,13 +243,9 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 		c.ConfirmDelete = true
 		c.DeleteErr = ""
 		return nil, taskListNone
-	case "q":
-		return nil, taskListQuit
-	case "esc", "backspace":
+	case "q", "backspace":
 		c.closeDetail()
 		return nil, taskListNone
-	case "ctrl+c":
-		return nil, taskListQuit
 	case "tab", "b":
 		c.Detail.noBlockedMsg = false
 		if !c.Detail.initCriteriaMode(c.Tasks[c.Cursor]) {
@@ -287,15 +293,11 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	switch msg.String() {
 	case "up", "k":
-		if c.Detail.criteriaCursor > 0 {
-			c.Detail.criteriaCursor--
-			c.refreshDetailViewport()
-		}
+		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor-1, len(c.Detail.blockedIndices))
+		c.refreshDetailViewport()
 	case "down", "j":
-		if c.Detail.criteriaCursor < len(c.Detail.blockedIndices)-1 {
-			c.Detail.criteriaCursor++
-			c.refreshDetailViewport()
-		}
+		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor+1, len(c.Detail.blockedIndices))
+		c.refreshDetailViewport()
 	case "enter":
 		c.Detail.showActionPicker = true
 		c.Detail.actionCursor = 0
@@ -303,13 +305,9 @@ func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskLis
 	case "tab":
 		c.Detail.exitCriteriaMode()
 		c.refreshDetailViewport()
-	case "esc", "backspace":
+	case "q", "backspace":
 		c.closeDetail()
 		return nil, taskListNone
-	case "q":
-		return nil, taskListQuit
-	case "ctrl+c":
-		return nil, taskListQuit
 	}
 	return nil, taskListNone
 }
@@ -317,18 +315,14 @@ func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskLis
 func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 	switch msg.String() {
 	case "up", "k":
-		if c.Detail.actionCursor > 0 {
-			c.Detail.actionCursor--
-			c.refreshDetailViewport()
-		}
+		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor-1, len(criteriaActions))
+		c.refreshDetailViewport()
 	case "down", "j":
-		if c.Detail.actionCursor < len(criteriaActions)-1 {
-			c.Detail.actionCursor++
-			c.refreshDetailViewport()
-		}
+		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor+1, len(criteriaActions))
+		c.refreshDetailViewport()
 	case "enter":
 		action := criteriaActions[c.Detail.actionCursor]
-		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action)
+		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action, c.storeForFile(c.Tasks[c.Cursor].SourceFile))
 		c.Detail.showActionPicker = false
 		if modified {
 			// Reload task from disk
@@ -344,8 +338,6 @@ func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskLis
 	case "esc":
 		c.Detail.showActionPicker = false
 		c.refreshDetailViewport()
-	case "ctrl+c":
-		return nil, taskListQuit
 	}
 	return nil, taskListNone
 }
@@ -357,7 +349,7 @@ func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskLi
 	switch msg.String() {
 	case "y", "Y", "enter":
 		t := c.Tasks[c.Cursor]
-		if err := parser.DeleteTask(t.SourceFile, t.ID); err != nil {
+		if err := c.storeForFile(t.SourceFile).DeleteTask(t.SourceFile, t.ID); err != nil {
 			c.DeleteErr = err.Error()
 			c.ConfirmDelete = false
 			return nil, taskListNone
@@ -373,7 +365,7 @@ func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskLi
 			return nil, taskListQuit
 		}
 		return nil, taskListDeleted
-	case "n", "N", "esc", "ctrl+c":
+	case "n", "N", "esc":
 		c.ConfirmDelete = false
 		return nil, taskListNone
 	}

@@ -9,28 +9,14 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
-	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
-var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Edit project settings interactively",
-	Long:  `Opens an interactive editor for .maggus/config.yml settings.`,
-	Args:  cobra.NoArgs,
-	RunE:  runConfig,
-}
-
-func init() {
-	rootCmd.AddCommand(configCmd)
-}
-
-func runConfig(cmd *cobra.Command, args []string) error {
+func runConfig() error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -111,19 +97,10 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	modelValues := []string{"(default)", "sonnet", "opus", "haiku"}
 	modelIdx := indexOf(modelValues, cfg.Model)
 
-	worktreeValues := []string{"on", "off"}
-	worktreeIdx := 1
-	if cfg.Worktree {
-		worktreeIdx = 0
-	}
-
-	autoWorkValues := []string{"disabled", "enabled", "delayed (5s)"}
-	autoWorkIdx := 0
-	switch cfg.AutoWork {
-	case config.AutoWorkEnabled:
-		autoWorkIdx = 1
-	case config.AutoWorkDelayed:
-		autoWorkIdx = 2
+	autoApproveValues := []string{"disabled", "enabled"}
+	autoApproveIdx := 0
+	if cfg.ApprovalMode == config.ApprovalModeOptOut {
+		autoApproveIdx = 1
 	}
 
 	autoBranchValues := []string{"on", "off"}
@@ -171,19 +148,23 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	featureActionIdx := indexOf(onCompleteValues, cfg.OnComplete.FeatureAction())
 	bugActionIdx := indexOf(onCompleteValues, cfg.OnComplete.BugAction())
 
-	// Load global auto-update setting
+	// Load global settings
 	autoUpdateValues := []string{"off", "notify", "auto"}
 	autoUpdateIdx := 1 // default: notify
+	discordPresenceValues := []string{"on", "off"}
+	discordPresenceIdx := 1
 	globalSettings, err := loadGlobalSettings()
 	if err == nil {
 		autoUpdateIdx = indexOf(autoUpdateValues, string(globalSettings.AutoUpdate))
+		if globalSettings.DiscordPresence {
+			discordPresenceIdx = 0
+		}
 	}
 
 	projectRows := []configRow{
 		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
-		{label: "Worktree", values: worktreeValues, current: worktreeIdx},
-		{label: "Auto-work", values: autoWorkValues, current: autoWorkIdx},
+		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
 		{label: "Protected branches", display: protectedDisplay},
@@ -198,6 +179,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	}
 
 	globalRows := []configRow{
+		{label: "Discord presence", values: discordPresenceValues, current: discordPresenceIdx},
 		{label: "Auto-update", values: autoUpdateValues, current: autoUpdateIdx},
 		{label: "Save global config", action: configActionSaveGlobal, isSave: true},
 		{label: "Edit global file in editor", action: configActionEditGlobal},
@@ -240,8 +222,7 @@ func (m configModel) optionByLabel(label string) configRow {
 
 func (m configModel) buildConfig() config.Config {
 	cfg := config.Config{
-		Agent:    m.optionByLabel("Agent").values[m.optionByLabel("Agent").current],
-		Worktree: m.optionByLabel("Worktree").values[m.optionByLabel("Worktree").current] == "on",
+		Agent: m.optionByLabel("Agent").values[m.optionByLabel("Agent").current],
 	}
 
 	modelRow := m.optionByLabel("Model")
@@ -284,14 +265,11 @@ func (m configModel) buildConfig() config.Config {
 		cfg.OnComplete.Bug = "delete"
 	}
 
-	autoWorkRow := m.optionByLabel("Auto-work")
-	switch autoWorkRow.values[autoWorkRow.current] {
-	case "enabled":
-		cfg.AutoWork = config.AutoWorkEnabled
-	case "delayed (5s)":
-		cfg.AutoWork = config.AutoWorkDelayed
-	default:
-		cfg.AutoWork = config.AutoWorkDisabled
+	autoApproveRow := m.optionByLabel("Auto-approve")
+	if autoApproveRow.values[autoApproveRow.current] == "enabled" {
+		cfg.ApprovalMode = config.ApprovalModeOptOut
+	} else {
+		cfg.ApprovalMode = config.ApprovalModeOptIn
 	}
 
 	return cfg
@@ -305,6 +283,7 @@ func (m configModel) saveGlobalConfig() error {
 		settings = globalconfig.DefaultSettings()
 	}
 	settings.AutoUpdate = mode
+	settings.DiscordPresence = m.optionByLabel("Discord presence").values[m.optionByLabel("Discord presence").current] == "on"
 	return saveGlobalSettings(settings)
 }
 
@@ -348,7 +327,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		itemCount := len(*rows)
 
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		case "q":
 			return m, tea.Quit
 		case "1":
 			m.activeTab = 0
@@ -371,8 +350,8 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.tabFocused {
 				m.tabFocused = false
 				m.cursor = 0
-			} else if m.cursor < itemCount-1 {
-				m.cursor++
+			} else {
+				m.cursor = styles.ClampCursor(m.cursor+1, itemCount)
 			}
 		case "left", "h":
 			if m.tabFocused {
@@ -461,158 +440,6 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 	return nil
 }
 
-func (m configModel) renderTabBar() string {
-	tabNames := []string{"Project", "Global"}
-
-	activeStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(styles.Primary).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.Primary).
-		Padding(0, 1)
-
-	inactiveStyle := lipgloss.NewStyle().
-		Foreground(styles.Muted).
-		Padding(0, 1)
-
-	focusedActiveStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("0")).
-		Background(styles.Primary).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.Primary).
-		Padding(0, 1)
-
-	var tabs []string
-	for i, name := range tabNames {
-		if i == m.activeTab {
-			if m.tabFocused {
-				tabs = append(tabs, focusedActiveStyle.Render(name))
-			} else {
-				tabs = append(tabs, activeStyle.Render(name))
-			}
-		} else {
-			tabs = append(tabs, inactiveStyle.Render(name))
-		}
-	}
-
-	return lipgloss.JoinHorizontal(lipgloss.Bottom, tabs...)
-}
-
-func (m configModel) View() string {
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	cursorStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	activeValueStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
-	activeOffStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Error)
-	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	normalStyle := lipgloss.NewStyle()
-	saveStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Success)
-
-	// Sections without a path display just the title
-	sectionTitleOnly := map[string]bool{
-		"On complete behaviour": true,
-	}
-
-	var sb strings.Builder
-
-	// Render tab bar
-	sb.WriteString(m.renderTabBar())
-	sb.WriteString("\n\n")
-
-	rows := *m.activeRows()
-	for i, row := range rows {
-		// Section header
-		if row.section != "" {
-			if i > 0 {
-				sb.WriteString("\n")
-			}
-			if sectionTitleOnly[row.section] {
-				sb.WriteString(titleStyle.Render(row.section) + "\n")
-			} else {
-				sb.WriteString(titleStyle.Render(row.section) + "\n")
-			}
-		}
-
-		if row.isOption() {
-			label := fmt.Sprintf("%-22s", row.label)
-
-			var valueParts []string
-			for vi, v := range row.values {
-				if vi == row.current {
-					if v == "off" {
-						valueParts = append(valueParts, activeOffStyle.Render(v))
-					} else {
-						valueParts = append(valueParts, activeValueStyle.Render(v))
-					}
-				} else {
-					valueParts = append(valueParts, mutedStyle.Render(v))
-				}
-			}
-			valueStr := strings.Join(valueParts, mutedStyle.Render(" / "))
-
-			if i == m.cursor {
-				fmt.Fprintf(&sb, "  %s %s  %s\n",
-					cursorStyle.Render("->"),
-					normalStyle.Render(label),
-					valueStr,
-				)
-			} else {
-				fmt.Fprintf(&sb, "     %s  %s\n",
-					normalStyle.Render(label),
-					valueStr,
-				)
-			}
-		} else if row.isDisplay() {
-			label := fmt.Sprintf("%-22s", row.label)
-			hint := mutedStyle.Render("(edit in config.yml)")
-			displayVal := mutedStyle.Render(row.display)
-			if i == m.cursor {
-				fmt.Fprintf(&sb, "  %s %s  %s  %s\n",
-					cursorStyle.Render("->"),
-					normalStyle.Render(label),
-					displayVal,
-					hint,
-				)
-			} else {
-				fmt.Fprintf(&sb, "     %s  %s  %s\n",
-					normalStyle.Render(label),
-					displayVal,
-					hint,
-				)
-			}
-		} else {
-			// Action button
-			btnStyle := normalStyle
-			if row.isSave {
-				btnStyle = saveStyle
-			}
-			if i == m.cursor {
-				fmt.Fprintf(&sb, "  %s %s\n", cursorStyle.Render("->"), btnStyle.Render(row.label))
-			} else {
-				fmt.Fprintf(&sb, "     %s\n", mutedStyle.Render(row.label))
-			}
-		}
-	}
-
-	// Status feedback
-	if m.statusText != "" {
-		sb.WriteString("\n")
-		statusStyle := lipgloss.NewStyle().Foreground(styles.Success)
-		if strings.HasPrefix(m.statusText, "Error:") {
-			statusStyle = lipgloss.NewStyle().Foreground(styles.Error)
-		}
-		sb.WriteString("  " + statusStyle.Render(m.statusText) + "\n")
-	}
-
-	content := sb.String()
-	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q/esc: exit")
-
-	borderColor := styles.ThemeColor(m.is2x)
-	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenColor(content, footer, m.width, m.height, borderColor)
-	}
-	return styles.Box.BorderForeground(borderColor).Render(content+"\n\n"+footer) + "\n"
-}
 
 func saveConfig(dir string, cfg config.Config) error {
 	maggusDir := filepath.Join(dir, ".maggus")

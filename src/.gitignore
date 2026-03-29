@@ -6,3 +6,6 @@
 .maggus/locks/
 .maggus-work/
 COMMIT.md
+.maggus/feature_approvals.yml
+.maggus/daemon.pid
+.maggus/interactive.lock

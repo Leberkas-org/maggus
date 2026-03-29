@@ -19,12 +19,6 @@ type Options struct {
 	// Run metadata
 	RunID     string
 	Iteration int
-
-	// Worktree indicates this session is running inside a git worktree.
-	Worktree bool
-
-	// WorktreeDir is the worktree directory relative to the repo root (e.g. ".maggus-work/<run-id>").
-	WorktreeDir string
 }
 
 // Build creates a focused prompt for Claude Code to work on a single task.
@@ -70,10 +64,6 @@ func writeRunMetadata(b *strings.Builder, opts Options) {
 	b.WriteString("# Run Metadata\n\n")
 	fmt.Fprintf(b, "- **RUN_ID:** %s\n", opts.RunID)
 	fmt.Fprintf(b, "- **ITERATION:** %d\n", opts.Iteration)
-	if opts.Worktree {
-		b.WriteString("- **WORKTREE:** true\n")
-		fmt.Fprintf(b, "- **WORKTREE_DIR:** %s\n", opts.WorktreeDir)
-	}
 	b.WriteString("\n")
 }
 
@@ -94,11 +84,6 @@ func writeTask(b *strings.Builder, task *parser.Task) {
 
 func writeInstructions(b *strings.Builder, task *parser.Task, opts Options) {
 	b.WriteString("# Instructions\n\n")
-	if opts.Worktree {
-		b.WriteString("**WORKTREE MODE:** You are running inside a git worktree. Other Maggus sessions may be running concurrently in separate worktrees. ")
-		b.WriteString("Do not make assumptions about branch state outside your own branch. ")
-		b.WriteString("Do not modify or switch branches — stay on your current branch.\n\n")
-	}
 	fmt.Fprintf(b, "IMPORTANT: The task has already been selected for you. Work ONLY on %s: %s.\n", task.ID, task.Title)
 	b.WriteString("Do NOT scan feature files to find a different task. Do NOT work on any other task.\n\n")
 	b.WriteString("Before finishing, verify that every acceptance criterion above is met. Do not work on anything outside this task.\n\n")

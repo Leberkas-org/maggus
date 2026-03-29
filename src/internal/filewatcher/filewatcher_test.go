@@ -23,6 +23,9 @@ func TestIsRelevantEvent(t *testing.T) {
 		{"bug write", fsnotify.Event{Name: "/b/bug_001.md", Op: fsnotify.Write}, true},
 		{"bug create", fsnotify.Event{Name: "/b/bug_002.md", Op: fsnotify.Create}, true},
 		{"completed feature", fsnotify.Event{Name: "/a/feature_001_completed.md", Op: fsnotify.Write}, true},
+		{"approval write", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Write}, true},
+		{"approval create", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Create}, true},
+		{"approval chmod", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Chmod}, false},
 		{"non-md file", fsnotify.Event{Name: "/a/feature_001.txt", Op: fsnotify.Write}, false},
 		{"random file", fsnotify.Event{Name: "/a/notes.md", Op: fsnotify.Write}, false},
 		{"chmod only", fsnotify.Event{Name: "/a/feature_001.md", Op: fsnotify.Chmod}, false},
@@ -310,6 +313,189 @@ func TestWatcherCreateEventHasNewFileTrue(t *testing.T) {
 		}
 	} else {
 		t.Error("expected an UpdateMsg to be sent")
+	}
+}
+
+func TestWatcherUpdateMsgIncludesPath(t *testing.T) {
+	baseDir := t.TempDir()
+	featDir := filepath.Join(baseDir, ".maggus", "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var lastMsg atomic.Value
+	send := func(msg any) { lastMsg.Store(msg) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	file := filepath.Join(featDir, "feature_042.md")
+	if err := os.WriteFile(file, []byte("# Feature 42"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	msg, ok := lastMsg.Load().(UpdateMsg)
+	if !ok {
+		t.Fatal("expected an UpdateMsg to be sent")
+	}
+	if msg.Path == "" {
+		t.Error("expected UpdateMsg.Path to be non-empty")
+	}
+	base := filepath.Base(msg.Path)
+	if base != "feature_042.md" {
+		t.Errorf("expected Path to end with feature_042.md, got %q", msg.Path)
+	}
+}
+
+func TestWatcherApprovalFileWakesDaemon(t *testing.T) {
+	baseDir := t.TempDir()
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Writing the approval file should trigger an UpdateMsg.
+	file := filepath.Join(maggusDir, "feature_approvals.yml")
+	if err := os.WriteFile(file, []byte("feature_001: true"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg for approval file, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if msg.Path == "" {
+			t.Error("expected UpdateMsg.Path to be non-empty")
+		}
+		if filepath.Base(msg.Path) != "feature_approvals.yml" {
+			t.Errorf("expected Path to end with feature_approvals.yml, got %q", msg.Path)
+		}
+	}
+}
+
+func TestWatcherApprovalDebounce(t *testing.T) {
+	baseDir := t.TempDir()
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	send := func(msg any) { count.Add(1) }
+
+	w, err := New(baseDir, send, 200*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Rapid writes to the approval file should be debounced into one UpdateMsg.
+	file := filepath.Join(maggusDir, "feature_approvals.yml")
+	for range 5 {
+		if err := os.WriteFile(file, []byte("update"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	time.Sleep(400 * time.Millisecond)
+
+	c := count.Load()
+	if c != 1 {
+		t.Errorf("expected exactly 1 debounced UpdateMsg for approval file, got %d", c)
+	}
+}
+
+func TestWatcherApprovalDoesNotBreakFeatureWatch(t *testing.T) {
+	baseDir := t.TempDir()
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	featDir := filepath.Join(maggusDir, "features")
+	bugDir := filepath.Join(maggusDir, "bugs")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(bugDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	send := func(msg any) { count.Add(1) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Feature file should still trigger.
+	feat := filepath.Join(featDir, "feature_001.md")
+	if err := os.WriteFile(feat, []byte("# Feature"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if count.Load() < 1 {
+		t.Error("expected UpdateMsg for feature file change")
+	}
+
+	count.Store(0)
+
+	// Bug file should still trigger.
+	bug := filepath.Join(bugDir, "bug_001.md")
+	if err := os.WriteFile(bug, []byte("# Bug"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if count.Load() < 1 {
+		t.Error("expected UpdateMsg for bug file change")
+	}
+}
+
+func TestWatcherIgnoresIrrelevantInMaggusRoot(t *testing.T) {
+	baseDir := t.TempDir()
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	send := func(msg any) { count.Add(1) }
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// A random file in .maggus/ should NOT trigger.
+	file := filepath.Join(maggusDir, "config.yml")
+	if err := os.WriteFile(file, []byte("model: sonnet"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() != 0 {
+		t.Errorf("expected 0 UpdateMsg for irrelevant file in .maggus/, got %d", count.Load())
 	}
 }
 

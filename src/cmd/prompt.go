@@ -3,37 +3,41 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"os/signal"
-	"path/filepath"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
-	"github.com/leberkas-org/maggus/internal/session"
+	"github.com/leberkas-org/maggus/internal/discord"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/usage"
-	"github.com/spf13/cobra"
 )
 
-var promptModelFlag string
-
-var promptCmd = &cobra.Command{
-	Use:   "prompt",
-	Short: "Launch an interactive Claude Code session with usage tracking",
-	Long: `Launches Claude Code interactively with full terminal passthrough.
-stdin, stdout, and stderr are connected directly so you get the normal
-Claude Code experience. Usage data is extracted after the session ends.`,
-	RunE: runPrompt,
+// skillMapping maps picker labels to their Claude skill command and usage kind.
+type skillMapping struct {
+	skill  string // e.g. "/maggus-plan"; empty for Plain
+	kind   string // usage kind: "prompt", "plan", "vision", etc.
+	title  string
+	detail string
 }
 
-func init() {
-	promptCmd.Flags().StringVar(&promptModelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
+var skillMappings = map[string]skillMapping{
+	"open console":         {skill: "", kind: "prompt", title: "Consulting AI", detail: "Manual Prompting"},
+	"/maggus-plan":         {skill: "/maggus-plan", kind: "plan", title: "Planning", detail: "Manual Prompting"},
+	"/maggus-vision":       {skill: "/maggus-vision", kind: "vision", title: "Defining a vision", detail: "Manual Prompting"},
+	"/maggus-architecture": {skill: "/maggus-architecture", kind: "architecture", title: "Architecture", detail: "Manual Prompting"},
+	"/maggus-bugreport":    {skill: "/maggus-bugreport", kind: "bugreport", title: "Creating bug ticket", detail: "Manual Prompting"},
+	"/bryan-plan":          {skill: "/bryan-plan", kind: "bryan_plan", title: "Planning with bryan", detail: "Manual Prompting"},
+	"/bryan-bugreport":     {skill: "/bryan-bugreport", kind: "bryan_bugreport", title: "Reporting bug to bryan", detail: "Manual Prompting"},
 }
 
-func runPrompt(cmd *cobra.Command, args []string) error {
+func runPrompt() error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
+
+	// Migrate any legacy per-project usage data to the global store (once, at startup).
+	_ = usage.MigrateProject(dir)
 
 	// Load config for default model.
 	cfg, err := config.Load(dir)
@@ -41,111 +45,76 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	// Resolve model: CLI flag overrides config file.
-	modelInput := cfg.Model
-	if promptModelFlag != "" {
-		modelInput = promptModelFlag
-	}
-	resolvedModel := config.ResolveModel(modelInput)
+	resolvedModel := config.ResolveModel(cfg.Model)
 
-	// Build claude command args for interactive mode (no -p, no --output-format).
-	claudeArgs := []string{"--dangerously-skip-permissions"}
-	if resolvedModel != "" {
-		claudeArgs = append(claudeArgs, "--model", resolvedModel)
-	}
-
-	claudePath, err := exec.LookPath("claude")
+	// Show the prompt picker TUI.
+	picker := newPromptPickerModel()
+	p := tea.NewProgram(picker, tea.WithAltScreen())
+	finalModel, err := p.Run()
 	if err != nil {
-		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
+		return fmt.Errorf("prompt picker: %w", err)
 	}
 
-	// Snapshot session directory before launching Claude (TASK-004).
-	sessionDir, _ := session.SessionDir(dir)
-	beforeSnapshot, _ := session.SnapshotDir(sessionDir)
-
-	startTime := time.Now()
-
-	proc := exec.Command(claudePath, claudeArgs...)
-
-	// Full terminal passthrough: connect stdin, stdout, stderr directly.
-	proc.Stdin = os.Stdin
-	proc.Stdout = os.Stdout
-	proc.Stderr = os.Stderr
-
-	// Forward interrupt signals to the child process by ignoring them in
-	// the parent — the terminal delivers SIGINT to the entire process group,
-	// so Claude receives it directly.
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, shutdownSignals...)
-	defer signal.Stop(sigCh)
-
-	if err := proc.Start(); err != nil {
-		return fmt.Errorf("start claude: %w", err)
+	result := finalModel.(promptPickerModel).result
+	if result.Cancelled {
+		return nil
 	}
 
-	// Wait for Claude to exit.
-	waitErr := proc.Wait()
-	endTime := time.Now()
+	mapping, ok := skillMappings[result.Skill]
+	if !ok {
+		return fmt.Errorf("unknown skill: %s", result.Skill)
+	}
 
-	// Stop capturing signals.
-	signal.Stop(sigCh)
-
-	// Extract usage data from session files (TASK-004 + TASK-005).
-	extractPromptUsage(dir, resolvedModel, beforeSnapshot, startTime, endTime)
-
-	if waitErr != nil {
-		// If Claude exited due to user Ctrl+C, that's not an error.
-		if proc.ProcessState != nil && proc.ProcessState.ExitCode() == 130 {
-			return nil
+	// Use shared presence from root menu if available; otherwise create our own.
+	presence := sharedPresence
+	ownPresence := false
+	gs, _ := globalconfig.LoadSettings()
+	if presence == nil && gs.DiscordPresence {
+		presence = &discord.Presence{}
+		_ = presence.Connect()
+		ownPresence = true
+	}
+	defer func() {
+		if ownPresence && presence != nil {
+			_ = presence.Close()
 		}
-		// Exit code 2 is also common for user-initiated exits in Claude.
-		if proc.ProcessState != nil && proc.ProcessState.ExitCode() == 2 {
-			return nil
+	}()
+
+	// Update presence with the selected skill's verb.
+	if presence != nil {
+		verb := skillMappings[result.Skill]
+
+		_ = presence.Update(discord.PresenceState{
+			FeatureTitle: verb.title,
+			Verb:         verb.detail,
+			StartTime:    time.Now(),
+		})
+	}
+
+	agentName := cfg.Agent
+	if agentName == "" {
+		agentName = "claude"
+	}
+
+	// Ensure the maggus plugin is installed for non-plain skills.
+	if mapping.skill != "" && agentName == "claude" {
+		if err := ensureMaggusPlugin(); err != nil {
+			return err
 		}
-		return fmt.Errorf("claude exited with error: %w", waitErr)
 	}
 
-	return nil
-}
-
-// extractPromptUsage detects the session file created during the Claude session,
-// extracts token usage, and appends a record to usage_prompt.jsonl.
-// Errors are printed as warnings but never cause a non-zero exit.
-func extractPromptUsage(dir, model string, beforeSnapshot map[string]bool, startTime, endTime time.Time) {
-	sessionFile, err := session.DetectSessionFile(dir, beforeSnapshot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not detect session file: %v\n", err)
-		return
-	}
-	if sessionFile == "" {
-		fmt.Fprintln(os.Stderr, "Warning: no new Claude session file found; skipping usage extraction")
-		return
+	// Build the prompt string: just the skill name.
+	var prompt string
+	if mapping.skill != "" {
+		prompt = mapping.skill
 	}
 
-	summary, err := session.ExtractUsage(sessionFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not extract usage from session: %v\n", err)
-		return
+	info, err := launchInteractive(agentName, prompt, dir, result.SkipPermissions, resolvedModel)
+
+	// Extract usage.
+	if mapping.kind != "" && info != nil {
+		extractSkillUsage(dir, resolvedModel, agentName, mapping.kind, info)
 	}
 
-	runID := startTime.Format("20060102-150405")
-	usagePath := filepath.Join(dir, ".maggus", "usage_prompt.jsonl")
-
-	rec := usage.Record{
-		RunID:                    runID,
-		Model:                    model,
-		Agent:                    "claude",
-		InputTokens:              summary.InputTokens,
-		OutputTokens:             summary.OutputTokens,
-		CacheCreationInputTokens: summary.CacheCreationInputTokens,
-		CacheReadInputTokens:     summary.CacheReadInputTokens,
-		CostUSD:                  0,
-		ModelUsage:               summary.ModelUsage,
-		StartTime:                startTime,
-		EndTime:                  endTime,
-	}
-
-	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not write usage record: %v\n", err)
-	}
+	return err
 }

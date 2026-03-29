@@ -1,4 +1,4 @@
-// Package usage appends per-task token usage records to .maggus/usage_work.jsonl.
+// Package usage appends per-task token usage records to ~/.maggus/usage/.
 package usage
 
 import (
@@ -9,16 +9,19 @@ import (
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 )
-
-const fileName = ".maggus/usage_work.jsonl"
 
 // Record represents a single task usage entry.
 type Record struct {
 	RunID                    string                       `json:"run_id"`
-	TaskID                   string                       `json:"task_id"`
-	TaskTitle                string                       `json:"task_title"`
-	FeatureFile              string                       `json:"feature_file"`
+	Repository               string                       `json:"repository,omitempty"`
+	Kind                     string                       `json:"kind,omitempty"`
+	ItemID                   string                       `json:"item_id,omitempty"`
+	ItemShort                string                       `json:"item_short,omitempty"`
+	ItemTitle                string                       `json:"item_title,omitempty"`
+	TaskShort                string                       `json:"task_short,omitempty"`
+	TaskTitle                string                       `json:"task_title,omitempty"`
 	Model                    string                       `json:"model"`
 	Agent                    string                       `json:"agent"`
 	InputTokens              int                          `json:"input_tokens"`
@@ -31,9 +34,45 @@ type Record struct {
 	EndTime                  time.Time                    `json:"end_time"`
 }
 
-// Append writes one or more usage records as JSON Lines to .maggus/usage_work.jsonl.
-func Append(dir string, records []Record) error {
-	return AppendTo(filepath.Join(dir, fileName), records)
+// Append writes one or more usage records to ~/.maggus/usage/.
+// Work records (Kind empty) go to work.jsonl; session records go to sessions.jsonl.
+// The ~/.maggus/usage/ directory is created automatically if missing.
+func Append(records []Record) error {
+	if len(records) == 0 {
+		return nil
+	}
+
+	globalDir, err := globalconfig.Dir()
+	if err != nil {
+		return fmt.Errorf("get global config dir: %w", err)
+	}
+
+	usageDir := filepath.Join(globalDir, "usage")
+	if err := os.MkdirAll(usageDir, 0o755); err != nil {
+		return fmt.Errorf("create usage directory: %w", err)
+	}
+
+	var workRecords, sessionRecords []Record
+	for _, r := range records {
+		if r.Kind == "" {
+			workRecords = append(workRecords, r)
+		} else {
+			sessionRecords = append(sessionRecords, r)
+		}
+	}
+
+	if len(workRecords) > 0 {
+		if err := AppendTo(filepath.Join(usageDir, "work.jsonl"), workRecords); err != nil {
+			return err
+		}
+	}
+	if len(sessionRecords) > 0 {
+		if err := AppendTo(filepath.Join(usageDir, "sessions.jsonl"), sessionRecords); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // AppendTo writes one or more usage records as JSON Lines to the given file path.

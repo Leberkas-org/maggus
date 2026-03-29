@@ -73,7 +73,8 @@ func (m Metrics) add(delta Metrics) Metrics {
 
 // Settings holds the global Maggus settings stored at ~/.maggus/config.yml.
 type Settings struct {
-	AutoUpdate AutoUpdateMode `yaml:"auto_update,omitempty"`
+	AutoUpdate      AutoUpdateMode `yaml:"auto_update,omitempty"`
+	DiscordPresence bool           `yaml:"discord_presence,omitempty"`
 }
 
 // DefaultSettings returns settings with default values.
@@ -419,7 +420,14 @@ func ShouldCheckUpdate(state UpdateState, now time.Time) bool {
 
 // Repository represents a single configured repository entry.
 type Repository struct {
-	Path string `yaml:"path"`
+	Path              string `yaml:"path"`
+	AutoStartDisabled bool   `yaml:"auto_start_disabled,omitempty"`
+}
+
+// IsAutoStartEnabled returns true when auto-start is enabled for this repository.
+// The zero value of AutoStartDisabled is false, so auto-start is enabled by default.
+func (r Repository) IsAutoStartEnabled() bool {
+	return !r.AutoStartDisabled
 }
 
 // GlobalConfig holds the global Maggus configuration stored at ~/.maggus/repositories.yml.

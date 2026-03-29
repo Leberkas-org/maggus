@@ -74,6 +74,15 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 
 GoReleaser (v2) builds binaries for linux/{amd64,arm64}, darwin/{amd64,arm64}, windows/amd64. Triggered by publishing a GitHub Release. Version is injected from the git tag.
 
+## Code Organization Rules
+
+- **File size limit:** No single `.go` file should exceed 500 lines (excluding tests). If a file grows beyond this, split it by responsibility (e.g., model/update/view for Bubble Tea TUI files).
+- **No duplicated logic:** Before writing cursor navigation, file loading, confirmation dialogs, or similar patterns — check if a shared helper already exists:
+  - Cursor navigation: `internal/tui/styles/nav.go` (`CursorUp`, `CursorDown`, `ClampCursor`)
+  - Feature/bug file loading: `internal/parser/plan.go` (`LoadPlans`, `Plan` type)
+- **Bubble Tea file split pattern:** Large TUI commands should be split into `<cmd>_model.go` (struct + init), `<cmd>_update.go` (Update + key handling), `<cmd>_view.go` (View + render helpers), `<cmd>_cmd.go` (cobra command + init).
+- **Pure functions over structs** for shared helpers — different TUI models have different field names, so helpers should take and return values rather than operating on a specific struct.
+
 ## Key Conventions
 
 - Feature files use `### TASK-NNN: Title` format with checkbox acceptance criteria

@@ -6,14 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/leberkas-org/maggus/internal/config"
+	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/session"
 	"github.com/leberkas-org/maggus/internal/usage"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -22,97 +19,11 @@ const (
 	maggusMarketplaceURL = "https://github.com/Leberkas-org/maggus-skills.git"
 )
 
-var planCmd = &cobra.Command{
-	Use:   "plan [description...]",
-	Short: "Open an interactive AI session to create an implementation plan",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-plan skill pre-filled. You provide the feature description and the
-AI walks you through clarifying questions before generating the plan.
-
-Examples:
-  maggus plan Add OAuth2 authentication with Google provider
-  maggus plan "Refactor the parser to support nested tasks"`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-plan", "usage_plan.jsonl"),
-}
-
-var visionCmd = &cobra.Command{
-	Use:   "vision [description...]",
-	Short: "Open an interactive AI session to create or improve VISION.md",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-vision skill pre-filled. You provide context about your project and the
-AI guides you through creating or refining a VISION.md.
-
-Examples:
-  maggus vision A CLI tool for orchestrating AI agents
-  maggus vision "Improve the vision for our e-commerce platform"`,
-	Args: cobra.MinimumNArgs(1),
-	RunE: runSkillCommand("/maggus-vision", "usage_vision.jsonl"),
-}
-
-var architectureCmd = &cobra.Command{
-	Use:   "architecture [description...]",
-	Short: "Open an interactive AI session to create or improve ARCHITECTURE.md",
-	Long: `Launches Claude Code (or the configured agent) interactively with the
-/maggus-architecture skill pre-filled. You provide context about your project
-and the AI guides you through creating or refining an ARCHITECTURE.md.
-
-Examples:
-  maggus architecture A Go CLI with plugin system and streaming output
-  maggus architecture "Review and improve our current architecture"`,
-	Aliases: []string{"arch"},
-	Args:    cobra.MinimumNArgs(1),
-	RunE:    runSkillCommand("/maggus-architecture", "usage_architecture.jsonl"),
-}
-
-// runSkillCommand returns a cobra RunE that launches the configured agent
-// interactively with the given skill and the user's description as prompt.
-// If usageFile is non-empty, token usage is extracted from the session and
-// appended to .maggus/<usageFile> after the session ends.
-func runSkillCommand(skill, usageFile string) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		description := strings.Join(args, " ")
-
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working directory: %w", err)
-		}
-
-		cfg, err := config.Load(dir)
-		if err != nil {
-			return fmt.Errorf("load config: %w", err)
-		}
-
-		agentName := cfg.Agent
-		if agentName == "" {
-			agentName = "claude"
-		}
-
-		// Ensure the maggus plugin is installed and enabled in Claude Code.
-		if agentName == "claude" {
-			if err := ensureMaggusPlugin(); err != nil {
-				return err
-			}
-		}
-
-		resolvedModel := config.ResolveModel(cfg.Model)
-
-		prompt := fmt.Sprintf("%s %s", skill, description)
-		info, err := launchInteractive(agentName, prompt, dir)
-
-		// Extract usage if a usage file is configured and we have session info.
-		if usageFile != "" && info != nil {
-			extractSkillUsage(dir, resolvedModel, agentName, usageFile, info)
-		}
-
-		return err
-	}
-}
-
 // extractSkillUsage detects the session file created during an interactive skill session,
-// extracts token usage, and appends a record to the specified usage file.
+// extracts token usage, and appends a record to the global usage directory.
+// The kind parameter identifies the session type (e.g. "plan", "bugreport", "prompt").
 // Errors are printed as warnings but never cause a non-zero exit.
-func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInfo) {
+func extractSkillUsage(dir, model, agentName, kind string, info *SessionInfo) {
 	sessionFile, err := session.DetectSessionFile(dir, info.BeforeSnapshot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not detect session file: %v\n", err)
@@ -130,10 +41,12 @@ func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInf
 	}
 
 	runID := info.StartTime.Format("20060102-150405")
-	usagePath := filepath.Join(dir, ".maggus", usageFile)
+	repoURL := gitutil.RepoURL(dir)
 
 	rec := usage.Record{
 		RunID:                    runID,
+		Repository:               repoURL,
+		Kind:                     kind,
 		Model:                    model,
 		Agent:                    agentName,
 		InputTokens:              summary.InputTokens,
@@ -146,7 +59,7 @@ func extractSkillUsage(dir, model, agentName, usageFile string, info *SessionInf
 		EndTime:                  info.EndTime,
 	}
 
-	if err := usage.AppendTo(usagePath, []usage.Record{rec}); err != nil {
+	if err := usage.Append([]usage.Record{rec}); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not write usage record: %v\n", err)
 	}
 }
@@ -159,12 +72,17 @@ type SessionInfo struct {
 	EndTime        time.Time
 }
 
-// launchInteractive launches the given agent CLI interactively with a prefilled prompt.
+// launchInteractive launches the given agent CLI interactively with an optional initial prompt.
 // It connects stdin/stdout/stderr directly so the user has full control.
 // The dir parameter is the working directory used to locate the Claude session directory
-// for snapshotting. Session timing info is returned so callers can extract usage afterward.
-// Snapshotting errors are logged as warnings and do not prevent the session from launching.
-func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
+// for snapshotting. When skipPermissions is true, --dangerously-skip-permissions is passed.
+// When model is non-empty, --model is passed. Session timing info is returned so callers
+// can extract usage afterward. Snapshotting errors are logged as warnings and do not
+// prevent the session from launching.
+//
+// When prompt is non-empty, it is passed as a positional argument to the Claude CLI,
+// which starts an interactive session with the prompt as the initial message.
+func launchInteractive(agentName, prompt, dir string, skipPermissions bool, model string) (*SessionInfo, error) {
 	path, err := exec.LookPath(agentName)
 	if err != nil {
 		return nil, fmt.Errorf("%s not found on PATH: %w", agentName, err)
@@ -185,12 +103,6 @@ func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
 
 	startTime := time.Now()
 
-	// Launch interactively: pass prompt as positional arg (not -p).
-	cmd := exec.Command(path, prompt)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
 	// Forward interrupt signals to the child process by ignoring them in
 	// the parent — the terminal delivers SIGINT to the entire process group,
 	// so the agent receives it directly.
@@ -198,33 +110,60 @@ func launchInteractive(agentName, prompt, dir string) (*SessionInfo, error) {
 	signal.Notify(sigCh, shutdownSignals...)
 	defer signal.Stop(sigCh)
 
+	var args []string
+	if skipPermissions {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if prompt != "" {
+		args = append(args, prompt)
+	}
+
+	return runInteractiveCmd(path, args, agentName, beforeSnapshot, startTime)
+}
+
+// runInteractiveCmd starts an interactive CLI session with the given args and waits for it to finish.
+func runInteractiveCmd(path string, args []string, agentName string, beforeSnapshot map[string]bool, startTime time.Time) (*SessionInfo, error) {
+	cmd := exec.Command(path, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", agentName, err)
 	}
 
 	waitErr := cmd.Wait()
-	endTime := time.Now()
-
-	signal.Stop(sigCh)
-
-	info := &SessionInfo{
-		BeforeSnapshot: beforeSnapshot,
-		StartTime:      startTime,
-		EndTime:        endTime,
-	}
+	info := buildSessionInfo(beforeSnapshot, startTime)
 
 	if waitErr != nil {
-		// User-initiated exits (Ctrl+C or exit code 2) are not errors.
-		if cmd.ProcessState != nil {
-			code := cmd.ProcessState.ExitCode()
-			if code == 130 || code == 2 {
-				return info, nil
-			}
+		if isUserExit(cmd) {
+			return info, nil
 		}
 		return info, fmt.Errorf("%s exited with error: %w", agentName, waitErr)
 	}
 
 	return info, nil
+}
+
+// isUserExit checks whether the command exited due to user-initiated cancellation (Ctrl+C).
+func isUserExit(cmd *exec.Cmd) bool {
+	if cmd.ProcessState != nil {
+		code := cmd.ProcessState.ExitCode()
+		return code == 130 || code == 2
+	}
+	return false
+}
+
+// buildSessionInfo creates a SessionInfo with the current time as the end time.
+func buildSessionInfo(beforeSnapshot map[string]bool, startTime time.Time) *SessionInfo {
+	return &SessionInfo{
+		BeforeSnapshot: beforeSnapshot,
+		StartTime:      startTime,
+		EndTime:        time.Now(),
+	}
 }
 
 // pluginInfo represents a single entry from `claude plugin list --json`.

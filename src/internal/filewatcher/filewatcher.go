@@ -13,8 +13,10 @@ import (
 // UpdateMsg is sent to the bubbletea program when watched files change.
 // HasNewFile is true when at least one fsnotify.Create event was seen during
 // the debounce window; false for pure Write/Remove/Rename bursts.
+// Path contains the name of the last file event that triggered the message.
 type UpdateMsg struct {
 	HasNewFile bool
+	Path       string
 }
 
 // SendFunc is a function that sends a message. In production this is
@@ -26,6 +28,7 @@ type SendFunc func(msg any)
 // and sending UpdateMsg via the provided send function.
 type Watcher struct {
 	fsw      *fsnotify.Watcher
+	mu       sync.Mutex
 	send     SendFunc
 	debounce time.Duration
 	done     chan struct{}
@@ -39,6 +42,7 @@ type Watcher struct {
 // before sending an UpdateMsg via the send function.
 func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error) {
 	dirs := []string{
+		filepath.Join(baseDir, ".maggus"),
 		filepath.Join(baseDir, ".maggus", "features"),
 		filepath.Join(baseDir, ".maggus", "bugs"),
 	}
@@ -68,6 +72,14 @@ func New(baseDir string, send SendFunc, debounce time.Duration) (*Watcher, error
 	go w.loop()
 
 	return w, nil
+}
+
+// SetSend replaces the send function used by the watcher's event loop.
+// This is safe to call while the watcher is running.
+func (w *Watcher) SetSend(send SendFunc) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.send = send
 }
 
 // Close stops the watcher and waits for the goroutine to exit.
@@ -129,7 +141,8 @@ func (w *Watcher) loop() {
 
 	var timer *time.Timer
 	var timerC <-chan time.Time
-	var hasCreate bool // true if any Create event seen in the current debounce window
+	var hasCreate bool  // true if any Create event seen in the current debounce window
+	var lastPath string // path of the last relevant event in the current debounce window
 
 	for {
 		select {
@@ -153,6 +166,7 @@ func (w *Watcher) loop() {
 			if event.Op&fsnotify.Create != 0 {
 				hasCreate = true
 			}
+			lastPath = event.Name
 			// Reset the debounce timer on each relevant event.
 			if timer == nil {
 				timer = time.NewTimer(w.debounce)
@@ -172,10 +186,16 @@ func (w *Watcher) loop() {
 			// Ignore watcher errors — they are non-fatal.
 
 		case <-timerC:
-			w.send(UpdateMsg{HasNewFile: hasCreate})
+			w.mu.Lock()
+			send := w.send
+			w.mu.Unlock()
+			if send != nil {
+				send(UpdateMsg{HasNewFile: hasCreate, Path: lastPath})
+			}
 			timer = nil
 			timerC = nil
 			hasCreate = false
+			lastPath = ""
 		}
 	}
 }
@@ -187,6 +207,9 @@ func isRelevantEvent(event fsnotify.Event) bool {
 		return false
 	}
 	name := filepath.Base(event.Name)
+	if name == "feature_approvals.yml" {
+		return true
+	}
 	if strings.HasPrefix(name, "feature_") && strings.HasSuffix(name, ".md") {
 		return true
 	}

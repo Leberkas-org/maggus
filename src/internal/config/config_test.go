@@ -19,9 +19,6 @@ func TestLoad_MissingFile(t *testing.T) {
 	if len(cfg.Include) != 0 {
 		t.Errorf("expected empty Include, got %v", cfg.Include)
 	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to be false, got true")
-	}
 }
 
 func TestLoad_ValidYAML(t *testing.T) {
@@ -123,79 +120,6 @@ func TestValidateIncludes_AllMissing(t *testing.T) {
 	result := ValidateIncludes([]string{"nope.md", "also-nope.md"}, dir)
 	if len(result) != 0 {
 		t.Errorf("expected empty result, got %v", result)
-	}
-}
-
-func TestLoad_WithWorktreeTrue(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: opus
-worktree: true
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Model != "opus" {
-		t.Errorf("Model = %q, want %q", cfg.Model, "opus")
-	}
-	if !cfg.Worktree {
-		t.Errorf("expected Worktree to be true, got false")
-	}
-}
-
-func TestLoad_WithWorktreeFalse(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: sonnet
-worktree: false
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to be false, got true")
-	}
-}
-
-func TestLoad_WithoutWorktreeKey(t *testing.T) {
-	dir := t.TempDir()
-	maggusDir := filepath.Join(dir, ".maggus")
-	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	content := `model: haiku
-include:
-  - README.md
-`
-	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if cfg.Worktree {
-		t.Errorf("expected Worktree to default to false when key is absent, got true")
 	}
 }
 
@@ -501,6 +425,139 @@ func TestOnCompleteConfig_BugAction(t *testing.T) {
 
 func boolPtr(b bool) *bool { return &b }
 
+func TestConfig_IsApprovalRequired(t *testing.T) {
+	tests := []struct {
+		name string
+		mode string
+		want bool
+	}{
+		{"zero value defaults to opt-in (required)", "", true},
+		{"opt-in requires approval", "opt-in", true},
+		{"opt-out does not require approval", "opt-out", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{ApprovalMode: tt.mode}
+			if got := cfg.IsApprovalRequired(); got != tt.want {
+				t.Errorf("IsApprovalRequired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_IsAutoContinueEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *bool
+		want bool
+	}{
+		{"nil defaults to false", nil, false},
+		{"explicit true enables auto-continue", boolPtr(true), true},
+		{"explicit false disables auto-continue", boolPtr(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{AutoContinue: tt.val}
+			if got := cfg.IsAutoContinueEnabled(); got != tt.want {
+				t.Errorf("IsAutoContinueEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_ApprovalModeDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.ApprovalMode != "opt-in" {
+		t.Errorf("ApprovalMode = %q, want %q", cfg.ApprovalMode, "opt-in")
+	}
+	if !cfg.IsApprovalRequired() {
+		t.Error("expected IsApprovalRequired() to be true by default")
+	}
+}
+
+func TestLoad_ApprovalModeOptOut(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `approval_mode: opt-out
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.ApprovalMode != "opt-out" {
+		t.Errorf("ApprovalMode = %q, want %q", cfg.ApprovalMode, "opt-out")
+	}
+	if cfg.IsApprovalRequired() {
+		t.Error("expected IsApprovalRequired() to be false for opt-out")
+	}
+}
+
+func TestLoad_AutoContinueDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.AutoContinue != nil {
+		t.Errorf("expected AutoContinue to be nil by default, got %v", *cfg.AutoContinue)
+	}
+	if cfg.IsAutoContinueEnabled() {
+		t.Error("expected IsAutoContinueEnabled() to be false by default")
+	}
+}
+
+func TestLoad_AutoContinueTrue(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `auto_continue: true
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.IsAutoContinueEnabled() {
+		t.Error("expected IsAutoContinueEnabled() to be true")
+	}
+}
+
 func TestLoad_WithGitConfig(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")
@@ -562,6 +619,161 @@ func TestLoad_GitConfigDefaults(t *testing.T) {
 	got := cfg.Git.ProtectedBranchList()
 	if len(got) != 3 {
 		t.Errorf("expected 3 default protected branches, got %d", len(got))
+	}
+}
+
+func TestLoad_DaemonPollInterval_Ignored(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// daemon_poll_interval is no longer used but should be silently ignored.
+	content := `daemon_poll_interval: "2m"
+model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error loading config with removed daemon_poll_interval key, got %v", err)
+	}
+	if cfg.Model != "sonnet" {
+		t.Errorf("Model = %q, want %q", cfg.Model, "sonnet")
+	}
+}
+
+func TestLoad_HooksFullConfig(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+  on_feature_complete:
+    - run: "./scripts/notify.sh"
+    - run: "powershell -File ./scripts/track.ps1"
+  on_bug_complete:
+    - run: "./scripts/close-ticket.sh"
+  on_task_complete:
+    - run: "./scripts/log-task.sh"
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 2 {
+		t.Fatalf("OnFeatureComplete length = %d, want 2", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if cfg.Hooks.OnFeatureComplete[0].Run != "./scripts/notify.sh" {
+		t.Errorf("OnFeatureComplete[0].Run = %q, want %q", cfg.Hooks.OnFeatureComplete[0].Run, "./scripts/notify.sh")
+	}
+	if cfg.Hooks.OnFeatureComplete[1].Run != "powershell -File ./scripts/track.ps1" {
+		t.Errorf("OnFeatureComplete[1].Run = %q, want %q", cfg.Hooks.OnFeatureComplete[1].Run, "powershell -File ./scripts/track.ps1")
+	}
+	if len(cfg.Hooks.OnBugComplete) != 1 {
+		t.Fatalf("OnBugComplete length = %d, want 1", len(cfg.Hooks.OnBugComplete))
+	}
+	if cfg.Hooks.OnBugComplete[0].Run != "./scripts/close-ticket.sh" {
+		t.Errorf("OnBugComplete[0].Run = %q, want %q", cfg.Hooks.OnBugComplete[0].Run, "./scripts/close-ticket.sh")
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 1 {
+		t.Fatalf("OnTaskComplete length = %d, want 1", len(cfg.Hooks.OnTaskComplete))
+	}
+	if cfg.Hooks.OnTaskComplete[0].Run != "./scripts/log-task.sh" {
+		t.Errorf("OnTaskComplete[0].Run = %q, want %q", cfg.Hooks.OnTaskComplete[0].Run, "./scripts/log-task.sh")
+	}
+}
+
+func TestLoad_HooksPartialConfig(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+  on_task_complete:
+    - run: "./scripts/log-task.sh"
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 1 {
+		t.Fatalf("OnTaskComplete length = %d, want 1", len(cfg.Hooks.OnTaskComplete))
+	}
+	if cfg.Hooks.OnTaskComplete[0].Run != "./scripts/log-task.sh" {
+		t.Errorf("OnTaskComplete[0].Run = %q, want %q", cfg.Hooks.OnTaskComplete[0].Run, "./scripts/log-task.sh")
+	}
+}
+
+func TestLoad_HooksEmptySection(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `hooks:
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 0 {
+		t.Errorf("OnTaskComplete length = %d, want 0", len(cfg.Hooks.OnTaskComplete))
+	}
+}
+
+func TestLoad_HooksMissingSection(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cfg.Hooks.OnFeatureComplete) != 0 {
+		t.Errorf("OnFeatureComplete length = %d, want 0", len(cfg.Hooks.OnFeatureComplete))
+	}
+	if len(cfg.Hooks.OnBugComplete) != 0 {
+		t.Errorf("OnBugComplete length = %d, want 0", len(cfg.Hooks.OnBugComplete))
+	}
+	if len(cfg.Hooks.OnTaskComplete) != 0 {
+		t.Errorf("OnTaskComplete length = %d, want 0", len(cfg.Hooks.OnTaskComplete))
 	}
 }
 

@@ -1,7 +1,9 @@
 agent: claude
-model: ""
+model: sonnet
 include: []
 worktree: false
+approval_mode: opt-in
+auto_continue: null
 notifications:
     sound: true
     on_task_complete: false
@@ -15,5 +17,9 @@ git:
         - dev
     check_sync: false
 on_complete:
-    feature: delete
-    bug: delete
+    feature: ""
+    bug: ""
+hooks:
+    on_feature_complete: []
+    on_bug_complete: []
+    on_task_complete: []

@@ -10,6 +10,13 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
+// planMutationStore is the subset of FeatureStore/BugStore used for criterion mutations.
+type planMutationStore interface {
+	UnblockCriterion(filePath string, c parser.Criterion) error
+	ResolveCriterion(filePath string, c parser.Criterion) error
+	DeleteCriterion(filePath string, c parser.Criterion) error
+}
+
 // criteriaAction represents the user's choice for a blocked criterion.
 type criteriaAction int
 
@@ -90,7 +97,7 @@ func (d *detailState) exitCriteriaMode() {
 
 // performAction executes the selected action on the blocked criterion.
 // Returns true if the plan file was modified (needs refresh).
-func (d *detailState) performAction(task parser.Task, action criteriaAction) (modified bool, err error) {
+func (d *detailState) performAction(task parser.Task, action criteriaAction, store planMutationStore) (modified bool, err error) {
 	if d.criteriaCursor >= len(d.blockedIndices) {
 		return false, nil
 	}
@@ -99,17 +106,17 @@ func (d *detailState) performAction(task parser.Task, action criteriaAction) (mo
 
 	switch action {
 	case criteriaActionUnblock:
-		if err := parser.UnblockCriterion(task.SourceFile, c); err != nil {
+		if err := store.UnblockCriterion(task.SourceFile, c); err != nil {
 			return false, err
 		}
 		return true, nil
 	case criteriaActionResolve:
-		if err := parser.ResolveCriterion(task.SourceFile, c); err != nil {
+		if err := store.ResolveCriterion(task.SourceFile, c); err != nil {
 			return false, err
 		}
 		return true, nil
 	case criteriaActionDelete:
-		if err := parser.DeleteCriterion(task.SourceFile, c); err != nil {
+		if err := store.DeleteCriterion(task.SourceFile, c); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -139,13 +146,9 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 	// Status
 	var statusText string
 	var statusStyle lipgloss.Style
-	ignoredStyle := lipgloss.NewStyle().Foreground(styles.Warning).Faint(true)
 	if t.IsComplete() {
 		statusText = "Complete"
 		statusStyle = successStyle
-	} else if t.Ignored {
-		statusText = "Ignored"
-		statusStyle = ignoredStyle
 	} else if t.IsBlocked() {
 		statusText = "Blocked"
 		statusStyle = warningStyle
@@ -280,7 +283,7 @@ func detailFooter(ds *detailState, scrollable bool) string {
 		if ds.showActionPicker {
 			return styles.StatusBar.Render("↑/↓: select action · enter: confirm · esc: cancel")
 		}
-		return styles.StatusBar.Render("↑/↓: navigate blocked · enter: action · tab: scroll mode · esc: back")
+		return styles.StatusBar.Render("↑/↓: navigate blocked · enter: action · tab: scroll mode · q: back")
 	}
 
 	var parts []string
@@ -289,6 +292,6 @@ func detailFooter(ds *detailState, scrollable bool) string {
 	}
 	parts = append(parts, "pgup/pgdn: prev/next task")
 	parts = append(parts, "tab: manage blocked")
-	parts = append(parts, "alt+i: ignore/unignore · alt+r: run · alt+bksp: delete · esc: back · q: exit")
+	parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
 	return styles.StatusBar.Render(strings.Join(parts, " · "))
 }

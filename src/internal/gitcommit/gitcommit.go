@@ -3,10 +3,11 @@ package gitcommit
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/leberkas-org/maggus/internal/gitutil"
 )
 
 const commitFile = "COMMIT.md"
@@ -45,11 +46,11 @@ func CommitIteration(workDir, fallbackMsg string) (Result, error) {
 		}
 		// fallbackMsg provided: run safety-gate then commit.
 		for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md", ".maggus/RELEASE_NOTES.md"} {
-			unstage := exec.Command("git", "reset", "HEAD", "--", pattern)
+			unstage := gitutil.Command("reset", "HEAD", "--", pattern)
 			unstage.Dir = workDir
 			unstage.CombinedOutput() // ignore errors (files may not be staged)
 		}
-		cmd := exec.Command("git", "commit", "-m", fallbackMsg)
+		cmd := gitutil.Command("commit", "-m", fallbackMsg)
 		cmd.Dir = workDir
 		out, commitErr := cmd.CombinedOutput()
 		outStr := strings.TrimSpace(string(out))
@@ -74,13 +75,13 @@ func CommitIteration(workDir, fallbackMsg string) (Result, error) {
 	// Safety gate: ensure internal files are never included in the commit.
 	// The agent may have staged them via `git add .` or `git add -A`.
 	for _, pattern := range []string{commitFile, ".maggus/runs/", ".maggus/MEMORY.md", ".maggus/RELEASE_NOTES.md"} {
-		unstage := exec.Command("git", "reset", "HEAD", "--", pattern)
+		unstage := gitutil.Command("reset", "HEAD", "--", pattern)
 		unstage.Dir = workDir
 		unstage.CombinedOutput() // ignore errors (files may not be staged)
 	}
 
 	// Run git commit
-	cmd := exec.Command("git", "commit", "-F", commitFile)
+	cmd := gitutil.Command("commit", "-F", commitFile)
 	cmd.Dir = workDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
