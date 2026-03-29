@@ -95,11 +95,11 @@ works inside the app router.
 **Parallel:** yes — can run alongside TASK-030-002, TASK-030-004, TASK-030-005, TASK-030-006
 
 **Acceptance Criteria:**
-- [ ] All `tea.Quit` calls in the config model are replaced with `navigateBackMsg`
-- [ ] `runConfig()` no longer calls `tea.NewProgram`; config initialisation moves to `appModel`
-- [ ] Any post-exit actions (e.g. external editor launch) are handled via `execProcessMsg` or
+- [x] All `tea.Quit` calls in the config model are replaced with `navigateBackMsg`
+- [x] `runConfig()` no longer calls `tea.NewProgram`; config initialisation moves to `appModel`
+- [x] Any post-exit actions (e.g. external editor launch) are handled via `execProcessMsg` or
   kept as non-TUI side effects triggered from the app model on `navigateBackMsg`
-- [ ] `go build ./...` passes
+- [x] `go build ./...` passes
 
 ---
 
