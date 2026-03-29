@@ -225,12 +225,20 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 			if icon == "" {
 				icon = "🥚"
 			}
-			desc := styles.Truncate(entry.Description, contentWidth-2)
-			toolLines[i] = fmt.Sprintf("  %s %s: %s  %s",
-				icon,
-				statusCyanStyle.Render(entry.Type),
-				statusBlueStyle.Render(desc),
-				statusDimStyle.Render(ts))
+			styledTs := statusDimStyle.Render(ts)
+			tsW := lipgloss.Width(styledTs) // always 8 for "15:04:05"
+			styledType := statusCyanStyle.Render(entry.Type)
+			iconW := lipgloss.Width(icon)
+			typeW := lipgloss.Width(styledType)
+			// Fixed overhead: 2 (indent) + iconW + 1 (space) + typeW + 2 (": ") + 1 (min pad for RightAlign) + tsW
+			fixedCols := 2 + iconW + 1 + typeW + 2 + 1 + tsW
+			maxDesc := contentWidth - fixedCols
+			if maxDesc < 0 {
+				maxDesc = 0
+			}
+			desc := styles.Truncate(entry.Description, maxDesc)
+			leftPart := fmt.Sprintf("  %s %s: %s", icon, styledType, statusBlueStyle.Render(desc))
+			toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
 		}
 
 		offset := m.logScroll

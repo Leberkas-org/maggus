@@ -78,12 +78,12 @@ The timestamp `ts` sits at the end of the string but is not padded to the right 
 The available width is `contentWidth` (= `width - 4`).
 
 **Acceptance Criteria:**
-- [ ] Each tool line is built using `styles.RightAlign(leftPart, tsStr, contentWidth)` (or
+- [x] Each tool line is built using `styles.RightAlign(leftPart, tsStr, contentWidth)` (or
   equivalent), where `leftPart` is everything except the timestamp.
-- [ ] The timestamp is rendered at the right edge of `contentWidth`.
-- [ ] When the terminal is very narrow and there is no room for the timestamp, the line
+- [x] The timestamp is rendered at the right edge of `contentWidth`.
+- [x] When the terminal is very narrow and there is no room for the timestamp, the line
   degrades gracefully (timestamp dropped, content preserved, no panic).
-- [ ] `go build ./...` and `go test ./...` pass.
+- [x] `go build ./...` and `go test ./...` pass.
 
 ---
 

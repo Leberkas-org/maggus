@@ -688,19 +688,19 @@ func (m TUIModel) renderProgressTab(w int) string {
 			icon := toolIcon(entry.Type)
 			styledType := cyanStyle.Render(entry.Type)
 			ts := entry.Timestamp.Format("15:04:05")
-			tsW := 8 // "15:04:05" is always 8 chars
-			// Fixed overhead: 2 (indent) + iconW + 1 (space) + typeW + 2 (": ") + 2 (spaces before ts) + tsW
-			fixedCols := lipgloss.Width(icon) + lipgloss.Width(styledType) + 2 + 1 + 2 + 2 + tsW
-			maxDesc := w - fixedCols
-			if maxDesc < 1 {
-				maxDesc = 1
+			styledTs := grayStyle.Render(ts)
+			tsW := lipgloss.Width(styledTs) // always 8 for "15:04:05"
+			// Fixed overhead: 2 (indent) + iconW + 1 (space) + typeW + 2 (": ") + 1 (min pad for RightAlign) + tsW
+			iconW := lipgloss.Width(icon)
+			typeW := lipgloss.Width(styledType)
+			fixedCols := 2 + iconW + 1 + typeW + 2 + 1 + tsW
+			maxDesc := contentWidth - fixedCols
+			if maxDesc < 0 {
+				maxDesc = 0
 			}
 			desc := styles.Truncate(entry.Description, maxDesc)
-			toolLines[i] = fmt.Sprintf("  %s %s: %s  %s",
-				icon,
-				styledType,
-				blueStyle.Render(desc),
-				grayStyle.Render(ts))
+			leftPart := fmt.Sprintf("  %s %s: %s", icon, styledType, blueStyle.Render(desc))
+			toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
 		}
 
 		// Viewport: clamp offset
