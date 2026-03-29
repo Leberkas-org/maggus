@@ -29,11 +29,11 @@ In the left pane tree, task rows have no visual distinction between complete and
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] In `renderLeftPane()` (`status_leftpane.go`), within the task row block, the `spinStr` logic is extended: if `task.IsComplete()` is true AND the task is not the currently active daemon task, render `spinStr` as `✓` in `greenStyle`
-- [ ] Active daemon task (spinner) takes priority: if `m.daemon.Running && m.daemon.CurrentTask == task.ID`, show the spinner as before regardless of completion state
-- [ ] The `✓` respects the selection background: use `addBg(greenStyle).Render("✓")` when the row is selected, `greenStyle.Render("✓")` otherwise
-- [ ] Task ID and title rendering is unchanged (still `mutedStyle`)
-- [ ] `go build ./...` passes
+- [x] In `renderLeftPane()` (`status_leftpane.go`), within the task row block, the `spinStr` logic is extended: if `task.IsComplete()` is true AND the task is not the currently active daemon task, render `spinStr` as `✓` in `greenStyle`
+- [x] Active daemon task (spinner) takes priority: if `m.daemon.Running && m.daemon.CurrentTask == task.ID`, show the spinner as before regardless of completion state
+- [x] The `✓` respects the selection background: use `addBg(greenStyle).Render("✓")` when the row is selected, `greenStyle.Render("✓")` otherwise
+- [x] Task ID and title rendering is unchanged (still `mutedStyle`)
+- [x] `go build ./...` passes
 
 ## Task Dependency Graph
 

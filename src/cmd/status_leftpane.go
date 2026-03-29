@@ -282,6 +282,8 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			var spinStr string
 			if m.daemon.Running && m.daemon.CurrentTask == task.ID {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
+			} else if task.IsComplete() {
+				spinStr = addBg(greenStyle).Render("✓")
 			} else {
 				spinStr = bgStr(" ")
 			}
