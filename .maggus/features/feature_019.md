@@ -46,17 +46,17 @@ Replace the flat feature/bug list in the left pane with a collapsible tree view.
 **Parallel:** yes — can run alongside TASK-019-003
 
 **Acceptance Criteria:**
-- [ ] `renderLeftPane` is rewritten to iterate over `buildTreeItems()` instead of `visiblePlans()`
-- [ ] **Plan row** layout (left to right): cursor indicator (`▸` or space, 1 char) + expand/collapse icon (`▶` collapsed, `▼` expanded, space if no tasks, 1 char) + space + title (truncated) + progress badge (`done/total` in muted style) + approval badge (existing `✓`/`○` logic, right-aligned)
-- [ ] **Task row** layout: 3-space indent + task ID (e.g. `TASK-019-001`, truncated) + space + task title fragment (truncated to remaining width)
-- [ ] The plan row that contains the daemon's `CurrentFeature` shows an animated spinner character (from `styles.SpinnerFrames[m.spinnerFrame]`) immediately before the title — only while `m.daemon.Running`
-- [ ] The task row whose task ID matches `m.daemon.CurrentTask` shows the same spinner character before the task ID — only while `m.daemon.Running`
-- [ ] If no spinner is active (daemon stopped), neither row shows a spinner character; layout remains stable (no width jump)
-- [ ] Selected row (at `treeCursor`) is highlighted with `selectedBg` background, same as before
-- [ ] Features and bugs remain in separate sections with the existing `─` divider between them
-- [ ] The progress badge format is `N/T` where N = `plan.DoneCount()` and T = `len(plan.Tasks)`; displayed in muted style; hidden if `len(plan.Tasks) == 0`
-- [ ] All existing tests pass: `cd src && go test ./...`
-- [ ] `cd src && go vet ./...` reports no issues
+- [x] `renderLeftPane` is rewritten to iterate over `buildTreeItems()` instead of `visiblePlans()`
+- [x] **Plan row** layout (left to right): cursor indicator (`▸` or space, 1 char) + expand/collapse icon (`▶` collapsed, `▼` expanded, space if no tasks, 1 char) + space + title (truncated) + progress badge (`done/total` in muted style) + approval badge (existing `✓`/`○` logic, right-aligned)
+- [x] **Task row** layout: 3-space indent + task ID (e.g. `TASK-019-001`, truncated) + space + task title fragment (truncated to remaining width)
+- [x] The plan row that contains the daemon's `CurrentFeature` shows an animated spinner character (from `styles.SpinnerFrames[m.spinnerFrame]`) immediately before the title — only while `m.daemon.Running`
+- [x] The task row whose task ID matches `m.daemon.CurrentTask` shows the same spinner character before the task ID — only while `m.daemon.Running`
+- [x] If no spinner is active (daemon stopped), neither row shows a spinner character; layout remains stable (no width jump)
+- [x] Selected row (at `treeCursor`) is highlighted with `selectedBg` background, same as before
+- [x] Features and bugs remain in separate sections with the existing `─` divider between them
+- [x] The progress badge format is `N/T` where N = `plan.DoneCount()` and T = `len(plan.Tasks)`; displayed in muted style; hidden if `len(plan.Tasks) == 0`
+- [x] All existing tests pass: `cd src && go test ./...`
+- [x] `cd src && go vet ./...` reports no issues
 
 ---
 

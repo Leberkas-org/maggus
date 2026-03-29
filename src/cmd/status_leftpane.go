@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -52,8 +53,9 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	greenStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	orangeStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
+	primaryStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 
-	visible := m.visiblePlans()
+	items := m.buildTreeItems()
 	var lines []string
 
 	// Header row: matches right pane tab bar style — dimmed number prefix + styled label.
@@ -67,7 +69,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	headerContent := " " + dimStyle.Render("[1]") + " " + labelStyle.Render("Items")
 	lines = append(lines, padToWidth(headerContent, contentW))
 
-	// Horizontal separator under daemon status line.
+	// Horizontal separator under header.
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
 
 	if m.exitDaemonOverlay || m.daemonStopOverlay {
@@ -95,7 +97,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			if m.daemon.CurrentTask != "" {
 				// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
 				indicatorW := lipgloss.Width(daemonLine)
-				taskMaxW := contentW - indicatorW - 2
+				taskMaxW := contentW - indicatorW - 3
 				if taskMaxW > 0 {
 					blub := m.daemon.CurrentFeature + " " + m.daemon.CurrentTask
 					task := leftPaneTruncate(blub, taskMaxW)
@@ -103,7 +105,6 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 				}
 			}
 		} else {
-
 			daemonLine = mutedStyle.Render("○ Stopped")
 		}
 	}
@@ -113,82 +114,165 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
 
 	// Empty state.
-	if len(visible) == 0 {
+	if len(items) == 0 {
 		lines = append(lines, mutedStyle.Render("  No features found"))
 	}
 
-	// Plan rows: features first, separator, then bugs.
+	// Spinner character — reserved unconditionally (1 char) to prevent layout jitter.
+	spinnerChar := styles.SpinnerFrames[m.spinnerFrame]
+
+	// Plan rows: features first, separator, then bugs (or bugs first based on ordering).
+	// Track when we cross the boundary between bugs and non-bugs sections.
 	bugSepAdded := false
 	bugAdded := false
-	for i, plan := range visible {
-		if !plan.IsBug && bugAdded && !bugSepAdded {
-			bugSepAdded = true
-			lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
-		}
 
-		if plan.IsBug && !bugAdded {
-			bugAdded = true
-		}
+	for i, item := range items {
+		isSelected := i == m.treeCursor
 
-		isSelected := i == m.planCursor
+		if item.kind == treeItemKindPlan {
+			plan := item.plan
 
-		// Cursor indicator (1 visual char).
-		var cursorChar string
-		if isSelected && m.leftFocused {
-			cursorChar = cursorStyle.Render("▸")
+			// Insert separator between bugs section and features section.
+			if !plan.IsBug && bugAdded && !bugSepAdded {
+				bugSepAdded = true
+				lines = append(lines, mutedStyle.Render(strings.Repeat("─", contentW-1)))
+			}
+			if plan.IsBug && !bugAdded {
+				bugAdded = true
+			}
+
+			// Cursor indicator (1 visual char).
+			var cursorChar string
+			if isSelected && m.leftFocused {
+				cursorChar = cursorStyle.Render("▸")
+			} else {
+				cursorChar = " "
+			}
+
+			// Expand/collapse icon (1 visual char).
+			var expandIcon string
+			if len(plan.Tasks) == 0 {
+				expandIcon = " "
+			} else if m.expandedPlans[plan.ID] {
+				expandIcon = mutedStyle.Render("▼")
+			} else {
+				expandIcon = mutedStyle.Render("▶")
+			}
+
+			// Spinner column (1 char, always reserved).
+			var spinStr string
+			if m.daemon.Running && m.daemon.CurrentFeature == plan.ID {
+				spinStr = primaryStyle.Render(spinnerChar)
+			} else {
+				spinStr = " "
+			}
+
+			// Approval badge.
+			var badge string
+			if plan.Completed {
+				badge = mutedStyle.Render("✓")
+			} else if isPlanApproved(plan, m.approvals, m.approvalRequired) {
+				badge = greenStyle.Render("✓")
+			} else {
+				badge = orangeStyle.Render("○")
+			}
+			badgeW := lipgloss.Width(badge)
+
+			// Progress badge (N/T), hidden if no tasks.
+			var progBadge string
+			progBadgeW := 0
+			if len(plan.Tasks) > 0 {
+				progStr := fmt.Sprintf("%d/%d", plan.DoneCount(), len(plan.Tasks))
+				progBadge = mutedStyle.Render(progStr)
+				progBadgeW = len(progStr) + 1 // +1 for the space before it
+			}
+
+			// Layout: cursor(1) + expand(1) + space(1) + spinner(1) + title + space(1) + [progBadge + space(1)] + badge + space(1)
+			// Fixed overhead on right = (progBadgeW) + 1 + badgeW + 1
+			// Fixed overhead on left  = 1 + 1 + 1 + 1 = 4
+			titleMaxW := contentW - 4 - progBadgeW - 1 - badgeW - 1
+			if titleMaxW < 0 {
+				titleMaxW = 0
+			}
+
+			title := plan.ID
+			if title == "" {
+				title = filepath.Base(plan.File)
+			}
+			title = leftPaneTruncate(title, titleMaxW)
+
+			// Apply per-type styling to title.
+			var titleStr string
+			switch {
+			case plan.Completed:
+				titleStr = mutedStyle.Render(title)
+			case plan.IsBug:
+				titleStr = errorStyle.Render(title)
+			default:
+				titleStr = title
+			}
+
+			// Pad title to fill its allocated width so badges stay right-aligned.
+			titlePad := titleMaxW - lipgloss.Width(titleStr)
+			if titlePad < 0 {
+				titlePad = 0
+			}
+
+			rowContent := cursorChar + expandIcon + " " + spinStr + titleStr + strings.Repeat(" ", titlePad)
+			if progBadgeW > 0 {
+				rowContent += " " + progBadge
+			}
+			rowContent += " " + badge + " "
+
+			var rowLine string
+			if isSelected {
+				rowLine = selectedBg.Render(padToWidth(rowContent, contentW))
+			} else {
+				rowLine = padToWidth(rowContent, contentW)
+			}
+			lines = append(lines, rowLine)
+
 		} else {
-			cursorChar = " "
-		}
+			// Task row.
+			task := item.task
 
-		// Right-aligned approval badge.
-		var badge string
-		if plan.Completed {
-			badge = mutedStyle.Render("✓")
-		} else if isPlanApproved(plan, m.approvals, m.approvalRequired) {
-			badge = greenStyle.Render("✓")
-		} else {
-			badge = orangeStyle.Render("○")
-		}
-		badgeW := lipgloss.Width(badge)
+			// Spinner column (1 char, always reserved).
+			var spinStr string
+			if m.daemon.Running && m.daemon.CurrentTask == task.ID {
+				spinStr = primaryStyle.Render(spinnerChar)
+			} else {
+				spinStr = " "
+			}
 
-		// Layout: cursor(1) + space(1) + title + space(1) + badge + space(1) = contentW
-		// → titleMaxW = contentW - 4 - badgeW
-		titleMaxW := contentW - 4 - badgeW
-		if titleMaxW < 0 {
-			titleMaxW = 0
-		}
-		title := plan.ID
-		if title == "" {
-			title = filepath.Base(plan.File)
-		}
-		title = leftPaneTruncate(title, titleMaxW)
+			// Layout: indent(3) + spinner(1) + taskID + space(1) + taskTitle
+			// Fixed = 4; allocate task ID up to half remaining, rest for title.
+			avail := contentW - 4
+			if avail < 0 {
+				avail = 0
+			}
+			taskIDMaxW := avail / 2
+			if taskIDMaxW < 1 {
+				taskIDMaxW = 1
+			}
+			taskIDStr := leftPaneTruncate(task.ID, taskIDMaxW)
+			taskIDVisW := lipgloss.Width(taskIDStr)
 
-		// Apply per-type styling to title.
-		var titleStr string
-		switch {
-		case plan.Completed:
-			titleStr = mutedStyle.Render(title)
-		case plan.IsBug:
-			titleStr = errorStyle.Render(title)
-		default:
-			titleStr = title
-		}
+			titleAvail := avail - taskIDVisW - 1
+			if titleAvail < 0 {
+				titleAvail = 0
+			}
+			taskTitleStr := leftPaneTruncate(task.Title, titleAvail)
 
-		// Pad title to fill its allocated width so the badge is right-aligned.
-		titlePad := titleMaxW - lipgloss.Width(titleStr)
-		if titlePad < 0 {
-			titlePad = 0
-		}
-		rowContent := cursorChar + " " + titleStr + strings.Repeat(" ", titlePad) + " " + badge + " "
+			rowContent := "   " + spinStr + mutedStyle.Render(taskIDStr) + " " + mutedStyle.Render(taskTitleStr)
 
-		// Apply selected-row highlight (background + left accent via ▶ cursor in primary color).
-		var rowLine string
-		if isSelected {
-			rowLine = selectedBg.Render(padToWidth(rowContent, contentW))
-		} else {
-			rowLine = padToWidth(rowContent, contentW)
+			var rowLine string
+			if isSelected {
+				rowLine = selectedBg.Render(padToWidth(rowContent, contentW))
+			} else {
+				rowLine = padToWidth(rowContent, contentW)
+			}
+			lines = append(lines, rowLine)
 		}
-		lines = append(lines, rowLine)
 	}
 
 	// Trim or pad to exact height.
