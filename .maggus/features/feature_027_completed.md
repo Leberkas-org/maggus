@@ -101,10 +101,10 @@ This feature introduces a **process-level `DaemonStateCache` singleton** — ini
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `loadDaemonStatus()` function deleted from `status_runlog.go`
-- [ ] All sub-functions it used (`readDaemonPID`, `findLatestRunLog`, `readLastNLogLines`, `parseLogForCurrentState`) are kept — they are still called directly
-- [ ] `go build ./...` passes with no unused function warnings
-- [ ] `go test ./...` passes
+- [x] `loadDaemonStatus()` function deleted from `status_runlog.go`
+- [x] All sub-functions it used (`readDaemonPID`, `findLatestRunLog`, `readLastNLogLines`, `parseLogForCurrentState`) are kept — they are still called directly
+- [x] `go build ./...` passes with no unused function warnings
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 
