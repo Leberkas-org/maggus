@@ -34,21 +34,21 @@ This feature introduces a **process-level `DaemonStateCache` singleton** — ini
 **Parallel:** no — other tasks depend on this
 
 **Acceptance Criteria:**
-- [ ] New file `src/cmd/daemon_state_cache.go` created in `package cmd`
-- [ ] `daemonPIDState` struct defined with `PID int` and `Running bool` fields
-- [ ] `DaemonStateCache` struct defined with mutex-protected state, fsnotify watcher, subscriber list, and done channel
-- [ ] `NewDaemonStateCache(dir string) (*DaemonStateCache, error)` constructor watches the `.maggus/` directory (not the file directly, so it works even if `daemon.pid` doesn't exist yet)
-- [ ] Constructor calls `reload()` synchronously before returning so first `Get()` is always populated
-- [ ] `reload()` calls existing `readDaemonPID(dir)` and `isProcessRunning(pid)` (already in `package cmd`); only notifies subscribers when state actually changes
-- [ ] Background `loop()` goroutine filters fsnotify events to `daemon.pid` filename only; calls `reload()` on `Create | Write | Remove | Rename`
-- [ ] `Get() daemonPIDState` returns cached state under RLock (zero I/O)
-- [ ] `Subscribe() chan daemonPIDState` returns a buffered (size 1) channel and registers it
-- [ ] `Unsubscribe(ch chan daemonPIDState)` removes the channel from the subscriber list
-- [ ] `Stop()` closes the done channel, waits for the loop goroutine, and closes all remaining subscriber channels
-- [ ] `notify()` fans out to all subscriber channels using non-blocking sends (drops stale updates if channel is full)
-- [ ] `daemonCacheUpdateMsg` Bubble Tea message type defined
-- [ ] `listenForDaemonCacheUpdate(ch <-chan daemonPIDState) tea.Cmd` defined (mirrors `listenForWatcherUpdate` pattern exactly)
-- [ ] `go build ./...` passes
+- [x] New file `src/cmd/daemon_state_cache.go` created in `package cmd`
+- [x] `daemonPIDState` struct defined with `PID int` and `Running bool` fields
+- [x] `DaemonStateCache` struct defined with mutex-protected state, fsnotify watcher, subscriber list, and done channel
+- [x] `NewDaemonStateCache(dir string) (*DaemonStateCache, error)` constructor watches the `.maggus/` directory (not the file directly, so it works even if `daemon.pid` doesn't exist yet)
+- [x] Constructor calls `reload()` synchronously before returning so first `Get()` is always populated
+- [x] `reload()` calls existing `readDaemonPID(dir)` and `isProcessRunning(pid)` (already in `package cmd`); only notifies subscribers when state actually changes
+- [x] Background `loop()` goroutine filters fsnotify events to `daemon.pid` filename only; calls `reload()` on `Create | Write | Remove | Rename`
+- [x] `Get() daemonPIDState` returns cached state under RLock (zero I/O)
+- [x] `Subscribe() chan daemonPIDState` returns a buffered (size 1) channel and registers it
+- [x] `Unsubscribe(ch chan daemonPIDState)` removes the channel from the subscriber list
+- [x] `Stop()` closes the done channel, waits for the loop goroutine, and closes all remaining subscriber channels
+- [x] `notify()` fans out to all subscriber channels using non-blocking sends (drops stale updates if channel is full)
+- [x] `daemonCacheUpdateMsg` Bubble Tea message type defined
+- [x] `listenForDaemonCacheUpdate(ch <-chan daemonPIDState) tea.Cmd` defined (mirrors `listenForWatcherUpdate` pattern exactly)
+- [x] `go build ./...` passes
 
 ### TASK-027-002: Wire cache into root.go and menu
 **Description:** As a developer, I want the `DaemonStateCache` initialized in `root.go` and the menu model to read from it so that the menu shows the correct daemon state on its very first rendered frame.
