@@ -131,6 +131,10 @@ const (
 	wakeFileChange                   // file change detected
 )
 
+// daemonIdlePollInterval is the maximum time the daemon will wait idle before
+// re-checking for work, providing a fallback for missed fsnotify events.
+const daemonIdlePollInterval = 30 * time.Second
+
 // waitForChanges blocks until a file change or context cancellation.
 // It uses the provided filewatcher (which may be nil if creation failed).
 // Returns the reason for waking and the path of the changed file (if applicable).
@@ -165,6 +169,8 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, s
 		return wakeSignal, ""
 	case evt := <-wakeCh:
 		return wakeFileChange, evt.path
+	case <-time.After(daemonIdlePollInterval):
+		return wakeFileChange, ""
 	}
 }
 
