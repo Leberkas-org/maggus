@@ -69,16 +69,16 @@ Replace the flat feature/bug list in the left pane with a collapsible tree view.
 **Parallel:** yes — can run alongside TASK-019-002
 
 **Acceptance Criteria:**
-- [ ] `up` / `k` moves `treeCursor` up by one through all visible tree items (wraps from top to bottom)
-- [ ] `down` / `j` moves `treeCursor` down by one through all visible tree items (wraps from bottom to top)
-- [ ] `right` / `l` on a **plan row**: adds the plan's ID to `expandedPlans` (expands it); rebuilds tree; does nothing if already expanded or if the plan has no tasks
-- [ ] `left` / `h` on a **plan row**: removes the plan's ID from `expandedPlans` (collapses it); rebuilds tree; does nothing if already collapsed
-- [ ] `left` / `h` on a **task row**: collapses the parent plan (same effect as pressing left on the plan row), then moves `treeCursor` to that plan row
-- [ ] After any cursor movement, `rebuildForSelectedPlan()` is called if the selected plan changed, so the right pane stays in sync
-- [ ] All pre-existing key bindings (Tab, Enter, `a`, `d`, `?`, etc.) continue to work correctly
-- [ ] When the left pane is not focused (`m.leftFocused == false`), left/right arrows are NOT consumed by tree navigation (they should pass through or be ignored, same as before)
-- [ ] All existing tests pass: `cd src && go test ./...`
-- [ ] `cd src && go vet ./...` reports no issues
+- [x] `up` / `k` moves `treeCursor` up by one through all visible tree items (wraps from top to bottom)
+- [x] `down` / `j` moves `treeCursor` down by one through all visible tree items (wraps from bottom to top)
+- [x] `right` / `l` on a **plan row**: adds the plan's ID to `expandedPlans` (expands it); rebuilds tree; does nothing if already expanded or if the plan has no tasks
+- [x] `left` / `h` on a **plan row**: removes the plan's ID from `expandedPlans` (collapses it); rebuilds tree; does nothing if already collapsed
+- [x] `left` / `h` on a **task row**: collapses the parent plan (same effect as pressing left on the plan row), then moves `treeCursor` to that plan row
+- [x] After any cursor movement, `rebuildForSelectedPlan()` is called if the selected plan changed, so the right pane stays in sync
+- [x] All pre-existing key bindings (Tab, Enter, `a`, `d`, `?`, etc.) continue to work correctly
+- [x] When the left pane is not focused (`m.leftFocused == false`), left/right arrows are NOT consumed by tree navigation (they should pass through or be ignored, same as before)
+- [x] All existing tests pass: `cd src && go test ./...`
+- [x] `cd src && go vet ./...` reports no issues
 
 ---
 

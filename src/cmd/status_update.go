@@ -460,17 +460,36 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Left pane is focused (default): feature navigation.
 	switch key {
 	case "up", "k":
-		visible := m.visiblePlans()
-		if len(visible) > 0 {
-			m.planCursor = styles.CursorUp(m.planCursor, len(visible))
-			m.rebuildForSelectedPlan()
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
 		}
 		return m, nil
 	case "down", "j":
-		visible := m.visiblePlans()
-		if len(visible) > 0 {
-			m.planCursor = styles.CursorDown(m.planCursor, len(visible))
-			m.rebuildForSelectedPlan()
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = styles.CursorDown(m.treeCursor, len(items))
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
+		}
+		return m, nil
+	case "shift+tab":
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
 		}
 		return m, nil
 	case "enter":
@@ -478,18 +497,37 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.leftFocused = false
 		m.activeTab = 1
 		return m, nil
-	case "right":
-		visible := m.visiblePlans()
-		if len(visible) > 1 {
-			m.planCursor = styles.CursorDown(m.planCursor, len(visible))
-			m.rebuildForSelectedPlan()
+	case "right", "l":
+		items := m.buildTreeItems()
+		if m.treeCursor < len(items) {
+			item := items[m.treeCursor]
+			if item.kind == treeItemKindPlan && len(item.plan.Tasks) > 0 && !m.expandedPlans[item.plan.ID] {
+				if m.expandedPlans == nil {
+					m.expandedPlans = make(map[string]bool)
+				}
+				m.expandedPlans[item.plan.ID] = true
+			}
 		}
 		return m, nil
-	case "shift+tab", "left":
-		visible := m.visiblePlans()
-		if len(visible) > 1 {
-			m.planCursor = styles.CursorUp(m.planCursor, len(visible))
-			m.rebuildForSelectedPlan()
+	case "left", "h":
+		items := m.buildTreeItems()
+		if m.treeCursor < len(items) {
+			item := items[m.treeCursor]
+			if item.kind == treeItemKindPlan {
+				delete(m.expandedPlans, item.plan.ID)
+			} else if item.kind == treeItemKindTask {
+				parentID := item.plan.ID
+				delete(m.expandedPlans, parentID)
+				// After collapsing, find and select the parent plan row.
+				newItems := m.buildTreeItems()
+				for i, it := range newItems {
+					if it.kind == treeItemKindPlan && it.plan.ID == parentID {
+						m.treeCursor = i
+						break
+					}
+				}
+				m.syncPlanCursorFromTreeCursor()
+			}
 		}
 		return m, nil
 	case "alt+a":

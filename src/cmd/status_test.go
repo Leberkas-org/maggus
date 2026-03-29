@@ -1298,6 +1298,7 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		m.height = 40
 		m.leftFocused = true
 		m.planCursor = 2
+		m.treeCursor = 2 // all plans collapsed, so treeCursor == planCursor
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 		got := result.(statusModel)
@@ -1312,10 +1313,11 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		m.height = 40
 		m.leftFocused = true
 		m.planCursor = 2
+		m.treeCursor = 2 // all plans collapsed, so treeCursor == planCursor
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 		got := result.(statusModel)
-		// CursorDown wraps: from last index stays or wraps to 0
+		// CursorDown wraps: from last index wraps to 0
 		if got.planCursor < 0 || got.planCursor >= len(plans) {
 			t.Errorf("planCursor = %d out of range [0, %d)", got.planCursor, len(plans))
 		}
@@ -1334,6 +1336,148 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		// Right pane focused: up scrolls log, not plan navigation
 		if got.planCursor != 1 {
 			t.Errorf("planCursor = %d, want 1 (should not change when right pane focused)", got.planCursor)
+		}
+	})
+}
+
+func TestStatusModel_TreeExpandCollapse(t *testing.T) {
+	plans := []parser.Plan{
+		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
+			{ID: "TASK-001", Title: "First"},
+			{ID: "TASK-002", Title: "Second"},
+		}},
+		{ID: "plan_2", File: "plan_2.md", Tasks: []parser.Task{
+			{ID: "TASK-010", Title: "Ten"},
+		}},
+	}
+
+	t.Run("right on plan row expands it", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		got := result.(statusModel)
+		if !got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should be expanded after right arrow")
+		}
+	})
+
+	t.Run("l on plan row expands it", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+		got := result.(statusModel)
+		if !got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should be expanded after l")
+		}
+	})
+
+	t.Run("right on already expanded plan does nothing", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.expandedPlans["plan_1"] = true
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		got := result.(statusModel)
+		if !got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should still be expanded")
+		}
+	})
+
+	t.Run("left on plan row collapses it", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.expandedPlans["plan_1"] = true
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+		got := result.(statusModel)
+		if got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should be collapsed after left arrow")
+		}
+	})
+
+	t.Run("h on plan row collapses it", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.expandedPlans["plan_1"] = true
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+		got := result.(statusModel)
+		if got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should be collapsed after h")
+		}
+	})
+
+	t.Run("left on task row collapses parent and moves to plan row", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.expandedPlans["plan_1"] = true
+		// Tree is: [0]=plan_1, [1]=TASK-001, [2]=TASK-002, [3]=plan_2
+		m.treeCursor = 1 // on TASK-001
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+		got := result.(statusModel)
+		if got.expandedPlans["plan_1"] {
+			t.Error("plan_1 should be collapsed")
+		}
+		if got.treeCursor != 0 {
+			t.Errorf("treeCursor = %d, want 0 (plan_1 row)", got.treeCursor)
+		}
+		if got.planCursor != 0 {
+			t.Errorf("planCursor = %d, want 0", got.planCursor)
+		}
+	})
+
+	t.Run("down through expanded tree visits task rows", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = true
+		m.expandedPlans["plan_1"] = true
+		m.treeCursor = 0 // plan_1
+
+		// Press down once: should move to TASK-001 (treeCursor=1)
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		got := result.(statusModel)
+		if got.treeCursor != 1 {
+			t.Errorf("treeCursor = %d, want 1 (TASK-001)", got.treeCursor)
+		}
+		// planCursor stays 0 (still plan_1's task)
+		if got.planCursor != 0 {
+			t.Errorf("planCursor = %d, want 0 (still plan_1)", got.planCursor)
+		}
+	})
+
+	t.Run("right/left not consumed when right pane focused", func(t *testing.T) {
+		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.leftFocused = false
+		m.activeTab = 0
+		m.treeCursor = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		got := result.(statusModel)
+		if got.expandedPlans["plan_1"] {
+			t.Error("right arrow should not expand when right pane focused")
 		}
 	})
 }

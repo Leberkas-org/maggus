@@ -212,6 +212,43 @@ func (m *statusModel) syncTreeCursorFromPlanCursor() {
 	m.treeCursor = 0
 }
 
+// syncPlanCursorFromTreeCursor derives planCursor from the current treeCursor.
+// planCursor is the index among plan rows only (0-based). For task rows,
+// planCursor points to the parent plan.
+func (m *statusModel) syncPlanCursorFromTreeCursor() {
+	items := m.buildTreeItems()
+	planIdx := 0
+	for i, item := range items {
+		if item.kind == treeItemKindPlan {
+			if i <= m.treeCursor {
+				planIdx++
+			}
+		}
+	}
+	if planIdx > 0 {
+		m.planCursor = planIdx - 1
+	} else {
+		m.planCursor = 0
+	}
+}
+
+// rebuildRightPane rebuilds the right-pane task list and metrics for the
+// currently selected plan without altering treeCursor or planCursor.
+func (m *statusModel) rebuildRightPane() {
+	visible := m.visiblePlans()
+	if m.planCursor >= len(visible) {
+		m.planCursor = 0
+	}
+	if len(visible) > 0 {
+		m.Tasks = buildSelectableTasksForFeature(m.selectedPlan(), m.showAll)
+	} else {
+		m.Tasks = nil
+	}
+	m.Cursor = 0
+	m.ScrollOffset = 0
+	m.loadMetrics()
+}
+
 // reloadPlans reloads all plans and approvals from disk and rebuilds the current view.
 func (m *statusModel) reloadPlans() {
 	plans, a, err := loadPlansWithApprovals(m.dir, m.featureStore, m.bugStore, true)
