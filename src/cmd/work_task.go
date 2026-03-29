@@ -21,7 +21,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/stores"
 )
 
@@ -38,7 +37,7 @@ const (
 // taskResult holds the outcome of a single task iteration.
 type taskResult struct {
 	action     taskAction
-	stopReason runner.StopReason // only set when action == taskBreak
+	stopReason StopReason // only set when action == taskBreak
 	committed  bool              // true if a commit was made
 	warning    string            // non-empty if commit succeeded but with a caveat
 	failed     *failedTask       // non-nil if the task failed
@@ -82,7 +81,7 @@ type taskContext struct {
 // maxCount is the user-requested task limit (0 = unlimited; used to cap progress total).
 func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskResult {
 	if tc.workCtx.Err() != nil {
-		return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
+		return taskResult{action: taskBreak, stopReason: StopReasonInterrupted}
 	}
 
 	// Find next workable task.
@@ -120,13 +119,13 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	model := resolveTaskModel(next.Model, tc.resolvedModel)
 	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.p); err != nil {
 		if tc.workCtx.Err() != nil {
-			return taskResult{action: taskBreak, stopReason: runner.StopReasonInterrupted}
+			return taskResult{action: taskBreak, stopReason: StopReasonInterrupted}
 		}
 		tc.notifier.PlayError()
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{AgentErrors: 1})
 		reason := err.Error()
 		tc.logger.TaskFailed(next.ID, reason)
-		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
+		tc.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
 		return taskResult{
 			action: taskSkipToNext,
 			taskID: next.ID,
@@ -199,7 +198,7 @@ func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, 
 	if commitErr != nil {
 		reason := commitErr.Error()
 		tc.logger.TaskFailed(task.ID, reason)
-		tc.p.Send(runner.InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", task.ID, reason)})
+		tc.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", task.ID, reason)})
 		return taskResult{
 			action: taskSkipToNext,
 			tasks:  parsedTasks,
@@ -216,7 +215,7 @@ func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, 
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{GitCommits: 1})
 		commitHash := captureShortHash(tc.workDir)
 		tc.logger.TaskComplete(task.ID, commitHash)
-		tc.p.Send(runner.CommitMsg{Message: commitResult.Message})
+		tc.p.Send(CommitMsg{Message: commitResult.Message})
 		tc.notifier.PlayTaskComplete()
 		result.committed = true
 
@@ -253,7 +252,7 @@ func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, 
 			msg = "commit skipped (unknown reason)"
 		}
 		result.warning = fmt.Sprintf("%s: %s", task.ID, msg)
-		tc.p.Send(runner.InfoMsg{Text: "⚠ " + result.warning})
+		tc.p.Send(InfoMsg{Text: "⚠ " + result.warning})
 	}
 
 	// Update progress to reflect completed iteration.
@@ -262,7 +261,7 @@ func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, 
 	if maxCount > 0 && progressTotal > maxCount {
 		progressTotal = maxCount
 	}
-	tc.p.Send(runner.ProgressMsg{Current: i + 1, Total: progressTotal})
+	tc.p.Send(ProgressMsg{Current: i + 1, Total: progressTotal})
 
 	// Between-task sync check: detect if remote changed while working.
 	// Skip on the final iteration (push happens next anyway).
@@ -288,9 +287,9 @@ func findNextWorkableTask(tasks []parser.Task) *parser.Task {
 // sendIterationStart sends the IterationStartMsg to the TUI with task details.
 // When plan is non-nil, its MaggusID and ID are used to populate item-level fields.
 func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, i, count, featureCurrent, featureTotal int, plan *parser.Plan) {
-	tuiCriteria := make([]runner.TaskCriterion, len(task.Criteria))
+	tuiCriteria := make([]TaskCriterion, len(task.Criteria))
 	for ci, c := range task.Criteria {
-		tuiCriteria[ci] = runner.TaskCriterion{
+		tuiCriteria[ci] = TaskCriterion{
 			Text:    c.Text,
 			Checked: c.Checked,
 			Blocked: c.Blocked,
@@ -298,7 +297,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 	}
 
 	// Build remaining tasks list (workable tasks after the current one).
-	var remaining []runner.RemainingTask
+	var remaining []RemainingTask
 	pastCurrent := false
 	for ti := range tasks {
 		if tasks[ti].ID == task.ID {
@@ -306,7 +305,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 			continue
 		}
 		if pastCurrent && tasks[ti].IsWorkable() {
-			remaining = append(remaining, runner.RemainingTask{
+			remaining = append(remaining, RemainingTask{
 				ID:         tasks[ti].ID,
 				Title:      tasks[ti].Title,
 				SourceFile: filepath.Base(tasks[ti].SourceFile),
@@ -326,7 +325,7 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 		}
 	}
 
-	p.Send(runner.IterationStartMsg{
+	p.Send(IterationStartMsg{
 		Current:         i + 1,
 		Total:           count,
 		TaskID:          task.ID,
@@ -346,19 +345,19 @@ func sendIterationStart(p *tea.Program, task *parser.Task, tasks []parser.Task, 
 
 // syncBreak is returned by betweenTaskSync when the work loop should stop.
 type syncBreak struct {
-	stopReason runner.StopReason
+	stopReason StopReason
 }
 
 // betweenTaskSync checks for remote changes between tasks. Returns non-nil if
 // the work loop should break (user chose abort or context cancelled).
 func betweenTaskSync(ctx context.Context, workDir string, p *tea.Program) *syncBreak {
 	if ctx.Err() != nil {
-		return &syncBreak{stopReason: runner.StopReasonInterrupted}
+		return &syncBreak{stopReason: StopReasonInterrupted}
 	}
 
 	fetchErr := gitsync.FetchRemote(workDir)
 	if fetchErr != nil {
-		p.Send(runner.InfoMsg{Text: "⚠ Could not reach remote between tasks — continuing offline"})
+		p.Send(InfoMsg{Text: "⚠ Could not reach remote between tasks — continuing offline"})
 		return nil
 	}
 
@@ -368,8 +367,8 @@ func betweenTaskSync(ctx context.Context, workDir string, p *tea.Program) *syncB
 	}
 
 	// Remote is ahead — show sync TUI and block until resolved.
-	resultCh := make(chan runner.SyncCheckResult, 1)
-	p.Send(runner.SyncCheckMsg{
+	resultCh := make(chan SyncCheckResult, 1)
+	p.Send(SyncCheckMsg{
 		Behind:       rs.Behind,
 		Ahead:        rs.Ahead,
 		RemoteBranch: rs.RemoteBranch,
@@ -378,15 +377,15 @@ func betweenTaskSync(ctx context.Context, workDir string, p *tea.Program) *syncB
 
 	select {
 	case result := <-resultCh:
-		if result.Action == runner.SyncAbort {
-			return &syncBreak{stopReason: runner.StopReasonInterrupted}
+		if result.Action == SyncAbort {
+			return &syncBreak{stopReason: StopReasonInterrupted}
 		}
 		if result.Message != "" {
-			p.Send(runner.InfoMsg{Text: result.Message})
+			p.Send(InfoMsg{Text: result.Message})
 		}
 		return nil
 	case <-ctx.Done():
-		return &syncBreak{stopReason: runner.StopReasonInterrupted}
+		return &syncBreak{stopReason: StopReasonInterrupted}
 	}
 }
 

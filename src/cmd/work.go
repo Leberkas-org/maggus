@@ -343,3 +343,51 @@ func findTaskByID(tasks []parser.Task, id string) *parser.Task {
 	}
 	return nil
 }
+
+// setupUsageCallback configures the TUI model to record per-task usage.
+func setupUsageCallback(m *runner.TUIModel, runID string, dir, modelDisplay, agentName string, runLogger *runlog.Logger) {
+	repoURL := gitutil.RepoURL(dir)
+	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
+		_ = usage.Append([]usage.Record{{
+			RunID:                    runID,
+			Repository:               repoURL,
+			Kind:                     tu.Kind,
+			ItemID:                   tu.ItemID,
+			ItemShort:                tu.ItemShort,
+			ItemTitle:                tu.ItemTitle,
+			TaskShort:                tu.TaskShort,
+			Model:                    modelDisplay,
+			Agent:                    agentName,
+			InputTokens:              tu.InputTokens,
+			OutputTokens:             tu.OutputTokens,
+			CacheCreationInputTokens: tu.CacheCreationInputTokens,
+			CacheReadInputTokens:     tu.CacheReadInputTokens,
+			CostUSD:                  tu.CostUSD,
+			ModelUsage:               tu.ModelUsage,
+			StartTime:                tu.StartTime,
+			EndTime:                  tu.EndTime,
+		}})
+		totalTokens := int64(tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens)
+		if totalTokens > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
+		}
+		modelUsage := make(map[string]runlog.ModelTokensEntry, len(tu.ModelUsage))
+		for name, mt := range tu.ModelUsage {
+			modelUsage[name] = runlog.ModelTokensEntry{
+				InputTokens:              mt.InputTokens,
+				OutputTokens:             mt.OutputTokens,
+				CacheCreationInputTokens: mt.CacheCreationInputTokens,
+				CacheReadInputTokens:     mt.CacheReadInputTokens,
+				CostUSD:                  mt.CostUSD,
+			}
+		}
+		runLogger.TaskUsage(runlog.TaskUsageData{
+			InputTokens:              tu.InputTokens,
+			OutputTokens:             tu.OutputTokens,
+			CacheCreationInputTokens: tu.CacheCreationInputTokens,
+			CacheReadInputTokens:     tu.CacheReadInputTokens,
+			CostUSD:                  tu.CostUSD,
+			ModelUsage:               modelUsage,
+		})
+	})
+}

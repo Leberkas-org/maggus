@@ -53,12 +53,12 @@ The daemon is now the only execution path. The old foreground `maggus work` mode
 - `cmd/status_metrics.go` — replace `runner.FormatTokens`, `runner.FormatCost`
 
 **Acceptance Criteria:**
-- [ ] `cmd/work_messages.go` exists and contains all message/data types listed above
-- [ ] `cmd/format_helpers.go` exists and contains `FormatTokens` and `FormatCost`
-- [ ] All files listed under "Files to update" no longer import `internal/runner`
-- [ ] `internal/runner` package is NOT deleted yet — this task only moves types and updates imports
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] `cmd/work_messages.go` exists and contains all message/data types listed above
+- [x] `cmd/format_helpers.go` exists and contains `FormatTokens` and `FormatCost`
+- [x] All files listed under "Files to update" no longer import `internal/runner`
+- [x] `internal/runner` package is NOT deleted yet — this task only moves types and updates imports
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

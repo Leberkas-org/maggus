@@ -9,18 +9,17 @@ import (
 
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
 )
 
 func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
-	var captured runner.TaskUsage
+	var captured TaskUsage
 	dm := nullTUIModel{}
-	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		captured = tu
 	})
 
 	// Start an iteration.
-	updated, _ := dm.Update(runner.IterationStartMsg{
+	updated, _ := dm.Update(IterationStartMsg{
 		TaskID:    "TASK-001-004",
 		TaskTitle: "Fix daemon-mode token usage tracking",
 		ItemID:    "uuid-001",
@@ -55,7 +54,7 @@ func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
 	dm = updated.(nullTUIModel)
 
 	// Trigger flush via QuitMsg.
-	updated, _ = dm.Update(runner.QuitMsg{})
+	updated, _ = dm.Update(QuitMsg{})
 	_ = updated
 
 	if captured.TaskShort != "TASK-001-004" {
@@ -88,14 +87,14 @@ func TestNullTUIModel_TokenUsageTracking(t *testing.T) {
 }
 
 func TestNullTUIModel_FlushOnIterationStart(t *testing.T) {
-	var usages []runner.TaskUsage
+	var usages []TaskUsage
 	dm := nullTUIModel{}
-	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		usages = append(usages, tu)
 	})
 
 	// First task.
-	updated, _ := dm.Update(runner.IterationStartMsg{
+	updated, _ := dm.Update(IterationStartMsg{
 		TaskID:    "TASK-001",
 		TaskTitle: "First task",
 	})
@@ -105,7 +104,7 @@ func TestNullTUIModel_FlushOnIterationStart(t *testing.T) {
 	dm = updated.(nullTUIModel)
 
 	// Second task — should flush first task's usage.
-	updated, _ = dm.Update(runner.IterationStartMsg{
+	updated, _ = dm.Update(IterationStartMsg{
 		TaskID:    "TASK-002",
 		TaskTitle: "Second task",
 	})
@@ -125,16 +124,16 @@ func TestNullTUIModel_FlushOnIterationStart(t *testing.T) {
 func TestNullTUIModel_NoFlushWhenNoTokens(t *testing.T) {
 	callCount := 0
 	dm := nullTUIModel{}
-	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		callCount++
 	})
 
 	// Start iteration with no usage data.
-	updated, _ := dm.Update(runner.IterationStartMsg{TaskID: "TASK-001"})
+	updated, _ := dm.Update(IterationStartMsg{TaskID: "TASK-001"})
 	dm = updated.(nullTUIModel)
 
 	// Flush via quit — no tokens accumulated, should not call callback.
-	updated, _ = dm.Update(runner.QuitMsg{})
+	updated, _ = dm.Update(QuitMsg{})
 	_ = updated
 
 	if callCount != 0 {
@@ -143,20 +142,20 @@ func TestNullTUIModel_NoFlushWhenNoTokens(t *testing.T) {
 }
 
 func TestNullTUIModel_StartTimeSet(t *testing.T) {
-	var captured runner.TaskUsage
+	var captured TaskUsage
 	dm := nullTUIModel{}
-	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		captured = tu
 	})
 
 	before := time.Now()
-	updated, _ := dm.Update(runner.IterationStartMsg{TaskID: "TASK-001"})
+	updated, _ := dm.Update(IterationStartMsg{TaskID: "TASK-001"})
 	dm = updated.(nullTUIModel)
 
 	updated, _ = dm.Update(agent.UsageMsg{InputTokens: 10, OutputTokens: 5})
 	dm = updated.(nullTUIModel)
 
-	updated, _ = dm.Update(runner.QuitMsg{})
+	updated, _ = dm.Update(QuitMsg{})
 	_ = updated
 
 	if captured.StartTime.Before(before) {
@@ -179,7 +178,7 @@ func TestNullTUIModel_SnapshotContainsTimestamps(t *testing.T) {
 	}
 
 	// Start an iteration — sets startTime (task start).
-	updated, _ := dm.Update(runner.IterationStartMsg{
+	updated, _ := dm.Update(IterationStartMsg{
 		TaskID:    "TASK-006-001",
 		TaskTitle: "Add timestamps",
 	})

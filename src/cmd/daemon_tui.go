@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
 )
 
 // nullTUIModel is a minimal bubbletea model used in daemon mode.
@@ -29,7 +28,7 @@ type nullTUIModel struct {
 	status       string
 	onToolUse    func(taskID, toolType string, params map[string]string)
 	onOutput     func(taskID, text string)
-	onTaskUsage  func(runner.TaskUsage)
+	onTaskUsage  func(TaskUsage)
 
 	// Snapshot state — written to state.json on each event.
 	snapshotDir   string // project root directory
@@ -57,7 +56,7 @@ func (m *nullTUIModel) SetOnOutput(fn func(taskID, text string)) {
 }
 
 // SetOnTaskUsage sets a callback invoked when a task's token usage is finalized.
-func (m *nullTUIModel) SetOnTaskUsage(fn func(runner.TaskUsage)) {
+func (m *nullTUIModel) SetOnTaskUsage(fn func(TaskUsage)) {
 	m.onTaskUsage = fn
 }
 
@@ -65,19 +64,19 @@ func (m nullTUIModel) Init() tea.Cmd { return nil }
 
 func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case runner.QuitMsg:
+	case QuitMsg:
 		_ = msg
 		m.flushUsage()
 		return m, tea.Quit
-	case runner.SyncCheckMsg:
+	case SyncCheckMsg:
 		// Auto-continue in daemon mode: skip the interactive sync screen.
-		go func(ch chan<- runner.SyncCheckResult) {
-			ch <- runner.SyncCheckResult{
-				Action:  runner.SyncProceed,
+		go func(ch chan<- SyncCheckResult) {
+			ch <- SyncCheckResult{
+				Action:  SyncProceed,
 				Message: "⚠ Remote sync skipped (daemon mode)",
 			}
 		}(msg.ResultCh)
-	case runner.IterationStartMsg:
+	case IterationStartMsg:
 		m.flushUsage()
 		m.taskID = msg.TaskID
 		m.taskTitle = msg.TaskTitle
@@ -89,7 +88,7 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toolEntries = nil
 		m.commits = nil
 		m.writeSnapshot()
-	case runner.CommitMsg:
+	case CommitMsg:
 		m.commits = append(m.commits, msg.Message)
 		m.writeSnapshot()
 	case agent.StatusMsg:
@@ -163,7 +162,7 @@ func (m *nullTUIModel) flushUsage() {
 	if m.taskID == "" || (m.iterInput == 0 && m.iterOutput == 0 && m.iterCacheCreation == 0 && m.iterCacheRead == 0) {
 		return
 	}
-	tu := runner.TaskUsage{
+	tu := TaskUsage{
 		ItemID:                   m.itemID,
 		ItemShort:                m.itemShort,
 		ItemTitle:                m.itemTitle,

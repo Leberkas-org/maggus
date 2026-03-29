@@ -11,12 +11,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
-	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
@@ -67,9 +65,6 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 			}
 		}
 	}()
-
-	// Initialise sync functions (once for the whole daemon lifetime).
-	runner.InitSyncFuncs(gitsync.Pull, gitsync.PullRebase, gitsync.ForcePull)
 
 	runID := daemonRunIDFlag
 
@@ -235,7 +230,7 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 		runLogger.Output(taskID, text)
 	})
 	repoURL := gitutil.RepoURL(dir)
-	dm.SetOnTaskUsage(func(tu runner.TaskUsage) {
+	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		_ = usage.Append([]usage.Record{{
 			RunID:                    runID,
 			Repository:               repoURL,

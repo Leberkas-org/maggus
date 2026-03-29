@@ -14,10 +14,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/stores"
-	"github.com/leberkas-org/maggus/internal/usage"
 )
 
 // iterationSetup holds everything needed to start the work loop TUI.
@@ -235,54 +232,6 @@ func firstWorkableTask(plans []parser.Plan) *parser.Task {
 	return nil
 }
 
-// setupUsageCallback configures the TUI model to record per-task usage.
-func setupUsageCallback(m *runner.TUIModel, runID string, dir, modelDisplay, agentName string, runLogger *runlog.Logger) {
-	repoURL := gitutil.RepoURL(dir)
-	m.SetOnTaskUsage(func(tu runner.TaskUsage) {
-		_ = usage.Append([]usage.Record{{
-			RunID:                    runID,
-			Repository:               repoURL,
-			Kind:                     tu.Kind,
-			ItemID:                   tu.ItemID,
-			ItemShort:                tu.ItemShort,
-			ItemTitle:                tu.ItemTitle,
-			TaskShort:                tu.TaskShort,
-			Model:                    modelDisplay,
-			Agent:                    agentName,
-			InputTokens:              tu.InputTokens,
-			OutputTokens:             tu.OutputTokens,
-			CacheCreationInputTokens: tu.CacheCreationInputTokens,
-			CacheReadInputTokens:     tu.CacheReadInputTokens,
-			CostUSD:                  tu.CostUSD,
-			ModelUsage:               tu.ModelUsage,
-			StartTime:                tu.StartTime,
-			EndTime:                  tu.EndTime,
-		}})
-		totalTokens := int64(tu.InputTokens + tu.OutputTokens + tu.CacheCreationInputTokens + tu.CacheReadInputTokens)
-		if totalTokens > 0 {
-			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TokensUsed: totalTokens})
-		}
-		modelUsage := make(map[string]runlog.ModelTokensEntry, len(tu.ModelUsage))
-		for name, mt := range tu.ModelUsage {
-			modelUsage[name] = runlog.ModelTokensEntry{
-				InputTokens:              mt.InputTokens,
-				OutputTokens:             mt.OutputTokens,
-				CacheCreationInputTokens: mt.CacheCreationInputTokens,
-				CacheReadInputTokens:     mt.CacheReadInputTokens,
-				CostUSD:                  mt.CostUSD,
-			}
-		}
-		runLogger.TaskUsage(runlog.TaskUsageData{
-			InputTokens:              tu.InputTokens,
-			OutputTokens:             tu.OutputTokens,
-			CacheCreationInputTokens: tu.CacheCreationInputTokens,
-			CacheReadInputTokens:     tu.CacheReadInputTokens,
-			CostUSD:                  tu.CostUSD,
-			ModelUsage:               modelUsage,
-		})
-	})
-}
-
 // workLoopParams bundles the parameters for runWorkGoroutine.
 type workLoopParams struct {
 	tc            taskContext
@@ -313,21 +262,21 @@ type workLoopParams struct {
 func runWorkGoroutine(params workLoopParams) {
 	go func() {
 		defer func() {
-			params.p.Send(runner.QuitMsg{})
+			params.p.Send(QuitMsg{})
 		}()
 
 		// Send startup info messages.
 		if params.activeAgentNm == "claude" {
-			params.p.Send(runner.InfoMsg{Text: "⚠ Using --dangerously-skip-permissions (Claude Code)"})
+			params.p.Send(InfoMsg{Text: "⚠ Using --dangerously-skip-permissions (Claude Code)"})
 		}
 		for _, w := range params.includeWarns {
-			params.p.Send(runner.InfoMsg{Text: w})
+			params.p.Send(InfoMsg{Text: w})
 		}
 		if params.branchMsg != "" {
-			params.p.Send(runner.InfoMsg{Text: params.branchMsg})
+			params.p.Send(InfoMsg{Text: params.branchMsg})
 		}
 		if params.syncInfoMsg != "" {
-			params.p.Send(runner.InfoMsg{Text: params.syncInfoMsg})
+			params.p.Send(InfoMsg{Text: params.syncInfoMsg})
 		}
 
 		// Determine effective feature limit.
@@ -344,17 +293,17 @@ func runWorkGoroutine(params workLoopParams) {
 		featureTotal := len(groups)
 
 		if featureTotal == 0 {
-			params.p.Send(runner.InfoMsg{Text: "No approved features available."})
+			params.p.Send(InfoMsg{Text: "No approved features available."})
 			summaryParams := params
 			summaryParams.count = 0
-			summary := buildSummaryData(summaryParams, 0, nil, runner.StopReasonNoTasks, "no approved features", nil)
+			summary := buildSummaryData(summaryParams, 0, nil, StopReasonNoTasks, "no approved features", nil)
 			params.tc.notifier.PlayRunComplete()
-			params.p.Send(runner.SummaryMsg{Data: summary})
+			params.p.Send(SummaryMsg{Data: summary})
 			pushToRemote(params.p, params.tc.workDir, 0, summary.Branch)
 			return
 		}
 
-		stopReason := runner.StopReasonComplete
+		stopReason := StopReasonComplete
 		var errorDetail string
 		var warnings []string
 		var failedTasks []failedTask
@@ -366,13 +315,13 @@ func runWorkGoroutine(params workLoopParams) {
 				break
 			}
 			if params.tc.workCtx.Err() != nil {
-				stopReason = runner.StopReasonInterrupted
+				stopReason = StopReasonInterrupted
 				break
 			}
 
 			// Between-feature stop flag check (only after the first feature starts).
 			if featuresDone > 0 && params.stopFlag.Load() {
-				stopReason = runner.StopReasonUserStop
+				stopReason = StopReasonUserStop
 				break
 			}
 
@@ -397,15 +346,15 @@ func runWorkGoroutine(params workLoopParams) {
 		}
 
 		// Determine final stop reason.
-		if len(failedTasks) > 0 && stopReason == runner.StopReasonComplete {
-			stopReason = runner.StopReasonPartialComplete
+		if len(failedTasks) > 0 && stopReason == StopReasonComplete {
+			stopReason = StopReasonPartialComplete
 		}
-		if totalCompleted == 0 && stopReason == runner.StopReasonComplete {
+		if totalCompleted == 0 && stopReason == StopReasonComplete {
 			if len(warnings) > 0 {
-				stopReason = runner.StopReasonError
+				stopReason = StopReasonError
 				errorDetail = "agent ran but produced no commits"
 			} else {
-				stopReason = runner.StopReasonNoTasks
+				stopReason = StopReasonNoTasks
 			}
 		}
 
@@ -415,7 +364,7 @@ func runWorkGoroutine(params workLoopParams) {
 		summary := buildSummaryData(summaryParams, totalCompleted, failedTasks, stopReason, errorDetail, warnings)
 
 		params.tc.notifier.PlayRunComplete()
-		params.p.Send(runner.SummaryMsg{Data: summary})
+		params.p.Send(SummaryMsg{Data: summary})
 
 		// Push commits to remote in the background.
 		pushToRemote(params.p, params.tc.workDir, totalCompleted, summary.Branch)
@@ -428,7 +377,7 @@ type groupTasksResult struct {
 	failed     []failedTask
 	warnings   []string
 	stopped    bool
-	stopReason runner.StopReason
+	stopReason StopReason
 }
 
 // runGroupTasks runs all workable tasks within a single plan.
@@ -455,7 +404,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 	for innerI := 0; ; innerI++ {
 		if tc.workCtx.Err() != nil {
 			result.stopped = true
-			result.stopReason = runner.StopReasonInterrupted
+			result.stopReason = StopReasonInterrupted
 			return result
 		}
 
@@ -467,7 +416,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 			}
 			if targetID == "" || targetID == lastCompletedTaskID || isTaskAtOrPastTarget(groupTasks, lastCompletedTaskID, targetID) {
 				result.stopped = true
-				result.stopReason = runner.StopReasonUserStop
+				result.stopReason = StopReasonUserStop
 				return result
 			}
 		}
@@ -524,7 +473,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 }
 
 // buildSummaryData constructs the summary data for the end-of-run summary screen.
-func buildSummaryData(params workLoopParams, completed int, failedTasks []failedTask, stopReason runner.StopReason, errorDetail string, warnings []string) runner.SummaryData {
+func buildSummaryData(params workLoopParams, completed int, failedTasks []failedTask, stopReason StopReason, errorDetail string, warnings []string) SummaryData {
 	endHashCmd := gitutil.Command("rev-parse", "--short", "HEAD")
 	endHashCmd.Dir = params.tc.workDir
 	endHashBytes, _ := endHashCmd.Output()
@@ -535,20 +484,20 @@ func buildSummaryData(params workLoopParams, completed int, failedTasks []failed
 	branchNameOut, _ := branchNameCmd.Output()
 	currentBranch := strings.TrimSpace(string(branchNameOut))
 
-	var remaining []runner.RemainingTask
+	var remaining []RemainingTask
 	latestTasks, _ := parseAllTasks(params.featureStore, params.bugStore)
 	for _, t := range latestTasks {
 		if t.IsWorkable() {
-			remaining = append(remaining, runner.RemainingTask{ID: t.ID, Title: t.Title})
+			remaining = append(remaining, RemainingTask{ID: t.ID, Title: t.Title})
 		}
 	}
 
-	var runnerFailedTasks []runner.FailedTask
+	var runnerFailedTasks []FailedTask
 	for _, ft := range failedTasks {
-		runnerFailedTasks = append(runnerFailedTasks, runner.FailedTask{ID: ft.ID, Title: ft.Title, Reason: ft.Reason})
+		runnerFailedTasks = append(runnerFailedTasks, FailedTask{ID: ft.ID, Title: ft.Title, Reason: ft.Reason})
 	}
 
-	return runner.SummaryData{
+	return SummaryData{
 		RunID:          params.runID,
 		Branch:         currentBranch,
 		Model:          params.modelDisplay,
@@ -577,7 +526,7 @@ func pushToRemote(p *tea.Program, workDir string, completed int, currentBranch s
 		}
 		push.Dir = workDir
 		if pushOut, pushErr := push.CombinedOutput(); pushErr != nil {
-			p.Send(runner.PushStatusMsg{
+			p.Send(PushStatusMsg{
 				Status: fmt.Sprintf("Push failed: %v", pushErr),
 				Done:   true,
 			})
@@ -586,10 +535,10 @@ func pushToRemote(p *tea.Program, workDir string, completed int, currentBranch s
 			if s := strings.TrimSpace(string(pushOut)); s != "" {
 				_ = s
 			}
-			p.Send(runner.PushStatusMsg{Status: msg, Done: true})
+			p.Send(PushStatusMsg{Status: msg, Done: true})
 		}
 	} else {
-		p.Send(runner.PushStatusMsg{Status: "Nothing to push", Done: true})
+		p.Send(PushStatusMsg{Status: "Nothing to push", Done: true})
 	}
 }
 

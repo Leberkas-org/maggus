@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
@@ -224,12 +223,12 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 	sb.WriteString(sectionStyle.Render("  Selected Feature"))
 	sb.WriteString("\n")
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tasks completed", fmt.Sprintf("%d", fm.tasksCompleted)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", runner.FormatCost(fm.totalCostUSD)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", runner.FormatTokens(int(fm.totalTokens))))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", FormatCost(fm.totalCostUSD)))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(fm.totalTokens))))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache hit rate", fmt.Sprintf("%.1f%%", fm.cacheHitRate*100)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache savings", runner.FormatCost(fm.cacheSavingsUSD)))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache savings", FormatCost(fm.cacheSavingsUSD)))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg duration", formatDurationSecs(fm.avgDurationSecs)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg cost/task", runner.FormatCost(fm.avgCostUSD)))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg cost/task", FormatCost(fm.avgCostUSD)))
 
 	// ── This Repository ──
 	sb.WriteString("\n")
@@ -238,8 +237,8 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Features", fmt.Sprintf("%d", rm.featuresCompleted)))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Bugs", fmt.Sprintf("%d", rm.bugsCompleted)))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tasks completed", fmt.Sprintf("%d", rm.tasksCompleted)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", runner.FormatCost(rm.totalCostUSD)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", runner.FormatTokens(int(rm.totalTokens))))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", FormatCost(rm.totalCostUSD)))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(rm.totalTokens))))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Git commits", fmt.Sprintf("%d", rm.gitCommits)))
 
 	// ── All Time (Global) ──
@@ -250,7 +249,7 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tasks completed", fmt.Sprintf("%d", gm.TasksCompleted)))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Features completed", fmt.Sprintf("%d", gm.FeaturesCompleted)))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Bugs completed", fmt.Sprintf("%d", gm.BugsCompleted)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", runner.FormatTokens(int(gm.TokensUsed))))
+	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(gm.TokensUsed))))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Git commits", fmt.Sprintf("%d", gm.GitCommits)))
 
 	// ── Model Breakdown ──
@@ -265,9 +264,9 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 				short = model[idx+1:]
 			}
 			detail := fmt.Sprintf("%s in / %s out · %s",
-				runner.FormatTokens(int(stat.InputTokens)),
-				runner.FormatTokens(int(stat.OutputTokens)),
-				runner.FormatCost(stat.CostUSD))
+				FormatTokens(int(stat.InputTokens)),
+				FormatTokens(int(stat.OutputTokens)),
+				FormatCost(stat.CostUSD))
 			sb.WriteString(metricsRow(labelStyle, valueStyle, "  "+short, detail))
 		}
 	}

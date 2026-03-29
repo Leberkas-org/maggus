@@ -8,7 +8,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/runner"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -248,11 +247,11 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	totalIn := snap.TokenInput
 	if totalIn > 0 || snap.TokenOutput > 0 {
 		tokenStr := fmt.Sprintf("%s in / %s out",
-			runner.FormatTokens(totalIn), runner.FormatTokens(snap.TokenOutput))
+			FormatTokens(totalIn), FormatTokens(snap.TokenOutput))
 		sb.WriteString(fmt.Sprintf("  %s  %s\n", statusBoldStyle.Render("Tokens:"), statusDimStyle.Render(tokenStr)))
 		costStr := "N/A"
 		if snap.TokenCost > 0 {
-			costStr = runner.FormatCost(snap.TokenCost)
+			costStr = FormatCost(snap.TokenCost)
 		}
 		sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Cost:"), statusDimStyle.Render(costStr)))
 	} else {
