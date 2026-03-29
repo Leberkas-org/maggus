@@ -88,12 +88,6 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if !m.daemon.Running {
 			m.snapshot = nil
 		}
-		if m.daemon.LogPath != "" {
-			newLines := readLastNLogLines(m.daemon.LogPath, 50)
-			m.applyLogLines(newLines)
-		} else {
-			m.logLines = nil
-		}
 		return m, logPollTick()
 
 	case featureSummaryUpdateMsg:
@@ -171,22 +165,35 @@ func (m *statusModel) resizeTab2DetailViewport() {
 	m.taskListComponent.detailViewport.Height = vpH
 }
 
-// applyLogLines updates the log line buffer and adjusts the scroll position.
-// If auto-scroll is active, the view is pinned to the bottom.
-func (m *statusModel) applyLogLines(newLines []string) {
-	prevLen := len(m.logLines)
-	m.logLines = newLines
-	if m.logAutoScroll {
-		m.logScroll = m.maxLogScroll()
-	} else if len(newLines) > prevLen {
-		// Preserve relative position as new lines arrive.
-		m.logScroll += len(newLines) - prevLen
-		if m.logScroll > m.maxLogScroll() {
-			m.logScroll = m.maxLogScroll()
-		}
+
+// clampTreeScroll adjusts treeScrollOffset so the cursor stays visible with
+// 2 lines of context above and below, then clamps the offset to valid bounds.
+func (m *statusModel) clampTreeScroll() {
+	items := m.buildTreeItems()
+	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
+	// 4 fixed header lines: "[1] Items" label + separator + daemon status + separator
+	const treeOverhead = 4
+	availH := innerH - treeOverhead
+	if availH < 1 {
+		availH = 1
 	}
-	if m.logScroll < 0 {
-		m.logScroll = 0
+
+	// Pull offset up when cursor is near the top
+	if m.treeCursor < m.treeScrollOffset+2 {
+		m.treeScrollOffset = max(0, m.treeCursor-2)
+	}
+	// Push offset down when cursor is near the bottom
+	if m.treeCursor >= m.treeScrollOffset+availH-2 {
+		m.treeScrollOffset = m.treeCursor - availH + 3
+	}
+
+	// Clamp to [0, max(0, len(items)-availH)]
+	maxOffset := max(0, len(items)-availH)
+	if m.treeScrollOffset < 0 {
+		m.treeScrollOffset = 0
+	}
+	if m.treeScrollOffset > maxOffset {
+		m.treeScrollOffset = maxOffset
 	}
 }
 
@@ -207,7 +214,7 @@ func (m *statusModel) logItemCount() int {
 	if m.snapshot != nil && m.daemon.Running {
 		return len(m.snapshot.ToolEntries)
 	}
-	return len(m.logLines)
+	return 0
 }
 
 // logVisibleLines returns the number of visible lines available for the scrollable

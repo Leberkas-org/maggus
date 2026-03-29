@@ -39,8 +39,9 @@ type statusModel struct {
 	// Split-pane layout fields
 	plans         []parser.Plan
 	planCursor    int
-	treeCursor    int              // primary navigation index into buildTreeItems(); replaces planCursor
-	expandedPlans map[string]bool // keyed by plan.ID; starts empty (all collapsed)
+	treeCursor       int             // primary navigation index into buildTreeItems(); replaces planCursor
+	treeScrollOffset int             // scroll offset for left pane tree view
+	expandedPlans    map[string]bool // keyed by plan.ID; starts empty (all collapsed)
 	leftFocused   bool
 	activeTab     int // 0–3: Output, Feature Details, Current Task, Metrics
 
@@ -79,8 +80,7 @@ type statusModel struct {
 	// Exit daemon prompt overlay (shown when daemon is running and auto-start is disabled)
 	exitDaemonOverlay bool
 
-	// Live log panel
-	logLines      []string
+	// Live log panel scroll state
 	logScroll     int
 	logAutoScroll bool
 	daemon        daemonStatus
