@@ -30,11 +30,12 @@ func listenForLogFileUpdate(ch <-chan logFileUpdateMsg) tea.Cmd {
 // LogFileWatcher watches the runs directory for new log files and the active
 // log file for writes, delivering logFileUpdateMsg via its channel.
 type LogFileWatcher struct {
-	watcher    *fsnotify.Watcher
-	dir        string
-	activePath string
-	ch         chan logFileUpdateMsg
-	done       chan struct{}
+	watcher       *fsnotify.Watcher
+	dir           string
+	activePath    string
+	stateJsonPath string
+	ch            chan logFileUpdateMsg
+	done          chan struct{}
 }
 
 // NewLogFileWatcher creates and starts a LogFileWatcher that watches
@@ -51,12 +52,18 @@ func NewLogFileWatcher(dir string) (*LogFileWatcher, error) {
 	// Ignore error if the directory doesn't exist yet.
 	_ = watcher.Add(runsDir)
 
+	stateJsonPath := filepath.Join(runsDir, "state.json")
+
 	lfw := &LogFileWatcher{
-		watcher: watcher,
-		dir:     dir,
-		ch:      make(chan logFileUpdateMsg, 1),
-		done:    make(chan struct{}),
+		watcher:       watcher,
+		dir:           dir,
+		stateJsonPath: filepath.Clean(stateJsonPath),
+		ch:            make(chan logFileUpdateMsg, 1),
+		done:          make(chan struct{}),
 	}
+
+	// Watch state.json for Write events. Ignore error if it doesn't exist yet.
+	_ = watcher.Add(stateJsonPath)
 
 	// Start watching the current latest log file if one exists.
 	_, logPath := findLatestRunLog(dir)
@@ -110,24 +117,43 @@ func (lfw *LogFileWatcher) handleEvent(event fsnotify.Event) {
 		return
 	}
 
-	// Create of a .log file in runs dir → check if active path changed.
-	if event.Has(fsnotify.Create) &&
-		strings.HasSuffix(name, ".log") &&
-		!strings.HasSuffix(name, "daemon.log") {
-		_, newPath := findLatestRunLog(lfw.dir)
-		if newPath == "" {
-			return
+	// Write on state.json → signal update (daemon started a new run).
+	if event.Has(fsnotify.Write) && name == lfw.stateJsonPath {
+		select {
+		case lfw.ch <- logFileUpdateMsg{}:
+		default:
 		}
-		newPath = filepath.Clean(newPath)
-		if newPath != lfw.activePath {
-			if lfw.activePath != "" {
-				_ = lfw.watcher.Remove(lfw.activePath)
-			}
-			lfw.activePath = newPath
-			_ = lfw.watcher.Add(newPath)
+		return
+	}
+
+	if event.Has(fsnotify.Create) {
+		// Create of state.json → add it to the watcher (wasn't present at init).
+		if name == lfw.stateJsonPath {
+			_ = lfw.watcher.Add(lfw.stateJsonPath)
 			select {
 			case lfw.ch <- logFileUpdateMsg{}:
 			default:
+			}
+			return
+		}
+
+		// Create of a .log file in runs dir → check if active path changed.
+		if strings.HasSuffix(name, ".log") && !strings.HasSuffix(name, "daemon.log") {
+			_, newPath := findLatestRunLog(lfw.dir)
+			if newPath == "" {
+				return
+			}
+			newPath = filepath.Clean(newPath)
+			if newPath != lfw.activePath {
+				if lfw.activePath != "" {
+					_ = lfw.watcher.Remove(lfw.activePath)
+				}
+				lfw.activePath = newPath
+				_ = lfw.watcher.Add(newPath)
+				select {
+				case lfw.ch <- logFileUpdateMsg{}:
+				default:
+				}
 			}
 		}
 	}
