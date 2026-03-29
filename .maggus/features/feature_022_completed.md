@@ -24,12 +24,12 @@ The left pane tree supports up/down navigation but has no way to jump directly t
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] In `updateList` in `src/cmd/status_update.go`, a `case "home":` block sets `m.treeCursor = 0` when the left pane is focused and the tree has items, then calls `m.syncPlanCursorFromTreeCursor()`
-- [ ] A `case "end":` block sets `m.treeCursor = len(items) - 1` when the left pane is focused and the tree has items, then calls `m.syncPlanCursorFromTreeCursor()`
-- [ ] Both cases are guarded by `m.leftFocused` (same guard as the up/down cases)
-- [ ] Both cases are no-ops when `len(items) == 0`
-- [ ] `go build ./...` passes
-- [ ] `go vet ./...` passes
+- [x] In `updateList` in `src/cmd/status_update.go`, a `case "home":` block sets `m.treeCursor = 0` when the left pane is focused and the tree has items, then calls `m.syncPlanCursorFromTreeCursor()`
+- [x] A `case "end":` block sets `m.treeCursor = len(items) - 1` when the left pane is focused and the tree has items, then calls `m.syncPlanCursorFromTreeCursor()`
+- [x] Both cases are guarded by `m.leftFocused` (same guard as the up/down cases)
+- [x] Both cases are no-ops when `len(items) == 0`
+- [x] `go build ./...` passes
+- [x] `go vet ./...` passes
 
 ## Task Dependency Graph
 
