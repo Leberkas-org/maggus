@@ -29,6 +29,7 @@ func (m statusModel) Init() tea.Cmd {
 		logPollTick(),
 		spinnerTick(),
 		listenForWatcherUpdate(m.watcherCh),
+		listenForDaemonCacheUpdate(m.daemonCacheCh),
 	)
 }
 
@@ -69,9 +70,24 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Keep ticking even when idle so the spinner starts immediately when daemon resumes.
 		return m, spinnerTick()
 
+	case daemonCacheUpdateMsg:
+		prevRunning := m.daemon.Running
+		m.daemon.PID = msg.State.PID
+		m.daemon.Running = msg.State.Running
+		if prevRunning && !m.daemon.Running {
+			m.snapshot = nil
+		}
+		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
+
 	case logPollTickMsg:
 		prevFeature := m.daemon.CurrentFeature
-		m.daemon = loadDaemonStatus(m.dir)
+		runID, logPath := findLatestRunLog(m.dir)
+		m.daemon.RunID = runID
+		m.daemon.LogPath = logPath
+		if logPath != "" {
+			lines := readLastNLogLines(logPath, 200)
+			m.daemon.CurrentFeature, m.daemon.CurrentTask = parseLogForCurrentState(lines)
+		}
 		// Auto-expand the active plan when CurrentFeature changes so the task row is visible.
 		if m.daemon.Running && m.daemon.CurrentFeature != "" && m.daemon.CurrentFeature != prevFeature {
 			if m.expandedPlans == nil {

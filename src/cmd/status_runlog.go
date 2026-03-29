@@ -44,26 +44,6 @@ type daemonStatus struct {
 	CurrentTask    string
 }
 
-// loadDaemonStatus reads the daemon PID file, checks whether the process is alive,
-// finds the latest run log, and parses the last entries for current feature/task state.
-func loadDaemonStatus(dir string) daemonStatus {
-	pid, _ := readDaemonPID(dir)
-	running := pid != 0 && isProcessRunning(pid)
-
-	runID, logPath := findLatestRunLog(dir)
-	info := daemonStatus{
-		PID:     pid,
-		Running: running,
-		RunID:   runID,
-		LogPath: logPath,
-	}
-	if logPath != "" {
-		lines := readLastNLogLines(logPath, 200)
-		info.CurrentFeature, info.CurrentTask = parseLogForCurrentState(lines)
-	}
-	return info
-}
-
 // findLatestRunLog returns the run ID (from the fixed-path state.json snapshot)
 // and the path to the latest flat .log file under .maggus/runs/.
 // Each is found independently; either may be empty if none exists.

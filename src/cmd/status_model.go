@@ -100,6 +100,9 @@ type statusModel struct {
 	// File watcher for live feature reload
 	watcher   *filewatcher.Watcher
 	watcherCh <-chan bool
+
+	// Daemon state cache subscription channel
+	daemonCacheCh chan daemonPIDState
 }
 
 func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {

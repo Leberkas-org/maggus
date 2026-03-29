@@ -81,15 +81,15 @@ This feature introduces a **process-level `DaemonStateCache` singleton** — ini
 **Parallel:** yes — can run alongside TASK-027-002 (touches different files)
 
 **Acceptance Criteria:**
-- [ ] `statusModel` has `daemonCacheCh chan daemonPIDState` field
-- [ ] In `runStatus()` (status_cmd.go): subscribe via `daemonCache.Subscribe()` and pre-populate `m.daemon.PID` and `m.daemon.Running` before `tea.NewProgram`
-- [ ] `statusModel.Init()` adds `listenForDaemonCacheUpdate(m.daemonCacheCh)` to its batch
-- [ ] `statusModel.Update()` handles `daemonCacheUpdateMsg`: updates `m.daemon.PID` and `m.daemon.Running`; if daemon just stopped (`prevRunning && !m.daemon.Running`), sets `m.snapshot = nil` immediately
-- [ ] `daemonCacheUpdateMsg` returns `listenForDaemonCacheUpdate(m.daemonCacheCh)` to keep listening
-- [ ] `logPollTickMsg` case in `status_update.go` no longer calls `loadDaemonStatus()` or reads PID/running; only reads log-file fields: calls `findLatestRunLog`, `readLastNLogLines`, `parseLogForCurrentState` to update `m.daemon.RunID`, `m.daemon.LogPath`, `m.daemon.CurrentFeature`, `m.daemon.CurrentTask`
-- [ ] Snapshot read logic in `logPollTickMsg` unchanged
-- [ ] After `prog.Run()` returns in `runStatus()`, `daemonCache.Unsubscribe(m.daemonCacheCh)` is called
-- [ ] `go build ./...` passes
+- [x] `statusModel` has `daemonCacheCh chan daemonPIDState` field
+- [x] In `runStatus()` (status_cmd.go): subscribe via `daemonCache.Subscribe()` and pre-populate `m.daemon.PID` and `m.daemon.Running` before `tea.NewProgram`
+- [x] `statusModel.Init()` adds `listenForDaemonCacheUpdate(m.daemonCacheCh)` to its batch
+- [x] `statusModel.Update()` handles `daemonCacheUpdateMsg`: updates `m.daemon.PID` and `m.daemon.Running`; if daemon just stopped (`prevRunning && !m.daemon.Running`), sets `m.snapshot = nil` immediately
+- [x] `daemonCacheUpdateMsg` returns `listenForDaemonCacheUpdate(m.daemonCacheCh)` to keep listening
+- [x] `logPollTickMsg` case in `status_update.go` no longer calls `loadDaemonStatus()` or reads PID/running; only reads log-file fields: calls `findLatestRunLog`, `readLastNLogLines`, `parseLogForCurrentState` to update `m.daemon.RunID`, `m.daemon.LogPath`, `m.daemon.CurrentFeature`, `m.daemon.CurrentTask`
+- [x] Snapshot read logic in `logPollTickMsg` unchanged
+- [x] After `prog.Run()` returns in `runStatus()`, `daemonCache.Unsubscribe(m.daemonCacheCh)` is called
+- [x] `go build ./...` passes
 
 ### TASK-027-004: Cleanup — remove loadDaemonStatus
 **Description:** As a developer, I want the now-unused `loadDaemonStatus()` function removed so the codebase doesn't carry dead code.

@@ -192,14 +192,28 @@ func runStatus() error {
 		}
 	}, 300*time.Millisecond)
 
+	var daemonCacheCh chan daemonPIDState
+	if daemonCache != nil {
+		daemonCacheCh = daemonCache.Subscribe()
+	}
+
 	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals, featureStore, bugStore)
 	m.presence = sharedPresence
 	m.watcherCh = watcherCh
 	m.watcher = w
+	m.daemonCacheCh = daemonCacheCh
+	if daemonCache != nil {
+		cached := daemonCache.Get()
+		m.daemon.PID = cached.PID
+		m.daemon.Running = cached.Running
+	}
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := prog.Run()
 	if w != nil {
 		w.Close()
+	}
+	if daemonCache != nil {
+		daemonCache.Unsubscribe(daemonCacheCh)
 	}
 	if err != nil {
 		return err
