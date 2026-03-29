@@ -144,9 +144,10 @@ func (m menuModel) viewConfirmStopDaemon() string {
 	sb.WriteString("\n\n")
 	sb.WriteString(mutedStyle.Render(fmt.Sprintf("  The daemon is running (PID %d).", m.daemon.PID)))
 	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("  %s / %s",
-		boldStyle.Render("y: stop daemon and exit"),
-		mutedStyle.Render("N/enter/esc: exit without stopping"),
+	sb.WriteString(fmt.Sprintf("  %s / %s / %s",
+		boldStyle.Render("y: stop and exit"),
+		mutedStyle.Render("n/d: exit detached"),
+		mutedStyle.Render("esc: cancel"),
 	))
 	return sb.String()
 }

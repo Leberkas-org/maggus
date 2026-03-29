@@ -324,9 +324,9 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m menuModel) updateConfirmStopDaemon(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEnter, tea.KeyEscape:
-		// Default is N — exit without stopping the daemon.
-		m.quitting = true
-		return m, tea.Quit
+		// Cancel the prompt and return to the main menu.
+		m.confirmStopDaemon = false
+		return m, nil
 	case tea.KeyRunes:
 		if len(msg.Runes) == 1 {
 			switch msg.Runes[0] {
@@ -337,8 +337,8 @@ func (m menuModel) updateConfirmStopDaemon(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 					_ = stopDaemonGracefully(cwd)
 					return daemonStopResultMsg{}
 				}
-			case 'n', 'N':
-				// Exit without stopping the daemon.
+			case 'n', 'N', 'd', 'D':
+				// Exit without stopping the daemon (detached).
 				m.quitting = true
 				return m, tea.Quit
 			}

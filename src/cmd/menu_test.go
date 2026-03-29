@@ -787,7 +787,7 @@ func TestConfirmStopDaemon_AnswerN_QuitsWithoutStopping(t *testing.T) {
 	}
 }
 
-func TestConfirmStopDaemon_Enter_QuitsWithoutStopping(t *testing.T) {
+func TestConfirmStopDaemon_Enter_CancelsPrompt(t *testing.T) {
 	m := menuModel{
 		items:             activeMenuItems(),
 		daemon:            daemonStatus{Running: true, PID: 1234},
@@ -796,11 +796,14 @@ func TestConfirmStopDaemon_Enter_QuitsWithoutStopping(t *testing.T) {
 
 	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyEnter})
 	rm := result.(menuModel)
-	if !rm.quitting {
-		t.Error("expected quitting=true after pressing Enter (default N)")
+	if rm.quitting {
+		t.Error("should not quit after pressing Enter — it should cancel the prompt")
 	}
-	if cmd == nil {
-		t.Error("expected tea.Quit cmd")
+	if rm.confirmStopDaemon {
+		t.Error("expected confirmStopDaemon=false after pressing Enter")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd after cancelling")
 	}
 }
 
@@ -824,7 +827,7 @@ func TestConfirmStopDaemon_AnswerY_StopsDaemon(t *testing.T) {
 	}
 }
 
-func TestConfirmStopDaemon_Esc_QuitsWithoutStopping(t *testing.T) {
+func TestConfirmStopDaemon_Esc_CancelsPrompt(t *testing.T) {
 	m := menuModel{
 		items:             activeMenuItems(),
 		daemon:            daemonStatus{Running: true, PID: 1234},
@@ -833,11 +836,48 @@ func TestConfirmStopDaemon_Esc_QuitsWithoutStopping(t *testing.T) {
 
 	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyEscape})
 	rm := result.(menuModel)
+	if rm.quitting {
+		t.Error("should not quit after pressing Esc — it should cancel the prompt")
+	}
+	if rm.confirmStopDaemon {
+		t.Error("expected confirmStopDaemon=false after pressing Esc")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd after cancelling")
+	}
+}
+
+func TestConfirmStopDaemon_D_ExitsDetached(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	rm := result.(menuModel)
 	if !rm.quitting {
-		t.Error("expected quitting=true after pressing Esc")
+		t.Error("expected quitting=true after pressing 'd'")
 	}
 	if cmd == nil {
-		t.Error("expected tea.Quit cmd")
+		t.Error("expected tea.Quit cmd after 'd'")
+	}
+}
+
+func TestConfirmStopDaemon_UpperD_ExitsDetached(t *testing.T) {
+	m := menuModel{
+		items:             activeMenuItems(),
+		daemon:            daemonStatus{Running: true, PID: 1234},
+		confirmStopDaemon: true,
+	}
+
+	result, cmd := m.updateConfirmStopDaemon(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	rm := result.(menuModel)
+	if !rm.quitting {
+		t.Error("expected quitting=true after pressing 'D'")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd after 'D'")
 	}
 }
 
