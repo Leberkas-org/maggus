@@ -287,7 +287,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 			// Layout: indent(3) + spinner(1) + taskID + space(1) + taskTitle
 			// Fixed = 4; allocate task ID up to half remaining, rest for title.
-			avail := contentW - 4
+			avail := contentW - 5
 			if avail < 0 {
 				avail = 0
 			}
@@ -315,7 +315,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 				taskIDRendered = mutedStyle.Render(taskIDStr)
 				taskTitleRendered = mutedStyle.Render(taskTitleStr)
 			}
-			rowContent := bgStr("   ") + spinStr + taskIDRendered + bgStr(" ") + taskTitleRendered
+			rowContent := bgStr("   ") + spinStr + bgStr(" ") + taskIDRendered + bgStr(" ") + taskTitleRendered
 
 			// Pad any remaining width with bg-aware spaces then emit the row.
 			if rw := lipgloss.Width(rowContent); rw < contentW {

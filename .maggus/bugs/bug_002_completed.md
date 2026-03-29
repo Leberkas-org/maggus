@@ -1,54 +1,54 @@
-<!-- maggus-id: 2cc0a61a-b54f-4ee1-bb2e-8df85a41e505 -->
-<!-- maggus-id: 20260326-135011-bug-002 -->
-# Bug: Number keys don't move focus to right pane in status split view
+<!-- maggus-id: 979800a6-34d3-4116-8e2d-4e0b9c6152d7 -->
+# Bug: Task row spinner/check missing space separator and truncates one char too late
 
 ## Summary
 
-Pressing `1`–`4` in the status split view switches the active tab in the right pane but does not move focus there. If the left pane is focused, the user remains in the left pane navigating the plan list — making the tab switch invisible and confusing.
+In the left pane tree, task rows render the spinner (or ✓) directly adjacent to the task ID with no separating space. The truncation width budget also does not account for this missing space, causing task titles to occupy one character more than intended.
 
 ## Steps to Reproduce
 
-1. Run `maggus status`
-2. Observe the split-pane view with left pane focused (default)
-3. Press `2`, `3`, or `4`
-4. Observe: the tab bar updates visually, but `↑/↓` still moves the plan cursor in the left pane
+1. Run `maggus status` with expanded plans so task rows are visible
+2. Observe a running task row — the spinner character is immediately followed by the task ID: `⠋TASK-001 Title`
+3. Observe a completed task row — the checkmark is immediately followed by the task ID: `✓TASK-001 Title`
 
 ## Expected Behavior
 
-Pressing a number key should move focus to the right pane and activate the corresponding tab. The user should be able to use `1` to jump to the left pane and `2`–`5` to jump to right-pane tabs 1–4 respectively.
+A space should appear between the spinner/checkmark and the task ID:
+`⠋ TASK-001 Title`
+`✓ TASK-001 Title`
+
+The title truncation should also be tightened by one character to account for the extra space in the layout.
 
 ## Root Cause
 
-In `src/cmd/status_update.go:336-344`, the `case "1", "2", "3", "4":` handler sets `m.activeTab` but never sets `m.leftFocused = false`:
+**Missing space in row construction — `status_leftpane.go` line 318:**
 
 ```go
-// Keys 1–4 switch the right-pane active tab regardless of pane focus.
-switch key {
-case "1", "2", "3", "4":
-    m.activeTab = int(key[0] - '1')   // tab switches...
-    // ...but m.leftFocused is never changed → focus stays on left pane
-    return m, nil
-}
+rowContent := bgStr("   ") + spinStr + taskIDRendered + bgStr(" ") + taskTitleRendered
 ```
+
+`spinStr` is rendered directly against `taskIDRendered` with no space between them.
+
+**Width budget off by one — `status_leftpane.go` line 290:**
+
+```go
+avail := contentW - 4
+```
+
+The comment on line 288 documents the layout as `indent(3) + spinner(1) + taskID + space(1) + taskTitle`. The fixed overhead is currently counted as 4 (indent + spinner). Adding the space between spinner and taskID raises the fixed overhead to 5, so `avail` must be `contentW - 5` to keep the total row width correct.
 
 ## User Stories
 
-### BUG-002-001: Remap number keys so 1 focuses left pane and 2–5 focus right pane tabs
+### BUG-002-001: Add space between spinner/check and task ID in tree rows
 
-**Description:** As a user, I want to press a single number key to jump to any pane/tab so that I can navigate the status view without needing the Tab key.
-
-**New key mapping:**
-- `1` → focus left pane (set `m.leftFocused = true`)
-- `2` → focus right pane + switch to tab 0 (Output)
-- `3` → focus right pane + switch to tab 1 (Feature Details)
-- `4` → focus right pane + switch to tab 2 (Current Task)
-- `5` → focus right pane + switch to tab 3 (Metrics)
+**Description:** As a user, I want the spinner and checkmark in task rows to be visually separated from the task ID so the tree is easier to read.
 
 **Acceptance Criteria:**
-- [x] Pressing `1` sets `m.leftFocused = true` and returns focus to the left pane
-- [x] Pressing `2`–`5` sets `m.leftFocused = false` and sets `m.activeTab` to `key - '2'`
-- [x] Pressing `2` (Output tab) still auto-scrolls the log to the bottom (`m.logAutoScroll = true`)
-- [x] Tab bar in `status_rightpane.go` renders numbers `2`–`5` instead of `1`–`4` next to tab names
-- [x] Footer hints in `status_view.go` are updated to reflect `1: left  2-5: tabs`
+- [x] In `renderLeftPane` (`status_leftpane.go` line 318), change `spinStr + taskIDRendered` to `spinStr + bgStr(" ") + taskIDRendered`
+- [x] In the same function at line 290, change `avail := contentW - 4` to `avail := contentW - 5` to compensate for the extra space
+- [x] Running task rows display as `⠋ TASK-NNN Title` (space after spinner)
+- [x] Completed task rows display as `✓ TASK-NNN Title` (space after checkmark)
+- [x] Idle task rows display as `  TASK-NNN Title` (two spaces: indent placeholder + gap)
+- [x] Row total width still equals `contentW` (no overflow or missing padding)
+- [x] No regression in tree scroll, cursor highlight, or selected-row styling
 - [x] `go vet ./...` and `go test ./...` pass
-- [x] No regression: Tab key still toggles focus between panes
