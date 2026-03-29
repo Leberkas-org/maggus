@@ -14,13 +14,11 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
-// logPollTickMsg is sent every 200ms to refresh the live log panel.
-type logPollTickMsg struct{}
-
-// logPollTick returns a tea.Cmd that fires logPollTickMsg after 200ms.
+// logPollTick returns a tea.Cmd that fires logFileUpdateMsg after 200ms.
+// Used as a fallback when LogFileWatcher cannot be initialized.
 func logPollTick() tea.Cmd {
 	return tea.Tick(200*time.Millisecond, func(_ time.Time) tea.Msg {
-		return logPollTickMsg{}
+		return logFileUpdateMsg{}
 	})
 }
 

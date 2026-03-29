@@ -197,11 +197,17 @@ func runStatus() error {
 		daemonCacheCh = daemonCache.Subscribe()
 	}
 
+	logWatcher, _ := NewLogFileWatcher(dir)
+
 	m := newStatusModel(features, false, nextTaskID, nextTaskFile, agentName, dir, false, approvalRequired, approvals, featureStore, bugStore)
 	m.presence = sharedPresence
 	m.watcherCh = watcherCh
 	m.watcher = w
 	m.daemonCacheCh = daemonCacheCh
+	if logWatcher != nil {
+		m.logWatcher = logWatcher
+		m.logWatcherCh = logWatcher.Chan()
+	}
 	if daemonCache != nil {
 		cached := daemonCache.Get()
 		m.daemon.PID = cached.PID
@@ -211,6 +217,9 @@ func runStatus() error {
 	result, err := prog.Run()
 	if w != nil {
 		w.Close()
+	}
+	if logWatcher != nil {
+		logWatcher.Stop()
 	}
 	if daemonCache != nil {
 		daemonCache.Unsubscribe(daemonCacheCh)

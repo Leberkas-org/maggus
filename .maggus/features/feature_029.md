@@ -96,9 +96,9 @@ The daemon is now the only execution path. The old foreground `maggus work` mode
 Also delete `internal/runner/procattr_windows.go` and `internal/runner/procattr_other.go` if they exist (OS-specific subprocess attrs used only by foreground runner).
 
 **Acceptance Criteria:**
-- [ ] The `internal/runner/` directory no longer exists
-- [ ] `go build ./...` passes (no dangling imports)
-- [ ] `go test ./...` passes
+- [x] The `internal/runner/` directory no longer exists
+- [x] `go build ./...` passes (no dangling imports)
+- [x] `go test ./...` passes
 
 ---
 
