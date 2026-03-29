@@ -686,20 +686,18 @@ func (m TUIModel) renderProgressTab(w int) string {
 		toolLines := make([]string, totalTools)
 		for i, entry := range m.toolEntries {
 			icon := toolIcon(entry.Type)
-			styledType := cyanStyle.Render(entry.Type)
 			ts := entry.Timestamp.Format("15:04:05")
 			styledTs := grayStyle.Render(ts)
 			tsW := lipgloss.Width(styledTs) // always 8 for "15:04:05"
-			// Fixed overhead: 2 (indent) + iconW + 1 (space) + typeW + 2 (": ") + 1 (min pad for RightAlign) + tsW
+			// Fixed overhead: 2 (indent) + iconW + 1 (space) + 1 (min pad for RightAlign) + tsW
 			iconW := lipgloss.Width(icon)
-			typeW := lipgloss.Width(styledType)
-			fixedCols := 2 + iconW + 1 + typeW + 2 + 1 + tsW
+			fixedCols := 2 + iconW + 1 + 1 + tsW
 			maxDesc := contentWidth - fixedCols
 			if maxDesc < 0 {
 				maxDesc = 0
 			}
 			desc := styles.Truncate(entry.Description, maxDesc)
-			leftPart := fmt.Sprintf("  %s %s: %s", icon, styledType, blueStyle.Render(desc))
+			leftPart := fmt.Sprintf("  %s %s", icon, blueStyle.Render(desc))
 			toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
 		}
 
