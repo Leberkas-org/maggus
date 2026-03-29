@@ -242,7 +242,8 @@ type menuModel struct {
 
 	// Daemon state
 	daemon            daemonStatus
-	daemonAutoWarning string // non-fatal warning if auto-start failed
+	daemonCacheCh     chan daemonPIDState // subscription channel into daemonCache
+	daemonAutoWarning string             // non-fatal warning if auto-start failed
 
 	// Stop-daemon confirmation state
 	confirmStopDaemon bool
@@ -273,15 +274,27 @@ func newMenuModel(summary featureSummary) menuModel {
 		}
 	}, 300*time.Millisecond)
 
+	// Subscribe to the daemon cache and pre-populate the initial daemon state
+	// so the first rendered frame already shows the correct daemon status.
+	var daemonCacheCh chan daemonPIDState
+	var initialDaemon daemonStatus
+	if daemonCache != nil {
+		daemonCacheCh = daemonCache.Subscribe()
+		s := daemonCache.Get()
+		initialDaemon = daemonStatus{PID: s.PID, Running: s.Running}
+	}
+
 	return menuModel{
-		items:        activeMenuItems(),
-		summary:      summary,
-		cwd:          cwd,
-		subMenuDefs:  buildSubMenus(),
-		watcher:      w,
-		watcherCh:    ch,
-		width:        termW,
-		height:       termH,
+		items:         activeMenuItems(),
+		summary:       summary,
+		cwd:           cwd,
+		subMenuDefs:   buildSubMenus(),
+		watcher:       w,
+		watcherCh:     ch,
+		width:         termW,
+		height:        termH,
+		daemon:        initialDaemon,
+		daemonCacheCh: daemonCacheCh,
 	}
 }
 

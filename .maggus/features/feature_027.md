@@ -59,18 +59,18 @@ This feature introduces a **process-level `DaemonStateCache` singleton** — ini
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `var daemonCache *DaemonStateCache` package-level var added in `root.go`
-- [ ] `daemonCache` initialized before the `for` loop in `runMenu()` with `defer daemonCache.Stop()`
-- [ ] If `NewDaemonStateCache` returns an error, `daemonCache` is nil and all call sites handle nil gracefully (no panic)
-- [ ] `menuModel` has `daemonCacheCh chan daemonPIDState` field
-- [ ] `newMenuModel()` subscribes via `daemonCache.Subscribe()` and immediately calls `daemonCache.Get()` to pre-populate `m.daemon.PID` and `m.daemon.Running`
-- [ ] `menuDaemonTickMsg` type deleted from `menu_update.go`
-- [ ] `pollMenuDaemonTick()` function deleted from `menu_update.go`
-- [ ] `menuModel.Init()` replaces `pollMenuDaemonTick()` with `listenForDaemonCacheUpdate(m.daemonCacheCh)`
-- [ ] `menuModel.Update()` handles `daemonCacheUpdateMsg`: updates `m.daemon.PID` and `m.daemon.Running`, returns `listenForDaemonCacheUpdate(m.daemonCacheCh)`
-- [ ] After `p.Run()` returns in `root.go`'s menu loop, `daemonCache.Unsubscribe(final.daemonCacheCh)` is called before the next iteration
-- [ ] `go build ./...` passes
-- [ ] Existing menu tests pass (`go test -run TestMenu ./cmd/...` or equivalent)
+- [x] `var daemonCache *DaemonStateCache` package-level var added in `root.go`
+- [x] `daemonCache` initialized before the `for` loop in `runMenu()` with `defer daemonCache.Stop()`
+- [x] If `NewDaemonStateCache` returns an error, `daemonCache` is nil and all call sites handle nil gracefully (no panic)
+- [x] `menuModel` has `daemonCacheCh chan daemonPIDState` field
+- [x] `newMenuModel()` subscribes via `daemonCache.Subscribe()` and immediately calls `daemonCache.Get()` to pre-populate `m.daemon.PID` and `m.daemon.Running`
+- [x] `menuDaemonTickMsg` type deleted from `menu_update.go`
+- [x] `pollMenuDaemonTick()` function deleted from `menu_update.go`
+- [x] `menuModel.Init()` replaces `pollMenuDaemonTick()` with `listenForDaemonCacheUpdate(m.daemonCacheCh)`
+- [x] `menuModel.Update()` handles `daemonCacheUpdateMsg`: updates `m.daemon.PID` and `m.daemon.Running`, returns `listenForDaemonCacheUpdate(m.daemonCacheCh)`
+- [x] After `p.Run()` returns in `root.go`'s menu loop, `daemonCache.Unsubscribe(final.daemonCacheCh)` is called before the next iteration
+- [x] `go build ./...` passes
+- [x] Existing menu tests pass (`go test -run TestMenu ./cmd/...` or equivalent)
 
 ### TASK-027-003: Wire cache into status view
 **Description:** As a developer, I want the status view to receive daemon PID/running state from the cache so that polling for those fields is eliminated and the status view responds instantly to daemon start/stop events.

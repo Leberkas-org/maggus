@@ -33,6 +33,10 @@ func init() {
 // caps holds the detected tool capabilities for this run.
 var caps capabilities.Capabilities
 
+// daemonCache is a package-level cache for the daemon's PID/running state,
+// shared across menu iterations within a single runMenu invocation.
+var daemonCache *DaemonStateCache
+
 // sharedPresence holds a Discord Presence instance created by the root menu
 // and shared with subcommands (prompt, work). When non-nil, subcommands use
 // this instead of creating their own connection.
@@ -87,6 +91,18 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Initialise the daemon state cache once for the lifetime of runMenu.
+	// If it fails (e.g. .maggus/ does not exist yet), daemonCache stays nil
+	// and all call sites handle nil gracefully.
+	cwd, _ := os.Getwd()
+	if cache, err := NewDaemonStateCache(cwd); err == nil {
+		daemonCache = cache
+		defer func() {
+			daemonCache.Stop()
+			daemonCache = nil
+		}()
+	}
+
 	for {
 		// Show idle presence while in the main menu.
 		if presence != nil {
@@ -116,6 +132,13 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 
 		final := result.(menuModel)
+
+		// Unsubscribe the model's daemon cache channel before the next iteration
+		// creates a new model with a fresh subscription.
+		if daemonCache != nil {
+			daemonCache.Unsubscribe(final.daemonCacheCh)
+		}
+
 		if final.quitting || final.selected == "" {
 			return nil
 		}

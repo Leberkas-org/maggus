@@ -26,9 +26,6 @@ type hideShortcutsMsg struct {
 	timerID int // only hide if this matches the current timer ID
 }
 
-// menuDaemonTickMsg is sent every 500ms to refresh the daemon status in the menu.
-type menuDaemonTickMsg struct{}
-
 // daemonAutoStartResultMsg carries the result of the silent daemon auto-start attempt.
 type daemonAutoStartResultMsg struct {
 	err error // nil = started or already running; non-nil = failed (show warning)
@@ -37,13 +34,6 @@ type daemonAutoStartResultMsg struct {
 // daemonStopResultMsg carries the result of the async daemon stop attempt.
 type daemonStopResultMsg struct {
 	err error
-}
-
-// pollMenuDaemonTick returns a tea.Cmd that fires menuDaemonTickMsg after 500ms.
-func pollMenuDaemonTick() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
-		return menuDaemonTickMsg{}
-	})
 }
 
 // loadSettings is injectable for testing.
@@ -125,7 +115,7 @@ func (m menuModel) Init() tea.Cmd {
 			return daemonAutoStartResultMsg{err: autoStartDaemon(m.cwd)}
 		},
 		listenForWatcherUpdate(m.watcherCh),
-		pollMenuDaemonTick(),
+		listenForDaemonCacheUpdate(m.daemonCacheCh),
 	}
 	return tea.Batch(cmds...)
 }
@@ -160,9 +150,10 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Daemon stop finished (success or failure) — exit the program.
 		m.quitting = true
 		return m, tea.Quit
-	case menuDaemonTickMsg:
-		m.daemon = loadDaemonStatus(m.cwd)
-		return m, pollMenuDaemonTick()
+	case daemonCacheUpdateMsg:
+		m.daemon.PID = msg.State.PID
+		m.daemon.Running = msg.State.Running
+		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
 		return m, listenForWatcherUpdate(m.watcherCh)
