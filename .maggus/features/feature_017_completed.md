@@ -39,14 +39,14 @@ Add a CLI-only `list` command that prints all active (non-completed) features an
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] New file `src/cmd/list.go` registers a `list` cobra command on `rootCmd`
-- [ ] Command loads all active (non-completed) plans via `stores.NewFileFeatureStore` and `stores.NewFileBugStore`, using `LoadAll(false)` (which skips completed plans)
-- [ ] Command loads approval status via `approval.Load(dir)`
-- [ ] Each plan is printed as one tab-separated line with exactly four fields in this order: `filename`, `id`, `title`, `approved` — where `filename` is `filepath.Base(plan.File)`, `id` is `plan.ID`, `title` is `plan.Title` (empty string if not set), and `approved` is either `approved` or `unapproved`
-- [ ] Output goes to `cmd.OutOrStdout()` (not `fmt.Print`) so it is testable
-- [ ] If there are no active plans, the command prints nothing and exits 0
-- [ ] `go test ./cmd` passes (add at least one test covering the tab-separated output format using in-memory fakes or a temp directory)
-- [ ] `go vet ./...` passes
+- [x] New file `src/cmd/list.go` registers a `list` cobra command on `rootCmd`
+- [x] Command loads all active (non-completed) plans via `stores.NewFileFeatureStore` and `stores.NewFileBugStore`, using `LoadAll(false)` (which skips completed plans)
+- [x] Command loads approval status via `approval.Load(dir)`
+- [x] Each plan is printed as one tab-separated line with exactly four fields in this order: `filename`, `id`, `title`, `approved` — where `filename` is `filepath.Base(plan.File)`, `id` is `plan.ID`, `title` is `plan.Title` (empty string if not set), and `approved` is either `approved` or `unapproved`
+- [x] Output goes to `cmd.OutOrStdout()` (not `fmt.Print`) so it is testable
+- [x] If there are no active plans, the command prints nothing and exits 0
+- [x] `go test ./cmd` passes (add at least one test covering the tab-separated output format using in-memory fakes or a temp directory)
+- [x] `go vet ./...` passes
 
 ## Task Dependency Graph
 
