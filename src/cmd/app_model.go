@@ -294,7 +294,14 @@ func (m *appModel) initScreen(s screenID) tea.Cmd {
 		return m.repos.Init()
 
 	case screenPrompt:
-		pm := newPromptPickerModel()
+		dir, _ := os.Getwd()
+		cfg, _ := config.Load(dir)
+		resolvedModel := config.ResolveModel(cfg.Model)
+		agentName := cfg.Agent
+		if agentName == "" {
+			agentName = "claude"
+		}
+		pm := newPromptPickerModel(dir, resolvedModel, agentName)
 		m.prompt = &pm
 		return m.prompt.Init()
 	}

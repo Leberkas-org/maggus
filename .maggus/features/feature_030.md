@@ -131,15 +131,15 @@ clean up its daemon caches via the app model, so it works inside the app router.
 **Parallel:** yes — can run alongside TASK-030-002, TASK-030-003, TASK-030-004, TASK-030-006
 
 **Acceptance Criteria:**
-- [ ] On cancel, prompt picker emits `navigateBackMsg` instead of `tea.Quit`
-- [ ] On skill selection, prompt picker emits `execProcessMsg` carrying the `*exec.Cmd` for
+- [x] On cancel, prompt picker emits `navigateBackMsg` instead of `tea.Quit`
+- [x] On skill selection, prompt picker emits `execProcessMsg` carrying the `*exec.Cmd` for
   `launchInteractive` (or equivalent) and a done-callback that returns `navigateBackMsg`
-- [ ] The app model handles `execProcessMsg` using `tea.ExecProcess` so the TUI suspends, claude
+- [x] The app model handles `execProcessMsg` using `tea.ExecProcess` so the TUI suspends, claude
   runs in the foreground, and the TUI resumes with the menu shown
-- [ ] All post-process work (usage extraction, presence update) is done in the `onDone` callback
+- [x] All post-process work (usage extraction, presence update) is done in the `onDone` callback
   or as a follow-up message to the app model
-- [ ] `runPrompt()` no longer calls `tea.NewProgram`; prompt initialisation moves to `appModel`
-- [ ] `go build ./...` passes
+- [x] `runPrompt()` no longer calls `tea.NewProgram`; prompt initialisation moves to `appModel`
+- [x] `go build ./...` passes
 
 ---
 
