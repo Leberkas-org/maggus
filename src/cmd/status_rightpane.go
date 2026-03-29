@@ -88,86 +88,28 @@ func (m *statusModel) rightPaneContentHeight() int {
 }
 
 // outputTabScrollableLines returns the number of scrollable lines available
-// in the Output tab's middle zone (tool list or log lines).
+// in the Output tab's tool list.
 func (m *statusModel) outputTabScrollableLines() int {
 	contentH := m.rightPaneContentHeight()
-	if m.snapshot != nil && m.daemon.Running {
-		// Fixed lines consumed by the rich snapshot view:
-		//   top:    blank(1) + status(1) + task(1) + separator(1) = 4
-		//   bottom: separator(1) + tokens(1) + cost(1) + run(1) + task(1) = 5
-		overhead := 9
-		avail := contentH - overhead
-		if avail < 3 {
-			avail = 3
-		}
-		return avail
-	}
-	// Plain log: blank(1) + title(1) + separator(1) = 3 overhead
-	overhead := 3
+	// Fixed lines consumed by the rich snapshot view:
+	//   top:    blank(1) + status(1) + task(1) + separator(1) = 4
+	//   bottom: separator(1) + tokens(1) + cost(1) + run(1) + task(1) = 5
+	overhead := 9
 	avail := contentH - overhead
-	if avail < 1 {
-		avail = 1
+	if avail < 3 {
+		avail = 3
 	}
 	return avail
 }
 
 // renderOutputTab renders the Output tab content: rich snapshot view when the
-// daemon is running and a snapshot is available, plain log fallback otherwise.
+// daemon is running and a snapshot is available, idle message otherwise.
 func (m statusModel) renderOutputTab(width, contentH int) string {
 	if m.snapshot != nil && m.daemon.Running {
 		return m.renderSnapshotInPane(width, contentH)
 	}
-	return m.renderPlainLogInPane(width, contentH)
-}
-
-// renderPlainLogInPane renders the plain JSONL log view sized for the right pane.
-func (m statusModel) renderPlainLogInPane(width, height int) string {
-	var sb strings.Builder
-
-	sb.WriteString(" " + statusBoldStyle.Render("Status:") + " waiting...")
-	sb.WriteString("\n " + statusBoldStyle.Render("Task:") + "   ---")
-
-	sb.WriteString(" " + styles.Separator(width-1))
-
-	// Lines available for scrollable log content (height minus blank+title+separator+scrollindicator).
-	available := height - 4
-	if available < 1 {
-		available = 1
-	}
-
-	if len(m.logLines) == 0 {
-		sb.WriteString("\n")
-		sb.WriteString(statusDimStyle.Render("  No active run"))
-	} else {
-		start := max(m.logScroll, 0)
-		remaining := available
-		end := start
-		for i := start; i < len(m.logLines) && remaining > 0; i++ {
-			subLines := strings.Split(formatLogLine(m.logLines[i], width-2), "\n")
-			for _, subLine := range subLines {
-				if subLine == "" {
-					continue
-				}
-				if remaining <= 0 {
-					break
-				}
-				sb.WriteString("\n ")
-				sb.WriteString(styles.Truncate(subLine, width-2))
-				remaining--
-			}
-			end = i + 1
-		}
-		if len(m.logLines) > available {
-			scrollHint := fmt.Sprintf(" [%d-%d of %d]", start+1, end, len(m.logLines))
-			if m.logAutoScroll {
-				scrollHint += " (auto)"
-			}
-			sb.WriteString("\n")
-			sb.WriteString(statusDimStyle.Render(scrollHint))
-		}
-	}
-
-	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+	msg := statusDimStyle.Render("  No active run")
+	return lipgloss.NewStyle().Width(width).Height(contentH).Render(msg)
 }
 
 // renderSnapshotInPane renders the rich live TUI from a state.json snapshot,

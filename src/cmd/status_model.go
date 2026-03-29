@@ -263,6 +263,7 @@ func (m *statusModel) reloadPlans() {
 	m.plans = plans
 	pruneStaleApprovals(m.dir, plans)
 	m.nextTaskID, m.nextTaskFile = findNextTask(plans)
+	m.treeScrollOffset = 0
 	m.rebuildForSelectedPlan()
 	// Clamp treeCursor to the new tree length so it never goes out of bounds.
 	items := m.buildTreeItems()

@@ -48,16 +48,16 @@ The left pane tree has no scroll support — when the item list (plans + expande
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `clampTreeScroll()` is called after every cursor move in `updateList()` — up, down, home, end, shift+tab
-- [ ] `clampTreeScroll()` is called after expand (`right`/`l`) and collapse (`left`/`h`) so newly revealed/hidden task rows don't leave the cursor off-screen
-- [ ] `renderLeftPane()` in `status_leftpane.go` is updated to:
+- [x] `clampTreeScroll()` is called after every cursor move in `updateList()` — up, down, home, end, shift+tab
+- [x] `clampTreeScroll()` is called after expand (`right`/`l`) and collapse (`left`/`h`) so newly revealed/hidden task rows don't leave the cursor off-screen
+- [x] `renderLeftPane()` in `status_leftpane.go` is updated to:
   - Call `m.buildTreeItems()` as before
   - Compute `availH` (same formula as in `clampTreeScroll`)
   - Slice the items slice: `visible := items[treeScrollOffset : min(treeScrollOffset+availH, len(items))]`
   - Render only the `visible` slice — remove the old trim/cut-off logic at the bottom of the function
   - Adjust cursor highlighting: the local index used for cursor comparison must account for the offset (`localIdx == treeCursor - treeScrollOffset`)
-- [ ] With a list of 30+ tasks across multiple expanded plans, scrolling down with `j`/down arrow keeps the cursor always visible with ~2 lines of context below
-- [ ] `go build ./...` passes
+- [x] With a list of 30+ tasks across multiple expanded plans, scrolling down with `j`/down arrow keeps the cursor always visible with ~2 lines of context below
+- [x] `go build ./...` passes
 
 ## Task Dependency Graph
 

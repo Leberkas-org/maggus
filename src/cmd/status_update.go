@@ -166,10 +166,10 @@ func (m *statusModel) resizeTab2DetailViewport() {
 }
 
 
-// clampTreeScroll adjusts treeScrollOffset so the cursor stays visible with
-// 2 lines of context above and below, then clamps the offset to valid bounds.
-func (m *statusModel) clampTreeScroll() {
-	items := m.buildTreeItems()
+// treeAvailableHeight returns the number of item rows visible in the left pane
+// after subtracting the fixed header lines (label + separator + daemon status + separator).
+// Used by both clampTreeScroll and renderLeftPane to keep scroll math consistent.
+func (m *statusModel) treeAvailableHeight() int {
 	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
 	// 4 fixed header lines: "[1] Items" label + separator + daemon status + separator
 	const treeOverhead = 4
@@ -177,6 +177,14 @@ func (m *statusModel) clampTreeScroll() {
 	if availH < 1 {
 		availH = 1
 	}
+	return availH
+}
+
+// clampTreeScroll adjusts treeScrollOffset so the cursor stays visible with
+// 2 lines of context above and below, then clamps the offset to valid bounds.
+func (m *statusModel) clampTreeScroll() {
+	items := m.buildTreeItems()
+	availH := m.treeAvailableHeight()
 
 	// Pull offset up when cursor is near the top
 	if m.treeCursor < m.treeScrollOffset+2 {
@@ -479,6 +487,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
@@ -490,6 +499,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = styles.CursorDown(m.treeCursor, len(items))
+			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
@@ -501,6 +511,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = 0
+			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
@@ -512,6 +523,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = len(items) - 1
+			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
@@ -523,6 +535,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = styles.CursorUp(m.treeCursor, len(items))
+			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
@@ -543,6 +556,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.expandedPlans = make(map[string]bool)
 				}
 				m.expandedPlans[item.plan.ID] = true
+				m.clampTreeScroll()
 			}
 		}
 		return m, nil
@@ -552,6 +566,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			item := items[m.treeCursor]
 			if item.kind == treeItemKindPlan {
 				delete(m.expandedPlans, item.plan.ID)
+				m.clampTreeScroll()
 			} else if item.kind == treeItemKindTask {
 				parentID := item.plan.ID
 				delete(m.expandedPlans, parentID)
@@ -564,6 +579,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.syncPlanCursorFromTreeCursor()
+				m.clampTreeScroll()
 			}
 		}
 		return m, nil

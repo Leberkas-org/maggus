@@ -62,7 +62,20 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
 	primaryStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 
-	items := m.buildTreeItems()
+	allItems := m.buildTreeItems()
+	availH := m.treeAvailableHeight()
+
+	// Slice to visible window based on scroll offset.
+	scrollOff := m.treeScrollOffset
+	if scrollOff > len(allItems) {
+		scrollOff = len(allItems)
+	}
+	end := scrollOff + availH
+	if end > len(allItems) {
+		end = len(allItems)
+	}
+	items := allItems[scrollOff:end]
+
 	var lines []string
 
 	// Header row: matches right pane tab bar style — dimmed number prefix + styled label.
@@ -134,7 +147,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	bugAdded := false
 
 	for i, item := range items {
-		isSelected := i == m.treeCursor
+		isSelected := (i + scrollOff) == m.treeCursor
 
 		// Per-row helpers that embed the selection background into styled strings.
 		addBg := func(s lipgloss.Style) lipgloss.Style {

@@ -11,10 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/runlog"
-	"github.com/leberkas-org/maggus/internal/runner"
-	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
 // logPollTickMsg is sent every 200ms to refresh the live log panel.
@@ -128,144 +125,6 @@ func readLastNLogLines(path string, n int) []string {
 	return lines
 }
 
-// Log line styles — reuse palette from styles package.
-var (
-	logTimestampStyle = lipgloss.NewStyle().Foreground(styles.Muted)
-	logTaskIDStyle    = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
-	logToolStyle      = lipgloss.NewStyle().Foreground(styles.Accent)
-	logErrorStyle     = lipgloss.NewStyle().Foreground(styles.Error)
-	logInfoStyle      = lipgloss.NewStyle().Foreground(styles.Muted)
-)
-
-// formatLogLine parses a JSONL log line and returns a color-coded string.
-// Non-JSON lines are returned as-is in muted style.
-// When width > 0 the HH:MM:SS timestamp is right-aligned using styles.RightAlign;
-// when width == 0 (unknown) it falls back to the original left-aligned format.
-func formatLogLine(raw string, width int) string {
-	var entry runlog.Entry
-	if err := json.Unmarshal([]byte(raw), &entry); err != nil {
-		// Graceful fallback: render plain text in muted style (no timestamp to place)
-		return logInfoStyle.Render(raw)
-	}
-
-	// Format timestamp as HH:MM:SS (compact, subordinate)
-	ts := entry.Ts
-	if t, err := time.Parse(time.RFC3339, entry.Ts); err == nil {
-		ts = t.Local().Format("15:04:05")
-	}
-	tsStr := logTimestampStyle.Render(ts)
-
-	// Format task ID if present
-	taskID := ""
-	if entry.TaskID != "" {
-		taskID = " " + logTaskIDStyle.Render(entry.TaskID)
-	}
-
-	// Build the body (everything except the timestamp) then place the timestamp.
-	// body always starts with a space so that tsStr+body reproduces the original format.
-	var body string
-	switch entry.Event {
-	case "tool_use":
-		toolTag := logToolStyle.Render(fmt.Sprintf("[%s]", entry.Tool))
-		body = fmt.Sprintf("%s %s %s", taskID, toolTag, logInfoStyle.Render(formatToolInput(entry.Tool, entry.Input)))
-
-	case "output":
-		// Output is the most important content — render at full contrast (default).
-		text := entry.Text
-		if len(text) > 200 {
-			text = text[:200] + "…"
-		}
-		body = fmt.Sprintf("%s %s", taskID, text)
-
-	case "task_failed":
-		reason := entry.Reason
-		if reason == "" {
-			reason = "unknown error"
-		}
-		body = fmt.Sprintf("%s %s", taskID, logErrorStyle.Render("FAILED: "+reason))
-
-	case "error":
-		text := entry.Text
-		if text == "" {
-			text = entry.Reason
-		}
-		body = fmt.Sprintf("%s %s", taskID, logErrorStyle.Render(text))
-
-	case "feature_start":
-		if entry.FeatureID != "" {
-			body = fmt.Sprintf(" %s %s %s", logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("started"))
-		} else {
-			body = fmt.Sprintf(" %s", logInfoStyle.Render("feature started"))
-		}
-
-	case "feature_complete":
-		if entry.FeatureID != "" {
-			body = fmt.Sprintf(" %s %s %s", logInfoStyle.Render("feature"), logTaskIDStyle.Render(entry.FeatureID), logInfoStyle.Render("complete"))
-		} else {
-			body = fmt.Sprintf(" %s", logInfoStyle.Render("feature complete"))
-		}
-
-	case "task_start":
-		title := entry.Title
-		if title == "" {
-			title = "started"
-		}
-		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(title))
-
-	case "task_complete":
-		detail := "complete"
-		if entry.Commit != "" {
-			detail = fmt.Sprintf("complete [%s]", entry.Commit)
-		}
-		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(detail))
-
-	case "info":
-		text := entry.Text
-		if text == "" {
-			text = "info"
-		}
-		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(text))
-
-	case "task_usage":
-		totalIn := entry.InputTokens + entry.CacheCreationInputTokens + entry.CacheReadInputTokens
-		line := fmt.Sprintf("usage: %s in / %s out  %s",
-			runner.FormatTokens(totalIn), runner.FormatTokens(entry.OutputTokens), runner.FormatCost(entry.CostUSD))
-		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(line))
-
-	default:
-		// Unknown event — render the whole line muted with whatever fields are available
-		desc := entry.Text
-		if desc == "" && len(entry.Input) > 0 {
-			desc = formatToolInput(entry.Event, entry.Input)
-		}
-		if desc == "" {
-			desc = entry.Event
-		}
-		body = fmt.Sprintf("%s %s", taskID, logInfoStyle.Render(desc))
-	}
-
-	if width == 0 {
-		return tsStr + body
-	}
-	return styles.RightAlign(body, tsStr, width)
-}
-
-// formatToolInput returns the most meaningful display value from a tool's input map.
-// Priority: file → command → pattern → skill → description → first value → tool name.
-func formatToolInput(tool string, input map[string]string) string {
-	for _, key := range []string{"file", "command", "pattern", "skill", "description"} {
-		if v, ok := input[key]; ok && v != "" {
-			return v
-		}
-	}
-	for _, v := range input {
-		if v != "" {
-			return v
-		}
-	}
-	return tool
-}
-
 // parseLogForCurrentState scans log lines from newest to oldest to find the most
 // recently started feature and task. Parses JSONL entries; non-JSON lines are silently skipped.
 func parseLogForCurrentState(lines []string) (feature, task string) {
@@ -285,33 +144,6 @@ func parseLogForCurrentState(lines []string) (feature, task string) {
 		}
 	}
 	return feature, task
-}
-
-// renderDaemonStatusLine returns a one-line string showing daemon state and
-// current feature/task progress (for use in the status header).
-func (m statusModel) renderDaemonStatusLine() string {
-	if m.daemon.Running {
-		indicator := statusCyanStyle.Render("●")
-		line := fmt.Sprintf(" %s daemon running (PID %d)", indicator, m.daemon.PID)
-		if m.daemon.CurrentFeature != "" {
-			line += statusDimStyle.Render(" · " + m.daemon.CurrentFeature)
-		}
-		if m.daemon.CurrentTask != "" {
-			line += statusDimStyle.Render(" · " + m.daemon.CurrentTask)
-		}
-		return line
-	}
-	// Show last run info using whichever identifier is available.
-	lastRun := m.daemon.RunID
-	if lastRun == "" && m.daemon.LogPath != "" {
-		// Fall back to the log filename (without directory and extension).
-		base := filepath.Base(m.daemon.LogPath)
-		lastRun = strings.TrimSuffix(base, ".log")
-	}
-	if lastRun != "" {
-		return statusDimStyle.Render(fmt.Sprintf(" ○ daemon not running · last run: %s", lastRun))
-	}
-	return statusDimStyle.Render(" ○ daemon not running")
 }
 
 // formatHumanDuration formats a duration as human-friendly text (e.g. "5m 32s", "1h 12m 5s").
@@ -335,27 +167,3 @@ func formatHumanDuration(d time.Duration) string {
 	}
 }
 
-// formatSnapshotModelTokens formats per-model token breakdown from the snapshot.
-// Returns multi-line output with one line per model, indented to align under "Tokens:".
-func (m statusModel) formatSnapshotModelTokens() string {
-	if m.snapshot == nil || len(m.snapshot.ModelBreakdown) == 0 {
-		return ""
-	}
-	// Sort model names for stable output
-	names := make([]string, 0, len(m.snapshot.ModelBreakdown))
-	for name := range m.snapshot.ModelBreakdown {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	var sb strings.Builder
-	for _, name := range names {
-		usage := m.snapshot.ModelBreakdown[name]
-		totalIn := usage.InputTokens + usage.CacheCreationInputTokens + usage.CacheReadInputTokens
-		costStr := runner.FormatCost(usage.CostUSD)
-		line := fmt.Sprintf("  %s: %s in / %s out (%s)",
-			name, runner.FormatTokens(totalIn), runner.FormatTokens(usage.OutputTokens), costStr)
-		sb.WriteString("  " + statusDimStyle.Render(line) + "\n")
-	}
-	return sb.String()
-}
