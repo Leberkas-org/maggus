@@ -79,19 +79,6 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 		removeDaemonPID(dir)
 	}
 
-	// Mutual exclusion: prevent daemon from starting while a work run is active.
-	workPID, wpErr := readWorkPID(dir)
-	if wpErr != nil {
-		return fmt.Errorf("check work status: %w", wpErr)
-	}
-	if workPID != 0 {
-		if isProcessRunning(workPID) {
-			return fmt.Errorf("a work run is active (PID %d) — wait for it to finish", workPID)
-		}
-		// Stale PID file — clean it up silently.
-		removeWorkPID(dir)
-	}
-
 	// Ensure .maggus/runs/ exists before opening daemon.log.
 	if err := os.MkdirAll(filepath.Join(dir, ".maggus", "runs"), 0755); err != nil {
 		return fmt.Errorf("create runs dir: %w", err)
@@ -209,18 +196,6 @@ func startDaemon(dir string) error {
 	// Stale PID file — clean it up.
 	if existingPID != 0 {
 		removeDaemonPID(dir)
-	}
-
-	// Mutual exclusion: don't start if a work run is active.
-	workPID, wpErr := readWorkPID(dir)
-	if wpErr != nil {
-		return fmt.Errorf("check work status: %w", wpErr)
-	}
-	if workPID != 0 {
-		if isProcessRunning(workPID) {
-			return nil // work is active — silently skip
-		}
-		removeWorkPID(dir)
 	}
 
 	// Ensure .maggus/runs/ exists before opening daemon.log.

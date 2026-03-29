@@ -128,12 +128,12 @@ Also delete `internal/runner/procattr_windows.go` and `internal/runner/procattr_
 Print a short message: `"Use 'maggus start' to start the daemon."` and return nil. Do not error — graceful redirect.
 
 **Acceptance Criteria:**
-- [ ] `cmd/gitsync.go`, `cmd/gitsync_test.go`, `cmd/workpid.go`, `cmd/work_sync.go`, `cmd/work_sync_test.go` are deleted
-- [ ] `cmd/work.go` RunE no longer references `runner.NewTUIModel`, `tea.NewProgram`, `p.Run()`, or any interactive TUI setup
-- [ ] `maggus work` (without `--daemon-run`) prints a redirect message and exits cleanly
-- [ ] `maggus work --daemon-run` (the internal daemon entry point) still works correctly
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] `cmd/gitsync.go`, `cmd/gitsync_test.go`, `cmd/workpid.go`, `cmd/work_sync.go`, `cmd/work_sync_test.go` are deleted
+- [x] `cmd/work.go` RunE no longer references `runner.NewTUIModel`, `tea.NewProgram`, `p.Run()`, or any interactive TUI setup
+- [x] `maggus work` (without `--daemon-run`) prints a redirect message and exits cleanly
+- [x] `maggus work --daemon-run` (the internal daemon entry point) still works correctly
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ---
 

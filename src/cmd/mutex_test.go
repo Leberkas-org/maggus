@@ -6,31 +6,6 @@ import (
 	"testing"
 )
 
-func TestStaleDaemonPID_CleanedUp(t *testing.T) {
-	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".maggus"), 0755)
-
-	// Write a PID that doesn't correspond to a running process.
-	// Use a very high PID that's almost certainly not running.
-	writeWorkPID(dir, 9999999)
-
-	pid, _ := readWorkPID(dir)
-	if pid == 0 {
-		t.Fatal("expected non-zero PID from file")
-	}
-
-	// Stale: process is not running.
-	if isProcessRunning(pid) {
-		t.Skip("PID 9999999 is somehow running, skipping")
-	}
-
-	// After detecting stale, we should clean up.
-	removeWorkPID(dir)
-	pidAfter, _ := readWorkPID(dir)
-	if pidAfter != 0 {
-		t.Error("stale work.pid should have been removed")
-	}
-}
 
 func TestLiveProcessDetected(t *testing.T) {
 	// Our own process should be detected as running.
