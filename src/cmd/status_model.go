@@ -37,10 +37,12 @@ type statusModel struct {
 	taskListComponent
 
 	// Split-pane layout fields
-	plans       []parser.Plan
-	planCursor  int
-	leftFocused bool
-	activeTab   int // 0–3: Output, Feature Details, Current Task, Metrics
+	plans         []parser.Plan
+	planCursor    int
+	treeCursor    int              // primary navigation index into buildTreeItems(); replaces planCursor
+	expandedPlans map[string]bool // keyed by plan.ID; starts empty (all collapsed)
+	leftFocused   bool
+	activeTab     int // 0–3: Output, Feature Details, Current Task, Metrics
 
 	// Right-pane tab 3 viewport
 	currentTaskViewport viewport.Model
@@ -108,6 +110,7 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 			bugStore:     bugStore,
 		},
 		plans:            features,
+		expandedPlans:    make(map[string]bool),
 		showAll:          showAll,
 		nextTaskID:       nextTaskID,
 		nextTaskFile:     nextTaskFile,
@@ -160,31 +163,53 @@ func (m statusModel) visiblePlans() []parser.Plan {
 	return visible
 }
 
-// selectedPlan returns the plan at planCursor from visiblePlans.
-// Returns a zero-value Plan if planCursor is out of range.
+// selectedPlan returns the plan for the tree row at treeCursor.
+// Returns a zero-value Plan if treeCursor is out of range.
 func (m statusModel) selectedPlan() parser.Plan {
-	visible := m.visiblePlans()
-	if m.planCursor < 0 || m.planCursor >= len(visible) {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
 		return parser.Plan{}
 	}
-	return visible[m.planCursor]
+	return items[m.treeCursor].plan
 }
 
 // rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
-// for the currently selected plan.
+// for the currently selected plan. It syncs treeCursor from planCursor so that
+// both cursors stay consistent while planCursor is still used for navigation.
 func (m *statusModel) rebuildForSelectedPlan() {
 	visible := m.visiblePlans()
 	if m.planCursor >= len(visible) {
 		m.planCursor = 0
 	}
+	// Sync treeCursor: walk buildTreeItems to find the tree-row index of the
+	// planCursor-th plan row (skipping any task rows from expanded plans).
+	m.syncTreeCursorFromPlanCursor()
 	if len(visible) > 0 {
-		m.Tasks = buildSelectableTasksForFeature(visible[m.planCursor], m.showAll)
+		m.Tasks = buildSelectableTasksForFeature(m.selectedPlan(), m.showAll)
 	} else {
 		m.Tasks = nil
 	}
 	m.Cursor = 0
 	m.ScrollOffset = 0
 	m.loadMetrics()
+}
+
+// syncTreeCursorFromPlanCursor sets treeCursor to the tree-row index of the
+// planCursor-th plan row in buildTreeItems(). This keeps treeCursor consistent
+// with planCursor when planCursor is changed outside of tree navigation.
+func (m *statusModel) syncTreeCursorFromPlanCursor() {
+	items := m.buildTreeItems()
+	planRowIdx := 0
+	for i, item := range items {
+		if item.kind == treeItemKindPlan {
+			if planRowIdx == m.planCursor {
+				m.treeCursor = i
+				return
+			}
+			planRowIdx++
+		}
+	}
+	m.treeCursor = 0
 }
 
 // reloadPlans reloads all plans and approvals from disk and rebuilds the current view.

@@ -979,8 +979,8 @@ func TestSelectedPlan(t *testing.T) {
 		{ID: "plan_3", File: "plan_3_completed.md", Completed: true},
 	}
 
-	t.Run("returns plan at planCursor", func(t *testing.T) {
-		m := statusModel{plans: plans, planCursor: 1, showAll: true}
+	t.Run("returns plan at treeCursor", func(t *testing.T) {
+		m := statusModel{plans: plans, treeCursor: 1, showAll: true}
 		p := m.selectedPlan()
 		if p.ID != "plan_2" {
 			t.Errorf("selectedPlan() = %q, want plan_2", p.ID)
@@ -988,7 +988,7 @@ func TestSelectedPlan(t *testing.T) {
 	})
 
 	t.Run("cursor out of range returns zero plan", func(t *testing.T) {
-		m := statusModel{plans: plans, planCursor: 99, showAll: false}
+		m := statusModel{plans: plans, treeCursor: 99, showAll: false}
 		p := m.selectedPlan()
 		if p.ID != "" {
 			t.Errorf("selectedPlan() with out-of-range cursor should return zero plan, got %q", p.ID)
@@ -996,8 +996,8 @@ func TestSelectedPlan(t *testing.T) {
 	})
 
 	t.Run("respects showAll filter", func(t *testing.T) {
-		// showAll=false: plans has 2 visible (plan_1, plan_2)
-		m := statusModel{plans: plans, planCursor: 1, showAll: false}
+		// showAll=false: plans has 2 visible (plan_1, plan_2); treeCursor=1 selects plan_2
+		m := statusModel{plans: plans, treeCursor: 1, showAll: false}
 		p := m.selectedPlan()
 		if p.ID != "plan_2" {
 			t.Errorf("selectedPlan() = %q, want plan_2", p.ID)

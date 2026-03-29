@@ -103,6 +103,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for i, f := range m.visiblePlans() {
 				if filepath.Base(f.File) == selectedFilename {
 					m.planCursor = i
+					m.syncTreeCursorFromPlanCursor()
 					m.Tasks = buildSelectableTasksForFeature(f, m.showAll)
 					// Clamp cursor and scroll to new bounds
 					if prevCursor < len(m.Tasks) {
@@ -557,6 +558,7 @@ func (m statusModel) movePlanUp() (tea.Model, tea.Cmd) {
 	}
 	swapPlansByFile(m.plans, current.File, target.File)
 	m.planCursor--
+	m.syncTreeCursorFromPlanCursor()
 	return m, nil
 }
 
@@ -574,6 +576,7 @@ func (m statusModel) movePlanDown() (tea.Model, tea.Cmd) {
 	}
 	swapPlansByFile(m.plans, current.File, target.File)
 	m.planCursor++
+	m.syncTreeCursorFromPlanCursor()
 	return m, nil
 }
 
