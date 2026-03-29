@@ -66,10 +66,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	availH := m.treeAvailableHeight()
 
 	// Slice to visible window based on scroll offset.
-	scrollOff := m.treeScrollOffset
-	if scrollOff > len(allItems) {
-		scrollOff = len(allItems)
-	}
+	scrollOff := min(m.treeScrollOffset, max(0, len(allItems)-1))
 	end := scrollOff + availH
 	if end > len(allItems) {
 		end = len(allItems)
