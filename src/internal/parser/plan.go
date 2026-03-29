@@ -12,6 +12,7 @@ type Plan struct {
 	ID        string  // base filename without extension or _completed suffix (e.g. "feature_001", "bug_002")
 	MaggusID  string  // UUID from <!-- maggus-id: ... --> comment; empty if absent
 	File      string  // full path to the source file
+	Title     string  // parsed from top-level heading (e.g. "Feature 001: Discord Rich Presence Integration")
 	Tasks     []Task  // all tasks from this file (may include complete/blocked)
 	IsBug     bool    // true for bug files (from .maggus/bugs/)
 	Completed bool    // true if the filename contains _completed suffix
@@ -88,6 +89,7 @@ func LoadPlans(dir string, includeCompleted bool) ([]Plan, error) {
 			ID:        planIDFromPath(f),
 			MaggusID:  ParseMaggusID(f),
 			File:      f,
+			Title:     ParseFileTitle(f),
 			Tasks:     tasks,
 			IsBug:     true,
 			Completed: strings.HasSuffix(f, "_completed.md"),
@@ -104,6 +106,7 @@ func LoadPlans(dir string, includeCompleted bool) ([]Plan, error) {
 			ID:        planIDFromPath(f),
 			MaggusID:  ParseMaggusID(f),
 			File:      f,
+			Title:     ParseFileTitle(f),
 			Tasks:     tasks,
 			IsBug:     false,
 			Completed: strings.HasSuffix(f, "_completed.md"),

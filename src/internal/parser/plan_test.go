@@ -322,7 +322,48 @@ func TestLoadPlans_ApprovalNotStored(t *testing.T) {
 	_ = plans[0].ID
 	_ = plans[0].MaggusID
 	_ = plans[0].File
+	_ = plans[0].Title
 	_ = plans[0].Tasks
 	_ = plans[0].IsBug
 	_ = plans[0].Completed
+}
+
+// TestLoadPlans_PopulatesTitle verifies LoadPlans populates Title field for each plan.
+func TestLoadPlans_PopulatesTitle(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", testFeatureWithMaggusID)
+	writeTempFeature(t, dir, "feature_002.md", testFeatureNoMaggusID)
+	writeTempBug(t, dir, "bug_001.md", testBugContent)
+
+	plans, err := LoadPlans(dir, false)
+	if err != nil {
+		t.Fatalf("LoadPlans error: %v", err)
+	}
+
+	if len(plans) != 3 {
+		t.Fatalf("expected 3 plans, got %d", len(plans))
+	}
+
+	// Bug should be first
+	if plans[0].ID != "bug_001" {
+		t.Errorf("expected first plan ID bug_001, got %q", plans[0].ID)
+	}
+	if plans[0].Title != "Test Bug" {
+		t.Errorf("plans[0].Title = %q, want %q", plans[0].Title, "Test Bug")
+	}
+
+	// Features should follow
+	if plans[1].ID != "feature_001" {
+		t.Errorf("expected second plan ID feature_001, got %q", plans[1].ID)
+	}
+	if plans[1].Title != "Test Feature" {
+		t.Errorf("plans[1].Title = %q, want %q", plans[1].Title, "Test Feature")
+	}
+
+	if plans[2].ID != "feature_002" {
+		t.Errorf("expected third plan ID feature_002, got %q", plans[2].ID)
+	}
+	if plans[2].Title != "Another Feature" {
+		t.Errorf("plans[2].Title = %q, want %q", plans[2].Title, "Another Feature")
+	}
 }
