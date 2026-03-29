@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,8 +26,26 @@ const (
 	reposStateConfirmInit                   // asking whether to initialize .maggus
 )
 
-// reposDaemonTickMsg is sent every 500ms to refresh daemon status for all repos.
-type reposDaemonTickMsg struct{}
+// reposDaemonUpdateMsg is delivered when a specific repo's daemon state changes.
+type reposDaemonUpdateMsg struct {
+	idx   int
+	state daemonPIDState
+}
+
+// listenForRepoDaemonUpdate returns a Cmd that blocks on ch until a daemon state
+// update arrives, then delivers a reposDaemonUpdateMsg for the given repo index.
+func listenForRepoDaemonUpdate(idx int, ch <-chan daemonPIDState) tea.Cmd {
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		state, ok := <-ch
+		if !ok {
+			return nil // channel closed, cache stopped
+		}
+		return reposDaemonUpdateMsg{idx: idx, state: state}
+	}
+}
 
 // reposDaemonActionResultMsg carries the result of an async daemon start/stop.
 type reposDaemonActionResultMsg struct {
@@ -37,13 +56,6 @@ type reposDaemonActionResultMsg struct {
 // reposStatusClearMsg is sent after 2 seconds to clear the status message.
 type reposStatusClearMsg struct {
 	id int // only clear if this matches the current timer ID
-}
-
-// pollReposDaemonTick returns a tea.Cmd that fires reposDaemonTickMsg after 500ms.
-func pollReposDaemonTick() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
-		return reposDaemonTickMsg{}
-	})
 }
 
 // reposModel is the bubbletea model for the repository management screen.
@@ -61,7 +73,9 @@ type reposModel struct {
 	statusID   int // incremented each time statusMsg is set, for timed clearing
 
 	// Per-repo daemon running state, indexed same as repos.
-	daemonRunning []bool
+	daemonRunning  []bool
+	daemonCaches   []*DaemonStateCache
+	daemonSubChans []chan daemonPIDState
 
 	is2x bool // true when Claude is in 2x mode (border turns yellow)
 
@@ -90,17 +104,44 @@ func newReposModel() reposModel {
 		isGitRepo:  isGitRepoCheck,
 		chdir:      os.Chdir,
 	}
-	m.refreshDaemonStatus()
+	m.buildCaches()
 	return m
 }
 
-// refreshDaemonStatus updates the daemonRunning slice for all repos.
-func (m *reposModel) refreshDaemonStatus() {
-	m.daemonRunning = make([]bool, len(m.repos))
-	for i, repo := range m.repos {
-		pid, _ := readDaemonPID(repo.Path)
-		m.daemonRunning[i] = pid != 0 && isProcessRunning(pid)
+// buildCaches stops any existing caches, then creates one DaemonStateCache per repo.
+// It pre-populates daemonRunning from cache.Get() and subscribes to each cache.
+// Repos whose path has no .maggus/ directory are skipped (running = false).
+func (m *reposModel) buildCaches() {
+	for _, c := range m.daemonCaches {
+		if c != nil {
+			c.Stop()
+		}
 	}
+	n := len(m.repos)
+	m.daemonCaches = make([]*DaemonStateCache, n)
+	m.daemonSubChans = make([]chan daemonPIDState, n)
+	m.daemonRunning = make([]bool, n)
+	for i, repo := range m.repos {
+		cache, err := NewDaemonStateCache(repo.Path)
+		if err != nil {
+			log.Printf("repos: DaemonStateCache for %s: %v", repo.Path, err)
+			continue
+		}
+		m.daemonCaches[i] = cache
+		m.daemonRunning[i] = cache.Get().Running
+		m.daemonSubChans[i] = cache.Subscribe()
+	}
+}
+
+// cacheListenCmds returns one listener Cmd per active cache subscription.
+func (m *reposModel) cacheListenCmds() tea.Cmd {
+	var cmds []tea.Cmd
+	for i, ch := range m.daemonSubChans {
+		if ch != nil {
+			cmds = append(cmds, listenForRepoDaemonUpdate(i, ch))
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 // setStatusMsg sets the status message and schedules a clear after 2 seconds.
@@ -118,7 +159,7 @@ func (m reposModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
 		},
-		pollReposDaemonTick(),
+		m.cacheListenCmds(),
 	)
 }
 
@@ -143,16 +184,20 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		is2x, _, tickCmd := fetch2xAndUpdate()
 		m.is2x = is2x
 		return m, tickCmd
-	case reposDaemonTickMsg:
-		m.refreshDaemonStatus()
-		return m, pollReposDaemonTick()
+	case reposDaemonUpdateMsg:
+		if msg.idx < len(m.daemonRunning) {
+			m.daemonRunning[msg.idx] = msg.state.Running
+		}
+		if msg.idx < len(m.daemonSubChans) {
+			return m, listenForRepoDaemonUpdate(msg.idx, m.daemonSubChans[msg.idx])
+		}
+		return m, nil
 	case reposDaemonActionResultMsg:
 		text := msg.msg
 		if msg.err != nil {
 			text = fmt.Sprintf("%s: %v", msg.msg, msg.err)
 		}
 		cmd := m.setStatusMsg(text)
-		m.refreshDaemonStatus()
 		return m, cmd
 	case reposStatusClearMsg:
 		if msg.id == m.statusID {
@@ -379,8 +424,8 @@ func (m reposModel) addRepo(path string) (tea.Model, tea.Cmd) {
 	m.cursor = len(m.repos) - 1 // move cursor to newly added
 	m.state = reposStateList
 	m.statusMsg = fmt.Sprintf("Added %s", filepath.Base(absPath))
-	m.refreshDaemonStatus()
-	return m, nil
+	m.buildCaches()
+	return m, m.cacheListenCmds()
 }
 
 func (m reposModel) removeRepo() (tea.Model, tea.Cmd) {
@@ -404,8 +449,8 @@ func (m reposModel) removeRepo() (tea.Model, tea.Cmd) {
 		m.cursor = len(m.repos) - 1
 	}
 	m.statusMsg = fmt.Sprintf("Removed %s", filepath.Base(path))
-	m.refreshDaemonStatus()
-	return m, nil
+	m.buildCaches()
+	return m, m.cacheListenCmds()
 }
 
 func (m reposModel) View() string {
@@ -537,9 +582,15 @@ func runRepos() error {
 	m := newReposModel()
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	result, err := p.Run()
+	if final, ok := result.(reposModel); ok {
+		for _, cache := range final.daemonCaches {
+			if cache != nil {
+				cache.Stop()
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
-	_ = result.(reposModel)
 	return nil
 }
