@@ -88,11 +88,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		prevRunning := m.daemon.Running
 		m.daemon.PID = msg.State.PID
 		m.daemon.Running = msg.State.Running
+		m.daemonStoppingAfterTask = msg.State.StoppingAfterTask
 		if prevRunning && !m.daemon.Running {
 			m.snapshot = nil
-			if m.daemonStoppingAfterTask {
-				m.daemonStoppingAfterTask = false
-			}
 		}
 		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
 
