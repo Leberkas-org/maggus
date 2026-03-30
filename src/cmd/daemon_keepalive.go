@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -18,6 +19,11 @@ import (
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
+
+// errStopAfterTask is returned by runOneDaemonCycle when the stop-after-task
+// signal was consumed during the cycle. The daemon loop treats this as a clean
+// exit request rather than an error.
+var errStopAfterTask = errors.New("stop-after-task")
 
 // runDaemonLoop runs the daemon work loop with keep-alive behaviour.
 // When no work is found, it watches for feature/bug file changes and retries.
@@ -97,6 +103,9 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		}
 
 		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx)
+		if errors.Is(err, errStopAfterTask) {
+			return nil
+		}
 		if err != nil {
 			runLogger.Info(fmt.Sprintf("work cycle error: %v", err))
 		}
@@ -347,6 +356,10 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	_, tuiErr := p.Run()
 	if tuiErr != nil {
 		return true, fmt.Errorf("TUI error: %w", tuiErr)
+	}
+
+	if stopFlagAtomic.Load() {
+		return true, errStopAfterTask
 	}
 
 	return true, nil

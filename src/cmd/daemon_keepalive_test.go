@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,5 +87,15 @@ func TestWaitForChanges_NilWatcher(t *testing.T) {
 
 	if reason != wakeSignal {
 		t.Errorf("expected wakeSignal with nil watcher, got %v", reason)
+	}
+}
+
+func TestErrStopAfterTask_IsSentinel(t *testing.T) {
+	// errStopAfterTask must be a distinct sentinel that wraps cleanly through errors.Is.
+	if !errors.Is(errStopAfterTask, errStopAfterTask) {
+		t.Fatal("errStopAfterTask should match itself via errors.Is")
+	}
+	if errors.Is(errStopAfterTask, context.Canceled) {
+		t.Fatal("errStopAfterTask must not match context.Canceled")
 	}
 }
