@@ -154,7 +154,7 @@ func (m configModel) View() string {
 	content := sb.String()
 	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q: exit")
 
-	borderColor := styles.ThemeColor(m.is2x)
+	borderColor := styles.ThemeColor(m.isNerfed)
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenColor(content, footer, m.width, m.height, borderColor)
 	}

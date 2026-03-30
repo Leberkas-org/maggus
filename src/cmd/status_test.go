@@ -598,33 +598,33 @@ func TestStatusModel_InitReturnsCmd(t *testing.T) {
 	}
 }
 
-func TestStatusModel_UpdateClaude2xResult(t *testing.T) {
+func TestStatusModel_UpdateClaude2xResultMsg(t *testing.T) {
 	plans := []parser.Plan{
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{
 			{ID: "TASK-001", Criteria: []parser.Criterion{{Checked: false}}},
 		}},
 	}
 
-	t.Run("2x active sets is2x and BorderColor to Warning", func(t *testing.T) {
+	t.Run("nerfed sets isNerfed and BorderColor to Error", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		msg := claude2xResultMsg{status: claude2x.Status{Is2x: true, TwoXWindowExpiresIn: "5h"}}
+		msg := claude2xResultMsg{status: claude2x.Status{IsNerfed: true, TwoXWindowExpiresIn: "5h"}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
-		if !updated.is2x {
-			t.Error("is2x should be true")
+		if !updated.isNerfed {
+			t.Error("isNerfed should be true")
 		}
-		if updated.BorderColor != styles.Warning {
-			t.Errorf("BorderColor = %q, want %q (Warning/yellow)", updated.BorderColor, styles.Warning)
+		if updated.BorderColor != styles.Error {
+			t.Errorf("BorderColor = %q, want %q (Error/red)", updated.BorderColor, styles.Error)
 		}
 	})
 
-	t.Run("2x inactive keeps is2x false and BorderColor Primary", func(t *testing.T) {
+	t.Run("normal keeps isNerfed false and BorderColor Primary", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		msg := claude2xResultMsg{status: claude2x.Status{Is2x: false}}
+		msg := claude2xResultMsg{status: claude2x.Status{IsNerfed: false}}
 		result, _ := m.Update(msg)
 		updated := result.(statusModel)
-		if updated.is2x {
-			t.Error("is2x should be false")
+		if updated.isNerfed {
+			t.Error("isNerfed should be false")
 		}
 		if updated.BorderColor != styles.Primary {
 			t.Errorf("BorderColor = %q, want %q (Primary/cyan)", updated.BorderColor, styles.Primary)
@@ -639,9 +639,9 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		}},
 	}
 
-	t.Run("non-2x view does not contain yellow border styling", func(t *testing.T) {
+	t.Run("normal view does not contain red border styling", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		m.is2x = false
+		m.isNerfed = false
 		m.width = 120
 		m.height = 40
 		m.activeTab = 1 // Item Details tab shows task list
@@ -655,9 +655,9 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		}
 	})
 
-	t.Run("2x view renders without error", func(t *testing.T) {
+	t.Run("nerfed view renders without error", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		m.is2x = true
+		m.isNerfed = true
 		m.width = 120
 		m.height = 40
 		m.activeTab = 1 // Item Details tab shows task list
@@ -671,9 +671,9 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		}
 	})
 
-	t.Run("empty features view renders with 2x", func(t *testing.T) {
+	t.Run("empty features view renders with nerfed", func(t *testing.T) {
 		m := newStatusModel(nil, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
-		m.is2x = true
+		m.isNerfed = true
 		m.width = 120
 		m.height = 40
 		view := m.View()

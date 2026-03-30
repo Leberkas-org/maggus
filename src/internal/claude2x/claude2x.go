@@ -1,58 +1,60 @@
 package claude2x
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"sync"
 	"time"
 )
 
-const apiURL = "https://isclaude2x.com/json"
-
-// Status represents the response from the isclaude2x API.
+// Status represents the current Claude rate limit window status.
+// Nerfed hours: 13:00–19:00 UTC on weekdays. All other times are normal.
 type Status struct {
-	Is2x                       bool   `json:"is2x"`
-	TwoXWindowExpiresIn        string `json:"2xWindowExpiresIn"`
-	TwoXWindowExpiresInSeconds int    `json:"2xWindowExpiresInSeconds"`
+	IsNerfed                   bool   `json:"isNerfed"`
+	TwoXWindowExpiresIn        string `json:"expiresIn"`
+	TwoXWindowExpiresInSeconds int    `json:"expiresInSeconds"`
 }
 
 var (
-	once        sync.Once
-	cached      Status
-	fetchedAt   time.Time
-	urlOverride string
+	mu           sync.RWMutex
+	testOverride *Status
 )
 
-// FetchStatus performs a GET request to the isclaude2x API at most once per process lifetime.
-// Subsequent calls compute the current status from the cached result and elapsed time.
-// On any error (network, parse, non-200 status), it returns a zero-value Status with Is2x: false.
+// FetchStatus computes the current Claude rate window status from the current UTC time.
 func FetchStatus() Status {
-	once.Do(func() {
-		url := apiURL
-		if urlOverride != "" {
-			url = urlOverride
-		}
-		cached = fetchFromURL(url)
-		fetchedAt = time.Now()
-	})
-	return computeStatus()
+	mu.RLock()
+	if testOverride != nil {
+		s := *testOverride
+		mu.RUnlock()
+		return s
+	}
+	mu.RUnlock()
+	return computeFromTime(time.Now().UTC())
 }
 
-func computeStatus() Status {
-	if !cached.Is2x {
+func computeFromTime(now time.Time) Status {
+	weekday := now.Weekday()
+	if weekday == time.Saturday || weekday == time.Sunday {
 		return Status{}
 	}
-	remaining := cached.TwoXWindowExpiresInSeconds - int(time.Since(fetchedAt).Seconds())
-	if remaining <= 0 {
-		return Status{Is2x: false}
+
+	h, m, s := now.Clock()
+	totalSecs := h*3600 + m*60 + s
+
+	const (
+		nerfStart = 13 * 3600 // 13:00 UTC
+		nerfEnd   = 19 * 3600 // 19:00 UTC
+	)
+
+	if totalSecs >= nerfStart && totalSecs < nerfEnd {
+		remaining := nerfEnd - totalSecs
+		return Status{
+			IsNerfed:                   true,
+			TwoXWindowExpiresInSeconds: remaining,
+			TwoXWindowExpiresIn:        formatRemaining(remaining),
+		}
 	}
-	return Status{
-		Is2x:                       true,
-		TwoXWindowExpiresInSeconds: remaining,
-		TwoXWindowExpiresIn:        formatRemaining(remaining),
-	}
+
+	return Status{}
 }
 
 func formatRemaining(seconds int) string {
@@ -68,37 +70,4 @@ func formatRemaining(seconds int) string {
 	default:
 		return fmt.Sprintf("%ds", s)
 	}
-}
-
-func resetCache() {
-	once = sync.Once{}
-	cached = Status{}
-	fetchedAt = time.Time{}
-	urlOverride = ""
-}
-
-func fetchFromURL(url string) Status {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return Status{}
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return Status{}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return Status{}
-	}
-
-	var s Status
-	if err := json.NewDecoder(resp.Body).Decode(&s); err != nil {
-		return Status{}
-	}
-	return s
 }

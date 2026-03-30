@@ -157,7 +157,7 @@ func (m statusModel) viewStatusSplit() string {
 	rightPane := m.renderRightPane(rightW, innerH-2)
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
-	borderColor := styles.ThemeColor(m.is2x)
+	borderColor := styles.ThemeColor(m.isNerfed)
 	footer := styles.StatusBar.Render(m.statusSplitFooter())
 	return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
 }

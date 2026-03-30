@@ -77,7 +77,7 @@ type reposModel struct {
 	daemonCaches   []*DaemonStateCache
 	daemonSubChans []chan daemonPIDState
 
-	is2x bool // true when Claude is in 2x mode (border turns yellow)
+	isNerfed bool // true during nerfed hours 13:00–19:00 UTC (border turns red)
 
 	// File browser sub-model (only active in browsing state)
 	browser    filebrowser.Model
@@ -175,14 +175,14 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case claude2xResultMsg:
-		m.is2x = msg.status.Is2x
-		if m.is2x {
+		m.isNerfed = msg.status.IsNerfed
+		if m.isNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
 	case claude2xTickMsg:
-		is2x, _, tickCmd := fetch2xAndUpdate()
-		m.is2x = is2x
+		isNerfed, _, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
 		return m, tickCmd
 	case reposDaemonUpdateMsg:
 		if msg.idx < len(m.daemonRunning) {
@@ -538,7 +538,7 @@ func (m reposModel) viewList() string {
 	content := b.String()
 	footer := styles.StatusBar.Render("s start/stop daemon · a toggle auto-start · enter switch · n add · d remove · q: exit")
 
-	borderColor := styles.ThemeColor(m.is2x)
+	borderColor := styles.ThemeColor(m.isNerfed)
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
 	}
@@ -561,7 +561,7 @@ func (m reposModel) viewConfirmInit() string {
 	content := b.String()
 	footer := styles.StatusBar.Render("y: initialize · n: add without initializing · esc: cancel")
 
-	borderColor := styles.ThemeColor(m.is2x)
+	borderColor := styles.ThemeColor(m.isNerfed)
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeftColor(content, footer, m.width, m.height, borderColor)
 	}

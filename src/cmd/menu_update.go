@@ -129,15 +129,15 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case claude2xResultMsg:
-		m.is2x = msg.status.Is2x
+		m.isNerfed = msg.status.IsNerfed
 		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
-		if m.is2x {
+		if m.isNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
 	case claude2xTickMsg:
-		is2x, expiresIn, tickCmd := fetch2xAndUpdate()
-		m.is2x = is2x
+		isNerfed, expiresIn, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
 		m.twoXExpiresIn = expiresIn
 		return m, tickCmd
 	case updateCheckResultMsg:

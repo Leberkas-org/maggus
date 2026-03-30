@@ -65,7 +65,7 @@ type statusModel struct {
 
 	approvalRequired bool // from config; used when reloading plans
 
-	is2x bool // true when Claude is in 2x mode (border turns yellow)
+	isNerfed bool // true during nerfed hours 13:00–19:00 UTC (border turns red)
 
 	// Temporary status note (e.g. "feature approved")
 	statusNote string

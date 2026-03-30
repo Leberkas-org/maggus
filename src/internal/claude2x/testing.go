@@ -1,25 +1,25 @@
 package claude2x
 
-import (
-	"sync"
-	"time"
-)
-
-// SetTestCache sets the cache directly for testing purposes.
-// The once is marked as done so FetchStatus() will not make an HTTP call.
-// remainingSeconds controls how much time appears to be left.
-func SetTestCache(is2x bool, remainingSeconds int) {
-	once = sync.Once{}
-	cached = Status{
-		Is2x:                       is2x,
-		TwoXWindowExpiresInSeconds: remainingSeconds,
+// SetTestCache sets an explicit status override for testing purposes.
+// If isNerfed is true and remainingSeconds > 0, returns an active nerfed status.
+// Otherwise returns a zero Status (simulates normal/off hours).
+func SetTestCache(isNerfed bool, remainingSeconds int) {
+	mu.Lock()
+	defer mu.Unlock()
+	if isNerfed && remainingSeconds > 0 {
+		testOverride = &Status{
+			IsNerfed:                   true,
+			TwoXWindowExpiresInSeconds: remainingSeconds,
+			TwoXWindowExpiresIn:        formatRemaining(remainingSeconds),
+		}
+	} else {
+		testOverride = &Status{}
 	}
-	fetchedAt = time.Now()
-	// Mark once as done so FetchStatus() uses the cache.
-	once.Do(func() {})
 }
 
-// ResetTestCache resets the cache to its zero state for test cleanup.
+// ResetTestCache clears the test override so FetchStatus uses the real time-based logic.
 func ResetTestCache() {
-	resetCache()
+	mu.Lock()
+	defer mu.Unlock()
+	testOverride = nil
 }

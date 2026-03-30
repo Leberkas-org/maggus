@@ -1,206 +1,119 @@
 package claude2x
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
 
-func TestFetchStatus_Success2x(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                     true,
-			"2xWindowExpiresIn":        "17h 54m 44s",
-			"2xWindowExpiresInSeconds": 64484,
-		})
-	}))
-	defer srv.Close()
+// makeWeekday returns a Monday at the given hour:minute:second UTC.
+func makeWeekday(h, m, s int) time.Time {
+	// 2026-03-02 is a Monday
+	return time.Date(2026, 3, 2, h, m, s, 0, time.UTC)
+}
 
-	urlOverride = srv.URL
+// makeWeekend returns a Saturday at the given hour:minute:second UTC.
+func makeWeekend(h, m, s int) time.Time {
+	// 2026-03-07 is a Saturday
+	return time.Date(2026, 3, 7, h, m, s, 0, time.UTC)
+}
+
+func TestComputeFromTime_Weekday_Normal(t *testing.T) {
+	// Outside 13:00–19:00 → normal (not nerfed)
+	for _, tc := range []struct{ h, m, s int }{
+		{0, 0, 0}, {6, 0, 0}, {12, 59, 59}, {19, 0, 0}, {23, 59, 59},
+	} {
+		s := computeFromTime(makeWeekday(tc.h, tc.m, tc.s))
+		if s.IsNerfed {
+			t.Errorf("at %02d:%02d:%02d expected normal (IsNerfed=false), got IsNerfed=true", tc.h, tc.m, tc.s)
+		}
+	}
+}
+
+func TestComputeFromTime_Weekday_NerfedHours(t *testing.T) {
+	// 13:00–19:00 weekday → nerfed
+	for _, tc := range []struct{ h, m, s int }{
+		{13, 0, 0}, {16, 0, 0}, {18, 59, 59},
+	} {
+		st := computeFromTime(makeWeekday(tc.h, tc.m, tc.s))
+		if !st.IsNerfed {
+			t.Errorf("at %02d:%02d:%02d expected IsNerfed=true", tc.h, tc.m, tc.s)
+		}
+		if st.TwoXWindowExpiresInSeconds <= 0 {
+			t.Errorf("at %02d:%02d:%02d expected positive remaining seconds, got %d", tc.h, tc.m, tc.s, st.TwoXWindowExpiresInSeconds)
+		}
+	}
+}
+
+func TestComputeFromTime_Weekday_Boundaries(t *testing.T) {
+	// Exactly at 13:00 → nerfed, 6h remaining
+	s := computeFromTime(makeWeekday(13, 0, 0))
+	if !s.IsNerfed {
+		t.Error("at 13:00:00 expected nerfed")
+	}
+	if s.TwoXWindowExpiresInSeconds != 6*3600 {
+		t.Errorf("at 13:00:00 expected 6h remaining, got %d", s.TwoXWindowExpiresInSeconds)
+	}
+
+	// Exactly at 19:00 → normal
+	s = computeFromTime(makeWeekday(19, 0, 0))
+	if s.IsNerfed {
+		t.Error("at 19:00:00 expected normal (not nerfed)")
+	}
+
+	// Exactly at 01:00 → normal
+	s = computeFromTime(makeWeekday(1, 0, 0))
+	if s.IsNerfed {
+		t.Error("at 01:00:00 expected normal (not nerfed)")
+	}
+}
+
+func TestComputeFromTime_Weekend(t *testing.T) {
+	// Weekends are never nerfed, even during 13:00–19:00
+	for _, tc := range []struct{ h, m, s int }{
+		{0, 0, 0}, {13, 0, 0}, {16, 0, 0}, {23, 59, 59},
+	} {
+		st := computeFromTime(makeWeekend(tc.h, tc.m, tc.s))
+		if st.IsNerfed {
+			t.Errorf("Saturday %02d:%02d expected IsNerfed=false", tc.h, tc.m)
+		}
+	}
+
+	// Sunday
+	sunday := time.Date(2026, 3, 8, 15, 0, 0, 0, time.UTC)
+	if computeFromTime(sunday).IsNerfed {
+		t.Error("Sunday expected IsNerfed=false")
+	}
+}
+
+func TestFetchStatus_TestOverride_Active(t *testing.T) {
+	SetTestCache(true, 3600)
+	t.Cleanup(ResetTestCache)
+
 	s := FetchStatus()
-	if !s.Is2x {
-		t.Error("expected Is2x to be true")
+	if !s.IsNerfed {
+		t.Error("expected IsNerfed=true from test override")
 	}
-	if s.TwoXWindowExpiresInSeconds < 64480 {
-		t.Errorf("expected TwoXWindowExpiresInSeconds ~64484, got %d", s.TwoXWindowExpiresInSeconds)
+	if s.TwoXWindowExpiresInSeconds < 3595 {
+		t.Errorf("expected ~3600 remaining, got %d", s.TwoXWindowExpiresInSeconds)
 	}
 }
 
-func TestFetchStatus_SuccessNot2x(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                     false,
-			"2xWindowExpiresIn":        nil,
-			"2xWindowExpiresInSeconds": 0,
-		})
-	}))
-	defer srv.Close()
+func TestFetchStatus_TestOverride_Expired(t *testing.T) {
+	SetTestCache(true, 0)
+	t.Cleanup(ResetTestCache)
 
-	urlOverride = srv.URL
 	s := FetchStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false")
+	if s.IsNerfed {
+		t.Error("expected IsNerfed=false when remainingSeconds=0")
 	}
 }
 
-func TestFetchStatus_Non200(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+func TestFetchStatus_TestOverride_Reset(t *testing.T) {
+	SetTestCache(true, 3600)
+	ResetTestCache()
 
-	urlOverride = srv.URL
-	s := FetchStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false on non-200")
-	}
-}
-
-func TestFetchStatus_MalformedJSON(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("not json"))
-	}))
-	defer srv.Close()
-
-	urlOverride = srv.URL
-	s := FetchStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false on malformed JSON")
-	}
-}
-
-func TestFetchStatus_NetworkError(t *testing.T) {
-	resetCache()
-	urlOverride = "http://127.0.0.1:1" // nothing listening
-	s := FetchStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false on network error")
-	}
-}
-
-func TestFetchStatus_Timeout(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(5 * time.Second)
-		json.NewEncoder(w).Encode(map[string]any{"is2x": true})
-	}))
-	defer srv.Close()
-
-	urlOverride = srv.URL
-	start := time.Now()
-	s := FetchStatus()
-	elapsed := time.Since(start)
-
-	if s.Is2x {
-		t.Error("expected Is2x to be false on timeout")
-	}
-	if elapsed > 4*time.Second {
-		t.Errorf("expected timeout within ~3s, took %v", elapsed)
-	}
-}
-
-func TestFetchStatus_ExtraFieldsIgnored(t *testing.T) {
-	resetCache()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                     true,
-			"2xWindowExpiresIn":        "1h 2m 3s",
-			"2xWindowExpiresInSeconds": 3723,
-			"promoActive":              true,
-			"isPeak":                   false,
-			"currentTimeET":            "2026-03-19T19:15:42",
-		})
-	}))
-	defer srv.Close()
-
-	urlOverride = srv.URL
-	s := FetchStatus()
-	if !s.Is2x {
-		t.Error("expected Is2x to be true")
-	}
-	if s.TwoXWindowExpiresInSeconds < 3720 {
-		t.Errorf("expected ~3723, got %d", s.TwoXWindowExpiresInSeconds)
-	}
-}
-
-func TestFetchStatus_CacheHit(t *testing.T) {
-	resetCache()
-	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		json.NewEncoder(w).Encode(map[string]any{
-			"is2x":                     true,
-			"2xWindowExpiresInSeconds": 3600,
-			"2xWindowExpiresIn":        "1h 0m 0s",
-		})
-	}))
-	defer srv.Close()
-
-	urlOverride = srv.URL
-	FetchStatus()
-	FetchStatus()
-	FetchStatus()
-
-	if calls != 1 {
-		t.Errorf("expected exactly 1 API call, got %d", calls)
-	}
-}
-
-func TestComputeStatus_StillActive(t *testing.T) {
-	resetCache()
-	cached = Status{
-		Is2x:                       true,
-		TwoXWindowExpiresInSeconds: 3600,
-		TwoXWindowExpiresIn:        "1h 0m 0s",
-	}
-	fetchedAt = time.Now().Add(-30 * time.Minute)
-
-	s := computeStatus()
-	if !s.Is2x {
-		t.Error("expected Is2x to be true")
-	}
-	// ~1800 remaining (3600 - 1800)
-	if s.TwoXWindowExpiresInSeconds < 1790 || s.TwoXWindowExpiresInSeconds > 1810 {
-		t.Errorf("expected remaining ~1800, got %d", s.TwoXWindowExpiresInSeconds)
-	}
-	if s.TwoXWindowExpiresIn != "30m 0s" && s.TwoXWindowExpiresIn != "29m 59s" && s.TwoXWindowExpiresIn != "30m 1s" {
-		t.Errorf("expected formatted ~30m 0s, got %q", s.TwoXWindowExpiresIn)
-	}
-}
-
-func TestComputeStatus_Expired(t *testing.T) {
-	resetCache()
-	cached = Status{
-		Is2x:                       true,
-		TwoXWindowExpiresInSeconds: 10,
-		TwoXWindowExpiresIn:        "10s",
-	}
-	fetchedAt = time.Now().Add(-11 * time.Second)
-
-	s := computeStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false after expiry")
-	}
-}
-
-func TestComputeStatus_WasNot2x(t *testing.T) {
-	resetCache()
-	cached = Status{Is2x: false}
-	fetchedAt = time.Now()
-
-	s := computeStatus()
-	if s.Is2x {
-		t.Error("expected Is2x to be false")
-	}
-	if s.TwoXWindowExpiresInSeconds != 0 {
-		t.Errorf("expected 0 seconds, got %d", s.TwoXWindowExpiresInSeconds)
-	}
+	// After reset, should use real time logic without panic
+	_ = FetchStatus()
 }
 
 func TestFormatRemaining_HoursMinSec(t *testing.T) {

@@ -18,7 +18,7 @@ const logo = `
  ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝`
 
 func (m menuModel) View() string {
-	themeColor := styles.ThemeColor(m.is2x)
+	themeColor := styles.ThemeColor(m.isNerfed)
 	logoStyle := lipgloss.NewStyle().Foreground(themeColor).Bold(true)
 	versionStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 	versionLine := versionStyle.Render(fmt.Sprintf("v%s — Markdown Agent for Goal-Gated Unsupervised Sprints", Version))
@@ -59,11 +59,11 @@ func (m menuModel) View() string {
 	// Daemon status line
 	header += "\n" + centerLine(formatDaemonStatusLine(m.daemon), contentW)
 
-	// Show 2x remaining time below the summary when active
-	if m.is2x && m.twoXExpiresIn != "" {
-		twoXStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
-		twoXLine := twoXStyle.Render(fmt.Sprintf("2x expires in: %s", m.twoXExpiresIn))
-		header += "\n" + centerLine(twoXLine, contentW)
+	// Show nerfed remaining time below the summary when active
+	if m.isNerfed && m.twoXExpiresIn != "" {
+		nerfedStyle := lipgloss.NewStyle().Foreground(styles.Error).Bold(true)
+		nerfedLine := nerfedStyle.Render(fmt.Sprintf("nerfed for: %s", m.twoXExpiresIn))
+		header += "\n" + centerLine(nerfedLine, contentW)
 	}
 
 	// Show update banner when available

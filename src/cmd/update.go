@@ -74,7 +74,7 @@ type updateModel struct {
 	autoUpdateOrigIdx int  // original index (to detect changes)
 	autoUpdateDirty   bool // true if user changed the setting
 
-	is2x       bool // true when Claude is in 2x mode (border turns yellow)
+	isNerfed   bool // true during nerfed hours 13:00–19:00 UTC (border turns red)
 	standalone bool // true when run via the cobra command (uses tea.Quit); false when embedded in the app router (uses navigateBackMsg)
 }
 
@@ -148,14 +148,14 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, updateTickCmd()
 
 	case claude2xResultMsg:
-		m.is2x = msg.status.Is2x
-		if m.is2x {
+		m.isNerfed = msg.status.IsNerfed
+		if m.isNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
 	case claude2xTickMsg:
-		is2x, _, tickCmd := fetch2xAndUpdate()
-		m.is2x = is2x
+		isNerfed, _, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
 		return m, tickCmd
 
 	case updateCheckMsg:
@@ -501,7 +501,7 @@ func (m updateModel) View() string {
 
 	visible := strings.Join(visibleLines, "\n")
 
-	borderColor := styles.ThemeColor(m.is2x)
+	borderColor := styles.ThemeColor(m.isNerfed)
 	if m.width > 0 && m.height > 0 {
 		return styles.FullScreenLeftColor(visible, footer, m.width, m.height, borderColor)
 	}

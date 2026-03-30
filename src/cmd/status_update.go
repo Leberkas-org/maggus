@@ -57,16 +57,16 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case claude2xResultMsg:
-		m.is2x = msg.status.Is2x
-		m.BorderColor = styles.ThemeColor(m.is2x)
-		if m.is2x {
+		m.isNerfed = msg.status.IsNerfed
+		m.BorderColor = styles.ThemeColor(m.isNerfed)
+		if m.isNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
 	case claude2xTickMsg:
-		is2x, _, tickCmd := fetch2xAndUpdate()
-		m.is2x = is2x
-		m.BorderColor = styles.ThemeColor(m.is2x)
+		isNerfed, _, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
+		m.BorderColor = styles.ThemeColor(m.isNerfed)
 		return m, tickCmd
 
 	case spinnerTickMsg:

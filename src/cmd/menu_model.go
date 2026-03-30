@@ -233,8 +233,8 @@ type menuModel struct {
 	width           int
 	height          int
 	cwd             string // current working directory, shown in header
-	is2x            bool   // true when Claude is in 2x mode (logo/border turn yellow)
-	twoXExpiresIn   string // e.g. "17h 54m 44s" — only set when is2x is true
+	isNerfed        bool   // true during nerfed hours 13:00–19:00 UTC (border turns red)
+	twoXExpiresIn   string // e.g. "5h 59m 59s" — only set when isNerfed is true
 	updateBanner    string // one-line update notification shown below summary
 	showShortcuts   bool   // true while alt is held — underlines shortcut chars
 	shortcutTimerID int    // monotonic counter to identify the latest hide timer

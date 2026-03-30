@@ -83,7 +83,7 @@ type configModel struct {
 	origInclude           []string
 	origProtectedBranches []string
 	statusText            string
-	is2x                  bool
+	isNerfed              bool
 }
 
 // activeRows returns a pointer to the currently active tab's row slice.
@@ -305,14 +305,14 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case claude2xResultMsg:
-		m.is2x = msg.status.Is2x
-		if m.is2x {
+		m.isNerfed = msg.status.IsNerfed
+		if m.isNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
 	case claude2xTickMsg:
-		is2x, _, tickCmd := fetch2xAndUpdate()
-		m.is2x = is2x
+		isNerfed, _, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
 		return m, tickCmd
 
 	case configResultMsg:

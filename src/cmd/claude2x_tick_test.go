@@ -25,20 +25,19 @@ func assertNoTickScheduled(t *testing.T, cmd tea.Cmd) {
 }
 
 func TestMenuUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
-	// Seed the claude2x cache with an active 2x status.
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
 	m := menuModel{
-		items: activeMenuItems(),
-		is2x:  true,
+		items:    activeMenuItems(),
+		isNerfed: true,
 	}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	mm := model.(menuModel)
 
-	if !mm.is2x {
-		t.Error("expected is2x to remain true")
+	if !mm.isNerfed {
+		t.Error("expected isNerfed to remain true")
 	}
 	if mm.twoXExpiresIn == "" {
 		t.Error("expected twoXExpiresIn to be set")
@@ -47,21 +46,20 @@ func TestMenuUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 }
 
 func TestMenuUpdate_Claude2xTickMsg_Expired(t *testing.T) {
-	// Seed the cache with an expired 2x status.
 	claude2x.SetTestCache(true, 0)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
 	m := menuModel{
 		items:         activeMenuItems(),
-		is2x:          true,
+		isNerfed:      true,
 		twoXExpiresIn: "1s",
 	}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	mm := model.(menuModel)
 
-	if mm.is2x {
-		t.Error("expected is2x to be false after expiry")
+	if mm.isNerfed {
+		t.Error("expected isNerfed to be false after expiry")
 	}
 	if mm.twoXExpiresIn != "" {
 		t.Errorf("expected twoXExpiresIn to be empty, got %q", mm.twoXExpiresIn)
@@ -73,25 +71,25 @@ func TestMenuUpdate_Claude2xResultMsg_SchedulesTick(t *testing.T) {
 	m := menuModel{items: activeMenuItems()}
 
 	model, cmd := m.Update(claude2xResultMsg{status: claude2x.Status{
-		Is2x:                true,
+		IsNerfed:            true,
 		TwoXWindowExpiresIn: "1h 0m 0s",
 	}})
 	mm := model.(menuModel)
 
-	if !mm.is2x {
-		t.Error("expected is2x to be true")
+	if !mm.isNerfed {
+		t.Error("expected isNerfed to be true")
 	}
 	assertTickScheduled(t, cmd)
 }
 
-func TestMenuUpdate_Claude2xResultMsg_NoTickWhenNot2x(t *testing.T) {
+func TestMenuUpdate_Claude2xResultMsg_NoTickWhenNormal(t *testing.T) {
 	m := menuModel{items: activeMenuItems()}
 
-	model, cmd := m.Update(claude2xResultMsg{status: claude2x.Status{Is2x: false}})
+	model, cmd := m.Update(claude2xResultMsg{status: claude2x.Status{IsNerfed: false}})
 	mm := model.(menuModel)
 
-	if mm.is2x {
-		t.Error("expected is2x to be false")
+	if mm.isNerfed {
+		t.Error("expected isNerfed to be false")
 	}
 	assertNoTickScheduled(t, cmd)
 }
@@ -100,16 +98,16 @@ func TestStatusUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := statusModel{is2x: true}
+	m := statusModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	sm := model.(statusModel)
 
-	if !sm.is2x {
-		t.Error("expected is2x to remain true")
+	if !sm.isNerfed {
+		t.Error("expected isNerfed to remain true")
 	}
 	if sm.BorderColor != styles.ThemeColor(true) {
-		t.Error("expected border color to match 2x theme")
+		t.Error("expected border color to match nerfed theme")
 	}
 	assertTickScheduled(t, cmd)
 }
@@ -118,13 +116,13 @@ func TestStatusUpdate_Claude2xTickMsg_Expired(t *testing.T) {
 	claude2x.SetTestCache(true, 0)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := statusModel{is2x: true}
+	m := statusModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	sm := model.(statusModel)
 
-	if sm.is2x {
-		t.Error("expected is2x to be false after expiry")
+	if sm.isNerfed {
+		t.Error("expected isNerfed to be false after expiry")
 	}
 	if sm.BorderColor != styles.ThemeColor(false) {
 		t.Error("expected border color to reset to default")
@@ -136,13 +134,13 @@ func TestConfigUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := configModel{is2x: true}
+	m := configModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	cm := model.(configModel)
 
-	if !cm.is2x {
-		t.Error("expected is2x to remain true")
+	if !cm.isNerfed {
+		t.Error("expected isNerfed to remain true")
 	}
 	assertTickScheduled(t, cmd)
 }
@@ -151,13 +149,13 @@ func TestConfigUpdate_Claude2xTickMsg_Expired(t *testing.T) {
 	claude2x.SetTestCache(true, 0)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := configModel{is2x: true}
+	m := configModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	cm := model.(configModel)
 
-	if cm.is2x {
-		t.Error("expected is2x to be false after expiry")
+	if cm.isNerfed {
+		t.Error("expected isNerfed to be false after expiry")
 	}
 	assertNoTickScheduled(t, cmd)
 }
@@ -166,13 +164,13 @@ func TestReposUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := reposModel{is2x: true}
+	m := reposModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	rm := model.(reposModel)
 
-	if !rm.is2x {
-		t.Error("expected is2x to remain true")
+	if !rm.isNerfed {
+		t.Error("expected isNerfed to remain true")
 	}
 	assertTickScheduled(t, cmd)
 }
@@ -181,13 +179,13 @@ func TestReposUpdate_Claude2xTickMsg_Expired(t *testing.T) {
 	claude2x.SetTestCache(true, 0)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := reposModel{is2x: true}
+	m := reposModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	rm := model.(reposModel)
 
-	if rm.is2x {
-		t.Error("expected is2x to be false after expiry")
+	if rm.isNerfed {
+		t.Error("expected isNerfed to be false after expiry")
 	}
 	assertNoTickScheduled(t, cmd)
 }
@@ -196,13 +194,13 @@ func TestUpdateModelUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := updateModel{is2x: true}
+	m := updateModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	um := model.(updateModel)
 
-	if !um.is2x {
-		t.Error("expected is2x to remain true")
+	if !um.isNerfed {
+		t.Error("expected isNerfed to remain true")
 	}
 	assertTickScheduled(t, cmd)
 }
@@ -211,13 +209,13 @@ func TestUpdateModelUpdate_Claude2xTickMsg_Expired(t *testing.T) {
 	claude2x.SetTestCache(true, 0)
 	t.Cleanup(func() { claude2x.ResetTestCache() })
 
-	m := updateModel{is2x: true}
+	m := updateModel{isNerfed: true}
 
 	model, cmd := m.Update(claude2xTickMsg{})
 	um := model.(updateModel)
 
-	if um.is2x {
-		t.Error("expected is2x to be false after expiry")
+	if um.isNerfed {
+		t.Error("expected isNerfed to be false after expiry")
 	}
 	assertNoTickScheduled(t, cmd)
 }

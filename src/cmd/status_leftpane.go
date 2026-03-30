@@ -52,7 +52,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	}
 
 	// Border dims when the right pane has focus.
-	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.is2x))
+	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.isNerfed))
 
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 

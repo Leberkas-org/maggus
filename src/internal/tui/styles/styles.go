@@ -208,11 +208,10 @@ func fullScreenInner(width, height int) (int, int) {
 	return innerW, innerH
 }
 
-// ThemeColor returns Warning (yellow) when is2x is true, otherwise Primary (cyan).
-// Used to dynamically switch logo and border colors based on Claude 2x status.
-func ThemeColor(is2x bool) lipgloss.Color {
-	if is2x {
-		return Warning
+// ThemeColor returns Error (red) during nerfed hours, otherwise Primary (cyan).
+func ThemeColor(isNerfed bool) lipgloss.Color {
+	if isNerfed {
+		return Error
 	}
 	return Primary
 }
