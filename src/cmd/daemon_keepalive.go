@@ -115,6 +115,12 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 			continue
 		}
 
+		// No work found — exit immediately if stop-after-task was requested.
+		if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+			removeStopAfterTaskFile(dir)
+			return nil
+		}
+
 		// No work found — enter wait state.
 		runLogger.Info("no work found, watching for changes")
 
