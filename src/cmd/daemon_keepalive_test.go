@@ -32,7 +32,7 @@ func TestWaitForChanges_FileChange(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(featDir, "feature_099.md"), []byte("# Test"), 0o644)
 	}()
 
-	reason, path := waitForChanges(fw, ctx)
+	reason, path := waitForChanges(fw, ctx, dir)
 
 	if reason != wakeFileChange {
 		t.Errorf("expected wakeFileChange, got %v", reason)
@@ -64,7 +64,7 @@ func TestWaitForChanges_ContextCancel(t *testing.T) {
 	}()
 
 	start := time.Now()
-	reason, _ := waitForChanges(fw, ctx)
+	reason, _ := waitForChanges(fw, ctx, dir)
 	elapsed := time.Since(start)
 
 	if reason != wakeSignal {
@@ -77,16 +77,50 @@ func TestWaitForChanges_ContextCancel(t *testing.T) {
 
 func TestWaitForChanges_NilWatcher(t *testing.T) {
 	// When watcher is nil, waitForChanges blocks on context only.
+	dir := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 	}()
 
-	reason, _ := waitForChanges(nil, ctx)
+	reason, _ := waitForChanges(nil, ctx, dir)
 
 	if reason != wakeSignal {
 		t.Errorf("expected wakeSignal with nil watcher, got %v", reason)
+	}
+}
+
+func TestWaitForChanges_StopAfterTask(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	fw, err := filewatcher.New(dir, nil, 500*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fw.Close()
+
+	ctx := context.Background()
+
+	// Write stop-after-task sentinel file after a short delay.
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = os.WriteFile(daemonStopAfterTaskFilePath(dir), []byte{}, 0o644)
+	}()
+
+	start := time.Now()
+	reason, _ := waitForChanges(fw, ctx, dir)
+	elapsed := time.Since(start)
+
+	if reason != wakeStopAfterTask {
+		t.Errorf("expected wakeStopAfterTask, got %v", reason)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("took too long to detect sentinel file: %v", elapsed)
 	}
 }
 

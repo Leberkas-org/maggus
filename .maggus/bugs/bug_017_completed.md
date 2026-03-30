@@ -89,8 +89,8 @@ The caller in `runDaemonLoop` then handles `wakeStopAfterTask` by removing the f
 **Description:** As a user, I want the daemon to react within milliseconds if I press stop-after-task while it is already in its idle wait state, so I'm not stuck waiting up to 30 seconds.
 
 **Acceptance Criteria:**
-- [ ] `waitForChanges` polls the stop-after-task sentinel file (500 ms interval) alongside the existing file-change watcher
-- [ ] When the sentinel file is detected inside `waitForChanges`, the function returns a new `wakeStopAfterTask` reason
-- [ ] The caller in `runDaemonLoop` handles `wakeStopAfterTask` by removing the sentinel file and returning nil
-- [ ] Normal file-change waking and context-cancellation shutdown are unaffected
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `waitForChanges` polls the stop-after-task sentinel file (500 ms interval) alongside the existing file-change watcher
+- [x] When the sentinel file is detected inside `waitForChanges`, the function returns a new `wakeStopAfterTask` reason
+- [x] The caller in `runDaemonLoop` handles `wakeStopAfterTask` by removing the sentinel file and returning nil
+- [x] Normal file-change waking and context-cancellation shutdown are unaffected
+- [x] `go vet ./...` and `go test ./...` pass

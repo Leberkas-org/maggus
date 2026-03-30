@@ -124,9 +124,12 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		// No work found — enter wait state.
 		runLogger.Info("no work found, watching for changes")
 
-		wakeReason, wakePath := waitForChanges(fw, workCtx)
+		wakeReason, wakePath := waitForChanges(fw, workCtx, dir)
 		switch wakeReason {
 		case wakeSignal:
+			return nil
+		case wakeStopAfterTask:
+			removeStopAfterTaskFile(dir)
 			return nil
 		case wakeFileChange:
 			runLogger.Info(fmt.Sprintf("file change detected: %s", wakePath))
@@ -138,22 +141,35 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 type wakeReason int
 
 const (
-	wakeSignal     wakeReason = iota // shutdown signal received
-	wakeFileChange                   // file change detected
+	wakeSignal        wakeReason = iota // shutdown signal received
+	wakeFileChange                      // file change detected
+	wakeStopAfterTask                   // stop-after-task sentinel file detected
 )
 
 // daemonIdlePollInterval is the maximum time the daemon will wait idle before
 // re-checking for work, providing a fallback for missed fsnotify events.
 const daemonIdlePollInterval = 30 * time.Second
 
-// waitForChanges blocks until a file change or context cancellation.
+// waitForChanges blocks until a file change, context cancellation, or
+// stop-after-task sentinel file detection.
 // It uses the provided filewatcher (which may be nil if creation failed).
 // Returns the reason for waking and the path of the changed file (if applicable).
-func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, string) {
+func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (wakeReason, string) {
+	stopAfterTaskTicker := time.NewTicker(500 * time.Millisecond)
+	defer stopAfterTaskTicker.Stop()
+
 	if fw == nil {
-		// No watcher available — block on context only.
-		<-ctx.Done()
-		return wakeSignal, ""
+		// No watcher available — block on context or stop-after-task only.
+		for {
+			select {
+			case <-ctx.Done():
+				return wakeSignal, ""
+			case <-stopAfterTaskTicker.C:
+				if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+					return wakeStopAfterTask, ""
+				}
+			}
+		}
 	}
 
 	type fileEvent struct {
@@ -175,13 +191,19 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, s
 	})
 	defer fw.SetSend(nil)
 
-	select {
-	case <-ctx.Done():
-		return wakeSignal, ""
-	case evt := <-wakeCh:
-		return wakeFileChange, evt.path
-	case <-time.After(daemonIdlePollInterval):
-		return wakeFileChange, ""
+	for {
+		select {
+		case <-ctx.Done():
+			return wakeSignal, ""
+		case evt := <-wakeCh:
+			return wakeFileChange, evt.path
+		case <-stopAfterTaskTicker.C:
+			if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+				return wakeStopAfterTask, ""
+			}
+		case <-time.After(daemonIdlePollInterval):
+			return wakeFileChange, ""
+		}
 	}
 }
 
