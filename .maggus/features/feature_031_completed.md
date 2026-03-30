@@ -73,29 +73,29 @@ is finishing its current task, so I know it received my request.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `statusModel` gains a `daemonStoppingAfterTask bool` field (in `status_model.go`)
-- [ ] In `updateStatusDaemonStopOverlay` (`status_update.go`):
+- [x] `statusModel` gains a `daemonStoppingAfterTask bool` field (in `status_model.go`)
+- [x] In `updateStatusDaemonStopOverlay` (`status_update.go`):
   - `s`/`S` (was `y`/`Y`) → calls `sendStopAfterTaskSignal(dir)`, sets
     `m.daemonStoppingAfterTask = true`, closes the overlay, stays in the status view
   - `k`/`K`/`ctrl+c` key handling is unchanged (immediate kill)
   - `esc` handling is unchanged (cancel overlay)
   - Old `y`/`Y` case is removed (it was a dead binding — the footer always showed `[s]`)
-- [ ] In `updateExitDaemonOverlay` (`status_update.go`):
+- [x] In `updateExitDaemonOverlay` (`status_update.go`):
   - `s`/`S` (was `y`/`Y`) → calls `sendStopAfterTaskSignal(dir)`, then quits the view
     (daemon will stop in background after the current task)
   - `k`/`K`/`ctrl+c` is unchanged
   - `d`/`D` is unchanged (disconnect without stopping daemon)
   - `esc`/`q`/`Q` is unchanged
   - Old `y`/`Y` case is removed
-- [ ] When `daemonCacheUpdateMsg` arrives and `daemonStoppingAfterTask` is `true` and
+- [x] When `daemonCacheUpdateMsg` arrives and `daemonStoppingAfterTask` is `true` and
   `msg.State.Running` is `false`, `daemonStoppingAfterTask` is reset to `false`
-- [ ] `statusSplitFooter` (`status_view.go`) renders an amber/warning "Stopping after
+- [x] `statusSplitFooter` (`status_view.go`) renders an amber/warning "Stopping after
   task…" line when `daemonStoppingAfterTask` is `true` and no overlay is active — placed
   above the normal footer hint so it is clearly visible
-- [ ] The left-pane daemon status line (`status_leftpane.go` or equivalent) shows a
+- [x] The left-pane daemon status line (`status_leftpane.go` or equivalent) shows a
   `(stopping after task)` annotation next to the daemon running indicator while
   `daemonStoppingAfterTask` is `true`
-- [ ] `go build ./...` passes with no errors
+- [x] `go build ./...` passes with no errors
 
 ## Task Dependency Graph
 

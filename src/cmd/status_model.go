@@ -80,6 +80,10 @@ type statusModel struct {
 	// Exit daemon prompt overlay (shown when daemon is running and auto-start is disabled)
 	exitDaemonOverlay bool
 
+	// daemonStoppingAfterTask is true after the user has sent the stop-after-task signal.
+	// It is cleared when the daemon process exits (daemon cache reports Running: false).
+	daemonStoppingAfterTask bool
+
 	// Live log panel scroll state
 	logScroll     int
 	logAutoScroll bool

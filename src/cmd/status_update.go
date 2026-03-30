@@ -90,6 +90,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.daemon.Running = msg.State.Running
 		if prevRunning && !m.daemon.Running {
 			m.snapshot = nil
+			if m.daemonStoppingAfterTask {
+				m.daemonStoppingAfterTask = false
+			}
 		}
 		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
 
@@ -392,12 +395,13 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 
 func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
-		// Graceful stop (stop after current task).
+	case "s", "S":
+		// Stop after current task — send the stop-after-task signal, stay in status view.
 		m.daemonStopOverlay = false
+		m.daemonStoppingAfterTask = true
 		dir := m.dir
 		return m, func() tea.Msg {
-			_ = stopDaemonGracefully(dir)
+			_ = sendStopAfterTaskSignal(dir)
 			return nil
 		}
 	case "k", "K", "ctrl+c", "ctrl+C":
@@ -421,8 +425,9 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	switch msg.String() {
 	case "d", "D":
 		return m, func() tea.Msg { return navigateBackMsg{} }
-	case "y", "Y":
-		_ = stopDaemonGracefully(m.dir)
+	case "s", "S":
+		// Stop after current task, then exit. Daemon finishes in background.
+		_ = sendStopAfterTaskSignal(m.dir)
 		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "k", "K", "ctrl+c", "ctrl+C":
 		_ = forceKill(m.daemon.PID)

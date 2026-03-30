@@ -99,7 +99,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			lines = append(lines, "")
 		}
 
-		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Warning).Render("[y] stop"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Warning).Render("[s] stop after task"))
 		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Error).Render("[ctrl+c] kill"))
 		lines = append(lines, lipgloss.NewStyle().Foreground(styles.Muted).Render("[esc] no/cancel "))
 	} else {
@@ -111,7 +111,10 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 	if !m.exitDaemonOverlay && !m.daemonStopOverlay {
 		if m.daemon.Running {
 			daemonLine = lipgloss.NewStyle().Foreground(styles.Success).Render("● Running")
-			if m.daemon.CurrentTask != "" {
+			if m.daemonStoppingAfterTask {
+				stoppingAnnotation := lipgloss.NewStyle().Foreground(styles.Warning).Render(" (stopping after task)")
+				daemonLine += stoppingAnnotation
+			} else if m.daemon.CurrentTask != "" {
 				// Available width: contentW minus the visible width of indicator+label minus 2 spaces gap
 				indicatorW := lipgloss.Width(daemonLine)
 				taskMaxW := contentW - indicatorW - 3

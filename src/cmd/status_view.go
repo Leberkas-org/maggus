@@ -172,6 +172,10 @@ func (m statusModel) statusSplitFooter() string {
 		hint := lipgloss.NewStyle().Foreground(styles.Warning)
 		return hint.Render("Stop daemon:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
 	}
+	if m.daemonStoppingAfterTask {
+		stoppingStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+		return stoppingStyle.Render("⏳ Stopping after task…")
+	}
 	if m.leftFocused {
 		daemonHint := "s: start"
 		if m.daemon.Running {
