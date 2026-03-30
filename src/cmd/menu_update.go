@@ -211,6 +211,13 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		if m.daemon.Running {
+			if m.daemon.StoppingAfterTask {
+				m.quitting = true
+				return m, tea.Sequence(
+					tea.Println("Daemon will stop after the current task completes."),
+					tea.Quit,
+				)
+			}
 			m.confirmStopDaemon = true
 			return m, nil
 		}
@@ -242,6 +249,13 @@ var menuScreenMap = map[string]screenID{
 func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	if item.isExit {
 		if m.daemon.Running {
+			if m.daemon.StoppingAfterTask {
+				m.quitting = true
+				return m, tea.Sequence(
+					tea.Println("Daemon will stop after the current task completes."),
+					tea.Quit,
+				)
+			}
 			m.confirmStopDaemon = true
 			return m, nil
 		}

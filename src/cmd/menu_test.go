@@ -829,6 +829,45 @@ func TestQuit_DaemonNotRunning_QuitsImmediately(t *testing.T) {
 	}
 }
 
+func TestQuit_DaemonStoppingAfterTask_SkipsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 1234, StoppingAfterTask: true},
+	}
+
+	result, cmd := m.updateMainMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is stopping after task")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true when daemon is stopping after task")
+	}
+	if cmd == nil {
+		t.Error("expected a cmd (tea.Sequence with Println+Quit)")
+	}
+}
+
+func TestActivateExitItem_DaemonStoppingAfterTask_SkipsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 1234, StoppingAfterTask: true},
+	}
+
+	exitItem := menuItem{isExit: true}
+	result, cmd := m.activateItem(exitItem)
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is stopping after task")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true when daemon is stopping after task")
+	}
+	if cmd == nil {
+		t.Error("expected a cmd (tea.Sequence with Println+Quit)")
+	}
+}
+
 func TestConfirmStopDaemon_AnswerN_QuitsWithoutStopping(t *testing.T) {
 	m := menuModel{
 		items:             activeMenuItems(),

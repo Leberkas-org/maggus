@@ -75,12 +75,12 @@ Additionally, the main menu daemon status line should display a "stopping after 
 **Parallel:** yes — can run alongside TASK-033-002
 
 **Acceptance Criteria:**
-- [ ] In `menu_update.go`, when quit is triggered (`q` or exit menu item) and `daemonStoppingAfterTask == true`, the app does **not** show the `confirmStopDaemon` overlay
-- [ ] Instead, the app exits the TUI and prints to stdout: `Daemon will stop after the current task completes.`
-- [ ] Hint is printed via `tea.Println` (before `tea.Quit`) so it appears cleanly below the TUI
-- [ ] When `daemonStoppingAfterTask == false` (daemon running normally), the existing stop/kill overlay behaviour is unchanged
-- [ ] When daemon is not running at all, the existing direct-quit behaviour is unchanged
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] In `menu_update.go`, when quit is triggered (`q` or exit menu item) and `daemonStoppingAfterTask == true`, the app does **not** show the `confirmStopDaemon` overlay
+- [x] Instead, the app exits the TUI and prints to stdout: `Daemon will stop after the current task completes.`
+- [x] Hint is printed via `tea.Println` (before `tea.Quit`) so it appears cleanly below the TUI
+- [x] When `daemonStoppingAfterTask == false` (daemon running normally), the existing stop/kill overlay behaviour is unchanged
+- [x] When daemon is not running at all, the existing direct-quit behaviour is unchanged
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 
