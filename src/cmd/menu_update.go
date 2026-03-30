@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -227,6 +229,14 @@ func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// menuScreenMap maps menu item names to their screenID for TUI navigation.
+var menuScreenMap = map[string]screenID{
+	"status": screenStatus,
+	"config": screenConfig,
+	"repos":  screenRepos,
+	"prompt": screenPrompt,
+}
+
 // activateItem handles selecting a menu item (enter or shortcut).
 func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 	if item.isExit {
@@ -252,9 +262,19 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 		m.subCursor = 0
 		return m, nil
 	}
-	// No sub-menu — launch directly
-	m.selected = item.name
-	return m, tea.Quit
+	// TUI sub-screens: navigate via the app router.
+	if screen, ok := menuScreenMap[item.name]; ok {
+		return m, func() tea.Msg { return navigateToMsg{screen: screen} }
+	}
+	// Non-TUI commands: run as a subprocess via the app router's ExecProcess handler.
+	name := item.name
+	return m, func() tea.Msg {
+		execPath, _ := os.Executable()
+		return execProcessMsg{
+			cmd:    exec.Command(execPath, name),
+			onDone: func(error) tea.Msg { return navigateBackMsg{} },
+		}
+	}
 }
 
 func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -294,11 +314,17 @@ func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.subCursor == len(m.activeSubDef.options) {
-			// "Run" selected
+			// "Run" selected — dispatch as subprocess
 			name := m.items[m.cursor].name
-			m.selected = name
-			m.args = buildArgs(name, m.activeSubDef.options)
-			return m, tea.Quit
+			builtArgs := buildArgs(name, m.activeSubDef.options)
+			return m, func() tea.Msg {
+				execPath, _ := os.Executable()
+				allArgs := append([]string{name}, builtArgs...)
+				return execProcessMsg{
+					cmd:    exec.Command(execPath, allArgs...),
+					onDone: func(error) tea.Msg { return navigateBackMsg{} },
+				}
+			}
 		}
 		// On an option row: cycle value forward
 		opt := &m.activeSubDef.options[m.subCursor]

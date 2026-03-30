@@ -223,8 +223,6 @@ func formatDaemonStatusLine(d daemonStatus) string {
 type menuModel struct {
 	items           []menuItem
 	cursor          int
-	selected        string   // command name chosen by the user, empty if quit
-	args            []string // args to pass to the selected command
 	quitting        bool
 	summary         featureSummary
 	width           int

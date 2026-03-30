@@ -154,16 +154,16 @@ string that the `for {}` loop in `root.go` reads.
 **Parallel:** yes — can run alongside TASK-030-002, TASK-030-003, TASK-030-004, TASK-030-005
 
 **Acceptance Criteria:**
-- [ ] When the user selects status/config/repos/prompt, the menu model emits
+- [x] When the user selects status/config/repos/prompt, the menu model emits
   `navigateToMsg{screen: screenXxx}` instead of setting `m.selected` and calling `tea.Quit`
-- [ ] The `selected` field and the quit-on-select logic are removed from the menu model
-- [ ] "Exit" still emits `tea.Quit` (this is the only path that actually terminates the program)
-- [ ] Non-TUI cobra subcommands dispatched from the menu (e.g. `work`, `list`, `clean`,
+- [x] The `selected` field and the quit-on-select logic are removed from the menu model
+- [x] "Exit" still emits `tea.Quit` (this is the only path that actually terminates the program)
+- [x] Non-TUI cobra subcommands dispatched from the menu (e.g. `work`, `list`, `clean`,
   `release`, `update`) continue to work — the menu model emits an `execProcessMsg` or the
   app model runs them as cobra sub-invocations; the exact mechanism is left to the implementer
   to choose the cleanest approach
-- [ ] The `for {}` loop structure in `root.go` is no longer needed for TUI sub-command dispatch
-- [ ] `go build ./...` passes
+- [x] The `for {}` loop structure in `root.go` is no longer needed for TUI sub-command dispatch
+- [x] `go build ./...` passes
 
 ---
 

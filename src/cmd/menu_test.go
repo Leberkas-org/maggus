@@ -703,7 +703,7 @@ func TestMenuView_DaemonNotRunningRendered(t *testing.T) {
 	}
 }
 
-func TestActivateItem_StatusFromMenu_NoShowLog(t *testing.T) {
+func TestActivateItem_StatusFromMenu_EmitsNavigateToMsg(t *testing.T) {
 	m := menuModel{
 		items: activeMenuItems(),
 	}
@@ -716,18 +716,17 @@ func TestActivateItem_StatusFromMenu_NoShowLog(t *testing.T) {
 		}
 	}
 
-	result, cmd := m.activateItem(statusItem)
-	rm := result.(menuModel)
-	if rm.selected != "status" {
-		t.Errorf("expected selected='status', got %q", rm.selected)
-	}
-	for _, arg := range rm.args {
-		if arg == "--show-log" {
-			t.Error("expected --show-log NOT in args when status activated from menu")
-		}
-	}
+	_, cmd := m.activateItem(statusItem)
 	if cmd == nil {
-		t.Error("expected tea.Quit cmd")
+		t.Fatal("expected non-nil cmd for status navigation")
+	}
+	msg := cmd()
+	nav, ok := msg.(navigateToMsg)
+	if !ok {
+		t.Fatalf("expected navigateToMsg, got %T", msg)
+	}
+	if nav.screen != screenStatus {
+		t.Errorf("expected screenStatus (%d), got %d", screenStatus, nav.screen)
 	}
 }
 
@@ -1060,9 +1059,6 @@ func TestMenuUpdate_FeatureSummaryUpdateMsg_HasNewFile_NoAutoDispatch(t *testing
 	updated, cmd := m.Update(featureSummaryUpdateMsg{HasNewFile: true})
 	um := updated.(menuModel)
 
-	if um.selected == "work" {
-		t.Error("expected menu to stay open (selected != 'work') when new file detected; auto-dispatch should be removed")
-	}
 	if um.quitting {
 		t.Error("expected quitting=false; menu should not quit on file creation")
 	}
@@ -1097,11 +1093,8 @@ func TestMenuInit_NoStartupAutoWorkMsg_WithWorkableTasks(t *testing.T) {
 		summary: featureSummary{workable: 5, bugWorkable: 2},
 	}
 
-	// Verify that Init does not immediately set selected or quitting.
+	// Verify that Init does not immediately set quitting (no auto-dispatch).
 	// (The full Init cmd batch is async; we only check initial model state.)
-	if m.selected != "" {
-		t.Errorf("expected selected='' at startup, got %q", m.selected)
-	}
 	if m.quitting {
 		t.Error("expected quitting=false at startup")
 	}

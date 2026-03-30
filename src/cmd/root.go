@@ -103,93 +103,36 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
-	for {
-		// Show idle presence while in the main menu.
-		if presence != nil {
-			select {
-			case <-presenceReady:
-				_ = presence.Update(discord.PresenceState{
-					FeatureTitle: "In Main Menu",
-					StartTime:    time.Now(),
-				})
-			default:
-				// Still connecting in background; the goroutine will
-				// send the initial update once connected.
-			}
+	// Show idle presence while in the main menu.
+	if presence != nil {
+		select {
+		case <-presenceReady:
+			sharedPresence = presence
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: "In Main Menu",
+				StartTime:    time.Now(),
+			})
+		default:
+			// Still connecting in background; the goroutine will
+			// send the initial update once connected.
 		}
-		m := newMenuModel(loadFeatureSummary())
-		p := tea.NewProgram(m, tea.WithAltScreen())
-		result, err := p.Run()
-
-		// Clean up the file watcher before processing the result.
-		if m.watcher != nil {
-			m.watcher.Close()
-			close(m.watcherCh)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		final := result.(menuModel)
-
-		// Unsubscribe the model's daemon cache channel before the next iteration
-		// creates a new model with a fresh subscription.
-		if daemonCache != nil {
-			daemonCache.Unsubscribe(final.daemonCacheCh)
-		}
-
-		if final.quitting || final.selected == "" {
-			return nil
-		}
-
-		cmdArgs := append([]string{final.selected}, final.args...)
-
-		// Direct dispatch for TUI commands no longer registered with cobra.
-		directDispatch := map[string]func() error{
-			"config": runConfig,
-			"prompt": runPrompt,
-			"repos":  runRepos,
-			"status": runStatus,
-		}
-		if fn, ok := directDispatch[final.selected]; ok {
-			if presence != nil {
-				select {
-				case <-presenceReady:
-					sharedPresence = presence
-				default:
-				}
-			}
-			_ = fn()
-			sharedPresence = nil
-			continue
-		}
-
-		sub, remaining, err := rootCmd.Find(cmdArgs)
-		if err != nil {
-			return err
-		}
-		// Reset work command flags so previous invocations don't leak.
-		resetWorkFlags()
-		if err := sub.ParseFlags(remaining); err != nil {
-			return err
-		}
-		// Share the menu's Discord presence with the subcommand.
-		if presence != nil {
-			select {
-			case <-presenceReady:
-				sharedPresence = presence
-			default:
-				// Still connecting — subcommand will create its own.
-			}
-		}
-
-		// Run the command; ignore errors so we return to the menu
-		_ = sub.RunE(sub, sub.Flags().Args())
-
-		// Reclaim presence ownership so the next loop iteration resets to "In Main Menu".
-		sharedPresence = nil
 	}
+
+	// Run the app model — it handles all TUI navigation internally via
+	// navigateToMsg / navigateBackMsg / execProcessMsg. The for {} loop is
+	// no longer needed for sub-command dispatch.
+	app := newAppModel()
+	p := tea.NewProgram(app, tea.WithAltScreen())
+	result, err := p.Run()
+
+	// Tear down any resources on the active screen (watchers, daemon subscriptions).
+	if am, ok := result.(appModel); ok {
+		am.teardownScreen(am.active)
+	}
+
+	sharedPresence = nil
+
+	return err
 }
 
 // resolveWorkingDirectory runs the startup directory resolution logic.
