@@ -47,7 +47,8 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 
 	// Watch for stop signal file (used on Windows where OS signals cannot
 	// reach a detached daemon process; harmless no-op on Unix).
-	removeDaemonStopFile(dir) // clean up leftover from previous run
+	removeDaemonStopFile(dir)       // clean up leftover from previous run
+	removeStopAfterTaskFile(dir)    // clean up leftover stop-after-task signal from previous run
 	go func() {
 		stopFile := daemonStopFilePath(dir)
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -285,6 +286,26 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 
 	stopFlagAtomic := &atomic.Bool{}
 	stopAtTaskIDAtomic := &atomic.Value{}
+
+	// Poll for the stop-after-task sentinel file. When found, set stopFlagAtomic so
+	// the work loop stops between tasks rather than cancelling the active invocation.
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		stopAfterTaskFile := daemonStopAfterTaskFilePath(dir)
+		for {
+			select {
+			case <-workCtx.Done():
+				return
+			case <-ticker.C:
+				if _, err := os.Stat(stopAfterTaskFile); err == nil {
+					removeStopAfterTaskFile(dir)
+					stopFlagAtomic.Store(true)
+					return
+				}
+			}
+		}
+	}()
 
 	tc := taskContext{
 		workCtx:       workCtx,

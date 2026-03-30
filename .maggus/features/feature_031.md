@@ -44,21 +44,21 @@ stop, without the running Claude invocation being cancelled mid-execution.
 **Parallel:** no — TASK-031-002 depends on the API introduced here
 
 **Acceptance Criteria:**
-- [ ] `daemonStopAfterTaskFilePath(dir string) string` helper added to `cmd/daemon.go`,
+- [x] `daemonStopAfterTaskFilePath(dir string) string` helper added to `cmd/daemon.go`,
   returning `<dir>/.maggus/daemon.stop-after-task`
-- [ ] `removeStopAfterTaskFile(dir string)` helper added to `cmd/daemon.go` (mirrors
+- [x] `removeStopAfterTaskFile(dir string)` helper added to `cmd/daemon.go` (mirrors
   `removeDaemonStopFile`)
-- [ ] `sendStopAfterTaskSignal(dir string) error` function added to `cmd/daemon_stop.go`;
+- [x] `sendStopAfterTaskSignal(dir string) error` function added to `cmd/daemon_stop.go`;
   it writes the PID (from `daemon.pid`) into the new sentinel file — same format as the
   existing stop-file on Windows — so the daemon can verify the signal is for itself
-- [ ] In `runOneDaemonCycle` (`cmd/daemon_keepalive.go`), a goroutine polls
+- [x] In `runOneDaemonCycle` (`cmd/daemon_keepalive.go`), a goroutine polls
   `daemonStopAfterTaskFilePath` every 500 ms (same interval as the existing stop-file
   watcher); when the file is found it removes the file, sets `stopFlagAtomic` to `true`,
   and returns — it does **not** call `workCancel()`
-- [ ] The polling goroutine exits cleanly when `workCtx` is cancelled
-- [ ] `removeStopAfterTaskFile` is called at daemon startup (before the work loop) to clean
+- [x] The polling goroutine exits cleanly when `workCtx` is cancelled
+- [x] `removeStopAfterTaskFile` is called at daemon startup (before the work loop) to clean
   up any leftover file from a previous run — mirrors how `removeDaemonStopFile` is called
-- [ ] `go build ./...` passes with no errors
+- [x] `go build ./...` passes with no errors
 
 ---
 

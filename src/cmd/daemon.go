@@ -65,6 +65,16 @@ func removeDaemonStopFile(dir string) {
 	_ = os.Remove(daemonStopFilePath(dir))
 }
 
+// daemonStopAfterTaskFilePath returns the path to the daemon stop-after-task sentinel file.
+func daemonStopAfterTaskFilePath(dir string) string {
+	return filepath.Join(dir, ".maggus", "daemon.stop-after-task")
+}
+
+// removeStopAfterTaskFile removes the stop-after-task sentinel file if it exists.
+func removeStopAfterTaskFile(dir string) {
+	_ = os.Remove(daemonStopAfterTaskFilePath(dir))
+}
+
 // generateDaemonRunID returns a timestamp-based run ID for the daemon session.
 func generateDaemonRunID() string {
 	return time.Now().Format("20060102-150405")
