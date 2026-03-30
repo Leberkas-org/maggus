@@ -10,7 +10,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -438,27 +437,10 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
-// shouldPromptOnExit returns true when the daemon is running and auto-start is
-// disabled for the current repo — meaning the user started it manually and
-// should be asked before exiting.
+// shouldPromptOnExit returns true when the daemon is running, so the user is
+// always asked before exiting to prevent orphaned daemon processes.
 func (m statusModel) shouldPromptOnExit() bool {
-	if !m.daemon.Running {
-		return false
-	}
-	cfg, err := globalconfig.Load()
-	if err != nil {
-		return false
-	}
-	absDir, err := filepath.Abs(m.dir)
-	if err != nil {
-		return false
-	}
-	for _, repo := range cfg.Repositories {
-		if repo.Path == absDir {
-			return !repo.IsAutoStartEnabled()
-		}
-	}
-	return false
+	return m.daemon.Running
 }
 
 // handleQuitRequest either shows the exit daemon overlay or quits immediately,
