@@ -153,8 +153,8 @@ func (m statusModel) viewStatusSplit() string {
 		rightW = 0
 	}
 
-	leftPane := m.renderLeftPane(leftW, innerH-1)
-	rightPane := m.renderRightPane(rightW, innerH-1)
+	leftPane := m.renderLeftPane(leftW, innerH-2)
+	rightPane := m.renderRightPane(rightW, innerH-2)
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 	borderColor := styles.ThemeColor(m.is2x)
