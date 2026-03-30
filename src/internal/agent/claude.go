@@ -348,30 +348,30 @@ func DescribeToolUse(tool string, input ToolInput) string {
 	switch tool {
 	case "Bash":
 		if input.Description != "" {
-			return fmt.Sprintf("Bash: %s", input.Description)
+			return input.Description
 		}
 		if input.Command != "" {
-			return fmt.Sprintf("Bash: %s", input.Command)
+			return input.Command
 		}
 	case "Read":
-		return fmt.Sprintf("Read: %s", input.FilePath)
+		return input.FilePath
 	case "Edit":
-		return fmt.Sprintf("Edit: %s", input.FilePath)
+		return input.FilePath
 	case "Write":
-		return fmt.Sprintf("Write: %s", input.FilePath)
+		return input.FilePath
 	case "Glob":
-		return fmt.Sprintf("Glob: %s", input.Pattern)
+		return input.Pattern
 	case "Grep":
-		return fmt.Sprintf("Grep: %s", input.Pattern)
+		return input.Pattern
 	case "Skill":
 		if input.Skill != "" {
-			return fmt.Sprintf("Skill: %s", input.Skill)
+			return input.Skill
 		}
 	}
 	if strings.HasPrefix(tool, "mcp__") {
 		parts := strings.SplitN(tool, "__", 3)
 		if len(parts) == 3 {
-			return fmt.Sprintf("MCP %s: %s", parts[1], parts[2])
+			return parts[2]
 		}
 	}
 	return tool

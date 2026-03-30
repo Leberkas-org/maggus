@@ -25,10 +25,10 @@ This feature separates the two concerns: `Description` will hold only the argume
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `DescribeToolUse` returns only the argument part for all cases (e.g. `"C:\path\to\file.go"` instead of `"Read: C:\path\to\file.go"`)
-- [ ] The MCP case returns only `"toolname"` (or the most useful part), not `"MCP servername: toolname"`
-- [ ] The fallback (unknown tool) still returns the tool name itself as a reasonable description
-- [ ] `go test ./internal/agent/...` passes
+- [x] `DescribeToolUse` returns only the argument part for all cases (e.g. `"C:\path\to\file.go"` instead of `"Read: C:\path\to\file.go"`)
+- [x] The MCP case returns only `"toolname"` (or the most useful part), not `"MCP servername: toolname"`
+- [x] The fallback (unknown tool) still returns the tool name itself as a reasonable description
+- [x] `go test ./internal/agent/...` passes
 
 ### TASK-034-002: Render [Type] in blue and description in muted white
 **Description:** As a user, I want the tool log to show `[Read] C:\path\to\file.go` with the bracketed tool name in blue and the argument in slightly muted white, so I can scan tool types at a glance.
