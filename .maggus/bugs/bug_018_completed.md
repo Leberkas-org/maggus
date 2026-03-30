@@ -41,8 +41,8 @@ The analogous seed for `Running` and `PID` is already present; `StoppingAfterTas
 **Description:** As a user, I want the stop-after-task indicator to appear immediately when I navigate to the status view, so I can confirm the signal was received without waiting for the next daemon event.
 
 **Acceptance Criteria:**
-- [ ] In `buildStatusModel()` (`src/cmd/app_model.go`), set `sm.daemonStoppingAfterTask = cached.StoppingAfterTask` alongside the existing `PID` and `Running` seeds
-- [ ] When the sentinel file is present and the user navigates to the status view, the footer immediately shows "⏳ Stopping after task…"
-- [ ] When the sentinel file is absent, the footer shows the normal hint bar (no regression)
-- [ ] No regression in the existing `daemonCacheUpdateMsg` handler that clears `daemonStoppingAfterTask` when the daemon stops
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] In `buildStatusModel()` (`src/cmd/app_model.go`), set `sm.daemonStoppingAfterTask = cached.StoppingAfterTask` alongside the existing `PID` and `Running` seeds
+- [x] When the sentinel file is present and the user navigates to the status view, the footer immediately shows "⏳ Stopping after task…"
+- [x] When the sentinel file is absent, the footer shows the normal hint bar (no regression)
+- [x] No regression in the existing `daemonCacheUpdateMsg` handler that clears `daemonStoppingAfterTask` when the daemon stops
+- [x] `go vet ./...` and `go test ./...` pass

@@ -392,6 +392,7 @@ func buildStatusModel() (*statusModel, error) {
 		cached := daemonCache.Get()
 		sm.daemon.PID = cached.PID
 		sm.daemon.Running = cached.Running
+		sm.daemonStoppingAfterTask = cached.StoppingAfterTask
 	}
 
 	// Seed log-derived fields immediately so the output panel is populated on re-entry.
