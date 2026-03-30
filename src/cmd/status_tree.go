@@ -18,6 +18,28 @@ type treeItem struct {
 	task *parser.Task // non-nil for task rows
 }
 
+// findNextPlanRow returns the index of the next plan-kind item strictly after cursor.
+// Separator rows are skipped. If no plan row exists after cursor, cursor is returned unchanged.
+func findNextPlanRow(items []treeItem, cursor int) int {
+	for i := cursor + 1; i < len(items); i++ {
+		if items[i].kind == treeItemKindPlan {
+			return i
+		}
+	}
+	return cursor
+}
+
+// findPrevPlanRow returns the index of the previous plan-kind item strictly before cursor.
+// Separator rows are skipped. If no plan row exists before cursor, cursor is returned unchanged.
+func findPrevPlanRow(items []treeItem, cursor int) int {
+	for i := cursor - 1; i >= 0; i-- {
+		if items[i].kind == treeItemKindPlan {
+			return i
+		}
+	}
+	return cursor
+}
+
 // buildTreeItems returns the flat, ordered list of visible tree rows reflecting
 // the current expand state. For each visible plan one plan-row is always emitted;
 // if that plan's ID is in expandedPlans, one task-row per task in plan.Tasks

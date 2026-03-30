@@ -616,6 +616,30 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "pgdown":
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = findNextPlanRow(items, m.treeCursor)
+			m.clampTreeScroll()
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
+		}
+		return m, nil
+	case "pgup":
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = findPrevPlanRow(items, m.treeCursor)
+			m.clampTreeScroll()
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
+		}
+		return m, nil
 	case "home":
 		items := m.buildTreeItems()
 		if len(items) > 0 {

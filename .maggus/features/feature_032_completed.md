@@ -41,32 +41,32 @@ stepping through every expanded task row.
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Two pure helper functions are added — `findNextPlanRow(items []treeItem, cursor int) int`
+- [x] Two pure helper functions are added — `findNextPlanRow(items []treeItem, cursor int) int`
   and `findPrevPlanRow(items []treeItem, cursor int) int`:
   - `findNextPlanRow` returns the index of the first `treeItemKindPlan` row whose index
     is **strictly greater** than `cursor`; returns `cursor` if none exists
   - `findPrevPlanRow` returns the index of the last `treeItemKindPlan` row whose index
     is **strictly less** than `cursor`; returns `cursor` if none exists
   - Separator rows (`treeItemKindSeparator`) are never returned by either helper
-- [ ] In `updateList` (`status_update.go`), `pgdn` and `pgup` key cases are added to the
+- [x] In `updateList` (`status_update.go`), `pgdn` and `pgup` key cases are added to the
   left-pane focused block (alongside `up`/`down`/`home`/`end`):
   - `pgdn` → set `m.treeCursor = findNextPlanRow(items, m.treeCursor)`, then call
     `m.clampTreeScroll()`, `m.syncPlanCursorFromTreeCursor()`, and `m.rebuildRightPane()`
     if the selected plan changed
   - `pgup` → set `m.treeCursor = findPrevPlanRow(items, m.treeCursor)`, then the same
     three follow-up calls
-- [ ] When the cursor is already on the last plan row, `pgdn` leaves the cursor unchanged
-- [ ] When the cursor is already on the first plan row, `pgup` leaves the cursor unchanged
-- [ ] When the cursor is on a task row, `pgdn` jumps to the next plan row below the parent
+- [x] When the cursor is already on the last plan row, `pgdn` leaves the cursor unchanged
+- [x] When the cursor is already on the first plan row, `pgup` leaves the cursor unchanged
+- [x] When the cursor is on a task row, `pgdn` jumps to the next plan row below the parent
   plan (not back to the parent itself); `pgup` jumps to the parent plan row (the first
   plan row strictly above the cursor)
-- [ ] The left-pane footer hint (`statusSplitFooter` in `status_view.go`) is updated to
+- [x] The left-pane footer hint (`statusSplitFooter` in `status_view.go`) is updated to
   include `pgup/pgdn: prev/next feature`
-- [ ] Unit tests for `findNextPlanRow` and `findPrevPlanRow` cover: cursor on plan row,
+- [x] Unit tests for `findNextPlanRow` and `findPrevPlanRow` cover: cursor on plan row,
   cursor on task row, cursor at first plan, cursor at last plan, list with separator,
   list with no expanded tasks
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 
