@@ -529,13 +529,15 @@ func TestMenuView_CWDStillCentered(t *testing.T) {
 
 	view := m.View()
 
-	// Find the line containing the CWD. It should have leading spaces (centered).
+	// Find the line containing the CWD. Content centering is done by padLeft
+	// inside the box, so the text before "/short" should contain multiple spaces.
 	for _, line := range strings.Split(view, "\n") {
 		if strings.Contains(line, "/short") {
-			trimmed := strings.TrimLeft(line, " ")
-			leadingSpaces := len(line) - len(trimmed)
-			if leadingSpaces == 0 {
-				t.Error("expected CWD line to be centered with leading spaces")
+			idx := strings.Index(line, "/short")
+			prefix := line[:idx]
+			spaceCount := strings.Count(prefix, " ")
+			if spaceCount < 5 {
+				t.Errorf("expected CWD line to be centered (>=5 spaces before path), got %d spaces in prefix %q", spaceCount, prefix)
 			}
 			return
 		}

@@ -80,15 +80,15 @@ func ProgressBarPlain(done, total, width int) string {
 }
 
 // FullScreenMargin is the number of characters reserved on each side of the
-// full-screen box (outside the border).
-const FullScreenMargin = 2
+// full-screen box (outside the border). Set to 0 so the box fills the terminal flush.
+const FullScreenMargin = 0
 
 // maxContentWidth is the target column width for centering content inside the
 // full-screen box. All views use the same reference so centering is consistent.
 const maxContentWidth = 90
 
 // FullScreen wraps content and an optional footer in a bordered box that fills
-// the terminal with a small margin. Content is centered as a block (columns
+// the terminal flush to the edges. Content is centered as a block (columns
 // stay aligned) and the footer is pinned to the bottom line.
 func FullScreen(content, footer string, width, height int) string {
 	innerW, innerH := fullScreenInner(width, height)
@@ -136,7 +136,7 @@ func FullScreen(content, footer string, width, height int) string {
 		Height(innerH).
 		Render(body)
 
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, box)
 }
 
 // FullScreenLeft is like FullScreen but keeps content left-aligned inside
@@ -172,7 +172,7 @@ func FullScreenLeftColor(content, footer string, width, height int, borderColor 
 		Height(innerH).
 		Render(body)
 
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, box)
 }
 
 // centerFooter trims trailing newlines, then centers each line independently.
@@ -259,7 +259,7 @@ func FullScreenColor(content, footer string, width, height int, borderColor lipg
 		Height(innerH).
 		Render(body)
 
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, box)
 }
 
 // Truncate truncates text to maxWidth characters, adding "..." if truncated.
