@@ -178,16 +178,16 @@ navigation happens inside that program.
 **Parallel:** no — requires all sub-model adaptations to be complete
 
 **Acceptance Criteria:**
-- [ ] `runMenu` creates a single `appModel` starting on `screenMenu` and runs
+- [x] `runMenu` creates a single `appModel` starting on `screenMenu` and runs
   `tea.NewProgram(app, tea.WithAltScreen())`
-- [ ] The `for {}` loop in `runMenu` is removed
-- [ ] The `directDispatch` map is removed (routing now lives in `appModel`)
-- [ ] Discord presence lifecycle, daemon cache, and shared-presence wiring are moved into
+- [x] The `for {}` loop in `runMenu` is removed
+- [x] The `directDispatch` map is removed (routing now lives in `appModel`)
+- [x] Discord presence lifecycle, daemon cache, and shared-presence wiring are moved into
   `appModel` or its initialisation so they survive across screen transitions
-- [ ] Opening maggus and navigating menu → status → menu → config → menu produces no visible
+- [x] Opening maggus and navigating menu → status → menu → config → menu produces no visible
   flicker between transitions (alt-screen is held continuously)
-- [ ] `go test ./...` passes
-- [ ] `go build ./...` produces a working binary
+- [x] `go test ./...` passes
+- [x] `go build ./...` produces a working binary
 
 ## Task Dependency Graph
 
