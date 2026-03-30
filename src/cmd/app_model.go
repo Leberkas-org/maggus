@@ -248,7 +248,10 @@ func (m appModel) navigateTo(target screenID) (tea.Model, tea.Cmd) {
 	}
 	if m.width > 0 || m.height > 0 {
 		sizeMsg := tea.WindowSizeMsg{Width: m.width, Height: m.height}
-		_, sizeCmd := m.forwardToActive(sizeMsg)
+		updatedModel, sizeCmd := m.forwardToActive(sizeMsg)
+		if am, ok := updatedModel.(appModel); ok {
+			m = am
+		}
 		if sizeCmd != nil {
 			cmds = append(cmds, sizeCmd)
 		}
