@@ -39,10 +39,10 @@ This feature separates the two concerns: `Description` will hold only the argume
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Each tool log line renders as `[TypeName]` in blue (`statusBlueStyle`) followed by a space and the argument in a slightly muted/dim white style
-- [ ] The width calculation in `renderSnapshotInPane` accounts for the `[TypeName]` bracket width when computing `maxDesc` for truncation — so long paths still truncate correctly
-- [ ] The existing `icon` (emoji) is still shown before `[TypeName]`
-- [ ] `go test ./cmd/...` passes
+- [x] Each tool log line renders as `[TypeName]` in blue (`statusBlueStyle`) followed by a space and the argument in a slightly muted/dim white style
+- [x] The width calculation in `renderSnapshotInPane` accounts for the `[TypeName]` bracket width when computing `maxDesc` for truncation — so long paths still truncate correctly
+- [x] The existing `icon` (emoji) is still shown before `[TypeName]`
+- [x] `go test ./cmd/...` passes
 
 ## Task Dependency Graph
 
