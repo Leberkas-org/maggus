@@ -22,6 +22,7 @@ const (
 	screenConfig          // project & global config editor
 	screenRepos           // repository management
 	screenPrompt          // prompt picker / interactive claude session
+	screenUpdate          // check for and install updates
 )
 
 // navigateToMsg tells the app router to switch to the given screen.
@@ -59,6 +60,7 @@ type appModel struct {
 	cfg    *configModel
 	repos  *reposModel
 	prompt *promptPickerModel
+	update *updateModel
 }
 
 // newAppModel creates an appModel starting on screenMenu with the menu pre-initialised.
@@ -94,6 +96,10 @@ func (m appModel) activeTeaModel() tea.Model {
 	case screenPrompt:
 		if m.prompt != nil {
 			return m.prompt
+		}
+	case screenUpdate:
+		if m.update != nil {
+			return m.update
 		}
 	}
 	return nil
@@ -156,6 +162,10 @@ func (m appModel) View() string {
 		if m.prompt != nil {
 			return m.prompt.View()
 		}
+	case screenUpdate:
+		if m.update != nil {
+			return m.update.View()
+		}
 	}
 	return ""
 }
@@ -201,6 +211,14 @@ func (m appModel) forwardToActive(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updated, cmd := m.prompt.Update(msg)
 			if pm, ok := updated.(promptPickerModel); ok {
 				m.prompt = &pm
+			}
+			return m, cmd
+		}
+	case screenUpdate:
+		if m.update != nil {
+			updated, cmd := m.update.Update(msg)
+			if um, ok := updated.(updateModel); ok {
+				m.update = &um
 			}
 			return m, cmd
 		}
@@ -258,6 +276,8 @@ func (m *appModel) teardownScreen(s screenID) {
 		}
 	case screenPrompt:
 		m.prompt = nil
+	case screenUpdate:
+		m.update = nil
 	}
 }
 
@@ -305,6 +325,11 @@ func (m *appModel) initScreen(s screenID) tea.Cmd {
 		pm := newPromptPickerModel(dir, resolvedModel, agentName)
 		m.prompt = &pm
 		return m.prompt.Init()
+
+	case screenUpdate:
+		um := newUpdateModel(Version)
+		m.update = &um
+		return m.update.Init()
 	}
 	return nil
 }

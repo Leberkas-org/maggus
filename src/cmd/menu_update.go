@@ -243,6 +243,7 @@ var menuScreenMap = map[string]screenID{
 	"config": screenConfig,
 	"repos":  screenRepos,
 	"prompt": screenPrompt,
+	"update": screenUpdate,
 }
 
 // activateItem handles selecting a menu item (enter or shortcut).

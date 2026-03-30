@@ -75,12 +75,12 @@ All other major screens (status, config, repos, prompt) use `navigateToMsg` and 
 **Description:** As a user, I want navigating to and from the update screen to be flicker-free, consistent with other sub-screens.
 
 **Acceptance Criteria:**
-- [ ] A `screenUpdate` constant is added to `src/cmd/app_model.go` alongside `screenStatus`, `screenConfig`, etc.
-- [ ] The `updateModel` is added as a lazy-initialised field in `appModel` (matching the pattern of other sub-models)
-- [ ] `app_model.go` handles `navigateToMsg{screen: screenUpdate}` and `navigateBackMsg` for the update screen
-- [ ] `menu_update.go` dispatches `navigateToMsg{screen: screenUpdate}` instead of `execProcessMsg`
-- [ ] `updateModel` receives `tea.WindowSizeMsg` correctly via the app router
-- [ ] Navigating menu → update → menu produces no visible flicker
-- [ ] The standalone `maggus update` cobra command still works (can keep its own `tea.NewProgram` for direct CLI use)
-- [ ] No regression in other screen navigation
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] A `screenUpdate` constant is added to `src/cmd/app_model.go` alongside `screenStatus`, `screenConfig`, etc.
+- [x] The `updateModel` is added as a lazy-initialised field in `appModel` (matching the pattern of other sub-models)
+- [x] `app_model.go` handles `navigateToMsg{screen: screenUpdate}` and `navigateBackMsg` for the update screen
+- [x] `menu_update.go` dispatches `navigateToMsg{screen: screenUpdate}` instead of `execProcessMsg`
+- [x] `updateModel` receives `tea.WindowSizeMsg` correctly via the app router
+- [x] Navigating menu → update → menu produces no visible flicker
+- [x] The standalone `maggus update` cobra command still works (can keep its own `tea.NewProgram` for direct CLI use)
+- [x] No regression in other screen navigation
+- [x] `go vet ./...` and `go test ./...` pass
