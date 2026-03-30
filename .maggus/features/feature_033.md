@@ -56,12 +56,12 @@ Additionally, the main menu daemon status line should display a "stopping after 
 **Parallel:** yes — can run alongside TASK-033-003
 
 **Acceptance Criteria:**
-- [ ] `menuModel` subscribes to the updated `daemonPIDState` and populates `daemon.StoppingAfterTask` (or an equivalent local field)
-- [ ] `formatDaemonStatusLine()` in `menu_model.go` handles the stopping-after-task case:
+- [x] `menuModel` subscribes to the updated `daemonPIDState` and populates `daemon.StoppingAfterTask` (or an equivalent local field)
+- [x] `formatDaemonStatusLine()` in `menu_model.go` handles the stopping-after-task case:
   - When `Running == true && StoppingAfterTask == true`: renders `● daemon stopping after task (PID X)` in a visually distinct style (e.g., warning/yellow colour, or the same style as status view's `⏳ Stopping after task…`)
   - Existing `● daemon running` and `○ daemon not running` cases are unchanged
-- [ ] When the daemon stops (PID file removed), the "stopping after task" display clears automatically via the cache notification
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When the daemon stops (PID file removed), the "stopping after task" display clears automatically via the cache notification
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 

@@ -208,10 +208,15 @@ func formatSummaryLine(s featureSummary) string {
 }
 
 // formatDaemonStatusLine returns a styled one-line string showing daemon state.
+// When stopping after task: "⏳ daemon stopping after task (PID 12345)" in warning/yellow.
 // When running: "● daemon running (PID 12345)" in cyan.
 // When not running: "○ daemon not running" in dim/muted.
 func formatDaemonStatusLine(d daemonStatus) string {
 	if d.Running {
+		if d.StoppingAfterTask {
+			warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+			return warningStyle.Render(fmt.Sprintf("⏳ daemon stopping after task (PID %d)", d.PID))
+		}
 		cyanStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 		return cyanStyle.Render(fmt.Sprintf("● daemon running (PID %d)", d.PID))
 	}
@@ -279,7 +284,7 @@ func newMenuModel(summary featureSummary) menuModel {
 	if daemonCache != nil {
 		daemonCacheCh = daemonCache.Subscribe()
 		s := daemonCache.Get()
-		initialDaemon = daemonStatus{PID: s.PID, Running: s.Running}
+		initialDaemon = daemonStatus{PID: s.PID, Running: s.Running, StoppingAfterTask: s.StoppingAfterTask}
 	}
 
 	return menuModel{

@@ -678,6 +678,66 @@ func TestFormatDaemonStatusLine_NotRunning(t *testing.T) {
 	}
 }
 
+func TestFormatDaemonStatusLine_StoppingAfterTask(t *testing.T) {
+	d := daemonStatus{Running: true, PID: 42, StoppingAfterTask: true}
+	line := formatDaemonStatusLine(d)
+	if !strings.Contains(line, "stopping after task") {
+		t.Errorf("expected 'stopping after task' in line, got %q", line)
+	}
+	if !strings.Contains(line, "42") {
+		t.Errorf("expected PID 42 in line, got %q", line)
+	}
+	if strings.Contains(line, "daemon running") {
+		t.Errorf("should not show 'daemon running' when stopping after task, got %q", line)
+	}
+}
+
+func TestMenuView_DaemonStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 7777, StoppingAfterTask: true},
+	}
+	view := m.View()
+	if !strings.Contains(view, "stopping after task") {
+		t.Error("expected 'stopping after task' in menu View() when daemon is stopping")
+	}
+	if !strings.Contains(view, "7777") {
+		t.Error("expected PID in menu View() when daemon is stopping after task")
+	}
+}
+
+func TestDaemonCacheUpdateMsg_PopulatesStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items: activeMenuItems(),
+	}
+	msg := daemonCacheUpdateMsg{State: daemonPIDState{PID: 55, Running: true, StoppingAfterTask: true}}
+	result, _ := m.Update(msg)
+	rm := result.(menuModel)
+	if !rm.daemon.StoppingAfterTask {
+		t.Error("expected daemon.StoppingAfterTask=true after daemonCacheUpdateMsg")
+	}
+	if rm.daemon.PID != 55 {
+		t.Errorf("expected PID=55, got %d", rm.daemon.PID)
+	}
+}
+
+func TestDaemonCacheUpdateMsg_ClearsStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 55, StoppingAfterTask: true},
+	}
+	// Daemon stops (PID file removed) — StoppingAfterTask should clear
+	msg := daemonCacheUpdateMsg{State: daemonPIDState{PID: 0, Running: false, StoppingAfterTask: false}}
+	result, _ := m.Update(msg)
+	rm := result.(menuModel)
+	if rm.daemon.StoppingAfterTask {
+		t.Error("expected StoppingAfterTask=false after daemon stopped")
+	}
+	if rm.daemon.Running {
+		t.Error("expected Running=false after daemon stopped")
+	}
+}
+
 func TestMenuView_DaemonStatusLineRendered(t *testing.T) {
 	m := menuModel{
 		items:  activeMenuItems(),

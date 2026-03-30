@@ -155,6 +155,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case daemonCacheUpdateMsg:
 		m.daemon.PID = msg.State.PID
 		m.daemon.Running = msg.State.Running
+		m.daemon.StoppingAfterTask = msg.State.StoppingAfterTask
 		return m, listenForDaemonCacheUpdate(m.daemonCacheCh)
 	case featureSummaryUpdateMsg:
 		m.summary = loadFeatureSummary()
