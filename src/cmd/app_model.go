@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/stores"
 )
 
@@ -366,6 +367,21 @@ func buildStatusModel() (*statusModel, error) {
 		cached := daemonCache.Get()
 		sm.daemon.PID = cached.PID
 		sm.daemon.Running = cached.Running
+	}
+
+	// Seed log-derived fields immediately so the output panel is populated on re-entry.
+	runID, logPath := findLatestRunLog(dir)
+	sm.daemon.RunID = runID
+	sm.daemon.LogPath = logPath
+	if logPath != "" {
+		lines := readLastNLogLines(logPath, 200)
+		sm.daemon.CurrentFeature, sm.daemon.CurrentTask = parseLogForCurrentState(lines)
+	}
+	if sm.daemon.Running && sm.daemon.RunID != "" {
+		snap, err := runlog.ReadSnapshot(dir)
+		if err == nil {
+			sm.snapshot = snap
+		}
 	}
 
 	return &sm, nil
