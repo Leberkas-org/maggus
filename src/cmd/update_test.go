@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -418,6 +419,167 @@ func TestUpdate_AutoUpdateToggle(t *testing.T) {
 
 	if savedMode != globalconfig.AutoUpdateAuto {
 		t.Errorf("expected saved mode auto, got %s", savedMode)
+	}
+}
+
+// TestUpdate_ScrollOffsetZeroAfterCheckMsg verifies that scrollOffset is 0
+// after the version check completes (BUG-022-001 diagnostic).
+func TestUpdate_ScrollOffsetZeroAfterCheckMsg(t *testing.T) {
+	defer setupUpdateTest(t)()
+	m := newUpdateModel("1.0.0")
+	// Simulate receiving the check result with a long changelog
+	info := updater.UpdateInfo{
+		TagName:     "v2.0.0",
+		DownloadURL: "https://example.com/maggus.zip",
+		IsNewer:     true,
+		Body:        strings.Repeat("This is a very long changelog line that exceeds typical terminal width by far.\n", 20),
+	}
+	model, _ := m.Update(updateCheckMsg{info: info})
+	um := model.(updateModel)
+	if um.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset 0 after updateCheckMsg, got %d", um.scrollOffset)
+	}
+	if um.phase != phaseConfirm {
+		t.Errorf("expected phaseConfirm, got %d", um.phase)
+	}
+}
+
+// TestUpdate_TitleVisibleAtTopWithLongChangelog verifies that "Maggus Update"
+// is visible as the first content line when the changelog is long (BUG-022-001).
+// At scrollOffset=0 the rendered box must not overflow the terminal height so
+// BubbleTea never drops lines from the top.
+func TestUpdate_TitleVisibleAtTopWithLongChangelog(t *testing.T) {
+	defer setupUpdateTest(t)()
+
+	longBody := strings.Repeat("This is a very long changelog line that would exceed a typical 80-column terminal width without wrapping.\n", 30)
+
+	info := updater.UpdateInfo{
+		TagName:     "v2.0.0",
+		DownloadURL: "https://example.com/maggus.zip",
+		IsNewer:     true,
+		Body:        longBody,
+	}
+
+	terminalSizes := [][2]int{
+		{80, 24},
+		{80, 40},
+		{80, 60},
+		{120, 24},
+		{120, 40},
+	}
+
+	for _, sz := range terminalSizes {
+		w, h := sz[0], sz[1]
+		m := newUpdateModel("1.0.0")
+		m.width = w
+		m.height = h
+
+		model, _ := m.Update(updateCheckMsg{info: info})
+		um := model.(updateModel)
+		um.width = w
+		um.height = h
+
+		view := um.View()
+		viewLines := strings.Split(view, "\n")
+
+		// The rendered output must not exceed the terminal height.
+		// If it does, BubbleTea would drop lines from the top.
+		if len(viewLines) > h {
+			t.Errorf("size %dx%d: rendered view has %d lines, exceeds terminal height %d — would cause top-clipping",
+				w, h, len(viewLines), h)
+		}
+
+		// "Maggus Update" must appear in the rendered output.
+		if !contains(view, "Maggus Update") {
+			t.Errorf("size %dx%d: 'Maggus Update' not found in view", w, h)
+		}
+
+		// "Maggus Update" must appear BEFORE "Auto:" in the rendered output,
+		// confirming the title is not scrolled off the top.
+		titleIdx := strings.Index(view, "Maggus Update")
+		autoIdx := strings.Index(view, "Auto:")
+		if titleIdx < 0 {
+			t.Errorf("size %dx%d: 'Maggus Update' not in view", w, h)
+		} else if autoIdx >= 0 && titleIdx > autoIdx {
+			t.Errorf("size %dx%d: 'Maggus Update' (pos %d) appears after 'Auto:' (pos %d) — title is clipped",
+				w, h, titleIdx, autoIdx)
+		}
+	}
+}
+
+// TestUpdate_FooterVisibleWithLongChangelog verifies that the footer (hints/menu)
+// remains visible when the changelog is long (BUG-022-001).
+func TestUpdate_FooterVisibleWithLongChangelog(t *testing.T) {
+	defer setupUpdateTest(t)()
+
+	longBody := strings.Repeat("A long changelog line that is quite verbose and likely to exceed 80 columns.\n", 30)
+
+	m := newUpdateModel("1.0.0")
+	m.width = 80
+	m.height = 24
+
+	model, _ := m.Update(updateCheckMsg{info: updater.UpdateInfo{
+		TagName:     "v2.0.0",
+		DownloadURL: "https://example.com/maggus.zip",
+		IsNewer:     true,
+		Body:        longBody,
+	}})
+	um := model.(updateModel)
+	um.width = 80
+	um.height = 24
+
+	view := um.View()
+	if !contains(view, "Install update") {
+		t.Errorf("footer menu 'Install update' not visible in view")
+	}
+	if !contains(view, "select") {
+		t.Errorf("footer hints not visible in view")
+	}
+}
+
+// TestUpdate_ScrollingWorksWithLongChangelog verifies that scrolling down and
+// back up works correctly in phaseConfirm with a long changelog.
+func TestUpdate_ScrollingWorksWithLongChangelog(t *testing.T) {
+	defer setupUpdateTest(t)()
+
+	longBody := strings.Repeat("Changelog line number %d here.\n", 40)
+
+	m := newUpdateModel("1.0.0")
+	m.width = 80
+	m.height = 24
+
+	model, _ := m.Update(updateCheckMsg{info: updater.UpdateInfo{
+		TagName:     "v2.0.0",
+		DownloadURL: "https://example.com/maggus.zip",
+		IsNewer:     true,
+		Body:        longBody,
+	}})
+	um := model.(updateModel)
+	um.width = 80
+	um.height = 24
+
+	// Scroll down several times.
+	for i := 0; i < 5; i++ {
+		model, _ = um.Update(tea.KeyMsg{Type: tea.KeyDown})
+		um = model.(updateModel)
+	}
+	if um.scrollOffset == 0 {
+		t.Error("expected scrollOffset > 0 after scrolling down")
+	}
+
+	// Scroll back to top with Home key.
+	model, _ = um.Update(tea.KeyMsg{Type: tea.KeyHome})
+	um = model.(updateModel)
+	if um.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset 0 after Home, got %d", um.scrollOffset)
+	}
+
+	// Title should be visible again.
+	um.width = 80
+	um.height = 24
+	view := um.View()
+	if !contains(view, "Maggus Update") {
+		t.Error("title not visible after scrolling back to top")
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/cellbuf"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -396,7 +397,16 @@ func (m updateModel) renderContent() string {
 		if m.info.Body != "" {
 			fmt.Fprintf(&content, "\n%s\n", styles.Subtitle.Render("Changelog"))
 			content.WriteString(styles.Separator(innerW) + "\n")
-			content.WriteString(m.info.Body + "\n")
+			// Pre-wrap body lines to innerW so they match the visual line count
+			// used by the viewport slicer. Without this, long lines get
+			// word-wrapped by lipgloss inside Box.Render(), making the rendered
+			// box taller than height. BubbleTea then drops lines from the top
+			// to fit the terminal, clipping the title and header rows.
+			body := m.info.Body
+			if innerW > 0 {
+				body = cellbuf.Wrap(body, innerW, "")
+			}
+			content.WriteString(body + "\n")
 		}
 
 		content.WriteString("\n")
