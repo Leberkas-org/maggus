@@ -83,12 +83,12 @@ log read on startup so the view is never blank on first render, regardless of wh
 the fsnotify path or the poll-tick fallback is used.
 
 **Acceptance Criteria:**
-- [ ] `statusModel.Init()` in `cmd/status_update.go` includes
+- [x] `statusModel.Init()` in `cmd/status_update.go` includes
   `func() tea.Msg { return logFileUpdateMsg{} }` in its `tea.Batch` call regardless
   of whether `logWatcherCh` is nil (i.e. it fires for both the `LogFileWatcher` path
   and the `logPollTick` fallback path)
-- [ ] The existing `listenForLogFileUpdate(m.logWatcherCh)` call is kept so subsequent
+- [x] The existing `listenForLogFileUpdate(m.logWatcherCh)` call is kept so subsequent
   fsnotify events continue to be processed
-- [ ] On cold-start `maggus status` (where the daemon may not be running), this extra
+- [x] On cold-start `maggus status` (where the daemon may not be running), this extra
   message results in a no-op read and no visible change in behaviour
-- [ ] No regression: `go vet ./...` and `go test ./...` pass
+- [x] No regression: `go vet ./...` and `go test ./...` pass

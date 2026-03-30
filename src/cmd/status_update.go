@@ -33,6 +33,7 @@ func (m statusModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
 		},
+		func() tea.Msg { return logFileUpdateMsg{} },
 		logCmd,
 		spinnerTick(),
 		listenForWatcherUpdate(m.watcherCh),
