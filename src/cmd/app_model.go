@@ -53,6 +53,12 @@ type execProcessMsg struct {
 type appModel struct {
 	active screenID
 
+	// Terminal dimensions, updated whenever a tea.WindowSizeMsg is received.
+	// Used to seed newly-created sub-models so they render at the correct size
+	// even when the WindowSizeMsg was fired before they were initialised.
+	width  int
+	height int
+
 	// Lazy-initialised sub-models. A nil pointer means the screen has not been
 	// visited yet (or has been torn down and needs re-initialisation).
 	menu   *menuModel
@@ -132,7 +138,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 
 	case tea.WindowSizeMsg:
-		// Forward to active sub-model and also store for future sub-model inits.
+		// Store dimensions so newly-created sub-models can be seeded immediately.
+		m.width = msg.Width
+		m.height = msg.Height
 		return m.forwardToActive(msg)
 	}
 
@@ -231,8 +239,21 @@ func (m appModel) forwardToActive(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m appModel) navigateTo(target screenID) (tea.Model, tea.Cmd) {
 	m.teardownScreen(m.active)
 	m.active = target
-	cmd := m.initScreen(target)
-	return m, cmd
+	initCmd := m.initScreen(target)
+	// If we already know the terminal size, seed the new sub-model immediately
+	// so it renders correctly without waiting for a (never-repeated) WindowSizeMsg.
+	var cmds []tea.Cmd
+	if initCmd != nil {
+		cmds = append(cmds, initCmd)
+	}
+	if m.width > 0 || m.height > 0 {
+		sizeMsg := tea.WindowSizeMsg{Width: m.width, Height: m.height}
+		_, sizeCmd := m.forwardToActive(sizeMsg)
+		if sizeCmd != nil {
+			cmds = append(cmds, sizeCmd)
+		}
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // teardownScreen closes watchers and unsubscribes channels for screen s.

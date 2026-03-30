@@ -41,10 +41,10 @@ The `maggus update` CLI path is unaffected because there `tea.NewProgram` fires 
 **Description:** As a user, I want the update screen (and any future screen added to the router) to render correctly when navigated to, so that I don't see a broken single-line view.
 
 **Acceptance Criteria:**
-- [ ] `appModel` stores `width int` and `height int` fields
-- [ ] `appModel.Update` stores the dimensions when it receives `tea.WindowSizeMsg`, before forwarding
-- [ ] `appModel.initScreen` (or `navigateTo`) sends a synthetic `tea.WindowSizeMsg` to the newly created sub-model so it is sized immediately
-- [ ] Navigating to the update screen from the menu renders the full view (title, content, footer) at the correct terminal size
-- [ ] `maggus update` (standalone CLI path) is unaffected
-- [ ] No regression in menu, status, config, repos, or prompt screens
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `appModel` stores `width int` and `height int` fields
+- [x] `appModel.Update` stores the dimensions when it receives `tea.WindowSizeMsg`, before forwarding
+- [x] `appModel.initScreen` (or `navigateTo`) sends a synthetic `tea.WindowSizeMsg` to the newly created sub-model so it is sized immediately
+- [x] Navigating to the update screen from the menu renders the full view (title, content, footer) at the correct terminal size
+- [x] `maggus update` (standalone CLI path) is unaffected
+- [x] No regression in menu, status, config, repos, or prompt screens
+- [x] `go vet ./...` and `go test ./...` pass
