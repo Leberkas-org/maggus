@@ -220,8 +220,7 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
-		m.quitting = true
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "up", "k":
 		m.cursor = styles.CursorUp(m.cursor, len(m.repos))
 	case "down", "j":
@@ -389,8 +388,7 @@ func (m reposModel) switchToRepo(path string) (tea.Model, tea.Cmd) {
 
 	m.cwd = path
 	m.switched = true
-	m.quitting = true
-	return m, tea.Quit
+	return m, func() tea.Msg { return navigateBackMsg{} }
 }
 
 func (m reposModel) addRepo(path string) (tea.Model, tea.Cmd) {
@@ -579,18 +577,12 @@ func isGitRepoCheck(dir string) bool {
 }
 
 func runRepos() error {
-	m := newReposModel()
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	result, err := p.Run()
-	if final, ok := result.(reposModel); ok {
-		for _, cache := range final.daemonCaches {
-			if cache != nil {
-				cache.Stop()
-			}
-		}
+	rm := newReposModel()
+	app := appModel{
+		active: screenRepos,
+		repos:  &rm,
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	p := tea.NewProgram(app, tea.WithAltScreen())
+	_, err := p.Run()
+	return err
 }

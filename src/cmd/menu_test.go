@@ -529,13 +529,15 @@ func TestMenuView_CWDStillCentered(t *testing.T) {
 
 	view := m.View()
 
-	// Find the line containing the CWD. It should have leading spaces (centered).
+	// Find the line containing the CWD. Content centering is done by padLeft
+	// inside the box, so the text before "/short" should contain multiple spaces.
 	for _, line := range strings.Split(view, "\n") {
 		if strings.Contains(line, "/short") {
-			trimmed := strings.TrimLeft(line, " ")
-			leadingSpaces := len(line) - len(trimmed)
-			if leadingSpaces == 0 {
-				t.Error("expected CWD line to be centered with leading spaces")
+			idx := strings.Index(line, "/short")
+			prefix := line[:idx]
+			spaceCount := strings.Count(prefix, " ")
+			if spaceCount < 5 {
+				t.Errorf("expected CWD line to be centered (>=5 spaces before path), got %d spaces in prefix %q", spaceCount, prefix)
 			}
 			return
 		}
@@ -678,6 +680,66 @@ func TestFormatDaemonStatusLine_NotRunning(t *testing.T) {
 	}
 }
 
+func TestFormatDaemonStatusLine_StoppingAfterTask(t *testing.T) {
+	d := daemonStatus{Running: true, PID: 42, StoppingAfterTask: true}
+	line := formatDaemonStatusLine(d)
+	if !strings.Contains(line, "stopping after task") {
+		t.Errorf("expected 'stopping after task' in line, got %q", line)
+	}
+	if !strings.Contains(line, "42") {
+		t.Errorf("expected PID 42 in line, got %q", line)
+	}
+	if strings.Contains(line, "daemon running") {
+		t.Errorf("should not show 'daemon running' when stopping after task, got %q", line)
+	}
+}
+
+func TestMenuView_DaemonStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 7777, StoppingAfterTask: true},
+	}
+	view := m.View()
+	if !strings.Contains(view, "stopping after task") {
+		t.Error("expected 'stopping after task' in menu View() when daemon is stopping")
+	}
+	if !strings.Contains(view, "7777") {
+		t.Error("expected PID in menu View() when daemon is stopping after task")
+	}
+}
+
+func TestDaemonCacheUpdateMsg_PopulatesStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items: activeMenuItems(),
+	}
+	msg := daemonCacheUpdateMsg{State: daemonPIDState{PID: 55, Running: true, StoppingAfterTask: true}}
+	result, _ := m.Update(msg)
+	rm := result.(menuModel)
+	if !rm.daemon.StoppingAfterTask {
+		t.Error("expected daemon.StoppingAfterTask=true after daemonCacheUpdateMsg")
+	}
+	if rm.daemon.PID != 55 {
+		t.Errorf("expected PID=55, got %d", rm.daemon.PID)
+	}
+}
+
+func TestDaemonCacheUpdateMsg_ClearsStoppingAfterTask(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 55, StoppingAfterTask: true},
+	}
+	// Daemon stops (PID file removed) — StoppingAfterTask should clear
+	msg := daemonCacheUpdateMsg{State: daemonPIDState{PID: 0, Running: false, StoppingAfterTask: false}}
+	result, _ := m.Update(msg)
+	rm := result.(menuModel)
+	if rm.daemon.StoppingAfterTask {
+		t.Error("expected StoppingAfterTask=false after daemon stopped")
+	}
+	if rm.daemon.Running {
+		t.Error("expected Running=false after daemon stopped")
+	}
+}
+
 func TestMenuView_DaemonStatusLineRendered(t *testing.T) {
 	m := menuModel{
 		items:  activeMenuItems(),
@@ -703,7 +765,7 @@ func TestMenuView_DaemonNotRunningRendered(t *testing.T) {
 	}
 }
 
-func TestActivateItem_StatusFromMenu_NoShowLog(t *testing.T) {
+func TestActivateItem_StatusFromMenu_EmitsNavigateToMsg(t *testing.T) {
 	m := menuModel{
 		items: activeMenuItems(),
 	}
@@ -716,18 +778,17 @@ func TestActivateItem_StatusFromMenu_NoShowLog(t *testing.T) {
 		}
 	}
 
-	result, cmd := m.activateItem(statusItem)
-	rm := result.(menuModel)
-	if rm.selected != "status" {
-		t.Errorf("expected selected='status', got %q", rm.selected)
-	}
-	for _, arg := range rm.args {
-		if arg == "--show-log" {
-			t.Error("expected --show-log NOT in args when status activated from menu")
-		}
-	}
+	_, cmd := m.activateItem(statusItem)
 	if cmd == nil {
-		t.Error("expected tea.Quit cmd")
+		t.Fatal("expected non-nil cmd for status navigation")
+	}
+	msg := cmd()
+	nav, ok := msg.(navigateToMsg)
+	if !ok {
+		t.Fatalf("expected navigateToMsg, got %T", msg)
+	}
+	if nav.screen != screenStatus {
+		t.Errorf("expected screenStatus (%d), got %d", screenStatus, nav.screen)
 	}
 }
 
@@ -767,6 +828,45 @@ func TestQuit_DaemonNotRunning_QuitsImmediately(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("expected tea.Quit cmd")
+	}
+}
+
+func TestQuit_DaemonStoppingAfterTask_SkipsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 1234, StoppingAfterTask: true},
+	}
+
+	result, cmd := m.updateMainMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is stopping after task")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true when daemon is stopping after task")
+	}
+	if cmd == nil {
+		t.Error("expected a cmd (tea.Sequence with Println+Quit)")
+	}
+}
+
+func TestActivateExitItem_DaemonStoppingAfterTask_SkipsConfirmation(t *testing.T) {
+	m := menuModel{
+		items:  activeMenuItems(),
+		daemon: daemonStatus{Running: true, PID: 1234, StoppingAfterTask: true},
+	}
+
+	exitItem := menuItem{isExit: true}
+	result, cmd := m.activateItem(exitItem)
+	rm := result.(menuModel)
+	if rm.confirmStopDaemon {
+		t.Error("should not show confirmation when daemon is stopping after task")
+	}
+	if !rm.quitting {
+		t.Error("expected quitting=true when daemon is stopping after task")
+	}
+	if cmd == nil {
+		t.Error("expected a cmd (tea.Sequence with Println+Quit)")
 	}
 }
 
@@ -1060,9 +1160,6 @@ func TestMenuUpdate_FeatureSummaryUpdateMsg_HasNewFile_NoAutoDispatch(t *testing
 	updated, cmd := m.Update(featureSummaryUpdateMsg{HasNewFile: true})
 	um := updated.(menuModel)
 
-	if um.selected == "work" {
-		t.Error("expected menu to stay open (selected != 'work') when new file detected; auto-dispatch should be removed")
-	}
 	if um.quitting {
 		t.Error("expected quitting=false; menu should not quit on file creation")
 	}
@@ -1097,11 +1194,8 @@ func TestMenuInit_NoStartupAutoWorkMsg_WithWorkableTasks(t *testing.T) {
 		summary: featureSummary{workable: 5, bugWorkable: 2},
 	}
 
-	// Verify that Init does not immediately set selected or quitting.
+	// Verify that Init does not immediately set quitting (no auto-dispatch).
 	// (The full Init cmd batch is async; we only check initial model state.)
-	if m.selected != "" {
-		t.Errorf("expected selected='' at startup, got %q", m.selected)
-	}
 	if m.quitting {
 		t.Error("expected quitting=false at startup")
 	}

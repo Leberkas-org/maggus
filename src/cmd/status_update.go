@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -32,6 +32,7 @@ func (m statusModel) Init() tea.Cmd {
 		func() tea.Msg {
 			return claude2xResultMsg{status: claude2x.FetchStatus()}
 		},
+		func() tea.Msg { return logFileUpdateMsg{} },
 		logCmd,
 		spinnerTick(),
 		listenForWatcherUpdate(m.watcherCh),
@@ -86,6 +87,7 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		prevRunning := m.daemon.Running
 		m.daemon.PID = msg.State.PID
 		m.daemon.Running = msg.State.Running
+		m.daemonStoppingAfterTask = msg.State.StoppingAfterTask
 		if prevRunning && !m.daemon.Running {
 			m.snapshot = nil
 		}
@@ -341,7 +343,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 		m.ConfirmDelete = false
 		m.ShowDetail = false
 		if len(m.Tasks) == 0 {
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
 	case "n", "N", "esc":
@@ -378,7 +380,7 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 		}
 		m.rebuildForSelectedPlan()
 		if len(newVisible) == 0 {
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
 	case "n", "N", "esc":
@@ -390,12 +392,13 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 
 func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
-		// Graceful stop (stop after current task).
+	case "s", "S":
+		// Stop after current task — send the stop-after-task signal, stay in status view.
 		m.daemonStopOverlay = false
+		m.daemonStoppingAfterTask = true
 		dir := m.dir
 		return m, func() tea.Msg {
-			_ = stopDaemonGracefully(dir)
+			_ = sendStopAfterTaskSignal(dir)
 			return nil
 		}
 	case "k", "K", "ctrl+c", "ctrl+C":
@@ -418,14 +421,15 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "d", "D":
-		return m, tea.Quit
-	case "y", "Y":
-		_ = stopDaemonGracefully(m.dir)
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
+	case "s", "S":
+		// Stop after current task, then exit. Daemon finishes in background.
+		_ = sendStopAfterTaskSignal(m.dir)
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "k", "K", "ctrl+c", "ctrl+C":
 		_ = forceKill(m.daemon.PID)
 		removeDaemonPID(m.dir)
-		return m, tea.Quit
+		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "esc", "q", "Q":
 		m.exitDaemonOverlay = false
 		return m, nil
@@ -433,27 +437,10 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
-// shouldPromptOnExit returns true when the daemon is running and auto-start is
-// disabled for the current repo — meaning the user started it manually and
-// should be asked before exiting.
+// shouldPromptOnExit returns true when the daemon is running, so the user is
+// always asked before exiting to prevent orphaned daemon processes.
 func (m statusModel) shouldPromptOnExit() bool {
-	if !m.daemon.Running {
-		return false
-	}
-	cfg, err := globalconfig.Load()
-	if err != nil {
-		return false
-	}
-	absDir, err := filepath.Abs(m.dir)
-	if err != nil {
-		return false
-	}
-	for _, repo := range cfg.Repositories {
-		if repo.Path == absDir {
-			return !repo.IsAutoStartEnabled()
-		}
-	}
-	return false
+	return m.daemon.Running
 }
 
 // handleQuitRequest either shows the exit daemon overlay or quits immediately,
@@ -463,8 +450,26 @@ func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
 		m.exitDaemonOverlay = true
 		return m, nil
 	}
-	return m, tea.Quit
+	return m, func() tea.Msg { return navigateBackMsg{} }
 }
+
+// buildRunTaskMsg returns a tea.Cmd that emits an execProcessMsg asking the app
+// router to run `maggus work --task <id>` in the foreground via tea.ExecProcess.
+// After the work process exits, the router receives navigateBackMsg to return to
+// the main menu.
+func (m statusModel) buildRunTaskMsg() tea.Cmd {
+	taskID := m.taskListComponent.RunTaskID
+	return func() tea.Msg {
+		execPath, _ := os.Executable()
+		return execProcessMsg{
+			cmd: exec.Command(execPath, "work", "--task", taskID),
+			onDone: func(err error) tea.Msg {
+				return navigateBackMsg{}
+			},
+		}
+	}
+}
+
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
@@ -472,8 +477,10 @@ func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
-	case taskListQuit, taskListRun:
-		return m, tea.Quit
+	case taskListQuit:
+		return m, func() tea.Msg { return navigateBackMsg{} }
+	case taskListRun:
+		return m, m.buildRunTaskMsg()
 	}
 	return m, cmd
 }
@@ -519,6 +526,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch action {
 			case taskListQuit:
 				return m.handleQuitRequest()
+			case taskListRun:
+				return m, m.buildRunTaskMsg()
 			case taskListDeleted:
 				m.reloadPlans()
 			}
@@ -580,6 +589,30 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
 			m.treeCursor = skipSeparatorDown(styles.CursorDown(m.treeCursor, len(items)), items)
+			m.clampTreeScroll()
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
+		}
+		return m, nil
+	case "pgdown":
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = findNextPlanRow(items, m.treeCursor)
+			m.clampTreeScroll()
+			m.syncPlanCursorFromTreeCursor()
+			if m.selectedPlan().ID != prevPlan.ID {
+				m.rebuildRightPane()
+			}
+		}
+		return m, nil
+	case "pgup":
+		items := m.buildTreeItems()
+		if len(items) > 0 {
+			prevPlan := m.selectedPlan()
+			m.treeCursor = findPrevPlanRow(items, m.treeCursor)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			if m.selectedPlan().ID != prevPlan.ID {
@@ -705,8 +738,10 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Delegate to component for shared navigation (task list, detail view, etc.)
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
-	case taskListQuit, taskListRun:
+	case taskListQuit:
 		return m.handleQuitRequest()
+	case taskListRun:
+		return m, m.buildRunTaskMsg()
 	case taskListDeleted:
 		m.reloadPlans()
 	}

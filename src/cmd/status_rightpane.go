@@ -180,17 +180,23 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 			if icon == "" {
 				icon = "🥚"
 			}
+			typeName := entry.Type
+			if typeName == "" {
+				typeName = "Tool"
+			}
+			bracketedType := fmt.Sprintf("[%s]", typeName)
 			styledTs := statusDimStyle.Render(ts)
 			tsW := lipgloss.Width(styledTs) // always 8 for "15:04:05"
 			iconW := lipgloss.Width(icon)
-			// Fixed overhead: 2 (indent) + iconW + 1 (space) + 1 (min pad for RightAlign) + tsW
-			fixedCols := 2 + iconW + 1 + 1 + tsW
+			bracketedTypeW := lipgloss.Width(bracketedType)
+			// Fixed overhead: 2 (indent) + iconW + 1 (space) + bracketedTypeW + 1 (space) + 1 (min pad for RightAlign) + tsW
+			fixedCols := 2 + iconW + 1 + bracketedTypeW + 1 + 1 + tsW
 			maxDesc := contentWidth - fixedCols
 			if maxDesc < 0 {
 				maxDesc = 0
 			}
 			desc := styles.Truncate(entry.Description, maxDesc)
-			leftPart := fmt.Sprintf("  %s %s", icon, statusBlueStyle.Render(desc))
+			leftPart := fmt.Sprintf("  %s %s %s", icon, statusBlueStyle.Render(bracketedType), statusDimStyle.Render(desc))
 			toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
 		}
 

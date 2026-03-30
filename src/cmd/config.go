@@ -27,8 +27,12 @@ func runConfig() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	m := newConfigModel(cfg, dir)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	cm := newConfigModel(cfg, dir)
+	app := appModel{
+		active: screenConfig,
+		cfg:    &cm,
+	}
+	p := tea.NewProgram(app, tea.WithAltScreen())
 	_, err = p.Run()
 	return err
 }
@@ -328,7 +332,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case "q":
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 		case "1":
 			m.activeTab = 0
 			m.cursor = 0
@@ -420,10 +424,19 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 	case configActionEditProject:
 		return func() tea.Msg {
 			path := filepath.Join(m.dir, ".maggus", "config.yml")
-			if err := openInEditor(path); err != nil {
+			cmd, err := buildEditorCmd(path)
+			if err != nil {
 				return configResultMsg{err: err}
 			}
-			return configResultMsg{text: "Opened project config in editor"}
+			return execProcessMsg{
+				cmd: cmd,
+				onDone: func(err error) tea.Msg {
+					if err != nil {
+						return configResultMsg{err: err}
+					}
+					return configResultMsg{text: "Returned from editor"}
+				},
+			}
 		}
 	case configActionEditGlobal:
 		return func() tea.Msg {
@@ -431,10 +444,19 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 			if err != nil {
 				return configResultMsg{err: err}
 			}
-			if err := openInEditor(path); err != nil {
+			cmd, err := buildEditorCmd(path)
+			if err != nil {
 				return configResultMsg{err: err}
 			}
-			return configResultMsg{text: "Opened global config in editor"}
+			return execProcessMsg{
+				cmd: cmd,
+				onDone: func(err error) tea.Msg {
+					if err != nil {
+						return configResultMsg{err: err}
+					}
+					return configResultMsg{text: "Returned from editor"}
+				},
+			}
 		}
 	}
 	return nil
@@ -461,17 +483,17 @@ func saveConfig(dir string, cfg config.Config) error {
 	return nil
 }
 
-// openInEditor opens the given file in the user's preferred editor as a
-// detached process so it doesn't block maggus or take over the terminal.
-func openInEditor(path string) error {
-	// Ensure the file exists before opening.
+// buildEditorCmd ensures the file at path exists and returns an exec.Cmd that
+// opens it in the user's preferred editor. The caller is responsible for
+// running the command (typically via execProcessMsg / tea.ExecProcess).
+func buildEditorCmd(path string) (*exec.Cmd, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		dir := filepath.Dir(path)
 		if mkErr := os.MkdirAll(dir, 0o755); mkErr != nil {
-			return fmt.Errorf("create directory: %w", mkErr)
+			return nil, fmt.Errorf("create directory: %w", mkErr)
 		}
 		if writeErr := os.WriteFile(path, []byte(defaultConfig), 0o644); writeErr != nil {
-			return fmt.Errorf("create config file: %w", writeErr)
+			return nil, fmt.Errorf("create config file: %w", writeErr)
 		}
 	}
 
@@ -487,12 +509,7 @@ func openInEditor(path string) error {
 		}
 	}
 
-	cmd := exec.Command(editor, path)
-	// Detach from terminal so the editor runs in the background.
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd.Start()
+	return exec.Command(editor, path), nil
 }
 
 func indexOf(values []string, target string) int {

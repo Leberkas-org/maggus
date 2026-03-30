@@ -153,8 +153,8 @@ func (m statusModel) viewStatusSplit() string {
 		rightW = 0
 	}
 
-	leftPane := m.renderLeftPane(leftW, innerH-1)
-	rightPane := m.renderRightPane(rightW, innerH-1)
+	leftPane := m.renderLeftPane(leftW, innerH-2)
+	rightPane := m.renderRightPane(rightW, innerH-2)
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 	borderColor := styles.ThemeColor(m.is2x)
@@ -172,12 +172,16 @@ func (m statusModel) statusSplitFooter() string {
 		hint := lipgloss.NewStyle().Foreground(styles.Warning)
 		return hint.Render("Stop daemon:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
 	}
+	if m.daemonStoppingAfterTask {
+		stoppingStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+		return stoppingStyle.Render("⏳ Stopping after task…")
+	}
 	if m.leftFocused {
 		daemonHint := "s: start"
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		footer := "1-5: tabs  ↑/↓ navigate/scroll  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
+		footer := "1-5: tabs  ↑/↓ navigate/scroll  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
 		if m.hasCompletedPlans() {
 			if m.showAll {
 				footer += "  alt+a: hide done"

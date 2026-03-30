@@ -72,6 +72,55 @@ type SessionInfo struct {
 	EndTime        time.Time
 }
 
+// buildInteractiveCmd prepares an *exec.Cmd for an interactive agent session and snapshots
+// the Claude session directory beforehand for post-run usage extraction.
+// Unlike launchInteractive, this function does not start the command; the caller is expected
+// to run it via tea.ExecProcess or equivalent. The returned SessionInfo has StartTime set;
+// the caller must set EndTime when the process exits.
+func buildInteractiveCmd(agentName, prompt, dir string, skipPermissions bool, model string) (*exec.Cmd, *SessionInfo, error) {
+	path, err := exec.LookPath(agentName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s not found on PATH: %w", agentName, err)
+	}
+
+	sessionDir, sdErr := session.SessionDir(dir)
+	var beforeSnapshot map[string]bool
+	if sdErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not resolve session directory: %v\n", sdErr)
+	} else {
+		var snapErr error
+		beforeSnapshot, snapErr = session.SnapshotDir(sessionDir)
+		if snapErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not snapshot session directory: %v\n", snapErr)
+		}
+	}
+
+	startTime := time.Now()
+
+	var args []string
+	if skipPermissions {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if prompt != "" {
+		args = append(args, prompt)
+	}
+
+	cmd := exec.Command(path, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	info := &SessionInfo{
+		BeforeSnapshot: beforeSnapshot,
+		StartTime:      startTime,
+	}
+
+	return cmd, info, nil
+}
+
 // launchInteractive launches the given agent CLI interactively with an optional initial prompt.
 // It connects stdin/stdout/stderr directly so the user has full control.
 // The dir parameter is the working directory used to locate the Claude session directory

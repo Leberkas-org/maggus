@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/cellbuf"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -73,7 +74,8 @@ type updateModel struct {
 	autoUpdateOrigIdx int  // original index (to detect changes)
 	autoUpdateDirty   bool // true if user changed the setting
 
-	is2x bool // true when Claude is in 2x mode (border turns yellow)
+	is2x       bool // true when Claude is in 2x mode (border turns yellow)
+	standalone bool // true when run via the cobra command (uses tea.Quit); false when embedded in the app router (uses navigateBackMsg)
 }
 
 // loadGlobalSettings is injectable for testing.
@@ -195,7 +197,7 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case phaseUpToDate, phaseSuccess, phaseError:
 			// Any key exits (except 'a' which is handled above)
 			saveAutoUpdateIfDirty(&m)
-			return m, tea.Quit
+			return m, m.doneCmd()
 
 		case phaseConfirm:
 			switch msg.Type {
@@ -236,7 +238,7 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.applyVersion
 				}
 				// Cancel
-				return m, tea.Quit
+				return m, m.doneCmd()
 			default:
 				if len(msg.Runes) == 1 {
 					switch msg.Runes[0] {
@@ -246,7 +248,7 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.applyVersion
 					case 'n', 'N', 'q', 'Q':
 						saveAutoUpdateIfDirty(&m)
-						return m, tea.Quit
+						return m, m.doneCmd()
 					case 'j':
 						m.scrollOffset++
 						clampUpdateScroll(&m)
@@ -269,6 +271,15 @@ func (m updateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// doneCmd returns the appropriate tea.Cmd to exit the update screen.
+// In standalone mode it quits the program; when embedded it navigates back to the menu.
+func (m updateModel) doneCmd() tea.Cmd {
+	if m.standalone {
+		return tea.Quit
+	}
+	return func() tea.Msg { return navigateBackMsg{} }
 }
 
 // saveAutoUpdateIfDirty persists the auto-update setting if it was changed.
@@ -386,7 +397,16 @@ func (m updateModel) renderContent() string {
 		if m.info.Body != "" {
 			fmt.Fprintf(&content, "\n%s\n", styles.Subtitle.Render("Changelog"))
 			content.WriteString(styles.Separator(innerW) + "\n")
-			content.WriteString(m.info.Body + "\n")
+			// Pre-wrap body lines to innerW so they match the visual line count
+			// used by the viewport slicer. Without this, long lines get
+			// word-wrapped by lipgloss inside Box.Render(), making the rendered
+			// box taller than height. BubbleTea then drops lines from the top
+			// to fit the terminal, clipping the title and header rows.
+			body := m.info.Body
+			if innerW > 0 {
+				body = cellbuf.Wrap(body, innerW, "")
+			}
+			content.WriteString(body + "\n")
 		}
 
 		content.WriteString("\n")
@@ -497,6 +517,7 @@ Examples:
   maggus update`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		m := newUpdateModel(Version)
+		m.standalone = true
 		prog := tea.NewProgram(m, tea.WithAltScreen())
 		_, err := prog.Run()
 		return err

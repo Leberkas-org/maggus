@@ -134,7 +134,7 @@ func TestTaskListComponent_EnsureCursorVisible_CursorAboveViewport(t *testing.T)
 func TestTaskListComponent_EnsureCursorVisible_CursorBelowViewport(t *testing.T) {
 	c := newTestComponent(sampleTasks(20))
 	c.ScrollOffset = 0
-	c.Cursor = 15
+	c.Cursor = 19 // last task, beyond the visible window
 
 	c.ensureCursorVisible()
 
@@ -180,10 +180,10 @@ func TestTaskListComponent_VisibleTaskLines_NormalSize(t *testing.T) {
 
 	visible := c.visibleTaskLines()
 
-	// FullScreenInnerSize(80, 24): innerH = 24 - 2*2 - 2 = 18
-	// avail = 18 - headerLines(2) - footerLines(1) = 15
-	if visible != 15 {
-		t.Errorf("visibleTaskLines = %d, want 15", visible)
+	// FullScreenInnerSize(80, 24): innerH = 24 - 0 - 2 = 22
+	// avail = 22 - headerLines(2) - footerLines(1) = 19
+	if visible != 19 {
+		t.Errorf("visibleTaskLines = %d, want 19", visible)
 	}
 }
 
@@ -195,9 +195,9 @@ func TestTaskListComponent_VisibleTaskLines_DifferentHeaderLines(t *testing.T) {
 
 	visible := c.visibleTaskLines()
 
-	// innerH = 18, avail = 18 - 5 - 1 = 12
-	if visible != 12 {
-		t.Errorf("visibleTaskLines = %d, want 12", visible)
+	// innerH = 22, avail = 22 - 5 - 1 = 16
+	if visible != 16 {
+		t.Errorf("visibleTaskLines = %d, want 16", visible)
 	}
 }
 

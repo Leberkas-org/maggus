@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -18,6 +19,11 @@ import (
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
 )
+
+// errStopAfterTask is returned by runOneDaemonCycle when the stop-after-task
+// signal was consumed during the cycle. The daemon loop treats this as a clean
+// exit request rather than an error.
+var errStopAfterTask = errors.New("stop-after-task")
 
 // runDaemonLoop runs the daemon work loop with keep-alive behaviour.
 // When no work is found, it watches for feature/bug file changes and retries.
@@ -47,7 +53,8 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 
 	// Watch for stop signal file (used on Windows where OS signals cannot
 	// reach a detached daemon process; harmless no-op on Unix).
-	removeDaemonStopFile(dir) // clean up leftover from previous run
+	removeDaemonStopFile(dir)       // clean up leftover from previous run
+	removeStopAfterTaskFile(dir)    // clean up leftover stop-after-task signal from previous run
 	go func() {
 		stopFile := daemonStopFilePath(dir)
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -96,6 +103,9 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 		}
 
 		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx)
+		if errors.Is(err, errStopAfterTask) {
+			return nil
+		}
 		if err != nil {
 			runLogger.Info(fmt.Sprintf("work cycle error: %v", err))
 		}
@@ -105,12 +115,21 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 			continue
 		}
 
+		// No work found — exit immediately if stop-after-task was requested.
+		if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+			removeStopAfterTaskFile(dir)
+			return nil
+		}
+
 		// No work found — enter wait state.
 		runLogger.Info("no work found, watching for changes")
 
-		wakeReason, wakePath := waitForChanges(fw, workCtx)
+		wakeReason, wakePath := waitForChanges(fw, workCtx, dir)
 		switch wakeReason {
 		case wakeSignal:
+			return nil
+		case wakeStopAfterTask:
+			removeStopAfterTaskFile(dir)
 			return nil
 		case wakeFileChange:
 			runLogger.Info(fmt.Sprintf("file change detected: %s", wakePath))
@@ -122,22 +141,35 @@ func runDaemonLoop(cmd printer, wc *workConfig) error {
 type wakeReason int
 
 const (
-	wakeSignal     wakeReason = iota // shutdown signal received
-	wakeFileChange                   // file change detected
+	wakeSignal        wakeReason = iota // shutdown signal received
+	wakeFileChange                      // file change detected
+	wakeStopAfterTask                   // stop-after-task sentinel file detected
 )
 
 // daemonIdlePollInterval is the maximum time the daemon will wait idle before
 // re-checking for work, providing a fallback for missed fsnotify events.
 const daemonIdlePollInterval = 30 * time.Second
 
-// waitForChanges blocks until a file change or context cancellation.
+// waitForChanges blocks until a file change, context cancellation, or
+// stop-after-task sentinel file detection.
 // It uses the provided filewatcher (which may be nil if creation failed).
 // Returns the reason for waking and the path of the changed file (if applicable).
-func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, string) {
+func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (wakeReason, string) {
+	stopAfterTaskTicker := time.NewTicker(500 * time.Millisecond)
+	defer stopAfterTaskTicker.Stop()
+
 	if fw == nil {
-		// No watcher available — block on context only.
-		<-ctx.Done()
-		return wakeSignal, ""
+		// No watcher available — block on context or stop-after-task only.
+		for {
+			select {
+			case <-ctx.Done():
+				return wakeSignal, ""
+			case <-stopAfterTaskTicker.C:
+				if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+					return wakeStopAfterTask, ""
+				}
+			}
+		}
 	}
 
 	type fileEvent struct {
@@ -159,13 +191,19 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context) (wakeReason, s
 	})
 	defer fw.SetSend(nil)
 
-	select {
-	case <-ctx.Done():
-		return wakeSignal, ""
-	case evt := <-wakeCh:
-		return wakeFileChange, evt.path
-	case <-time.After(daemonIdlePollInterval):
-		return wakeFileChange, ""
+	for {
+		select {
+		case <-ctx.Done():
+			return wakeSignal, ""
+		case evt := <-wakeCh:
+			return wakeFileChange, evt.path
+		case <-stopAfterTaskTicker.C:
+			if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
+				return wakeStopAfterTask, ""
+			}
+		case <-time.After(daemonIdlePollInterval):
+			return wakeFileChange, ""
+		}
 	}
 }
 
@@ -286,6 +324,26 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	stopFlagAtomic := &atomic.Bool{}
 	stopAtTaskIDAtomic := &atomic.Value{}
 
+	// Poll for the stop-after-task sentinel file. When found, set stopFlagAtomic so
+	// the work loop stops between tasks rather than cancelling the active invocation.
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		stopAfterTaskFile := daemonStopAfterTaskFilePath(dir)
+		for {
+			select {
+			case <-workCtx.Done():
+				return
+			case <-ticker.C:
+				if _, err := os.Stat(stopAfterTaskFile); err == nil {
+					removeStopAfterTaskFile(dir)
+					stopFlagAtomic.Store(true)
+					return
+				}
+			}
+		}
+	}()
+
 	tc := taskContext{
 		workCtx:       workCtx,
 		p:             p,
@@ -326,6 +384,10 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	_, tuiErr := p.Run()
 	if tuiErr != nil {
 		return true, fmt.Errorf("TUI error: %w", tuiErr)
+	}
+
+	if stopFlagAtomic.Load() {
+		return true, errStopAfterTask
 	}
 
 	return true, nil

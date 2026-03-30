@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -8,10 +9,11 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// daemonPIDState holds the cached daemon PID and running flag.
+// daemonPIDState holds the cached daemon PID, running flag, and stop-after-task sentinel.
 type daemonPIDState struct {
-	PID     int
-	Running bool
+	PID                int
+	Running            bool
+	StoppingAfterTask  bool
 }
 
 // DaemonStateCache watches the .maggus/ directory for changes to daemon.pid,
@@ -97,12 +99,17 @@ func (c *DaemonStateCache) Stop() {
 	c.subscribers = nil
 }
 
-// reload reads daemon.pid and isProcessRunning, then notifies subscribers
-// only if the state actually changed.
+// reload reads daemon.pid, isProcessRunning, and the stop-after-task sentinel,
+// then notifies subscribers only if the state actually changed.
 func (c *DaemonStateCache) reload() {
 	pid, _ := readDaemonPID(c.dir)
 	running := pid != 0 && isProcessRunning(pid)
-	newState := daemonPIDState{PID: pid, Running: running}
+	var stoppingAfterTask bool
+	if running {
+		_, err := os.Stat(daemonStopAfterTaskFilePath(c.dir))
+		stoppingAfterTask = err == nil
+	}
+	newState := daemonPIDState{PID: pid, Running: running, StoppingAfterTask: stoppingAfterTask}
 
 	c.mu.Lock()
 	changed := c.state != newState
@@ -143,7 +150,8 @@ func (c *DaemonStateCache) loop() {
 			if !ok {
 				return
 			}
-			if filepath.Base(event.Name) != "daemon.pid" {
+			base := filepath.Base(event.Name)
+			if base != "daemon.pid" && base != "daemon.stop-after-task" {
 				continue
 			}
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename) == 0 {

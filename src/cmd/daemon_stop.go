@@ -4,11 +4,30 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/spf13/cobra"
 )
+
+// sendStopAfterTaskSignal writes the daemon PID into the stop-after-task sentinel file.
+// The daemon polls for this file; when found it sets stopFlagAtomic (without cancelling
+// workCtx) so the current task runs to completion before the daemon exits.
+func sendStopAfterTaskSignal(dir string) error {
+	pid, err := readDaemonPID(dir)
+	if err != nil {
+		return fmt.Errorf("read daemon PID: %w", err)
+	}
+	if pid == 0 {
+		return fmt.Errorf("no daemon is running")
+	}
+	path := daemonStopAfterTaskFilePath(dir)
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0755); mkErr != nil {
+		return fmt.Errorf("create .maggus dir: %w", mkErr)
+	}
+	return os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0644)
+}
 
 var stopAllFlag bool
 

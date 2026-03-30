@@ -1871,3 +1871,26 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 		}
 	})
 }
+
+func TestShouldPromptOnExit(t *testing.T) {
+	t.Run("returns true when daemon is running", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: true}}
+		if !m.shouldPromptOnExit() {
+			t.Error("shouldPromptOnExit() = false, want true when daemon is running")
+		}
+	})
+
+	t.Run("returns false when daemon is not running", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: false}}
+		if m.shouldPromptOnExit() {
+			t.Error("shouldPromptOnExit() = true, want false when daemon is not running")
+		}
+	})
+
+	t.Run("returns true when daemon is running with active task", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"}}
+		if !m.shouldPromptOnExit() {
+			t.Error("shouldPromptOnExit() = false, want true when daemon is running with active task")
+		}
+	})
+}

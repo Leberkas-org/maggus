@@ -272,3 +272,30 @@ func TestStreamEvent_ResultWithoutCostUSD(t *testing.T) {
 		t.Errorf("CostUSD = %f, want 0", event.CostUSD)
 	}
 }
+
+func TestDescribeToolUse(t *testing.T) {
+	tests := []struct {
+		tool  string
+		input ToolInput
+		want  string
+	}{
+		{"Read", ToolInput{FilePath: `C:\path\to\file.go`}, `C:\path\to\file.go`},
+		{"Edit", ToolInput{FilePath: `C:\path\to\file.go`}, `C:\path\to\file.go`},
+		{"Write", ToolInput{FilePath: `C:\path\to\file.go`}, `C:\path\to\file.go`},
+		{"Glob", ToolInput{Pattern: "**/*.go"}, "**/*.go"},
+		{"Grep", ToolInput{Pattern: "func main"}, "func main"},
+		{"Skill", ToolInput{Skill: "my-skill"}, "my-skill"},
+		{"Bash", ToolInput{Description: "Run tests"}, "Run tests"},
+		{"Bash", ToolInput{Command: "go test ./..."}, "go test ./..."},
+		{"Bash", ToolInput{}, "Bash"},
+		{"mcp__myserver__mytool", ToolInput{}, "mytool"},
+		{"UnknownTool", ToolInput{}, "UnknownTool"},
+	}
+
+	for _, tc := range tests {
+		got := DescribeToolUse(tc.tool, tc.input)
+		if got != tc.want {
+			t.Errorf("DescribeToolUse(%q, ...) = %q, want %q", tc.tool, got, tc.want)
+		}
+	}
+}

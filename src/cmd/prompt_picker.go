@@ -3,18 +3,14 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/discord"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
-
-// promptPickerResult holds the user's selection from the prompt picker TUI.
-type promptPickerResult struct {
-	Skill           string
-	SkipPermissions bool
-	Cancelled       bool
-}
 
 // promptPickerFocus tracks which UI element has focus.
 type promptPickerFocus int
@@ -47,15 +43,22 @@ type promptPickerModel struct {
 	skillCursor     int
 	focus           promptPickerFocus
 	skipPermissions bool
-	result          promptPickerResult
 	width           int
 	height          int
+
+	// Config needed to build the interactive command on selection.
+	dir           string
+	resolvedModel string
+	agentName     string
 }
 
-func newPromptPickerModel() promptPickerModel {
+func newPromptPickerModel(dir, resolvedModel, agentName string) promptPickerModel {
 	return promptPickerModel{
 		skills:          defaultSkills,
 		skipPermissions: true,
+		dir:             dir,
+		resolvedModel:   resolvedModel,
+		agentName:       agentName,
 	}
 }
 
@@ -75,8 +78,7 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch key {
 		case "q", "esc":
-			m.result = promptPickerResult{Cancelled: true}
-			return m, tea.Quit
+			return m, func() tea.Msg { return navigateBackMsg{} }
 
 		case "up", "k":
 			if m.focus == focusSkillList {
@@ -121,8 +123,12 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if m.focus == focusSkillList {
-				m.result = m.buildResult()
-				return m, tea.Quit
+				label := m.skills[m.skillCursor].label
+				dir := m.dir
+				resolvedModel := m.resolvedModel
+				agentName := m.agentName
+				skipPermissions := m.skipPermissions
+				return m, m.buildLaunchCmd(label, dir, resolvedModel, agentName, skipPermissions)
 			} else if m.focus == focusToggle {
 				m.skipPermissions = !m.skipPermissions
 			}
@@ -137,11 +143,74 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m promptPickerModel) buildResult() promptPickerResult {
-	return promptPickerResult{
-		Skill:           m.skills[m.skillCursor].label,
-		SkipPermissions: m.skipPermissions,
-		Cancelled:       false,
+// buildLaunchCmd returns a tea.Cmd that prepares and emits an execProcessMsg for
+// the selected skill. All pre-process work (presence update, plugin ensure, session
+// snapshot) is done inside the cmd function so it runs off the main goroutine.
+func (m promptPickerModel) buildLaunchCmd(label, dir, resolvedModel, agentName string, skipPermissions bool) tea.Cmd {
+	return func() tea.Msg {
+		mapping, ok := skillMappings[label]
+		if !ok {
+			return navigateBackMsg{}
+		}
+
+		// Use shared presence from root menu if available; otherwise create our own.
+		presence := sharedPresence
+		ownPresence := false
+		if presence == nil {
+			gs, _ := globalconfig.LoadSettings()
+			if gs.DiscordPresence {
+				p := &discord.Presence{}
+				_ = p.Connect()
+				presence = p
+				ownPresence = true
+			}
+		}
+
+		// Update presence with the selected skill's verb.
+		if presence != nil {
+			_ = presence.Update(discord.PresenceState{
+				FeatureTitle: mapping.title,
+				Verb:         mapping.detail,
+				StartTime:    time.Now(),
+			})
+		}
+
+		// Ensure the maggus plugin is installed for non-plain skills.
+		if mapping.skill != "" && agentName == "claude" {
+			if err := ensureMaggusPlugin(); err != nil {
+				if ownPresence && presence != nil {
+					_ = presence.Close()
+				}
+				return navigateBackMsg{}
+			}
+		}
+
+		var prompt string
+		if mapping.skill != "" {
+			prompt = mapping.skill
+		}
+
+		cmd, info, err := buildInteractiveCmd(agentName, prompt, dir, skipPermissions, resolvedModel)
+		if err != nil {
+			if ownPresence && presence != nil {
+				_ = presence.Close()
+			}
+			return navigateBackMsg{}
+		}
+
+		return execProcessMsg{
+			cmd: cmd,
+			onDone: func(err error) tea.Msg {
+				info.EndTime = time.Now()
+				if mapping.kind != "" {
+					extractSkillUsage(dir, resolvedModel, agentName, mapping.kind, info)
+				}
+				if ownPresence && presence != nil {
+					_ = presence.Close()
+				}
+				return navigateBackMsg{}
+			},
+		}
 	}
 }
 

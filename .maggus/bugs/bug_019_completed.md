@@ -1,0 +1,50 @@
+<!-- maggus-id: 358733bb-b1f7-40e0-944a-a4398502d156 -->
+# Bug: Update view only displays the title when opened via app router
+
+## Summary
+
+When navigating to the update screen from the menu, the view renders only the first line (the title). All changelog content, footer, and controls are hidden. This regressed in commit `37cc4f1` which integrated the update view into the app router.
+
+## Related
+
+- **Commit:** 37cc4f1 (fix(BUG-016-002): Integrate update view into the app router to eliminate flicker)
+
+## Steps to Reproduce
+
+1. Run `maggus` (the interactive TUI)
+2. From the menu, navigate to "Check for updates"
+3. Observe: only the title line is visible, all other content is missing
+
+## Expected Behavior
+
+The update screen should render its full content — changelog, status, footer hints — filling the terminal just as it does when run via `maggus update` directly.
+
+## Root Cause
+
+`appModel` does not store the terminal dimensions. When `navigateTo(screenUpdate)` is called, `initScreen` creates a new `updateModel` via `newUpdateModel(Version)` (`app_model.go:330`) with `width=0` and `height=0`.
+
+The new model never receives a `tea.WindowSizeMsg` because Bubble Tea only fires that message once at program start, and `appModel.Update` only forwards it to whichever sub-model is **currently active** (`app_model.go:134–136`). The update screen isn't active at that point.
+
+When `View()` is called on the unsized model, this chain produces the broken render:
+
+1. `viewportHeight()` at `update.go:302` calls `styles.FullScreenInnerSize(0, 0)` → returns `(0, 0)` (`styles.go:199–208`)
+2. `vp = 0 - 1 - 1 = -2` → clamped to `1` (`update.go:310–311`)
+3. Back in `View()`, `end = 0 + 1 = 1`, so `visibleLines = lines[0:1]` — only the title
+4. Since `m.width == 0`, the fallback non-fullscreen render path is used (`update.go:495–498`), rendering a tiny box with just one line
+
+The `maggus update` CLI path is unaffected because there `tea.NewProgram` fires `WindowSizeMsg` before any `View()` call, so `width`/`height` are set in time.
+
+## User Stories
+
+### BUG-019-001: Store terminal dimensions in appModel and seed new sub-models on navigation
+
+**Description:** As a user, I want the update screen (and any future screen added to the router) to render correctly when navigated to, so that I don't see a broken single-line view.
+
+**Acceptance Criteria:**
+- [x] `appModel` stores `width int` and `height int` fields
+- [x] `appModel.Update` stores the dimensions when it receives `tea.WindowSizeMsg`, before forwarding
+- [x] `appModel.initScreen` (or `navigateTo`) sends a synthetic `tea.WindowSizeMsg` to the newly created sub-model so it is sized immediately
+- [x] Navigating to the update screen from the menu renders the full view (title, content, footer) at the correct terminal size
+- [x] `maggus update` (standalone CLI path) is unaffected
+- [x] No regression in menu, status, config, repos, or prompt screens
+- [x] `go vet ./...` and `go test ./...` pass
