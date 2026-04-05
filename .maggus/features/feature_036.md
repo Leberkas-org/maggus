@@ -62,7 +62,7 @@ The hidden `work` cobra command is a legacy name from when users invoked it dire
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `git mv` renames applied for all nine files:
+- [x] `git mv` renames applied for all nine files:
   - `work_loop.go` → `run_loop.go`
   - `work_setup.go` → `run_setup.go`
   - `work_task.go` → `run_task.go`
@@ -72,13 +72,13 @@ The hidden `work` cobra command is a legacy name from when users invoked it dire
   - `work_setup_test.go` → `run_setup_test.go`
   - `work_task_test.go` → `run_task_test.go`
 - [x] `src/cmd/dispatch_test.go`: all 6 occurrences of `workCmd` → `runCmd`
-- [ ] `src/cmd/root_test.go`: test case string `[]string{"maggus", "work"}` → `[]string{"maggus", "run"}`
-- [ ] Internal symbol renames across renamed files:
-  - `workConfig` → `runConfig`
+- [x] `src/cmd/root_test.go`: test case string `[]string{"maggus", "work"}` → `[]string{"maggus", "run"}`
+- [x] Internal symbol renames across renamed files:
+  - `workConfig` → `runLoopConfig` (renamed to `runLoopConfig` to avoid collision with existing `runConfig()` func in config.go)
   - `workSetup` → `runSetup`
   - `workLoopParams` → `runLoopParams`
-- [ ] `go build ./...` passes in `src/`
-- [ ] `go test ./...` passes in `src/`
+- [x] `go build ./...` passes in `src/`
+- [x] `go test ./...` passes in `src/`
 
 ### TASK-036-004: Update ARCHITECTURE.md
 **Description:** As a developer, I want ARCHITECTURE.md updated to reflect the renamed component so that the architecture documentation stays accurate.

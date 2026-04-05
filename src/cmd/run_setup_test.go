@@ -24,7 +24,7 @@ func (f *fakeAgent) RunOnce(_ context.Context, _ string, _ string) (string, erro
 func (f *fakeAgent) Name() string                                                    { return f.name }
 func (f *fakeAgent) Validate() error                                                 { return f.validateErr }
 
-// stubSetupDeps replaces workSetup's function variables with test stubs
+// stubSetupDeps replaces runSetup's function variables with test stubs
 // and restores originals on cleanup.
 type setupStubs struct {
 	loadConfig   func(string) (config.Config, error)
@@ -115,7 +115,7 @@ func TestWorkSetup_ModelFlagOverridesConfig(t *testing.T) {
 	modelFlag = "opus"
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestWorkSetup_ConfigModelUsedWhenNoFlag(t *testing.T) {
 	modelFlag = ""
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestWorkSetup_EmptyModelShowsDefault(t *testing.T) {
 	modelFlag = ""
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestWorkSetup_AgentFlagOverridesConfig(t *testing.T) {
 	agentFlag = "opencode"
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestWorkSetup_ConfigAgentUsedWhenNoFlag(t *testing.T) {
 	agentFlag = ""
 	countFlag = 1
 
-	_, err := workSetup(newDummyCmd(), nil)
+	_, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestWorkSetup_TaskFlagForcesCountOne(t *testing.T) {
 	taskFlag = "TASK-001"
 	countFlag = 10
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestWorkSetup_ArgsOverrideCountFlag(t *testing.T) {
 	taskFlag = ""
 	countFlag = 5
 
-	wc, err := workSetup(newDummyCmd(), []string{"3"})
+	wc, err := runSetup(newDummyCmd(), []string{"3"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestWorkSetup_InvalidCountArg(t *testing.T) {
 	taskFlag = ""
 	countFlag = 5
 
-	_, err := workSetup(newDummyCmd(), []string{"abc"})
+	_, err := runSetup(newDummyCmd(), []string{"abc"})
 	if err == nil {
 		t.Fatal("expected error for invalid count arg")
 	}
@@ -285,7 +285,7 @@ func TestWorkSetup_ZeroCountArg(t *testing.T) {
 
 	taskFlag = ""
 
-	_, err := workSetup(newDummyCmd(), []string{"0"})
+	_, err := runSetup(newDummyCmd(), []string{"0"})
 	if err == nil {
 		t.Fatal("expected error for zero count")
 	}
@@ -300,7 +300,7 @@ func TestWorkSetup_NegativeCountArg(t *testing.T) {
 
 	taskFlag = ""
 
-	_, err := workSetup(newDummyCmd(), []string{"-1"})
+	_, err := runSetup(newDummyCmd(), []string{"-1"})
 	if err == nil {
 		t.Fatal("expected error for negative count")
 	}
@@ -332,7 +332,7 @@ func TestWorkSetup_IncludeWarningsForMissingFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestWorkSetup_EmptyFingerprint_SetsUnknown(t *testing.T) {
 
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestWorkSetup_Fingerprint_UsesReturnedValue(t *testing.T) {
 
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

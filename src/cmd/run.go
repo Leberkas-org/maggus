@@ -56,7 +56,7 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{WorkRuns: 1})
 
-		wc, err := workSetup(cmd, args)
+		wc, err := runSetup(cmd, args)
 		if err != nil {
 			return err
 		}

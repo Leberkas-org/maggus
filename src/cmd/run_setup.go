@@ -25,8 +25,8 @@ var (
 	getwdFn           = os.Getwd
 )
 
-// workConfig holds all resolved configuration needed by the work loop.
-type workConfig struct {
+// runLoopConfig holds all resolved configuration needed by the work loop.
+type runLoopConfig struct {
 	count           int
 	dir             string
 	cfg             config.Config
@@ -40,9 +40,9 @@ type workConfig struct {
 	hostFingerprint string
 }
 
-// workSetup resolves CLI flags, loads config, validates the agent, and
+// runSetup resolves CLI flags, loads config, validates the agent, and
 // prepares all configuration the work loop needs to run.
-func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
+func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 	count := countFlag
 
 	if taskFlag != "" {
@@ -128,7 +128,7 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 
 	globalSettings, _ := globalconfig.LoadSettings()
 
-	return &workConfig{
+	return &runLoopConfig{
 		count:           count,
 		dir:             dir,
 		cfg:             cfg,

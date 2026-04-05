@@ -232,8 +232,8 @@ func firstWorkableTask(plans []parser.Plan) *parser.Task {
 	return nil
 }
 
-// workLoopParams bundles the parameters for runWorkGoroutine.
-type workLoopParams struct {
+// runLoopParams bundles the parameters for runWorkGoroutine.
+type runLoopParams struct {
 	tc            taskContext
 	tasks         []parser.Task // flat merged list — used for summary remaining tasks
 	featureGroups []parser.Plan // ordered approved plans to work (bugs first, then features)
@@ -259,7 +259,7 @@ type workLoopParams struct {
 // It processes one feature group at a time: all tasks in a feature are completed before
 // moving to the next. Feature progression is controlled by --count (feature limit) and
 // the auto_continue config option.
-func runWorkGoroutine(params workLoopParams) {
+func runWorkGoroutine(params runLoopParams) {
 	go func() {
 		defer func() {
 			params.p.Send(QuitMsg{})
@@ -382,7 +382,7 @@ type groupTasksResult struct {
 
 // runGroupTasks runs all workable tasks within a single plan.
 // The inner loop mirrors the old task loop but is scoped to one source file.
-func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) groupTasksResult {
+func runGroupTasks(tc taskContext, params runLoopParams, group parser.Plan) groupTasksResult {
 	var result groupTasksResult
 
 	groupTasks := group.Tasks
@@ -473,7 +473,7 @@ func runGroupTasks(tc taskContext, params workLoopParams, group parser.Plan) gro
 }
 
 // buildSummaryData constructs the summary data for the end-of-run summary screen.
-func buildSummaryData(params workLoopParams, completed int, failedTasks []failedTask, stopReason StopReason, errorDetail string, warnings []string) SummaryData {
+func buildSummaryData(params runLoopParams, completed int, failedTasks []failedTask, stopReason StopReason, errorDetail string, warnings []string) SummaryData {
 	endHashCmd := gitutil.Command("rev-parse", "--short", "HEAD")
 	endHashCmd.Dir = params.tc.workDir
 	endHashBytes, _ := endHashCmd.Output()
