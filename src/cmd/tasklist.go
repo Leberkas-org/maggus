@@ -129,7 +129,7 @@ func (c *taskListComponent) openDetail() {
 		content += c.DetailSuffix
 	}
 	w, h := styles.FullScreenInnerSize(c.Width, c.Height)
-	c.detailViewport = viewport.New(w, h-1)
+	c.detailViewport = viewport.New(w, h-2)
 	c.detailViewport.SetContent(content)
 	c.detailReady = true
 }
@@ -148,7 +148,7 @@ func (c *taskListComponent) HandleResize(width, height int) {
 	if c.ShowDetail {
 		w, h := styles.FullScreenInnerSize(width, height)
 		c.detailViewport.Width = w
-		c.detailViewport.Height = h - 1
+		c.detailViewport.Height = h - 2
 		c.detailReady = true
 	}
 }
