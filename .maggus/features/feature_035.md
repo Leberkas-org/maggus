@@ -88,17 +88,17 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 **Model:** sonnet
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/configuration.md`: The example `.maggus/config.yml` block at the top is updated to reflect all supported fields (remove `worktree` if it is not in the Config struct; add approval_mode, auto_continue, max_log_files, git section, on_complete section, hooks section)
-- [ ] `docs/reference/configuration.md`: `approval_mode` is documented — values `opt-in` (default, features must be approved before work starts) and `opt-out` (all features are worked unless explicitly excluded)
-- [ ] `docs/reference/configuration.md`: `auto_continue` is documented — boolean, default false, when true Maggus continues to the next feature automatically instead of stopping after each feature completes
-- [ ] `docs/reference/configuration.md`: `max_log_files` is documented — integer, default 50, controls how many run log directories are retained in `.maggus/runs/`
-- [ ] `docs/reference/configuration.md`: `git` section is documented with all three sub-fields:
+- [x] `docs/reference/configuration.md`: The example `.maggus/config.yml` block at the top is updated to reflect all supported fields (remove `worktree` if it is not in the Config struct; add approval_mode, auto_continue, max_log_files, git section, on_complete section, hooks section)
+- [x] `docs/reference/configuration.md`: `approval_mode` is documented — values `opt-in` (default, features must be approved before work starts) and `opt-out` (all features are worked unless explicitly excluded)
+- [x] `docs/reference/configuration.md`: `auto_continue` is documented — boolean, default false, when true Maggus continues to the next feature automatically instead of stopping after each feature completes
+- [x] `docs/reference/configuration.md`: `max_log_files` is documented — integer, default 50, controls how many run log directories are retained in `.maggus/runs/`
+- [x] `docs/reference/configuration.md`: `git` section is documented with all three sub-fields:
   - `auto_branch` (bool, default true — create feature branches automatically)
   - `protected_branches` (list of branch names, default `[main, master, dev]`)
   - `check_sync` (bool, default true — verify branch is in sync before starting work)
-- [ ] `docs/reference/configuration.md`: `on_complete` section is documented — `feature` and `bug` fields accept `"rename"` (default, renames to `_completed.md`) or `"delete"` (deletes the file)
-- [ ] `docs/reference/configuration.md`: `hooks` section is documented — `on_feature_complete`, `on_bug_complete`, `on_task_complete` each accept a list of `{ run: "shell command" }` entries that execute at the corresponding lifecycle event
-- [ ] `docs/reference/configuration.md`: `worktree` is removed from the YAML config block if it is not a real config field (it is CLI-flag-only per the source code); the worktree behavior is mentioned under `--worktree` CLI flag instead
+- [x] `docs/reference/configuration.md`: `on_complete` section is documented — `feature` and `bug` fields accept `"rename"` (default, renames to `_completed.md`) or `"delete"` (deletes the file)
+- [x] `docs/reference/configuration.md`: `hooks` section is documented — `on_feature_complete`, `on_bug_complete`, `on_task_complete` each accept a list of `{ run: "shell command" }` entries that execute at the corresponding lifecycle event
+- [x] `docs/reference/configuration.md`: `worktree` is removed from the YAML config block if it is not a real config field (it is CLI-flag-only per the source code); the worktree behavior is mentioned under `--worktree` CLI flag instead
 
 ---
 

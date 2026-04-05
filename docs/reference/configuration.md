@@ -10,12 +10,29 @@ Maggus reads its project configuration from `.maggus/config.yml` in your project
 # .maggus/config.yml
 agent: claude
 model: anthropic/claude-sonnet-4-6
-worktree: false
+approval_mode: opt-in
+auto_continue: false
+max_log_files: 50
 include:
   - ARCHITECTURE.md
   - docs/PATTERNS.md
 notifications:
   sound: false
+git:
+  auto_branch: true
+  protected_branches:
+    - main
+    - master
+    - dev
+  check_sync: true
+on_complete:
+  feature: rename
+  bug: rename
+hooks:
+  on_feature_complete:
+    - run: echo "Feature done"
+  on_bug_complete: []
+  on_task_complete: []
 ```
 
 ### `agent`
@@ -66,15 +83,40 @@ Bare model IDs without a provider prefix (e.g. `claude-sonnet-4-6`) still work f
 
 If omitted, Maggus does not pass a model flag to the agent, which uses the agent's default model.
 
-### `worktree`
+### `approval_mode`
 
-When set to `true`, `maggus work` runs each task in an isolated git worktree under `.maggus-work/`. This allows multiple Maggus instances to work on different tasks in parallel without interfering with each other.
+Controls whether features require explicit approval before Maggus works on them.
 
 ```yaml
-worktree: true
+approval_mode: opt-in
 ```
 
-Defaults to `false`. Can be overridden with `--worktree` or `--no-worktree` CLI flags.
+| Value | Description |
+|-------|-------------|
+| `opt-in` | Features must be explicitly approved before work starts (default) |
+| `opt-out` | All features are worked on unless explicitly excluded |
+
+If omitted, defaults to `opt-in`.
+
+### `auto_continue`
+
+When `true`, Maggus automatically continues to the next feature after a feature completes, instead of stopping and waiting.
+
+```yaml
+auto_continue: true
+```
+
+Defaults to `false`.
+
+### `max_log_files`
+
+Controls how many run log directories are retained in `.maggus/runs/`. When the limit is exceeded, the oldest runs are deleted.
+
+```yaml
+max_log_files: 100
+```
+
+Defaults to `50`. Set to a higher value if you need more history, or lower to save disk space.
 
 ### `include`
 
@@ -111,6 +153,71 @@ notifications:
 | `on_error` | `true` | Play a sound when a task or commit fails |
 
 The per-event toggles default to `true` when `sound` is enabled. Set any to `false` to selectively disable specific notifications.
+
+### `git`
+
+Controls git workflow behavior during the work loop.
+
+```yaml
+git:
+  auto_branch: true
+  protected_branches:
+    - main
+    - master
+    - dev
+  check_sync: true
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `auto_branch` | `true` | Automatically create a `feature/maggustask-NNN` branch when on a protected branch |
+| `protected_branches` | `["main", "master", "dev"]` | List of branch names that trigger auto-branching |
+| `check_sync` | `true` | Before starting work, verify the current branch is in sync with its remote |
+
+When `auto_branch` is `true` and the current branch matches one of the `protected_branches`, Maggus creates a new feature branch before running the agent. This prevents commits landing directly on protected branches.
+
+When `check_sync` is `true`, Maggus checks whether the branch is ahead, behind, or diverged from its remote tracking branch and warns before proceeding.
+
+### `on_complete`
+
+Controls what happens to a feature or bug file after all its tasks are marked complete.
+
+```yaml
+on_complete:
+  feature: rename
+  bug: rename
+```
+
+| Field | Default | Values | Description |
+|-------|---------|--------|-------------|
+| `feature` | `rename` | `rename`, `delete` | Action taken when a feature file is fully completed |
+| `bug` | `rename` | `rename`, `delete` | Action taken when a bug file is fully completed |
+
+- **`rename`** — renames the file to `feature_N_completed.md` (or `bug_N_completed.md`), keeping it in the `.maggus/features/` directory as an archive.
+- **`delete`** — permanently deletes the file once all tasks are done.
+
+### `hooks`
+
+Defines shell commands to run at lifecycle events during the work loop.
+
+```yaml
+hooks:
+  on_feature_complete:
+    - run: git push origin HEAD
+    - run: ./scripts/notify-team.sh
+  on_bug_complete:
+    - run: git push origin HEAD
+  on_task_complete:
+    - run: echo "Task done"
+```
+
+| Event | Trigger |
+|-------|---------|
+| `on_feature_complete` | Runs after all tasks in a feature file are complete |
+| `on_bug_complete` | Runs after all tasks in a bug file are complete |
+| `on_task_complete` | Runs after each individual task completes |
+
+Each hook is a list of `{ run: "shell command" }` entries. Commands are executed in order using the system shell. If a command exits with a non-zero status, Maggus logs the failure but continues the work loop.
 
 ## Global Config (`~/.maggus/config.yml`)
 
@@ -188,6 +295,20 @@ maggus work --agent opencode --model openai/gpt-4.1
 
 The agent's CLI tool must be installed and available on your PATH. Maggus validates this before starting the work loop and exits with a clear error if the tool is not found.
 
+### `--worktree` / `--no-worktree`
+
+The `--worktree` flag on `maggus work` runs each task in an isolated git worktree under `.maggus-work/`. This allows multiple Maggus instances to work on different tasks in parallel without interfering with each other.
+
+```bash
+# Run in an isolated worktree
+maggus work --worktree
+
+# Explicitly disable worktree mode (the default)
+maggus work --no-worktree
+```
+
+Worktree mode is a CLI-only flag and is not configurable via `config.yml`.
+
 ## Bootstrap Context Files
 
 Before each task, Maggus automatically reads the following files from the project root (if they exist) and includes them in the prompt:
@@ -227,13 +348,22 @@ A typical configuration using Claude Code (the default agent):
 # .maggus/config.yml — Claude Code
 agent: claude
 model: sonnet
-worktree: false
+approval_mode: opt-in
+auto_continue: false
 include:
   - ARCHITECTURE.md
   - docs/coding-guidelines.md
 notifications:
   sound: true
   on_error: true
+git:
+  auto_branch: true
+  check_sync: true
+on_complete:
+  feature: rename
+hooks:
+  on_feature_complete:
+    - run: git push origin HEAD
 ```
 
 ```bash
@@ -242,6 +372,9 @@ maggus work --model opus --count 3
 
 # Skip bootstrap context
 maggus work --no-bootstrap
+
+# Run in isolated worktree
+maggus work --worktree
 ```
 
 ### OpenCode Setup
