@@ -1,0 +1,187 @@
+[6n[?9001h[?1004h[m]0;C:\Users\Dirnei\AppData\Local\Temp\maggus-demo\maggus[?25hCurrent directory C:\Users\Dirnei\AppData\Local\Temp\maggus-demo is a git repo but not in your repository list. Add it? [y/N] y
+[?25l[?1049h[2J[?2004h[H[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K[120C[36m[H╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│[29X[1m[29C ███╗   ███╗  █████╗   ██████╗  ██████╗  ██╗   ██╗ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ████╗ ████║ ██╔══██╗ ██╔════╝ ██╔════╝  ██║   ██║ ██╔════╝[m[30X[36m[30C│
+│[29X[1m[29C ██╔████╔██║ ███████║ ██║  ███╗██║  ███╗ ██║   ██║ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ██║╚██╔╝██║ ██╔══██║ ██║   ██║██║   ██║ ██║   ██║ ╚════██║[m[30X[36m[30C│
+│[29X[1m[29C ██║ ╚═╝ ██║ ██║  ██║ ╚██████╔╝╚██████╔╝ ╚██████╔╝ ███████║[m[30X[36m[30C│
+│[29X[1m[29C ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝[m[30X[36m[30C│
+│[30X[90m[30Cvdev — Markdown Agent for Goal-Gated Unsupervised Sprints[31X[36m[31C│
+│[52X[90m[52CNo open tasks[53X[36m[53C│
+│[36X[1m[36CC:\Users\Dirnei\AppData\Local\Temp\maggus-demo[m[36X[36m[36C│
+│[49X[m[2m[49C○ daemon not running[22m[49X[36m[49C│
+│                                                                                                                      │
+│[26X[1m[26C→[m [36m[1m status[m  [90mLive log & feature management[52X[36m[52C│
+│[30X[m[30Crepos  [90mManage configured repositories[51X[36m[51C│
+│                                                                                                                      │
+│[29X[m[29Cprompt  [90mLaunch interactive Claude session with usage tracking[28X[36m[28C│
+│                                                                                                                      │
+│[28X[m[28Crelease  [90mGenerate RELEASE.md with changelog[47X[36m[47C│
+│[30X[m[30Cclean  [90mRemove completed features and finished runs[38X[36m[38C│
+│[29X[m[29Cupdate  [90mCheck for and install updates[52X[36m[52C│
+│                                                                                                                      │
+│[29X[m[29Cconfig  [90mEdit project settings[60X[36m[60C│
+│                                                                                                                      │
+│[31X[m[31Cexit  [90mExit Maggus[70X[36m[70C│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│[28X[90m[28C↑/↓ navigate · enter select · hold alt for shortcuts · q: exit[28X[36m[28C│
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[36m[H╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│[29X[1m[29C ███╗   ███╗  █████╗   ██████╗  ██████╗  ██╗   ██╗ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ████╗ ████║ ██╔══██╗ ██╔════╝ ██╔════╝  ██║   ██║ ██╔════╝[m[30X[36m[30C│
+│[29X[1m[29C ██╔████╔██║ ███████║ ██║  ███╗██║  ███╗ ██║   ██║ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ██║╚██╔╝██║ ██╔══██║ ██║   ██║██║   ██║ ██║   ██║ ╚════██║[m[30X[36m[30C│
+│[29X[1m[29C ██║ ╚═╝ ██║ ██║  ██║ ╚██████╔╝╚██████╔╝ ╚██████╔╝ ███████║[m[30X[36m[30C│
+│[29X[1m[29C ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝[m[30X[36m[30C│
+│[30X[90m[30Cvdev — Markdown Agent for Goal-Gated Unsupervised Sprints[31X[36m[31C│
+│[52X[90m[52CNo open tasks[53X[36m[53C│
+│[36X[1m[36CC:\Users\Dirnei\AppData\Local\Temp\maggus-demo[m[36X[36m[36C│
+│[49X[m[2m[49C○ daemon not running[22m[49X[36m[49C│
+│                                                                                                                      │
+│[26X[1m[26C→[m [36m[1m status[m  [90mLive log & feature management[52X[36m[52C│
+│[30X[m[30Crepos  [90mManage configured repositories[51X[36m[51C│
+│                                                                                                                      │
+│[29X[m[29Cprompt  [90mLaunch interactive Claude session with usage tracking[28X[36m[28C│
+│                                                                                                                      │
+│[28X[m[28Crelease  [90mGenerate RELEASE.md with changelog[47X[36m[47C│
+│[30X[m[30Cclean  [90mRemove completed features and finished runs[38X[36m[38C│
+│[29X[m[29Cupdate  [90mCheck for and install updates[52X[36m[52C│
+│                                                                                                                      │
+│[29X[m[29Cconfig  [90mEdit project settings[60X[36m[60C│
+│                                                                                                                      │
+│[31X[m[31Cexit  [90mExit Maggus[70X[36m[70C│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│[28X[90m[28C↑/↓ navigate · enter select · hold alt for shortcuts · q: exit[28X[36m[28C│
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[36m[H╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│[29X[1m[29C ███╗   ███╗  █████╗   ██████╗  ██████╗  ██╗   ██╗ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ████╗ ████║ ██╔══██╗ ██╔════╝ ██╔════╝  ██║   ██║ ██╔════╝[m[30X[36m[30C│
+│[29X[1m[29C ██╔████╔██║ ███████║ ██║  ███╗██║  ███╗ ██║   ██║ ███████╗[m[30X[36m[30C│
+│[29X[1m[29C ██║╚██╔╝██║ ██╔══██║ ██║   ██║██║   ██║ ██║   ██║ ╚════██║[m[30X[36m[30C│
+│[29X[1m[29C ██║ ╚═╝ ██║ ██║  ██║ ╚██████╔╝╚██████╔╝ ╚██████╔╝ ███████║[m[30X[36m[30C│
+│[29X[1m[29C ╚═╝     ╚═╝ ╚═╝  ╚═╝  ╚═════╝  ╚═════╝   ╚═════╝  ╚══════╝[m[30X[36m[30C│
+│[30X[90m[30Cvdev — Markdown Agent for Goal-Gated Unsupervised Sprints[31X[36m[31C│
+│[52X[90m[52CNo open tasks[53X[36m[53C│
+│[36X[1m[36CC:\Users\Dirnei\AppData\Local\Temp\maggus-demo[m[36X[36m[36C│
+│[49X[m[2m[49C○ daemon not running[22m[49X[36m[49C│
+│                                                                                                                      │
+│[26X[1m[26C→[m [36m[1m status[m  [90mLive log & feature management[52X[36m[52C│
+│[30X[m[30Crepos  [90mManage configured repositories[51X[36m[51C│
+│                                                                                                                      │
+│[29X[m[29Cprompt  [90mLaunch interactive Claude session with usage tracking[28X[36m[28C│
+│                                                                                                                      │
+│[28X[m[28Crelease  [90mGenerate RELEASE.md with changelog[47X[36m[47C│
+│[30X[m[30Cclean  [90mRemove completed features and finished runs[38X[36m[38C│
+│[29X[m[29Cupdate  [90mCheck for and install updates[52X[36m[52C│
+│                                                                                                                      │
+│[29X[m[29Cconfig  [90mEdit project settings[60X[36m[60C│
+│                                                                                                                      │
+│[31X[m[31Cexit  [90mExit Maggus[70X[36m[70C│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│[28X[90m[28C↑/↓ navigate · enter select · hold alt for shortcuts · q: exit[28X[36m[28C│
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[m[36m[13;1H│[14X[33m[14Cdaemon auto-start failed: launch daemon: exec: "C:\\Users\\Dirnei\\AppData\\Local\\Temp\\maggus-        [36m│
+│ [33mdemo\\maggus": executable file not found in %PATH%[67X[36m[67C│
+│                                                                                                                      │
+│[26X[1m[26C→[m [36m[1m status[m  [90mLive log & feature management[52X[36m[52C│
+│[30X[m[30Crepos  [90mManage configured repositories[51X[36m[51C│[19;1H│[29X[m[29Cprompt  [90mLaunch interactive Claude session with usage tracking[28X[36m[28C│
+│                                                                                                                      │
+│[28X[m[28Crelease  [90mGenerate RELEASE.md with changelog[47X[36m[47C│
+│[30X[m[30Cclean  [90mRemove completed features and finished runs[38X[36m[38C│
+│[29X[m[29Cupdate  [90mCheck for and install updates[52X[36m[52C│[25;1H│[29X[m[29Cconfig  [90mEdit project settings[60X[36m[60C│[27;1H│[31X[m[31Cexit  [90mExit Maggus[70X[36m[70C│[43;1H│                                                                                                                      │
+│[28X[90m[28C↑/↓ navigate · enter select · hold alt for shortcuts · q: exit[28X[36m[28C│[m

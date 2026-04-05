@@ -90,8 +90,8 @@ The hidden `work` cobra command is a legacy name from when users invoked it dire
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `ARCHITECTURE.md` Work Loop row in the components table updated from `cmd/work.go` to `cmd/run.go`
-- [ ] Any other references to `work.go` in ARCHITECTURE.md updated
+- [x] `ARCHITECTURE.md` Work Loop row in the components table updated from `cmd/work.go` to `cmd/run.go`
+- [x] Any other references to `work.go` in ARCHITECTURE.md updated
 
 ## Task Dependency Graph
 
