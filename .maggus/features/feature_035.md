@@ -52,12 +52,12 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 **Parallel:** yes — can run alongside TASK-035-001, TASK-035-003, TASK-035-004, TASK-035-005
 
 **Acceptance Criteria:**
-- [ ] `docs/guide/writing-plans.md`: The "Plan File Location" section is updated — pattern changes from `.maggus/plan_*.md` to `.maggus/features/feature_*.md`, examples updated accordingly
-- [ ] `docs/guide/writing-plans.md`: A new "Bug Files" section (or equivalent) explains that bug files live in `.maggus/bugs/bug_*.md`, follow the same task format as feature files, and are worked on before features in the work loop
-- [ ] `docs/guide/writing-plans.md`: The bug section mentions using `/maggus-bugreport` to generate bug files and `/maggus-plan` to generate feature files, rather than writing by hand
-- [ ] `docs/guide/writing-plans.md`: The "Full Example Plan" uses the correct file path in its intro (`.maggus/features/feature_001.md` or similar)
-- [ ] `docs/guide/writing-plans.md`: The "Generating Plans Automatically" section references `/maggus-plan` for features and mentions `/maggus-bugreport` for bug files
-- [ ] `docs/guide/writing-plans.md`: The "Completed Plans" section is updated — rename example uses `feature_N.md` → `feature_N_completed.md` in `.maggus/features/`
+- [x] `docs/guide/writing-plans.md`: The "Plan File Location" section is updated — pattern changes from `.maggus/plan_*.md` to `.maggus/features/feature_*.md`, examples updated accordingly
+- [x] `docs/guide/writing-plans.md`: A new "Bug Files" section (or equivalent) explains that bug files live in `.maggus/bugs/bug_*.md`, follow the same task format as feature files, and are worked on before features in the work loop
+- [x] `docs/guide/writing-plans.md`: The bug section mentions using `/maggus-bugreport` to generate bug files and `/maggus-plan` to generate feature files, rather than writing by hand
+- [x] `docs/guide/writing-plans.md`: The "Full Example Plan" uses the correct file path in its intro (`.maggus/features/feature_001.md` or similar)
+- [x] `docs/guide/writing-plans.md`: The "Generating Plans Automatically" section references `/maggus-plan` for features and mentions `/maggus-bugreport` for bug files
+- [x] `docs/guide/writing-plans.md`: The "Completed Plans" section is updated — rename example uses `feature_N.md` → `feature_N_completed.md` in `.maggus/features/`
 
 ---
 
