@@ -2,8 +2,6 @@
 
 Maggus uses a full-screen terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lipgloss](https://github.com/charmbracelet/lipgloss). Every interactive view runs inside a bordered box with a status bar at the bottom showing available keyboard shortcuts.
 
-When Claude 2x mode is active, the logo and borders turn yellow and a countdown timer is displayed.
-
 ## Main Menu
 
 When you run `maggus` without any arguments in a terminal, the interactive main menu launches.
@@ -184,15 +182,17 @@ The status view shows plan progress with tabbed plan sections, progress bars, an
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `Shift+Tab` | Switch between plans |
-| `Up` / `Down` | Navigate tasks |
+| `Up` / `Down` | Navigate plans and tasks |
+| `PgUp` / `PgDn` | Jump to previous/next plan |
+| `Left` / `Right` | Collapse/expand a plan |
+| `Home` / `End` | Jump to first/last item |
 | `Enter` | Open task detail view |
-| `Alt+A` | Toggle showing all tasks vs. only incomplete |
-| `Alt+I` | Ignore/unignore the selected task |
-| `Alt+P` | Ignore/unignore the selected plan |
+| `Alt+A` | Toggle showing completed plans |
+| `a` | Approve/unapprove the selected plan |
 | `Alt+R` | Run the selected task |
+| `Alt+D` | Delete the selected plan (with confirmation) |
 | `Alt+Backspace` | Delete the selected task (with confirmation) |
-| `q` / `Esc` | Exit |
+| `q` | Exit |
 
 ### Task Detail
 
@@ -204,11 +204,10 @@ Press **Enter** on any task to open a detail view showing its plan file, status,
 |-----|--------|
 | `PgUp` / `PgDn` | Previous/next task |
 | `Tab` | Enter criteria mode (for blocked tasks) |
-| `Alt+I` | Ignore/unignore the task |
+| `Alt+P` | Approve/unapprove the plan |
 | `Alt+R` | Run the task |
 | `Alt+Backspace` | Delete the task |
-| `Esc` | Back to task list |
-| `q` | Exit |
+| `q` / `Backspace` | Back to task list |
 
 ### Managing Blocked Tasks
 

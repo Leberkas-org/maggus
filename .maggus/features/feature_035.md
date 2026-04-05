@@ -111,10 +111,10 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 **Parallel:** yes — can run alongside TASK-035-001, TASK-035-002, TASK-035-003, TASK-035-004
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/tui.md`: The sentence "When Claude 2x mode is active, the logo and borders turn yellow and a countdown timer is displayed." is removed entirely
-- [ ] `docs/reference/tui.md`: The Status View keyboard shortcuts table includes `PgUp` / `PgDn` for switching between plans (added in TASK-032)
-- [ ] `docs/reference/tui.md`: No other references to "Claude 2x mode" or "2x" remain on the page
-- [ ] `docs/reference/tui.md`: All other keyboard shortcut tables are reviewed for accuracy against the current key bindings
+- [x] `docs/reference/tui.md`: The sentence "When Claude 2x mode is active, the logo and borders turn yellow and a countdown timer is displayed." is removed entirely
+- [x] `docs/reference/tui.md`: The Status View keyboard shortcuts table includes `PgUp` / `PgDn` for switching between plans (added in TASK-032)
+- [x] `docs/reference/tui.md`: No other references to "Claude 2x mode" or "2x" remain on the page
+- [x] `docs/reference/tui.md`: All other keyboard shortcut tables are reviewed for accuracy against the current key bindings
 
 ---
 
