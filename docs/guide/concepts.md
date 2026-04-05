@@ -6,7 +6,7 @@ This page explains Maggus's runtime behavior — what happens when you run `magg
 
 When you run `maggus work`, Maggus enters a loop that processes tasks one at a time:
 
-1. **Parse** — Load all active plan files (`.maggus/plan_*.md`), skipping completed (`_completed.md`) files
+1. **Parse** — Load all active feature files (`.maggus/features/feature_*.md`) and bug files (`.maggus/bugs/bug_*.md`), skipping completed (`_completed.md`) files
 2. **Find task** — Identify the next workable task (incomplete and not blocked) across all plans
 3. **Branch** — If on a protected branch (`main`, `master`, `dev`), create a feature branch
 4. **Prompt** — Assemble the prompt with bootstrap context files, run metadata, and task details
@@ -14,7 +14,7 @@ When you run `maggus work`, Maggus enters a loop that processes tasks one at a t
 6. **Commit** — Read the `COMMIT.md` file written by the agent, stage all changes, and commit
 7. **Repeat** — Loop back to step 2 for the next task
 
-When all tasks are complete or blocked, the loop exits. If a plan has all tasks completed, it is automatically renamed from `plan_N.md` to `plan_N_completed.md`.
+When all tasks are complete or blocked, the loop exits. If a feature file has all tasks completed, it is automatically renamed from `feature_N.md` to `feature_N_completed.md`.
 
 You can limit the number of iterations with the `--count` flag:
 

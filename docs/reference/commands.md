@@ -150,7 +150,7 @@ Maggus Status — 3 plans (2 active), 24 tasks total
 
  Summary: 18/24 tasks complete · 4 pending · 2 blocked
 
- Tasks — plan_8.md
+ Tasks — feature_8.md
  ──────────────────────────────────────────
    ✓  TASK-001: Scaffold VitePress project in docs/
    ✓  TASK-002: Apply Simpsons-inspired theme
@@ -374,7 +374,7 @@ maggus ignore task <TASK-NNN>
 ### Examples
 
 ```bash
-# Ignore plan 3 (renames plan_3.md → plan_3_ignored.md)
+# Ignore plan 3 (renames feature_3.md → feature_3_ignored.md)
 maggus ignore plan 3
 
 # Ignore a specific task (rewrites heading to ### IGNORED TASK-007: ...)
@@ -399,7 +399,7 @@ maggus unignore task <TASK-NNN>
 ### Examples
 
 ```bash
-# Unignore plan 3 (renames plan_3_ignored.md → plan_3.md)
+# Unignore plan 3 (renames feature_3_ignored.md → feature_3.md)
 maggus unignore plan 3
 
 # Unignore a specific task

@@ -71,7 +71,7 @@ maggus init
 
 ## Writing Your First Plan
 
-Create a plan file at `.maggus/plan_1.md`:
+Create a plan file at `.maggus/features/feature_001.md`:
 
 ```markdown
 # Plan: Hello World
