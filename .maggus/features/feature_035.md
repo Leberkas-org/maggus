@@ -70,11 +70,11 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 **Parallel:** yes — can run alongside TASK-035-001, TASK-035-002, TASK-035-004, TASK-035-005
 
 **Acceptance Criteria:**
-- [ ] `docs/guide/maggus-plan-skill.md`: The skills overview table is updated — `/maggus-plan` output column shows `feature_*.md` in `.maggus/features/`
-- [ ] `docs/guide/maggus-plan-skill.md`: A new row is added to the table for `/maggus-bugreport` → produces `bug_*.md` in `.maggus/bugs/`
-- [ ] `docs/guide/maggus-plan-skill.md`: The `/maggus-plan` section output format table shows `.maggus/features/feature_*.md` (auto-numbered)
-- [ ] `docs/guide/maggus-plan-skill.md`: A new `/maggus-bugreport` section is added, explaining: what it produces, how to invoke it (`/maggus-bugreport <description>` in Claude Code), that it generates a structured bug ticket in `.maggus/bugs/bug_*.md`
-- [ ] `docs/guide/maggus-plan-skill.md`: Any example plan file paths in the page show the correct `features/` subdirectory
+- [x] `docs/guide/maggus-plan-skill.md`: The skills overview table is updated — `/maggus-plan` output column shows `feature_*.md` in `.maggus/features/`
+- [x] `docs/guide/maggus-plan-skill.md`: A new row is added to the table for `/maggus-bugreport` → produces `bug_*.md` in `.maggus/bugs/`
+- [x] `docs/guide/maggus-plan-skill.md`: The `/maggus-plan` section output format table shows `.maggus/features/feature_*.md` (auto-numbered)
+- [x] `docs/guide/maggus-plan-skill.md`: A new `/maggus-bugreport` section is added, explaining: what it produces, how to invoke it (`/maggus-bugreport <description>` in Claude Code), that it generates a structured bug ticket in `.maggus/bugs/bug_*.md`
+- [x] `docs/guide/maggus-plan-skill.md`: Any example plan file paths in the page show the correct `features/` subdirectory
 
 ---
 

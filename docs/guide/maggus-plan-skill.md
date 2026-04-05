@@ -4,7 +4,8 @@ Maggus ships with three Claude Code skills that use AI to generate project docum
 
 | Skill | Command | Produces |
 |---|---|---|
-| `/maggus-plan` | `maggus plan <description>` | `.maggus/plan_*.md` — implementation plan |
+| `/maggus-plan` | `maggus plan <description>` | `.maggus/features/feature_*.md` — implementation plan |
+| `/maggus-bugreport` | `maggus bugreport <description>` | `.maggus/bugs/bug_*.md` — structured bug ticket |
 | `/maggus-vision` | `maggus vision <description>` | `VISION.md` — project vision document |
 | `/maggus-architecture` | `maggus architecture <description>` | `ARCHITECTURE.md` — architecture document |
 
@@ -38,7 +39,7 @@ You can invoke skills either through the Maggus CLI (`maggus plan`, `maggus visi
 
 ## /maggus-plan
 
-Generates Maggus plan files in the `.maggus/plan_*.md` format with tasks, descriptions, and acceptance criteria — ready to run with `maggus work`.
+Generates Maggus feature files in the `.maggus/features/feature_*.md` format with tasks, descriptions, and acceptance criteria — ready to run with `maggus work`.
 
 ### Invocation
 
@@ -78,7 +79,7 @@ You: 1. PostgreSQL
 
 #### Step 3: Skill generates the plan
 
-The skill writes a file like `.maggus/plan_3.md`:
+The skill writes a file like `.maggus/features/feature_3.md`:
 
 ```markdown
 # Plan: Blog Post REST API
@@ -127,13 +128,103 @@ The skill produces standard Maggus plan files. Key formatting conventions:
 
 | Element | Format |
 |---|---|
-| File name | `.maggus/plan_*.md` (auto-numbered) |
+| File name | `.maggus/features/feature_*.md` (auto-numbered) |
 | Task heading | `### TASK-NNN: Title` |
 | Description | `**Description:** As a <role>, I want <goal> so that <reason>.` |
 | Acceptance criteria | Checkbox list under `**Acceptance Criteria:**` |
 | Blocked criteria | `- [ ] BLOCKED: <text> — <reason>` |
 
 For full details on plan structure, see [Writing Plans](./writing-plans).
+
+---
+
+## /maggus-bugreport
+
+Generates structured bug tickets in the `.maggus/bugs/bug_*.md` format — ready to track and resolve with `maggus work`.
+
+### Invocation
+
+```bash
+# Via Maggus CLI
+maggus bugreport Login button does nothing when clicked on mobile
+
+# Via Claude Code slash command
+/maggus-bugreport Login button does nothing when clicked on mobile
+```
+
+### Example Interaction
+
+#### Step 1: Invoke the skill
+
+```
+You: /maggus-bugreport The app crashes when uploading a file larger than 10MB
+```
+
+#### Step 2: Answer clarifying questions
+
+```
+Skill: A few questions to help me write a precise bug ticket:
+
+1. What OS and browser/environment does this occur in?
+2. What is the expected behavior?
+3. Can you reproduce this consistently, or is it intermittent?
+4. Are there any error messages or logs?
+5. What version or commit are you on?
+
+You: 1. macOS 14, Chrome 124
+     2. The file should upload and show a progress bar
+     3. Consistently reproducible with any file over 10MB
+     4. Console shows: "RangeError: Invalid array length"
+     5. main branch, commit abc1234
+```
+
+#### Step 3: Skill generates the bug ticket
+
+The skill writes a file like `.maggus/bugs/bug_3.md`:
+
+```markdown
+# Bug: App crashes when uploading files larger than 10MB
+
+## Summary
+
+Uploading a file larger than 10MB causes a crash with
+"RangeError: Invalid array length" instead of showing a progress bar.
+
+## Steps to Reproduce
+
+1. Open the app in Chrome 124 on macOS 14
+2. Navigate to the file upload screen
+3. Select any file larger than 10MB
+4. Observe the crash
+
+## Expected Behavior
+
+The file uploads successfully and a progress bar is shown.
+
+## Actual Behavior
+
+The app crashes with `RangeError: Invalid array length` in the console.
+
+## Environment
+
+- OS: macOS 14
+- Browser: Chrome 124
+- Commit: abc1234 (main)
+
+## Additional Notes
+
+Consistently reproducible. Smaller files upload without issue.
+```
+
+### Output Format
+
+| Element | Format |
+|---|---|
+| File name | `.maggus/bugs/bug_*.md` (auto-numbered) |
+| Summary | Short description of the defect |
+| Steps to reproduce | Numbered list |
+| Expected vs actual | Separate sections |
+| Environment | OS, browser/runtime, version |
 
 ---
 
@@ -176,13 +267,13 @@ The skill reads your existing codebase for context. If an `ARCHITECTURE.md` alre
 
 ## Integration with Maggus
 
-Generated plan files are standard `.maggus/plan_*.md` files — Maggus treats them identically to hand-written plans:
+Generated feature files are standard `.maggus/features/feature_*.md` files — Maggus treats them identically to hand-written plans:
 
-- `maggus work` picks up generated plans automatically
-- `maggus status` shows progress across all plans including generated ones
-- `maggus list` previews upcoming tasks from the plan
+- `maggus work` picks up generated feature files automatically
+- `maggus status` shows progress across all feature files including generated ones
+- `maggus list` previews upcoming tasks from the feature file
 
-You can mix hand-written and generated plans freely, and edit generated plans before running them.
+You can mix hand-written and generated feature files freely, and edit generated files before running them.
 
 ## Tips
 
