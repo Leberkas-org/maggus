@@ -454,15 +454,15 @@ func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
 }
 
 // buildRunTaskMsg returns a tea.Cmd that emits an execProcessMsg asking the app
-// router to run `maggus work --task <id>` in the foreground via tea.ExecProcess.
-// After the work process exits, the router receives navigateBackMsg to return to
+// router to run `maggus run --task <id>` in the foreground via tea.ExecProcess.
+// After the run process exits, the router receives navigateBackMsg to return to
 // the main menu.
 func (m statusModel) buildRunTaskMsg() tea.Cmd {
 	taskID := m.taskListComponent.RunTaskID
 	return func() tea.Msg {
 		execPath, _ := os.Executable()
 		return execProcessMsg{
-			cmd: exec.Command(execPath, "work", "--task", taskID),
+			cmd: exec.Command(execPath, "run", "--task", taskID),
 			onDone: func(err error) tea.Msg {
 				return navigateBackMsg{}
 			},

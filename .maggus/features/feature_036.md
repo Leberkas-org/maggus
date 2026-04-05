@@ -47,11 +47,11 @@ The hidden `work` cobra command is a legacy name from when users invoked it dire
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/cmd/daemon_start.go`: both `daemonArgs` string slices changed from `"work"` to `"run"` (~lines 103 and 222)
-- [ ] `src/cmd/status_update.go`: `exec.Command(execPath, "work", "--task", ...)` → `"run"`; nearby comment updated
-- [ ] `src/cmd/dispatch.go`: `rootCmd.Find([]string{"work", "--task", ...})` → `"run"`; `resetWorkFlags()` call → `resetRunFlags()`; comment updated
-- [ ] `src/cmd/init.go`: the user-facing line `"  maggus work ..."` in the init success message is removed (the command is hidden)
-- [ ] `go build ./...` passes in `src/`
+- [x] `src/cmd/daemon_start.go`: both `daemonArgs` string slices changed from `"work"` to `"run"` (~lines 103 and 222)
+- [x] `src/cmd/status_update.go`: `exec.Command(execPath, "work", "--task", ...)` → `"run"`; nearby comment updated
+- [x] `src/cmd/dispatch.go`: `rootCmd.Find([]string{"work", "--task", ...})` → `"run"`; `resetWorkFlags()` call → `resetRunFlags()`; comment updated
+- [x] `src/cmd/init.go`: the user-facing line `"  maggus work ..."` in the init success message is removed (the command is hidden)
+- [x] `go build ./...` passes in `src/`
 
 ### TASK-036-003: Rename remaining work_*.go source files and update tests
 **Description:** As a developer, I want all `work_*.go` files renamed to `run_*.go` and all test references updated so that the file layout matches the command name.
@@ -71,7 +71,7 @@ The hidden `work` cobra command is a legacy name from when users invoked it dire
   - `work_loop_test.go` → `run_loop_test.go`
   - `work_setup_test.go` → `run_setup_test.go`
   - `work_task_test.go` → `run_task_test.go`
-- [ ] `src/cmd/dispatch_test.go`: all 6 occurrences of `workCmd` → `runCmd`
+- [x] `src/cmd/dispatch_test.go`: all 6 occurrences of `workCmd` → `runCmd`
 - [ ] `src/cmd/root_test.go`: test case string `[]string{"maggus", "work"}` → `[]string{"maggus", "run"}`
 - [ ] Internal symbol renames across renamed files:
   - `workConfig` → `runConfig`

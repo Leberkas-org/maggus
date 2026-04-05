@@ -9,11 +9,11 @@ import (
 
 func TestDispatchWork_FindsWorkSubcommand(t *testing.T) {
 	// Save the original RunE so we can restore it after the test.
-	origRunE := workCmd.RunE
-	defer func() { workCmd.RunE = origRunE }()
+	origRunE := runCmd.RunE
+	defer func() { runCmd.RunE = origRunE }()
 
 	var called bool
-	workCmd.RunE = func(cmd *cobra.Command, args []string) error {
+	runCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		called = true
 		return nil
 	}
@@ -27,15 +27,15 @@ func TestDispatchWork_FindsWorkSubcommand(t *testing.T) {
 }
 
 func TestDispatchWork_TaskFlagIsSet(t *testing.T) {
-	origRunE := workCmd.RunE
+	origRunE := runCmd.RunE
 	origTaskFlag := taskFlag
 	defer func() {
-		workCmd.RunE = origRunE
+		runCmd.RunE = origRunE
 		taskFlag = origTaskFlag
 	}()
 
 	var capturedTaskFlag string
-	workCmd.RunE = func(cmd *cobra.Command, args []string) error {
+	runCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		capturedTaskFlag = taskFlag
 		return nil
 	}
@@ -49,11 +49,11 @@ func TestDispatchWork_TaskFlagIsSet(t *testing.T) {
 }
 
 func TestDispatchWork_PropagatesRunError(t *testing.T) {
-	origRunE := workCmd.RunE
-	defer func() { workCmd.RunE = origRunE }()
+	origRunE := runCmd.RunE
+	defer func() { runCmd.RunE = origRunE }()
 
 	sentinel := errors.New("work failed")
-	workCmd.RunE = func(cmd *cobra.Command, args []string) error {
+	runCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return sentinel
 	}
 
