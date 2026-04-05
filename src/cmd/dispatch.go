@@ -7,7 +7,7 @@ func dispatchWork(taskID string) error {
 		return err
 	}
 	// Reset work command flags so previous invocations don't leak.
-	resetWorkFlags()
+	resetRunFlags()
 	if err := sub.ParseFlags(remaining); err != nil {
 		return err
 	}
