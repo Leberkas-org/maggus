@@ -12,6 +12,7 @@ agent: claude
 model: anthropic/claude-sonnet-4-6
 approval_mode: opt-in
 auto_continue: false
+session_persistence: false
 max_log_files: 50
 include:
   - ARCHITECTURE.md
@@ -107,6 +108,21 @@ auto_continue: true
 ```
 
 Defaults to `false`.
+
+### `session_persistence`
+
+Controls whether the agent subprocess should maintain session state across task invocations.
+
+```yaml
+session_persistence: true
+```
+
+| Value | Description |
+|-------|-------------|
+| `true` | Keep the agent's session state (e.g. Claude Code context windows, cached auth tokens) between tasks |
+| `false` | Start each task with a fresh session by passing `--no-session-persistence` to the agent (default) |
+
+Defaults to `false`. When set to `false`, each task is invoked with a clean session state, which is useful for isolating task contexts. When set to `true`, the agent may retain state between tasks, potentially improving performance at the cost of increased memory usage.
 
 ### `max_log_files`
 

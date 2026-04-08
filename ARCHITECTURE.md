@@ -135,6 +135,8 @@ type Agent interface {
 ```
 
 - **Current backend:** Claude Code (`claude --output-format stream-json --dangerously-skip-permissions`)
+  - Passes `--no-session-persistence` unless `session_persistence: true` is set in `.maggus/config.yml`
+  - This ensures each task starts with a fresh session by default
 - **Planned backends:** OpenCode, self-hosted AI agents
 - Model aliases (`sonnet` → `claude-sonnet-4-6`, `opus` → `claude-opus-4-6`,
   `haiku` → `claude-haiku-4-5-20251001`) resolved at config parse time

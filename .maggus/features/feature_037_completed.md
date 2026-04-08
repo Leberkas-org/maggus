@@ -60,9 +60,9 @@ Add a `session_persistence` config field to `.maggus/config.yml` that controls w
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `ARCHITECTURE.md`: The agent invocation section mentions `--no-session-persistence` is conditionally passed based on config
-- [ ] `docs/reference/configuration.md` (if it exists): `session_persistence` is documented with type (`bool`), default (`false`), and behavior description
-- [ ] `go vet ./...` and `go build ./...` still pass (no code changes, but verify nothing broke)
+- [x] `ARCHITECTURE.md`: The agent invocation section mentions `--no-session-persistence` is conditionally passed based on config
+- [x] `docs/reference/configuration.md` (if it exists): `session_persistence` is documented with type (`bool`), default (`false`), and behavior description
+- [x] `go vet ./...` and `go build ./...` still pass (no code changes, but verify nothing broke)
 
 ## Task Dependency Graph
 
