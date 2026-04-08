@@ -20,7 +20,8 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 - Remove stale "Claude 2x mode" mention from the TUI reference
 - Add PgUp/PgDn plan-hopping to the status view keyboard table
 - Document the bug workflow briefly, pointing users to `/maggus-bugreport` and `/maggus-plan` skills
-- Refresh all 8 TUI screenshots to match the current UI
+- Rewrite `tui.md` to remove the defunct Work View, sub-menus section, and stale menu items; add daemon status documentation
+- Replace 4 TUI screenshots that match surviving views; delete 4 obsolete screenshot files
 
 ## Tasks
 
@@ -118,23 +119,40 @@ This feature brings the docs back in sync with the codebase and adds coverage fo
 
 ---
 
-### TASK-035-006: [YOU] Take fresh screenshots for all 8 TUI views
-**Description:** As a user reading the docs, I want screenshots that match the current UI so that the visual references are useful rather than misleading.
+### TASK-035-007: Rewrite tui.md to match current architecture
+**Description:** As a user reading the TUI reference, I want the entire page to reflect the current application — not the old `maggus work` TUI that no longer exists. The `run` command is hidden and daemon-based; the Work View TUI (progress/detail/task/commits tabs), sub-menus, and several menu items referenced in `tui.md` have all been removed.
+
+**Token Estimate:** ~50k tokens
+**Predecessors:** none
+**Successors:** TASK-035-006
+**Parallel:** no — must complete before screenshots are taken
+
+**Acceptance Criteria:**
+- [x] `docs/reference/tui.md`: The **Work View** section (`## Work View`) is removed entirely — `maggus work`/`maggus run` no longer has its own TUI; work is driven by the daemon (`maggus start`)
+- [x] `docs/reference/tui.md`: The **Sub-Menus** section is removed entirely — `buildSubMenus()` returns an empty map; no sub-menus exist in the current build
+- [x] `docs/reference/tui.md`: The **Main Menu → Menu Items** table is rewritten to match `allMenuItems` in `src/cmd/menu_model.go`. Current items are: **status**, **repos**, **prompt** (Claude required), **release**, **clean**, **update**, **config**, **init** (hidden when initialized), **exit**. Items that no longer exist (`work`, `list`, `vision`, `architecture`, `plan`, `worktree`) are removed
+- [x] `docs/reference/tui.md`: The **Main Menu → Layout** description is updated — the header now shows daemon running/stopped status instead of plan summary; the summary line format has changed
+- [x] `docs/reference/tui.md`: All `![…](/screenshots/sub-menu-work.png)`, `![…](/screenshots/work-progress-view.png)`, `![…](/screenshots/work-detail-view.png)`, and `![…](/screenshots/list-view.png)` image references are removed
+- [x] `docs/reference/tui.md`: The **List View** section is removed or replaced with a note that `maggus list` is a plain-text CLI command (tab-separated output), not a TUI view
+- [x] `docs/reference/tui.md`: A brief **Daemon Status** section or note is added under the Main Menu explaining the daemon indicator line (● running / ○ not running) and that work is driven by `maggus start` / `maggus stop`
+- [x] `docs/reference/tui.md`: All remaining screenshot `img` tags reference only files that will actually exist after TASK-035-006: `main-menu.png`, `plan-view.png`, `task-detail.png`, `blocked-handling.png`
+
+---
+
+### TASK-035-006: [YOU] Take fresh screenshots for all current TUI views
+**Description:** As a user reading the docs, I want screenshots that match the current UI so that the visual references are useful rather than misleading. **Note:** The Work View TUI no longer exists (work runs via daemon). Sub-menus no longer exist. `maggus list` is plain text. Only 4 screenshots are needed now.
 
 **Token Estimate:** n/a — human task
-**Predecessors:** none
+**Predecessors:** TASK-035-007
 **Successors:** none
-**Parallel:** yes — can be done alongside or after the agent tasks
+**Parallel:** no — wait for TASK-035-007 to finish updating tui.md first
 
 **Acceptance Criteria:**
 - [ ] Run `maggus` without arguments, take a screenshot of the main menu → save as `docs/public/screenshots/main-menu.png`
-- [ ] From the main menu, select **work** to open the sub-menu, take a screenshot → save as `docs/public/screenshots/sub-menu-work.png`
-- [ ] Run `maggus work` on a repo with a task, take a screenshot of the **Progress tab** → save as `docs/public/screenshots/work-progress-view.png`
-- [ ] Switch to the **Detail tab** during a work run, take a screenshot → save as `docs/public/screenshots/work-detail-view.png`
-- [ ] Run `maggus status`, take a screenshot of the status view → save as `docs/public/screenshots/plan-view.png`
+- [ ] Run `maggus status` (or navigate to status from the menu), take a screenshot of the status view → save as `docs/public/screenshots/plan-view.png`
 - [ ] Press **Enter** on a task in the status view, take a screenshot of the task detail view → save as `docs/public/screenshots/task-detail.png`
 - [ ] Navigate to a task with a blocked criterion, press **Tab** to enter criteria mode, take a screenshot of the action picker → save as `docs/public/screenshots/blocked-handling.png`
-- [ ] Run `maggus list`, take a screenshot of the list view → save as `docs/public/screenshots/list-view.png`
+- [ ] Delete the now-obsolete screenshots that no longer have corresponding docs sections: `docs/public/screenshots/sub-menu-work.png`, `docs/public/screenshots/work-progress-view.png`, `docs/public/screenshots/work-detail-view.png`, `docs/public/screenshots/list-view.png`
 - [ ] All screenshots are saved at an appropriate terminal size (100+ columns wide) so the UI renders cleanly
 
 ## Task Dependency Graph
@@ -144,20 +162,22 @@ TASK-035-001 ─┐
 TASK-035-002 ─┤
 TASK-035-003 ─┼─ (all parallel, no dependencies)
 TASK-035-004 ─┤
-TASK-035-005 ─┤
-TASK-035-006 ─┘
+TASK-035-005 ─┘
+
+TASK-035-007 ──► TASK-035-006 (screenshots after tui.md rewrite)
 ```
 
 | Task | Estimate | Predecessors | Parallel | Model |
 |------|----------|--------------|----------|-------|
-| TASK-035-001 | ~30k | none | yes (with all) | — |
-| TASK-035-002 | ~40k | none | yes (with all) | — |
-| TASK-035-003 | ~35k | none | yes (with all) | — |
-| TASK-035-004 | ~55k | none | yes (with all) | sonnet |
-| TASK-035-005 | ~25k | none | yes (with all) | — |
-| TASK-035-006 | n/a (human) | none | yes | — |
+| TASK-035-001 | ~30k | none | yes (with 002–005) | — |
+| TASK-035-002 | ~40k | none | yes (with 001, 003–005) | — |
+| TASK-035-003 | ~35k | none | yes (with 001–002, 004–005) | — |
+| TASK-035-004 | ~55k | none | yes (with 001–003, 005) | sonnet |
+| TASK-035-005 | ~25k | none | yes (with 001–004) | — |
+| TASK-035-007 | ~50k | none | no (blocks 006) | — |
+| TASK-035-006 | n/a (human) | TASK-035-007 | no | — |
 
-**Total estimated agent tokens:** ~185k
+**Total estimated agent tokens:** ~235k
 
 ## Functional Requirements
 
@@ -167,7 +187,7 @@ TASK-035-006 ─┘
 - FR-4: The `/maggus-bugreport` skill must be introduced on the skills page with enough detail that a user knows when and how to use it
 - FR-5: The TUI reference must not reference "Claude 2x mode" anywhere
 - FR-6: The status view keyboard table must include PgUp/PgDn for plan navigation
-- FR-7: All 8 screenshot files in `docs/public/screenshots/` must be replaced with current captures
+- FR-7: Exactly 4 screenshot files must exist in `docs/public/screenshots/` after this feature completes: `main-menu.png`, `plan-view.png`, `task-detail.png`, `blocked-handling.png`. The 4 obsolete files (`sub-menu-work.png`, `work-progress-view.png`, `work-detail-view.png`, `list-view.png`) must be deleted.
 
 ## Non-Goals
 
