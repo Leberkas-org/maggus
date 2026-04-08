@@ -47,20 +47,21 @@ type taskResult struct {
 
 // taskContext bundles the shared state needed by runTask.
 type taskContext struct {
-	workCtx       context.Context
-	p             *tea.Program
-	activeAgent   agent.Agent
-	resolvedModel string
-	notifier      *notify.Notifier
-	validIncludes []string
-	repoDir       string
-	workDir       string
-	runID         string
-	onComplete    config.OnCompleteConfig
-	hooks         config.HooksConfig
-	logger        *runlog.Logger // structured run log; nil-safe
-	featureStore  stores.FeatureStore
-	bugStore      stores.BugStore
+	workCtx            context.Context
+	p                  *tea.Program
+	activeAgent        agent.Agent
+	resolvedModel      string
+	sessionPersistence bool
+	notifier           *notify.Notifier
+	validIncludes      []string
+	repoDir            string
+	workDir            string
+	runID              string
+	onComplete         config.OnCompleteConfig
+	hooks              config.HooksConfig
+	logger             *runlog.Logger // structured run log; nil-safe
+	featureStore       stores.FeatureStore
+	bugStore           stores.BugStore
 
 	// Discord Rich Presence (nil when disabled).
 	presence *discord.Presence
@@ -117,7 +118,7 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	tc.logger.TaskStart(next.ID, next.Title)
 	builtPrompt := prompt.Build(next, opts)
 	model := resolveTaskModel(next.Model, tc.resolvedModel)
-	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.p); err != nil {
+	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.sessionPersistence, tc.p); err != nil {
 		if tc.workCtx.Err() != nil {
 			return taskResult{action: taskBreak, stopReason: StopReasonInterrupted}
 		}

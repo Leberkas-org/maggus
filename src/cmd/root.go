@@ -91,17 +91,19 @@ func runMenu(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	// Initialise the daemon state cache once for the lifetime of runMenu.
-	// If it fails (e.g. .maggus/ does not exist yet), daemonCache stays nil
-	// and all call sites handle nil gracefully.
+	// Initialise the daemon state cache for the current working directory.
+	// It may be recreated later by refreshGlobalDaemonCache() if the user
+	// switches repos. The defer cleans up whichever cache is active at exit.
 	cwd, _ := os.Getwd()
 	if cache, err := NewDaemonStateCache(cwd); err == nil {
 		daemonCache = cache
-		defer func() {
+	}
+	defer func() {
+		if daemonCache != nil {
 			daemonCache.Stop()
 			daemonCache = nil
-		}()
-	}
+		}
+	}()
 
 	// Show idle presence while in the main menu.
 	if presence != nil {

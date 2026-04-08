@@ -89,3 +89,16 @@ GoReleaser (v2) builds binaries for linux/{amd64,arm64}, darwin/{amd64,arm64}, w
 - Tasks containing `BLOCKED:` in any unchecked criterion are skipped
 - The `.maggus/` directory is the working data directory; `runs/` and `MEMORY.md` inside it are gitignored
 - Config supports `include` paths for additional context files fed into prompts
+
+## Auto-Memory
+
+Do not use auto-memory. Do not read from or write to the memory directory.
+
+## Session Persistence
+
+At the end of each session, update `.maggus/MEMORY.md` with all project-relevant info needed for consistency across PCs. This file is gitignored and synced via a dedicated service. It should contain: project structure, build instructions, CI/CD setup, tools, and any setup-specific knowledge.
+
+## Workflow Rules
+
+- **Feature plans:** Always use the `/maggus-plan` skill (via `Skill` tool) when creating feature implementation plans. Do not use `superpowers:writing-plans`. The maggus project has its own plan format that saves to `.maggus/features/feature_NNN.md`.
+- **Plan output:** When `/plan` + `maggus-plan` are used together, the `.maggus/features/feature_NNN.md` file IS the plan. Do not write a separate Claude plan file to the plans directory. Still call ExitPlanMode at the end to close plan mode.

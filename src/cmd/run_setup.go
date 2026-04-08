@@ -27,17 +27,18 @@ var (
 
 // runLoopConfig holds all resolved configuration needed by the work loop.
 type runLoopConfig struct {
-	count           int
-	dir             string
-	cfg             config.Config
-	globalSettings  globalconfig.Settings
-	validIncludes   []string
-	includeWarnings []string
-	activeAgent     agent.Agent
-	resolvedModel   string
-	modelDisplay    string
-	notifier        *notify.Notifier
-	hostFingerprint string
+	count              int
+	dir                string
+	cfg                config.Config
+	globalSettings     globalconfig.Settings
+	validIncludes      []string
+	includeWarnings    []string
+	activeAgent        agent.Agent
+	resolvedModel      string
+	modelDisplay       string
+	notifier           *notify.Notifier
+	hostFingerprint    string
+	sessionPersistence bool
 }
 
 // runSetup resolves CLI flags, loads config, validates the agent, and
@@ -129,17 +130,18 @@ func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 	globalSettings, _ := globalconfig.LoadSettings()
 
 	return &runLoopConfig{
-		count:           count,
-		dir:             dir,
-		cfg:             cfg,
-		globalSettings:  globalSettings,
-		validIncludes:   validIncludes,
-		includeWarnings: includeWarnings,
-		activeAgent:     activeAgent,
-		resolvedModel:   resolvedModel,
-		modelDisplay:    modelDisplay,
-		notifier:        notifier,
-		hostFingerprint: hostFingerprint,
+		count:              count,
+		dir:                dir,
+		cfg:                cfg,
+		globalSettings:     globalSettings,
+		validIncludes:      validIncludes,
+		includeWarnings:    includeWarnings,
+		activeAgent:        activeAgent,
+		resolvedModel:      resolvedModel,
+		modelDisplay:       modelDisplay,
+		notifier:           notifier,
+		hostFingerprint:    hostFingerprint,
+		sessionPersistence: cfg.IsSessionPersistenceEnabled(),
 	}, nil
 }
 

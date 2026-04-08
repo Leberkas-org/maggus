@@ -16,11 +16,13 @@ type Agent interface {
 	// Run invokes the agent in streaming mode and sends progress events
 	// to the provided bubbletea program. It blocks until the agent process
 	// completes or the context is cancelled.
-	Run(ctx context.Context, prompt string, model string, p *tea.Program) error
+	// When sessionPersistence is false, --no-session-persistence is passed to the subprocess.
+	Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p *tea.Program) error
 
 	// RunOnce invokes the agent in text mode and returns the full response.
 	// This is used for one-shot invocations that don't need streaming or TUI.
-	RunOnce(ctx context.Context, prompt string, model string) (string, error)
+	// When sessionPersistence is false, --no-session-persistence is passed to the subprocess.
+	RunOnce(ctx context.Context, prompt string, model string, sessionPersistence bool) (string, error)
 
 	// Name returns the agent identifier (e.g. "claude", "opencode").
 	Name() string

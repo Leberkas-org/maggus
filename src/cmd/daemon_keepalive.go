@@ -345,20 +345,21 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	}()
 
 	tc := taskContext{
-		workCtx:       workCtx,
-		p:             p,
-		activeAgent:   wc.activeAgent,
-		resolvedModel: wc.resolvedModel,
-		notifier:      wc.notifier,
-		validIncludes: wc.validIncludes,
-		repoDir:       repoDir,
-		workDir:       workDir,
-		runID:         runID,
-		onComplete:    wc.cfg.OnComplete,
-		hooks:         wc.cfg.Hooks,
-		logger:        runLogger,
-		featureStore:  featureStore,
-		bugStore:      bugStore,
+		workCtx:            workCtx,
+		p:                  p,
+		activeAgent:        wc.activeAgent,
+		resolvedModel:      wc.resolvedModel,
+		sessionPersistence: wc.sessionPersistence,
+		notifier:           wc.notifier,
+		validIncludes:      wc.validIncludes,
+		repoDir:            repoDir,
+		workDir:            workDir,
+		runID:              runID,
+		onComplete:         wc.cfg.OnComplete,
+		hooks:              wc.cfg.Hooks,
+		logger:             runLogger,
+		featureStore:       featureStore,
+		bugStore:           bugStore,
 	}
 
 	runWorkGoroutine(runLoopParams{
