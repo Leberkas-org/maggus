@@ -2,8 +2,86 @@ package agent
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 )
+
+// --- Session persistence args tests ---
+
+func TestBuildStreamArgs_NoSessionPersistenceFalse(t *testing.T) {
+	args := buildStreamArgs("", false, "hello")
+	if !slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v should contain --no-session-persistence when sessionPersistence=false", args)
+	}
+}
+
+func TestBuildStreamArgs_NoSessionPersistenceTrue(t *testing.T) {
+	args := buildStreamArgs("", true, "hello")
+	if slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v should NOT contain --no-session-persistence when sessionPersistence=true", args)
+	}
+}
+
+func TestBuildStreamArgs_WithModel(t *testing.T) {
+	args := buildStreamArgs("claude-sonnet-4-6", false, "hello")
+	if !slices.Contains(args, "--model") {
+		t.Errorf("args %v should contain --model", args)
+	}
+	if !slices.Contains(args, "claude-sonnet-4-6") {
+		t.Errorf("args %v should contain model name", args)
+	}
+	if !slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v should contain --no-session-persistence", args)
+	}
+}
+
+func TestBuildStreamArgs_NoModelSkipped(t *testing.T) {
+	args := buildStreamArgs("", true, "hello")
+	if slices.Contains(args, "--model") {
+		t.Errorf("args %v should NOT contain --model when model is empty", args)
+	}
+}
+
+func TestBuildStreamArgs_PromptIncluded(t *testing.T) {
+	args := buildStreamArgs("", true, "my-prompt")
+	if !slices.Contains(args, "my-prompt") {
+		t.Errorf("args %v should contain the prompt", args)
+	}
+	if !slices.Contains(args, "-p") {
+		t.Errorf("args %v should contain -p flag", args)
+	}
+}
+
+func TestBuildTextArgs_NoSessionPersistenceFalse(t *testing.T) {
+	args := buildTextArgs("", false, "hello")
+	if !slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v should contain --no-session-persistence when sessionPersistence=false", args)
+	}
+}
+
+func TestBuildTextArgs_NoSessionPersistenceTrue(t *testing.T) {
+	args := buildTextArgs("", true, "hello")
+	if slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v should NOT contain --no-session-persistence when sessionPersistence=true", args)
+	}
+}
+
+func TestBuildTextArgs_WithModel(t *testing.T) {
+	args := buildTextArgs("claude-opus-4-6", false, "hello")
+	if !slices.Contains(args, "--model") {
+		t.Errorf("args %v should contain --model", args)
+	}
+	if !slices.Contains(args, "claude-opus-4-6") {
+		t.Errorf("args %v should contain model name", args)
+	}
+}
+
+func TestBuildTextArgs_PromptIncluded(t *testing.T) {
+	args := buildTextArgs("", true, "my-prompt")
+	if !slices.Contains(args, "my-prompt") {
+		t.Errorf("args %v should contain the prompt", args)
+	}
+}
 
 func TestStreamUsage_JSONDeserialization(t *testing.T) {
 	raw := `{

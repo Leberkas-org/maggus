@@ -43,12 +43,12 @@ Add a `session_persistence` config field to `.maggus/config.yml` that controls w
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `src/internal/agent/claude.go`: The `Run` method appends `--no-session-persistence` to args when session persistence is `false`
-- [ ] `src/internal/agent/claude.go`: The `RunOnce` method appends `--no-session-persistence` to args when session persistence is `false`
-- [ ] The config value is threaded from `runSetup()` through to the agent — either via the `ClaudeAgent` struct or via the method signature (follow the existing pattern for how `model` flows)
-- [ ] When `session_persistence: true` is set in config, the flag is NOT added to the subprocess args
-- [ ] `go vet ./...` and `go build ./...` pass
-- [ ] Unit tests verify args contain `--no-session-persistence` when config is `false`, and do not contain it when `true`
+- [x] `src/internal/agent/claude.go`: The `Run` method appends `--no-session-persistence` to args when session persistence is `false`
+- [x] `src/internal/agent/claude.go`: The `RunOnce` method appends `--no-session-persistence` to args when session persistence is `false`
+- [x] The config value is threaded from `runSetup()` through to the agent — either via the `ClaudeAgent` struct or via the method signature (follow the existing pattern for how `model` flows)
+- [x] When `session_persistence: true` is set in config, the flag is NOT added to the subprocess args
+- [x] `go vet ./...` and `go build ./...` pass
+- [x] Unit tests verify args contain `--no-session-persistence` when config is `false`, and do not contain it when `true`
 
 ### TASK-037-003: Update ARCHITECTURE.md and docs
 **Description:** As a user reading the docs, I want to know about the `session_persistence` config field so I can use it.
