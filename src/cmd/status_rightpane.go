@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
@@ -110,25 +111,35 @@ func (m *statusModel) outputTabScrollableLines() int {
 	return avail
 }
 
-// renderOutputTab renders the Output tab content: parallel worker split panes,
-// single-task rich snapshot view, or idle message depending on mode.
+// renderOutputTab renders the Output tab for the selected task.
+// For running tasks: shows the live snapshot view (same as before, but per-task).
+// For completed tasks: loads and displays tool history from run log JSONL files.
+// The old parallel worker card grid (renderWorkerPanes) is no longer used here.
 func (m statusModel) renderOutputTab(width, contentH int) string {
-	// Parallel mode: show split panes per worker.
-	if m.isParallelMode() && m.daemon.Running {
-		return m.renderWorkerPanes(width, contentH)
+	ctx := m.selectionCtx()
+
+	if ctx == selRunningTask {
+		snap := m.snapshotForSelectedTask()
+		if snap != nil {
+			spinnerFrame := m.spinnerFrameForTask(snap.TaskID)
+			return m.renderSnapshotInPane(snap, spinnerFrame, width, contentH)
+		}
+		msg := statusDimStyle.Render("  Waiting for agent output...")
+		return lipgloss.NewStyle().Width(width).Height(contentH).Render(msg)
 	}
-	// Sequential mode: single-task rich snapshot view.
-	if m.snapshot != nil && m.daemon.Running {
-		return m.renderSnapshotInPane(width, contentH)
+
+	if ctx == selCompletedTask {
+		return m.renderCompletedTaskOutput(width, contentH)
 	}
+
 	msg := statusDimStyle.Render("  No active run")
 	return lipgloss.NewStyle().Width(width).Height(contentH).Render(msg)
 }
 
-// renderSnapshotInPane renders the rich live TUI from a state.json snapshot,
-// sized for the right pane content area.
-func (m statusModel) renderSnapshotInPane(width, height int) string {
-	snap := m.snapshot
+// renderSnapshotInPane renders the rich live TUI from a state snapshot,
+// sized for the right pane content area. Accepts the snapshot and spinner
+// frame so it works for both sequential (main snapshot) and parallel (per-worker) modes.
+func (m statusModel) renderSnapshotInPane(snap *runlog.StateSnapshot, spinnerFrame, width, height int) string {
 	var sb strings.Builder
 
 	contentWidth := width - 4
@@ -136,8 +147,8 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 		contentWidth = 20
 	}
 
-	// ── Top zone (fixed): blank + spinner/status + task ID/title + separator ──
-	spinnerStr := statusCyanStyle.Render(styles.SpinnerFrames[m.spinnerFrame])
+	// ── Top zone (fixed): spinner/status + task ID/title + separator ──
+	spinnerStr := statusCyanStyle.Render(styles.SpinnerFrames[spinnerFrame%len(styles.SpinnerFrames)])
 	sColor := lipgloss.NewStyle().Foreground(styles.Warning)
 	switch snap.Status {
 	case "Done":
@@ -152,18 +163,15 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	}
 	sb.WriteString(fmt.Sprintf(" %s  %s  %s\n", statusBoldStyle.Render("Status:"), spinnerStr, sColor.Render(snap.Status)))
 	if snap.TaskID != "" {
-		// Compute max available width for the title
 		taskLabel := statusBoldStyle.Render("Task:")
 		taskLabelW := lipgloss.Width(taskLabel)
 		taskIDRendered := statusCyanStyle.Render(snap.TaskID)
 		taskIDW := lipgloss.Width(taskIDRendered)
-		maxTitleW := width - 1 - taskLabelW - 4 - taskIDW - 3 // 1=leading space, 4=gap, 3=" - "
+		maxTitleW := width - 1 - taskLabelW - 4 - taskIDW - 3
 
 		if maxTitleW <= 0 {
-			// Width too narrow; omit title, show only TaskID
 			sb.WriteString(fmt.Sprintf(" %s    %s\n", taskLabel, taskIDRendered))
 		} else {
-			// Truncate title to fit available width
 			truncatedTitle := styles.Truncate(snap.TaskTitle, maxTitleW)
 			sb.WriteString(fmt.Sprintf(" %s    %s - %s\n", taskLabel, taskIDRendered, truncatedTitle))
 		}
@@ -171,12 +179,10 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	// ── Middle zone (scrollable tool list) ──
-	// Fixed overhead consumed by top(4) + bottom(5) zones = 9 lines.
 	available := height - 9
 	if available < 3 {
 		available = 3
 	}
-
 	totalTools := len(snap.ToolEntries)
 	if totalTools == 0 {
 		sb.WriteString(statusDimStyle.Render("  No tool invocations yet.") + "\n")
@@ -184,81 +190,8 @@ func (m statusModel) renderSnapshotInPane(width, height int) string {
 			sb.WriteString("\n")
 		}
 	} else {
-		toolLines := make([]string, totalTools)
-		for i, entry := range snap.ToolEntries {
-			ts := entry.Timestamp
-			if t, err := time.Parse(time.RFC3339, entry.Timestamp); err == nil {
-				ts = t.Local().Format("15:04:05")
-			}
-			icon := entry.Icon
-			if icon == "" {
-				icon = "🥚"
-			}
-			typeName := entry.Type
-			if typeName == "" {
-				typeName = "Tool"
-			}
-			bracketedType := fmt.Sprintf("[%s]", typeName)
-			styledTs := statusDimStyle.Render(ts)
-			tsW := lipgloss.Width(styledTs) // always 8 for "15:04:05"
-			iconW := lipgloss.Width(icon)
-			bracketedTypeW := lipgloss.Width(bracketedType)
-			// Fixed overhead: 2 (indent) + iconW + 1 (space) + bracketedTypeW + 1 (space) + 1 (min pad for RightAlign) + tsW
-			fixedCols := 2 + iconW + 1 + bracketedTypeW + 1 + 1 + tsW
-			maxDesc := contentWidth - fixedCols
-			if maxDesc < 0 {
-				maxDesc = 0
-			}
-			desc := styles.Truncate(entry.Description, maxDesc)
-			leftPart := fmt.Sprintf("  %s %s %s", icon, statusBlueStyle.Render(bracketedType), statusDimStyle.Render(desc))
-			toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
-		}
-
-		offset := m.logScroll
-		maxOffset := totalTools - available
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		if offset > maxOffset {
-			offset = maxOffset
-		}
-		if offset < 0 {
-			offset = 0
-		}
-
-		if totalTools > available {
-			end := offset + available
-			if end > totalTools {
-				end = totalTools
-			}
-			indicator := statusDimStyle.Render(fmt.Sprintf("[%d-%d of %d]", offset+1, end, totalTools))
-			if m.logAutoScroll {
-				indicator += statusDimStyle.Render(" (auto)")
-			}
-			sb.WriteString(indicator + "\n")
-			viewH := available - 1
-			if viewH < 1 {
-				viewH = 1
-			}
-			end = offset + viewH
-			if end > totalTools {
-				end = totalTools
-			}
-			for _, line := range toolLines[offset:end] {
-				sb.WriteString(line + "\n")
-			}
-			rendered := end - offset
-			for i := rendered; i < viewH; i++ {
-				sb.WriteString("\n")
-			}
-		} else {
-			for _, line := range toolLines {
-				sb.WriteString(line + "\n")
-			}
-			for i := totalTools; i < available; i++ {
-				sb.WriteString("\n")
-			}
-		}
+		toolLines := buildToolLines(snap.ToolEntries, contentWidth)
+		m.renderScrollableToolList(&sb, toolLines, totalTools, available)
 	}
 
 	// ── Bottom zone (fixed): separator + tokens + cost + run + task elapsed ──

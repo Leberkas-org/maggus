@@ -136,6 +136,16 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Read parallel worker state (nil when not in parallel mode).
 		m.refreshWorkerSnapshots()
 
+		// Auto-scroll the output tab to follow the latest tool entry.
+		if m.logAutoScroll {
+			m.logScroll = m.maxLogScroll()
+		}
+
+		// Refresh completed task output cache when viewing a completed task.
+		if m.selectionCtx() == selCompletedTask {
+			m.ensureCompletedTaskOutput()
+		}
+
 		newSnapStatus := ""
 		if m.snapshot != nil {
 			newSnapStatus = m.snapshot.Status
@@ -313,9 +323,19 @@ func (m *statusModel) maxLogScroll() int {
 }
 
 // logItemCount returns the number of scrollable items in the log panel.
+// For running tasks, uses the appropriate live snapshot (main or per-worker).
+// For completed tasks, uses the cached JSONL-loaded output.
 func (m *statusModel) logItemCount() int {
-	if m.snapshot != nil && m.daemon.Running {
-		return len(m.snapshot.ToolEntries)
+	ctx := m.selectionCtx()
+	if ctx == selRunningTask {
+		snap := m.snapshotForSelectedTask()
+		if snap != nil {
+			return len(snap.ToolEntries)
+		}
+		return 0
+	}
+	if ctx == selCompletedTask && m.cachedTaskOutput != nil {
+		return len(m.cachedTaskOutput.ToolEntries)
 	}
 	return 0
 }

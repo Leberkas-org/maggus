@@ -140,6 +140,10 @@ type statusModel struct {
 	workerIndex     []runlog.WorkerIndexEntry        // ordered list of workers; nil when not in parallel mode
 	workerSnapshots map[string]*runlog.StateSnapshot // taskID → per-worker snapshot
 	workerSpinners  map[string]int                   // taskID → spinner frame (only for "working" status)
+
+	// Cached per-task output for completed tasks (loaded from run log JSONL).
+	cachedTaskOutput   *runlog.StateSnapshot // synthetic snapshot built from JSONL
+	cachedTaskOutputID string               // task ID for which the cache is valid
 }
 
 func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {
@@ -385,12 +389,18 @@ func (m *statusModel) syncPlanCursorFromTreeCursor() {
 
 // updateTabsForSelectionChange checks whether the selection context changed
 // relative to prevCtx and resets activeTab to 0 if so. In all cases it clamps
-// activeTab to the bounds of the current available tabs.
+// activeTab to the bounds of the current available tabs. Pre-loads completed
+// task output when navigating to a completed task.
 func (m *statusModel) updateTabsForSelectionChange(prevCtx selectionContext) {
 	if m.selectionCtx() != prevCtx {
 		m.activeTab = 0
+		m.logScroll = 0
+		m.logAutoScroll = true
 	}
 	m.clampActiveTab()
+	if m.selectionCtx() == selCompletedTask {
+		m.ensureCompletedTaskOutput()
+	}
 }
 
 // rebuildRightPane rebuilds the right-pane task list and metrics for the

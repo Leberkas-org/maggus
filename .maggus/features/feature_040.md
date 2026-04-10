@@ -100,14 +100,14 @@ The new design makes the left pane the primary navigator: what you select determ
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] When a **running task** is selected (daemon is actively working on it), the Output tab shows the same rich snapshot view as the current `renderSnapshotInPane()`: spinner, status, task ID/title, scrollable tool list, tokens, cost, elapsed time
-- [ ] The tool list for a running task auto-scrolls to follow the latest entry; manual scroll-up pauses auto-scroll (existing behavior preserved)
-- [ ] When a **completed task** is selected, the Output tab loads tool history from the run log files in `.maggus/runs/`
-- [ ] Completed task tool history is loaded by scanning the run log JSONL for entries matching the selected task ID, extracting tool-use events
-- [ ] The completed task view shows: task ID/title, outcome (done/failed), full scrollable tool list, final token counts and cost
-- [ ] Scrolling (up/down/g/G) works identically for both running and completed task output
-- [ ] The old parallel-mode worker card grid (`renderWorkerPanes`) is no longer used for the Output tab (it may still exist but is not rendered)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When a **running task** is selected (daemon is actively working on it), the Output tab shows the same rich snapshot view as the current `renderSnapshotInPane()`: spinner, status, task ID/title, scrollable tool list, tokens, cost, elapsed time
+- [x] The tool list for a running task auto-scrolls to follow the latest entry; manual scroll-up pauses auto-scroll (existing behavior preserved)
+- [x] When a **completed task** is selected, the Output tab loads tool history from the run log files in `.maggus/runs/`
+- [x] Completed task tool history is loaded by scanning the run log JSONL for entries matching the selected task ID, extracting tool-use events
+- [x] The completed task view shows: task ID/title, outcome (done/failed), full scrollable tool list, final token counts and cost
+- [x] Scrolling (up/down/g/G) works identically for both running and completed task output
+- [x] The old parallel-mode worker card grid (`renderWorkerPanes`) is no longer used for the Output tab (it may still exist but is not rendered)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-040-005: Update Metrics tab to always show global + scoped metrics
 **Description:** As a user, I want the Metrics tab to always show global metrics and additionally show scoped metrics based on my selection, so I always have the full picture.

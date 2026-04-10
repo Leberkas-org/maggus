@@ -187,9 +187,9 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 		m := makeModelForCtx(selRunningTask)
 		m.activeTab = 0 // Output
 		out := m.renderRightPane(80, 20)
-		// Daemon running but no snapshot → "No active run"
-		if !strings.Contains(out, "No active run") {
-			t.Errorf("selRunningTask/Output with no snapshot should show 'No active run'; got: %q", out)
+		// Daemon running but no snapshot → "Waiting for agent output..."
+		if !strings.Contains(out, "Waiting for agent output") {
+			t.Errorf("selRunningTask/Output with no snapshot should show 'Waiting for agent output'; got: %q", out)
 		}
 	})
 
@@ -345,11 +345,9 @@ func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 				Status:    "Running",
 			}
 
-			m := statusModel{
-				snapshot: snap,
-			}
+			m := statusModel{}
 
-			output := m.renderSnapshotInPane(tt.width, 30)
+			output := m.renderSnapshotInPane(snap, 0, tt.width, 30)
 
 			// Find the Task title line (line with TaskID in "Task: TASKID - Title" format)
 			lines := strings.Split(output, "\n")
