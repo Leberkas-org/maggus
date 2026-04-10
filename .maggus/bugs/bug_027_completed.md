@@ -54,9 +54,9 @@ A bare `bool` defaults to `false`. To make the default `true` it must become `*b
 **Description:** As a user, I want to toggle parallel mode from the config view so I don't have to edit `config.yml` by hand.
 
 **Acceptance Criteria:**
-- [ ] A "Parallel" row with values `["on", "off"]` appears in `projectRows` in `newConfigModel()` (`src/cmd/config.go`)
-- [ ] The row is initialised from `cfg.IsParallelEnabled()` (on → index 0, off → index 1)
-- [ ] `buildConfig()` reads the row and sets `cfg.Parallel` accordingly (writes `nil`/omitted when on, `false` pointer when off — or stores the explicit pointer)
-- [ ] Saving project config persists the parallel value correctly
-- [ ] No regression in other project config rows
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] A "Parallel" row with values `["on", "off"]` appears in `projectRows` in `newConfigModel()` (`src/cmd/config.go`)
+- [x] The row is initialised from `cfg.IsParallelEnabled()` (on → index 0, off → index 1)
+- [x] `buildConfig()` reads the row and sets `cfg.Parallel` accordingly (writes `nil`/omitted when on, `false` pointer when off — or stores the explicit pointer)
+- [x] Saving project config persists the parallel value correctly
+- [x] No regression in other project config rows
+- [x] `go vet ./...` and `go test ./...` pass

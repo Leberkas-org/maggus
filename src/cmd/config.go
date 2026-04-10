@@ -119,6 +119,12 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 		checkSyncIdx = 1
 	}
 
+	parallelValues := []string{"on", "off"}
+	parallelIdx := 0
+	if !cfg.IsParallelEnabled() {
+		parallelIdx = 1
+	}
+
 	protectedDisplay := strings.Join(cfg.Git.ProtectedBranchList(), ", ")
 	if len(protectedDisplay) > 40 {
 		protectedDisplay = protectedDisplay[:37] + "..."
@@ -168,6 +174,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	projectRows := []configRow{
 		{label: "Agent", values: agentValues, current: agentIdx},
 		{label: "Model", values: modelValues, current: modelIdx},
+		{label: "Parallel", values: parallelValues, current: parallelIdx},
 		{label: "Auto-approve", values: autoApproveValues, current: autoApproveIdx},
 		{label: "Auto-branch", values: autoBranchValues, current: autoBranchIdx},
 		{label: "Check sync", values: checkSyncValues, current: checkSyncIdx},
@@ -248,6 +255,11 @@ func (m configModel) buildConfig() config.Config {
 	if m.optionByLabel("  On error").values[m.optionByLabel("  On error").current] == "off" {
 		f := false
 		cfg.Notifications.OnError = &f
+	}
+
+	if m.optionByLabel("Parallel").values[m.optionByLabel("Parallel").current] == "off" {
+		f := false
+		cfg.Parallel = &f
 	}
 
 	if m.optionByLabel("Auto-branch").values[m.optionByLabel("Auto-branch").current] == "off" {

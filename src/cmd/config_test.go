@@ -58,8 +58,8 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 	m := newConfigModel(cfg, "")
 
 	opts := optionRows(m)
-	if len(opts) != 13 {
-		t.Fatalf("expected 13 option rows, got %d", len(opts))
+	if len(opts) != 14 {
+		t.Fatalf("expected 14 option rows, got %d", len(opts))
 	}
 
 	// Agent defaults to claude (index 0)
@@ -75,44 +75,49 @@ func TestNewConfigModel_Defaults(t *testing.T) {
 		t.Errorf("model current = %d, want 0 ((default))", opts[1].current)
 	}
 
+	// Parallel defaults to on (index 0)
+	if opts[2].label != "Parallel" || opts[2].current != 0 {
+		t.Errorf("parallel: label=%q current=%d, want 'Parallel' / 0 (on)", opts[2].label, opts[2].current)
+	}
+
 	// Auto-approve defaults to disabled (index 0)
-	if opts[2].current != 0 {
-		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[2].current)
+	if opts[3].current != 0 {
+		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[3].current)
 	}
 
 	// Auto-branch defaults to on (index 0)
-	if opts[3].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 
 	// Check sync defaults to on (index 0)
-	if opts[4].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
+	if opts[5].current != 0 {
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
 	}
 
 	// Sound defaults to off (index 1)
-	if opts[5].current != 1 {
-		t.Errorf("sound current = %d, want 1 (off)", opts[5].current)
+	if opts[6].current != 1 {
+		t.Errorf("sound current = %d, want 1 (off)", opts[6].current)
 	}
 
 	// Notification sub-options default to on (index 0) when nil
-	for i := 6; i <= 8; i++ {
+	for i := 7; i <= 9; i++ {
 		if opts[i].current != 0 {
 			t.Errorf("opts[%d].current = %d, want 0 (on)", i, opts[i].current)
 		}
 	}
 
 	// On-complete defaults to rename (index 0)
-	if opts[9].label != "  Feature" || opts[9].current != 0 {
-		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[9].label, opts[9].current)
+	if opts[10].label != "  Feature" || opts[10].current != 0 {
+		t.Errorf("on-complete feature: label=%q current=%d, want '  Feature' / 0", opts[10].label, opts[10].current)
 	}
-	if opts[10].label != "  Bug" || opts[10].current != 0 {
-		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[10].label, opts[10].current)
+	if opts[11].label != "  Bug" || opts[11].current != 0 {
+		t.Errorf("on-complete bug: label=%q current=%d, want '  Bug' / 0", opts[11].label, opts[11].current)
 	}
 
 	// Discord presence defaults to off (index 1) — now in global settings
-	if opts[11].current != 1 {
-		t.Errorf("discord-presence current = %d, want 1 (off)", opts[11].current)
+	if opts[12].current != 1 {
+		t.Errorf("discord-presence current = %d, want 1 (off)", opts[12].current)
 	}
 
 	if m.cursor != 0 {
@@ -148,30 +153,34 @@ func TestNewConfigModel_CustomValues(t *testing.T) {
 	if opts[1].current != 2 {
 		t.Errorf("model current = %d, want 2 (opus)", opts[1].current)
 	}
-	// Auto-approve defaults to disabled (index 0) — not set in config
+	// Parallel defaults to on (index 0) — not set in config
 	if opts[2].current != 0 {
-		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[2].current)
+		t.Errorf("parallel current = %d, want 0 (on)", opts[2].current)
+	}
+	// Auto-approve defaults to disabled (index 0) — not set in config
+	if opts[3].current != 0 {
+		t.Errorf("auto-approve current = %d, want 0 (disabled)", opts[3].current)
 	}
 	// Auto-branch defaults to on (index 0) — not set in config
-	if opts[3].current != 0 {
-		t.Errorf("auto-branch current = %d, want 0 (on)", opts[3].current)
+	if opts[4].current != 0 {
+		t.Errorf("auto-branch current = %d, want 0 (on)", opts[4].current)
 	}
 	// Check sync defaults to on (index 0) — not set in config
-	if opts[4].current != 0 {
-		t.Errorf("check-sync current = %d, want 0 (on)", opts[4].current)
-	}
 	if opts[5].current != 0 {
-		t.Errorf("sound current = %d, want 0 (on)", opts[5].current)
+		t.Errorf("check-sync current = %d, want 0 (on)", opts[5].current)
+	}
+	if opts[6].current != 0 {
+		t.Errorf("sound current = %d, want 0 (on)", opts[6].current)
 	}
 	// All notification sub-options set to false → off (index 1)
-	for i := 6; i <= 8; i++ {
+	for i := 7; i <= 9; i++ {
 		if opts[i].current != 1 {
 			t.Errorf("opts[%d].current = %d, want 1 (off)", i, opts[i].current)
 		}
 	}
 	// Discord presence defaults to off (index 1) — not set in config, now in global settings
-	if opts[11].current != 1 {
-		t.Errorf("discord-presence current = %d, want 1 (off)", opts[11].current)
+	if opts[12].current != 1 {
+		t.Errorf("discord-presence current = %d, want 1 (off)", opts[12].current)
 	}
 }
 
@@ -256,6 +265,26 @@ func TestBuildConfig_GitSettings(t *testing.T) {
 	}
 	if len(result.Git.ProtectedBranches) != 2 || result.Git.ProtectedBranches[0] != "main" {
 		t.Errorf("ProtectedBranches = %v, want [main release]", result.Git.ProtectedBranches)
+	}
+}
+
+func TestBuildConfig_ParallelDefault(t *testing.T) {
+	// Default: parallel on → Parallel pointer should be nil
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
+	result := m.buildConfig()
+	if result.Parallel != nil {
+		t.Errorf("Parallel = %v, want nil (on by default)", result.Parallel)
+	}
+}
+
+func TestBuildConfig_ParallelOff(t *testing.T) {
+	// Explicit false → Parallel pointer should be &false
+	f := false
+	cfg := config.Config{Agent: "claude", Parallel: &f}
+	m := newConfigModel(cfg, "")
+	result := m.buildConfig()
+	if result.Parallel == nil || *result.Parallel {
+		t.Error("Parallel should be false when set to off")
 	}
 }
 
@@ -425,6 +454,7 @@ func TestNewConfigModel_OptionLabels(t *testing.T) {
 	expectedLabels := []string{
 		"Agent",
 		"Model",
+		"Parallel",
 		"Auto-approve",
 		"Auto-branch",
 		"Check sync",
