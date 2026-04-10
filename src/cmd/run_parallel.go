@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
@@ -44,6 +45,13 @@ type parallelOrchestrator struct {
 	mu             sync.Mutex
 	completedIDs   map[string]bool
 	iteration      int
+	runStartedAt   time.Time
+
+	// Per-worker TUI state for split pane view.
+	workerOrder     []string          // ordered list of worker task IDs
+	workerStatuses  map[string]string // taskID → "working"/"done"/"failed"/"blocked"
+	workerTitles    map[string]string // taskID → task title
+	workerStartedAt map[string]string // taskID → RFC3339 start time
 }
 
 type parallelWorkResult struct {
@@ -94,6 +102,7 @@ func runParallelWorkGoroutine(params runLoopParams, planBranch string) {
 			parentLogger: params.tc.logger,
 			featureStore: params.featureStore, bugStore: params.bugStore,
 			completedIDs: make(map[string]bool),
+			runStartedAt: params.startTime,
 		}
 		for _, t := range group.Tasks {
 			if t.IsComplete() {
@@ -126,6 +135,7 @@ func runParallelWorkGoroutine(params runLoopParams, planBranch string) {
 // run executes the parallel work loop for a single plan.
 func (o *parallelOrchestrator) run(group parser.Plan) parallelWorkResult {
 	var result parallelWorkResult
+	defer cleanupWorkerSnapshots(o.repoDir)
 
 	if maggusID, err := parser.EnsureMaggusID(group.File); err == nil {
 		group.MaggusID = maggusID
@@ -204,6 +214,15 @@ func (o *parallelOrchestrator) runParallelBatch(group parser.Plan, tasks []parse
 	var result parallelWorkResult
 	var resultMu sync.Mutex
 
+	// Register all workers and write initial index.
+	o.mu.Lock()
+	o.ensureWorkerMaps()
+	for _, t := range tasks {
+		o.registerWorker(t.ID, t.Title)
+	}
+	o.updateWorkersIndex(o.buildWorkerEntries())
+	o.mu.Unlock()
+
 	o.p.Send(InfoMsg{Text: fmt.Sprintf("⚡ Launching %d parallel tasks", len(tasks))})
 	g, _ := errgroup.WithContext(o.ctx)
 
@@ -248,15 +267,23 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	}()
 	workerLogger.SetCurrentMaggusID(group.MaggusID)
 
+	// Create per-worker snapshot writer for TUI split view (parallel tasks only).
+	var wsw *workerSnapshotWriter
+	if useWorktree {
+		wsw = newWorkerSnapshotWriter(o.repoDir, o.runID, task.ID, task.Title, group.Title, o.runStartedAt)
+	}
+
 	workDir := o.repoDir
 	if useWorktree {
 		worktreePath := filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting in worktree", task.ID)})
 
 		if err := gitbranch.CreateBranchFrom(o.repoDir, taskBranch, o.planBranch); err != nil {
+			o.markWorkerFailed(task.ID, wsw)
 			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create branch: %v", err))
 		}
 		if err := gitworktree.CreateWorktree(o.repoDir, worktreePath, taskBranch); err != nil {
+			o.markWorkerFailed(task.ID, wsw)
 			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create worktree: %v", err))
 		}
 		workDir = worktreePath
@@ -269,12 +296,16 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 
 	workerLogger.TaskStart(task.ID, task.Title)
 
-	// Run agent.
+	// Run agent — parallel workers use per-worker snapshot writer, sequential use main program.
 	opts := prompt.Options{Include: o.validIncludes, RunID: o.runID, Iteration: iter}
 	builtPrompt := prompt.Build(&task, opts)
 	model := resolveTaskModel(task.Model, o.resolvedModel)
 
-	if err := o.activeAgent.Run(o.ctx, builtPrompt, model, o.sessionPersist, o.p); err != nil {
+	var agentSender agent.MessageSender = o.p
+	if wsw != nil {
+		agentSender = wsw
+	}
+	if err := o.activeAgent.Run(o.ctx, builtPrompt, model, o.sessionPersist, agentSender); err != nil {
 		if o.ctx.Err() != nil {
 			result.stopReason = StopReasonInterrupted
 			return result
@@ -285,6 +316,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		workerLogger.TaskFailed(task.ID, reason)
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s", task.ID, reason)})
 		result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
+		o.markWorkerFailed(task.ID, wsw)
 		if useWorktree {
 			_ = gitworktree.RemoveWorktree(o.repoDir, filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID))
 		}
@@ -298,6 +330,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		workerLogger.TaskFailed(task.ID, reason)
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s", task.ID, reason)})
 		result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
+		o.markWorkerFailed(task.ID, wsw)
 		if useWorktree {
 			_ = gitworktree.RemoveWorktree(o.repoDir, filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID))
 		}
@@ -324,6 +357,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		mergeErr := gitmerge.MergeTaskBranch(o.repoDir, o.planBranch, taskBranch)
 		o.mu.Unlock()
 		if mergeErr != nil {
+			o.markWorkerBlocked(task.ID, wsw, mergeErr)
 			return o.handleMergeErr(&result, workerLogger, task, mergeErr)
 		}
 	} else {
@@ -338,6 +372,9 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	o.completedIDs[task.ID] = true
 	o.mu.Unlock()
 
+	// Update worker snapshot and index with done status.
+	o.markWorkerDone(task.ID, wsw)
+
 	o.p.Send(InfoMsg{Text: fmt.Sprintf("✓ %s: Completed and merged into %s", task.ID, o.planBranch)})
 	_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
 
@@ -345,6 +382,42 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		result.completed = 1
 	}
 	return result
+}
+
+// markWorkerDone updates a worker's status to "done" in the index and snapshot.
+func (o *parallelOrchestrator) markWorkerDone(taskID string, wsw *workerSnapshotWriter) {
+	if wsw != nil {
+		wsw.SetStatus("Done")
+	}
+	o.mu.Lock()
+	if o.hasWorkerMaps() {
+		o.setWorkerStatus(taskID, "done")
+	}
+	o.mu.Unlock()
+}
+
+// markWorkerFailed updates a worker's status to "failed" in the index and snapshot.
+func (o *parallelOrchestrator) markWorkerFailed(taskID string, wsw *workerSnapshotWriter) {
+	if wsw != nil {
+		wsw.SetStatus("Failed")
+	}
+	o.mu.Lock()
+	if o.hasWorkerMaps() {
+		o.setWorkerStatus(taskID, "failed")
+	}
+	o.mu.Unlock()
+}
+
+// markWorkerBlocked updates a worker's status to "blocked" in the index and snapshot.
+func (o *parallelOrchestrator) markWorkerBlocked(taskID string, wsw *workerSnapshotWriter, _ error) {
+	if wsw != nil {
+		wsw.SetStatus("Blocked")
+	}
+	o.mu.Lock()
+	if o.hasWorkerMaps() {
+		o.setWorkerStatus(taskID, "blocked")
+	}
+	o.mu.Unlock()
 }
 
 // failTask records a failed task and returns the result.

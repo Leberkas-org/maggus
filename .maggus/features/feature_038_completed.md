@@ -125,13 +125,13 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] In parallel mode, the status view splits horizontally into one pane per active worker (up to terminal width)
-- [ ] Each pane shows: task ID, task title, current tool being invoked, token usage, elapsed time — mirroring the existing single-pane layout
-- [ ] Panes are added dynamically as new tasks start and frozen with a ✓ or ✗ indicator when tasks complete or are blocked
-- [ ] When worker count exceeds what fits horizontally, panes stack vertically (no silent clipping)
-- [ ] Terminal resize redistributes pane widths proportionally
-- [ ] Non-parallel mode (single worker) shows the existing single-pane status view with zero changes
-- [ ] Typecheck/lint passes
+- [x] In parallel mode, the status view splits horizontally into one pane per active worker (up to terminal width)
+- [x] Each pane shows: task ID, task title, current tool being invoked, token usage, elapsed time — mirroring the existing single-pane layout
+- [x] Panes are added dynamically as new tasks start and frozen with a ✓ or ✗ indicator when tasks complete or are blocked
+- [x] When worker count exceeds what fits horizontally, panes stack vertically (no silent clipping)
+- [x] Terminal resize redistributes pane widths proportionally
+- [x] Non-parallel mode (single worker) shows the existing single-pane status view with zero changes
+- [x] Typecheck/lint passes
 
 ## Task Dependency Graph
 

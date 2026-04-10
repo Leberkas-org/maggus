@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ClaudeAgent implements the Agent interface for Claude Code.
@@ -69,7 +67,7 @@ func buildTextArgs(model string, sessionPersistence bool, prompt string) []strin
 // Run invokes `claude -p <prompt>` with stream-json output and sends progress events
 // to the provided bubbletea program. If model is non-empty, --model <model> is added.
 // When sessionPersistence is false, --no-session-persistence is appended.
-func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p *tea.Program) error {
+func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p MessageSender) error {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)

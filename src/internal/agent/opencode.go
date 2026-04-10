@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // OpenCodeAgent implements the Agent interface for OpenCode.
@@ -40,7 +38,7 @@ func (a *OpenCodeAgent) Validate() error {
 // to the provided bubbletea program. OpenCode does not stream events, so
 // StatusMsg updates are sent at process start and on completion.
 // The model and sessionPersistence parameters are ignored — OpenCode uses its config file.
-func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p *tea.Program) error {
+func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p MessageSender) error {
 	path, err := exec.LookPath("opencode")
 	if err != nil {
 		return fmt.Errorf("opencode not found on PATH: %w\nInstall OpenCode from https://github.com/opencode-ai/opencode", err)

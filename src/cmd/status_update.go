@@ -72,11 +72,21 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spinnerTickMsg:
 		if m.daemon.Running && m.snapshot != nil {
 			isTerminal := m.snapshot.Status == "Done" || m.snapshot.Status == "Failed" || m.snapshot.Status == "Interrupted"
-			if isTerminal {
+			if isTerminal && !m.isParallelMode() {
 				// Stop the tick loop; it will be restarted when a new run begins.
 				m.spinnerTicking = false
 				return m, nil
 			}
+			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
+			// Advance per-worker spinners in parallel mode.
+			if m.isParallelMode() {
+				m.advanceWorkerSpinners()
+			}
+			return m, spinnerTick()
+		}
+		// Advance worker spinners even without main snapshot in parallel mode.
+		if m.daemon.Running && m.isParallelMode() {
+			m.advanceWorkerSpinners()
 			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
 			return m, spinnerTick()
 		}
@@ -122,6 +132,9 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if !m.daemon.Running {
 			m.snapshot = nil
 		}
+
+		// Read parallel worker state (nil when not in parallel mode).
+		m.refreshWorkerSnapshots()
 
 		newSnapStatus := ""
 		if m.snapshot != nil {

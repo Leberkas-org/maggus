@@ -101,9 +101,14 @@ func (m *statusModel) outputTabScrollableLines() int {
 	return avail
 }
 
-// renderOutputTab renders the Output tab content: rich snapshot view when the
-// daemon is running and a snapshot is available, idle message otherwise.
+// renderOutputTab renders the Output tab content: parallel worker split panes,
+// single-task rich snapshot view, or idle message depending on mode.
 func (m statusModel) renderOutputTab(width, contentH int) string {
+	// Parallel mode: show split panes per worker.
+	if m.isParallelMode() && m.daemon.Running {
+		return m.renderWorkerPanes(width, contentH)
+	}
+	// Sequential mode: single-task rich snapshot view.
 	if m.snapshot != nil && m.daemon.Running {
 		return m.renderSnapshotInPane(width, contentH)
 	}

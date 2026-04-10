@@ -114,6 +114,11 @@ type statusModel struct {
 	// fsnotify-based log file watcher (nil when fsnotify unavailable — falls back to polling)
 	logWatcher   *LogFileWatcher
 	logWatcherCh <-chan logFileUpdateMsg
+
+	// Parallel mode worker pane state (populated from state-workers.json + state-<taskID>.json).
+	workerIndex     []runlog.WorkerIndexEntry        // ordered list of workers; nil when not in parallel mode
+	workerSnapshots map[string]*runlog.StateSnapshot // taskID → per-worker snapshot
+	workerSpinners  map[string]int                   // taskID → spinner frame (only for "working" status)
 }
 
 func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {

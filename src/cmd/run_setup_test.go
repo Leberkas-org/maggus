@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/spf13/cobra"
@@ -19,7 +18,7 @@ type fakeAgent struct {
 	validateErr error
 }
 
-func (f *fakeAgent) Run(_ context.Context, _ string, _ string, _ bool, _ *tea.Program) error {
+func (f *fakeAgent) Run(_ context.Context, _ string, _ string, _ bool, _ agent.MessageSender) error {
 	return nil
 }
 func (f *fakeAgent) RunOnce(_ context.Context, _ string, _ string, _ bool) (string, error) {

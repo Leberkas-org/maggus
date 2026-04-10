@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/leberkas-org/maggus/internal/agent"
@@ -94,4 +95,138 @@ func ReadSnapshot(dir string) (*StateSnapshot, error) {
 		return nil, fmt.Errorf("parse snapshot: %w", err)
 	}
 	return &snap, nil
+}
+
+// ── Per-worker snapshots for parallel mode ──
+
+// WorkerIndexEntry describes one parallel worker's identity and status.
+type WorkerIndexEntry struct {
+	TaskID    string `json:"task_id"`
+	TaskTitle string `json:"task_title"`
+	Status    string `json:"status"` // "working", "done", "failed", "blocked"
+	StartedAt string `json:"started_at,omitempty"`
+}
+
+// WorkerIndex is the on-disk list of parallel workers.
+type WorkerIndex struct {
+	Workers []WorkerIndexEntry `json:"workers"`
+}
+
+// workersIndexPath returns the fixed path to state-workers.json.
+func workersIndexPath(dir string) string {
+	return filepath.Join(dir, ".maggus", "runs", "state-workers.json")
+}
+
+// workerSnapshotPath returns the path for a per-worker snapshot.
+func workerSnapshotPath(dir, taskID string) string {
+	return filepath.Join(dir, ".maggus", "runs", "state-"+taskID+".json")
+}
+
+// WriteWorkersIndex atomically writes the workers index file.
+func WriteWorkersIndex(dir string, workers []WorkerIndexEntry) error {
+	target := workersIndexPath(dir)
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(WorkerIndex{Workers: workers})
+	if err != nil {
+		return err
+	}
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		os.Remove(target)
+		if err2 := os.Rename(tmp, target); err2 != nil {
+			os.Remove(tmp)
+			return err2
+		}
+	}
+	return nil
+}
+
+// ReadWorkersIndex reads the workers index. Returns nil slice when the file
+// does not exist (non-parallel mode or run finished).
+func ReadWorkersIndex(dir string) []WorkerIndexEntry {
+	data, err := os.ReadFile(workersIndexPath(dir))
+	if err != nil {
+		return nil
+	}
+	var idx WorkerIndex
+	if err := json.Unmarshal(data, &idx); err != nil {
+		return nil
+	}
+	return idx.Workers
+}
+
+// RemoveWorkersIndex removes the workers index file (called when a parallel run finishes).
+func RemoveWorkersIndex(dir string) {
+	target := workersIndexPath(dir)
+	os.Remove(target)
+	os.Remove(target + ".tmp")
+}
+
+// WriteWorkerSnapshot atomically writes a per-worker snapshot.
+func WriteWorkerSnapshot(dir, taskID string, snap StateSnapshot) error {
+	target := workerSnapshotPath(dir, taskID)
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	snap.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	data, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		os.Remove(target)
+		if err2 := os.Rename(tmp, target); err2 != nil {
+			os.Remove(tmp)
+			return err2
+		}
+	}
+	return nil
+}
+
+// ReadWorkerSnapshot reads a single per-worker snapshot.
+func ReadWorkerSnapshot(dir, taskID string) (*StateSnapshot, error) {
+	data, err := os.ReadFile(workerSnapshotPath(dir, taskID))
+	if err != nil {
+		return nil, err
+	}
+	var snap StateSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return nil, err
+	}
+	return &snap, nil
+}
+
+// RemoveWorkerSnapshot removes a per-worker snapshot file.
+func RemoveWorkerSnapshot(dir, taskID string) {
+	target := workerSnapshotPath(dir, taskID)
+	os.Remove(target)
+	os.Remove(target + ".tmp")
+}
+
+// RemoveAllWorkerSnapshots removes all per-worker snapshot files and the index.
+func RemoveAllWorkerSnapshots(dir string) {
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, "state-") && strings.HasSuffix(name, ".json") && name != "state-workers.json" {
+			os.Remove(filepath.Join(runsDir, name))
+		}
+		if strings.HasPrefix(name, "state-") && strings.HasSuffix(name, ".json.tmp") {
+			os.Remove(filepath.Join(runsDir, name))
+		}
+	}
+	RemoveWorkersIndex(dir)
 }
