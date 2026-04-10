@@ -3,6 +3,7 @@ package gitworktree
 import (
 	"bufio"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/leberkas-org/maggus/internal/gitutil"
@@ -17,7 +18,27 @@ type WorktreeInfo struct {
 
 // CreateWorktree adds a worktree at path on branch.
 // If branch does not exist it is created off HEAD.
+// If path is already a registered worktree on the expected branch, the call is
+// a no-op (idempotent success). If it is registered on a different branch, a
+// descriptive error is returned.
 func CreateWorktree(repoRoot, path, branch string) error {
+	// Check for an already-registered worktree at path to make this call idempotent.
+	existing, err := ListWorktrees(repoRoot)
+	if err != nil {
+		return fmt.Errorf("CreateWorktree: listing worktrees: %w", err)
+	}
+	cleanPath := filepath.Clean(path)
+	for _, wt := range existing {
+		if filepath.Clean(wt.Path) != cleanPath {
+			continue
+		}
+		// Path is already registered.
+		if wt.Branch == branch {
+			return nil // idempotent success
+		}
+		return fmt.Errorf("worktree at %q is already registered on branch %q, not %q", path, wt.Branch, branch)
+	}
+
 	var args []string
 	if branchExists(repoRoot, branch) {
 		args = []string{"worktree", "add", path, branch}

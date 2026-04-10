@@ -88,8 +88,8 @@ There is no deduplication check. When the same batch is retried, the same task I
 **Description:** As a developer, I want `gitworktree.CreateWorktree` to succeed (or be skippable) when the worktree path is already registered, so interrupted parallel runs can resume cleanly.
 
 **Acceptance Criteria:**
-- [ ] `CreateWorktree` in `src/internal/gitworktree/gitworktree.go` checks if the given path is already a registered worktree (via `ListWorktrees` or `git worktree list --porcelain`) before calling `git worktree add`
-- [ ] If the path is already registered and points to the expected branch, the function returns `nil` (idempotent success)
-- [ ] If the path is registered but on a different branch, the function returns a descriptive error
-- [ ] `go vet ./...` and `go test ./...` pass
-- [ ] Existing `CreateWorktree` tests remain green; a new test covers the already-registered case
+- [x] `CreateWorktree` in `src/internal/gitworktree/gitworktree.go` checks if the given path is already a registered worktree (via `ListWorktrees` or `git worktree list --porcelain`) before calling `git worktree add`
+- [x] If the path is already registered and points to the expected branch, the function returns `nil` (idempotent success)
+- [x] If the path is registered but on a different branch, the function returns a descriptive error
+- [x] `go vet ./...` and `go test ./...` pass
+- [x] Existing `CreateWorktree` tests remain green; a new test covers the already-registered case

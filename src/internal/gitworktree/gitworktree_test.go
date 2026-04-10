@@ -192,6 +192,44 @@ func TestListWorktrees_PrunesStale(t *testing.T) {
 	}
 }
 
+func TestCreateWorktree_AlreadyRegistered_SameBranch(t *testing.T) {
+	repo := t.TempDir()
+	initGitRepo(t, repo)
+
+	wt := filepath.Join(t.TempDir(), "wt-idem")
+	branch := "feature/idempotent"
+
+	if err := CreateWorktree(repo, wt, branch); err != nil {
+		t.Fatalf("first CreateWorktree failed: %v", err)
+	}
+
+	// Second call with same path and same branch must succeed (idempotent).
+	if err := CreateWorktree(repo, wt, branch); err != nil {
+		t.Errorf("second CreateWorktree (same branch) returned error: %v", err)
+	}
+}
+
+func TestCreateWorktree_AlreadyRegistered_DifferentBranch(t *testing.T) {
+	repo := t.TempDir()
+	initGitRepo(t, repo)
+
+	wt := filepath.Join(t.TempDir(), "wt-conflict")
+	branch := "feature/original"
+
+	if err := CreateWorktree(repo, wt, branch); err != nil {
+		t.Fatalf("first CreateWorktree failed: %v", err)
+	}
+
+	// Second call with same path but a different branch must return an error.
+	err := CreateWorktree(repo, wt, "feature/different")
+	if err == nil {
+		t.Fatal("expected error when re-registering path on a different branch, got nil")
+	}
+	if !strings.Contains(err.Error(), "already registered") {
+		t.Errorf("error message should mention 'already registered', got: %v", err)
+	}
+}
+
 func TestParsePorcelain(t *testing.T) {
 	input := "worktree /path/to/main\nHEAD abc123\nbranch refs/heads/main\n\nworktree /path/to/feat\nHEAD def456\nbranch refs/heads/feature/foo\n\n"
 
