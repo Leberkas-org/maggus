@@ -32,15 +32,15 @@ This is a follow-up iteration to feature 040 that simplifies the interaction mod
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] The `leftFocused` field is removed from `statusModel`
-- [ ] Up/down keys always drive `treeCursor` navigation (same behavior as current left-focused mode)
-- [ ] Left/right keys still expand/collapse tree nodes
-- [ ] Tab number keys (`1`, `2`, `3`, etc.) switch the right pane tab without changing any focus state — they start at `1` now (no more `[1]` for left pane focus)
-- [ ] PgUp/PgDn on the left pane still jumps between features (existing behavior preserved)
-- [ ] The `enter` key still opens task detail view for the selected task
-- [ ] All key handling branches that check `m.leftFocused` are removed or refactored
-- [ ] `go vet ./...` and `go test ./...` pass
-- [ ] Existing tests that assert `leftFocused` behavior are updated
+- [x] The `leftFocused` field is removed from `statusModel`
+- [x] Up/down keys always drive `treeCursor` navigation (same behavior as current left-focused mode)
+- [x] Left/right keys still expand/collapse tree nodes
+- [x] Tab number keys (`1`, `2`, `3`, etc.) switch the right pane tab without changing any focus state — they start at `1` now (no more `[1]` for left pane focus)
+- [x] PgUp/PgDn on the left pane still jumps between features (existing behavior preserved)
+- [x] The `enter` key still opens task detail view for the selected task
+- [x] All key handling branches that check `m.leftFocused` are removed or refactored
+- [x] `go vet ./...` and `go test ./...` pass
+- [x] Existing tests that assert `leftFocused` behavior are updated
 
 ### TASK-042-002: Add content scrolling via dedicated keys
 **Description:** As a user viewing the Output tab or Task Details tab, I want to scroll the content using dedicated keys so I can read long tool logs or acceptance criteria.

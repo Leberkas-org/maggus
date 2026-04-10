@@ -176,55 +176,39 @@ func (m statusModel) statusSplitFooter() string {
 		stoppingStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
 		return stoppingStyle.Render("⏳ Stopping after task…")
 	}
-	tabRange := fmt.Sprintf("1-%d: tabs", len(m.availableTabs())+1)
-	if m.leftFocused {
-		daemonHint := "s: start"
-		if m.daemon.Running {
-			daemonHint = "s: stop"
-		}
-		footer := tabRange + "  ↑/↓ navigate/scroll  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
-		if m.hasCompletedPlans() {
-			if m.showAll {
-				footer += "  alt+a: hide done"
-			} else {
-				footer += "  alt+a: show done"
+	// When a task detail view is open, show detail-specific hints.
+	c := &m.taskListComponent
+	if c.ShowDetail {
+		ds := &c.Detail
+		if ds.criteriaMode {
+			if ds.showActionPicker {
+				return "↑/↓: navigate/scroll · enter: confirm · esc: cancel"
 			}
+			return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · q: back"
 		}
-		return footer
+		scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
+		var parts []string
+		if scrollable {
+			parts = append(parts, "↑/↓: scroll")
+		}
+		parts = append(parts, "pgup/pgdn: prev/next task")
+		parts = append(parts, "tab: manage blocked")
+		parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
+		return strings.Join(parts, " · ")
 	}
 
-	tabs := m.availableTabs()
-	activeKey := ""
-	if m.activeTab >= 0 && m.activeTab < len(tabs) {
-		activeKey = tabs[m.activeTab].key
+	tabRange := fmt.Sprintf("1-%d: tabs", len(m.availableTabs()))
+	daemonHint := "s: start"
+	if m.daemon.Running {
+		daemonHint = "s: stop"
 	}
-	switch activeKey {
-	case "output":
-		return tabRange + "  ↑/↓ navigate/scroll  g: top  G: bottom  q: exit"
-	case "details":
-		c := &m.taskListComponent
-		if c.ShowDetail {
-			ds := &c.Detail
-			if ds.criteriaMode {
-				if ds.showActionPicker {
-					return "↑/↓: navigate/scroll · enter: confirm · esc: cancel"
-				}
-				return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · q: back"
-			}
-			scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
-			var parts []string
-			if scrollable {
-				parts = append(parts, "↑/↓: scroll")
-			}
-			parts = append(parts, "pgup/pgdn: prev/next task")
-			parts = append(parts, "tab: manage blocked")
-			parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
-			return strings.Join(parts, " · ")
+	footer := tabRange + "  ↑/↓: navigate  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d: delete  " + daemonHint + "  q: exit"
+	if m.hasCompletedPlans() {
+		if m.showAll {
+			footer += "  alt+a: hide done"
+		} else {
+			footer += "  alt+a: show done"
 		}
-		return tabRange + "  ↑/↓ navigate/scroll  enter: detail  q: exit"
-	case "taskdetails":
-		return tabRange + "  ↑/↓ navigate/scroll  q: exit"
-	default:
-		return tabRange + "  q: exit"
 	}
+	return footer
 }

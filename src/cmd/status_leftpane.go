@@ -75,15 +75,9 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 	var lines []string
 
-	// Header row: matches right pane tab bar style — dimmed number prefix + styled label.
-	dimStyle := lipgloss.NewStyle().Faint(true)
-	var labelStyle lipgloss.Style
-	if m.leftFocused {
-		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Underline(true)
-	} else {
-		labelStyle = mutedStyle
-	}
-	headerContent := " " + dimStyle.Render("[1]") + " " + labelStyle.Render("Items")
+	// Header row: styled label for the left pane tree.
+	labelStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Underline(true)
+	headerContent := " " + labelStyle.Render("Items")
 	lines = append(lines, padToWidth(headerContent, contentW))
 
 	// Horizontal separator under header.
@@ -171,17 +165,11 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			var expandIcon string
 			if len(plan.Tasks) == 0 {
 				expandIcon = bgStr(" ")
-			} else if isSelected && m.leftFocused {
+			} else if isSelected {
 				if m.expandedPlans[plan.ID] {
 					expandIcon = addBg(whiteStyle).Render("▼")
 				} else {
 					expandIcon = addBg(whiteStyle).Render("▶")
-				}
-			} else if isSelected {
-				if m.expandedPlans[plan.ID] {
-					expandIcon = addBg(mutedStyle).Render("▼")
-				} else {
-					expandIcon = addBg(mutedStyle).Render("▶")
 				}
 			} else {
 				if m.expandedPlans[plan.ID] {
@@ -241,7 +229,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			case plan.IsBug:
 				titleStr = addBg(errorStyle).Render(title)
 			default:
-				if isSelected && m.leftFocused {
+				if isSelected {
 					titleStr = addBg(whiteStyle).Render(title)
 				} else {
 					titleStr = bgStr(title)
@@ -300,12 +288,9 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			taskTitleStr := leftPaneTruncate(task.Title, titleAvail)
 
 			var taskIDRendered, taskTitleRendered string
-			if isSelected && m.leftFocused {
+			if isSelected {
 				taskIDRendered = addBg(whiteStyle).Render(taskIDStr)
 				taskTitleRendered = addBg(whiteStyle).Render(taskTitleStr)
-			} else if isSelected {
-				taskIDRendered = addBg(mutedStyle).Render(taskIDStr)
-				taskTitleRendered = addBg(mutedStyle).Render(taskTitleStr)
 			} else {
 				taskIDRendered = mutedStyle.Render(taskIDStr)
 				taskTitleRendered = mutedStyle.Render(taskTitleStr)

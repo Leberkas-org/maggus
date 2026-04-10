@@ -15,7 +15,6 @@ import (
 func makeModelForCtx(ctx selectionContext) statusModel {
 	m := statusModel{
 		expandedPlans: make(map[string]bool),
-		leftFocused:   true,
 		width:         120,
 		height:        40,
 	}
@@ -100,7 +99,7 @@ func TestRenderRightPaneTabBar_RendersOnlyAvailableTabs(t *testing.T) {
 
 // ── TestRenderRightPaneTabBar_NumberLabelsStartAt2 ────────────────────────────
 
-func TestRenderRightPaneTabBar_NumberLabelsStartAt2(t *testing.T) {
+func TestRenderRightPaneTabBar_NumberLabelsStartAt1(t *testing.T) {
 	tests := []struct {
 		ctx        selectionContext
 		wantLabels []string
@@ -108,23 +107,23 @@ func TestRenderRightPaneTabBar_NumberLabelsStartAt2(t *testing.T) {
 	}{
 		{
 			ctx:        selNone,
-			wantLabels: []string{"[2]"},
-			noLabels:   []string{"[3]", "[4]", "[5]"},
+			wantLabels: []string{"[1]"},
+			noLabels:   []string{"[2]", "[3]", "[4]"},
 		},
 		{
 			ctx:        selFeature,
-			wantLabels: []string{"[2]", "[3]", "[4]"},
-			noLabels:   []string{"[5]"},
+			wantLabels: []string{"[1]", "[2]", "[3]"},
+			noLabels:   []string{"[4]"},
 		},
 		{
 			ctx:        selRunningTask,
-			wantLabels: []string{"[2]", "[3]", "[4]"},
-			noLabels:   []string{"[5]"},
+			wantLabels: []string{"[1]", "[2]", "[3]"},
+			noLabels:   []string{"[4]"},
 		},
 		{
 			ctx:        selCompletedTask,
-			wantLabels: []string{"[2]", "[3]", "[4]", "[5]"},
-			noLabels:   []string{"[1]"},
+			wantLabels: []string{"[1]", "[2]", "[3]", "[4]"},
+			noLabels:   []string{"[5]"},
 		},
 	}
 
@@ -209,34 +208,29 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 func TestUpdateList_NumberKeysMappedPositionally(t *testing.T) {
 	tests := []struct {
-		ctx          selectionContext
-		key          string
-		wantTab      int
-		wantFocused  bool // leftFocused after the key press
+		ctx     selectionContext
+		key     string
+		wantTab int
 	}{
 		// selFeature has 3 tabs (Summary=0, Details=1, Metrics=2)
-		{ctx: selFeature, key: "2", wantTab: 0, wantFocused: false},
-		{ctx: selFeature, key: "3", wantTab: 1, wantFocused: false},
-		{ctx: selFeature, key: "4", wantTab: 2, wantFocused: false},
+		{ctx: selFeature, key: "1", wantTab: 0},
+		{ctx: selFeature, key: "2", wantTab: 1},
+		{ctx: selFeature, key: "3", wantTab: 2},
 		// selCompletedTask has 4 tabs
-		{ctx: selCompletedTask, key: "2", wantTab: 0, wantFocused: false},
-		{ctx: selCompletedTask, key: "5", wantTab: 3, wantFocused: false},
+		{ctx: selCompletedTask, key: "1", wantTab: 0},
+		{ctx: selCompletedTask, key: "4", wantTab: 3},
 		// selNone has 1 tab (Metrics=0)
-		{ctx: selNone, key: "2", wantTab: 0, wantFocused: false},
+		{ctx: selNone, key: "1", wantTab: 0},
 	}
 
 	for _, tt := range tests {
 		name := fmt.Sprintf("ctx=%d key=%s → tab %d", tt.ctx, tt.key, tt.wantTab)
 		t.Run(name, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.leftFocused = true
 			m.activeTab = 0
 			result := pressKey(m, tt.key)
 			if result.activeTab != tt.wantTab {
 				t.Errorf("activeTab = %d, want %d", result.activeTab, tt.wantTab)
-			}
-			if result.leftFocused != tt.wantFocused {
-				t.Errorf("leftFocused = %v, want %v", result.leftFocused, tt.wantFocused)
 			}
 		})
 	}
@@ -246,30 +240,27 @@ func TestUpdateList_NumberKeysMappedPositionally(t *testing.T) {
 
 func TestUpdateList_KeysBeyondTabCountIgnored(t *testing.T) {
 	tests := []struct {
-		ctx            selectionContext
-		key            string
-		desc           string
+		ctx  selectionContext
+		key  string
+		desc string
 	}{
-		// selNone has 1 tab; keys 3,4,5 are beyond count
+		// selNone has 1 tab; keys 2,3,4,5 are beyond count
+		{ctx: selNone, key: "2", desc: "selNone: key 2 beyond 1 tab"},
 		{ctx: selNone, key: "3", desc: "selNone: key 3 beyond 1 tab"},
 		{ctx: selNone, key: "4", desc: "selNone: key 4 beyond 1 tab"},
-		{ctx: selNone, key: "5", desc: "selNone: key 5 beyond 1 tab"},
-		// selFeature has 3 tabs; key 5 is beyond count
+		// selFeature has 3 tabs; key 4,5 are beyond count
+		{ctx: selFeature, key: "4", desc: "selFeature: key 4 beyond 3 tabs"},
 		{ctx: selFeature, key: "5", desc: "selFeature: key 5 beyond 3 tabs"},
-		// selRunningTask has 3 tabs; key 5 is beyond count
-		{ctx: selRunningTask, key: "5", desc: "selRunningTask: key 5 beyond 3 tabs"},
+		// selRunningTask has 3 tabs; key 4,5 are beyond count
+		{ctx: selRunningTask, key: "4", desc: "selRunningTask: key 4 beyond 3 tabs"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.leftFocused = true
 			m.activeTab = 0
 			result := pressKey(m, tt.key)
-			// Left pane focus and active tab should be unchanged
-			if !result.leftFocused {
-				t.Errorf("leftFocused should remain true (key ignored), but got false")
-			}
+			// Active tab should be unchanged
 			if result.activeTab != 0 {
 				t.Errorf("activeTab should remain 0 (key ignored), but got %d", result.activeTab)
 			}
@@ -281,23 +272,22 @@ func TestUpdateList_KeysBeyondTabCountIgnored(t *testing.T) {
 
 func TestStatusSplitFooter_DynamicTabRange(t *testing.T) {
 	tests := []struct {
-		ctx          selectionContext
-		wantRange    string
+		ctx       selectionContext
+		wantRange string
 	}{
-		// selNone: 1 right-pane tab → key range is 1-2
-		{ctx: selNone, wantRange: "1-2: tabs"},
-		// selFeature: 3 right-pane tabs → key range is 1-4
-		{ctx: selFeature, wantRange: "1-4: tabs"},
-		// selRunningTask: 3 right-pane tabs → key range is 1-4
-		{ctx: selRunningTask, wantRange: "1-4: tabs"},
-		// selCompletedTask: 4 right-pane tabs → key range is 1-5
-		{ctx: selCompletedTask, wantRange: "1-5: tabs"},
+		// selNone: 1 tab → key range is 1-1
+		{ctx: selNone, wantRange: "1-1: tabs"},
+		// selFeature: 3 tabs → key range is 1-3
+		{ctx: selFeature, wantRange: "1-3: tabs"},
+		// selRunningTask: 3 tabs → key range is 1-3
+		{ctx: selRunningTask, wantRange: "1-3: tabs"},
+		// selCompletedTask: 4 tabs → key range is 1-4
+		{ctx: selCompletedTask, wantRange: "1-4: tabs"},
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("context %d", tt.ctx), func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.leftFocused = true // footer in left-pane mode shows the tab range
 			footer := m.statusSplitFooter()
 			if !strings.Contains(footer, tt.wantRange) {
 				t.Errorf("footer should contain %q; got: %q", tt.wantRange, footer)

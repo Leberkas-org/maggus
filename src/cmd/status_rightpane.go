@@ -25,11 +25,9 @@ func (m statusModel) renderRightPaneTabBar() string {
 	tabs := m.availableTabs()
 	var parts []string
 	for i, td := range tabs {
-		numStr := dimStyle.Render(fmt.Sprintf("[%d]", i+2))
+		numStr := dimStyle.Render(fmt.Sprintf("[%d]", i+1))
 		var nameStr string
-		if m.leftFocused {
-			nameStr = inactiveStyle.Render(td.name)
-		} else if i == m.activeTab {
+		if i == m.activeTab {
 			nameStr = activeStyle.Render(td.name)
 		} else {
 			nameStr = inactiveStyle.Render(td.name)
@@ -59,20 +57,26 @@ func (m statusModel) renderRightPane(width, height int) string {
 	if m.activeTab >= 0 && m.activeTab < len(tabs) {
 		tabKey = tabs[m.activeTab].key
 	}
+	// When a task detail is open (entered via tree), render it regardless of active tab.
 	var content string
-	switch tabKey {
-	case "output":
-		content = m.renderOutputTab(width, contentH)
-	case "summary":
-		content = m.renderSummaryTab(width, contentH)
-	case "details":
-		content = m.renderFeatureDetailsTab(width, contentH)
-	case "taskdetails":
-		content = m.renderCurrentTaskTab(width, contentH)
-	case "metrics":
-		content = m.renderMetricsTab(width, contentH)
-	default:
-		content = lipgloss.NewStyle().Width(width).Height(contentH).Render("")
+	c := &m.taskListComponent
+	if c.ShowDetail && c.detailReady {
+		content = m.renderTab2Detail(width, contentH)
+	} else {
+		switch tabKey {
+		case "output":
+			content = m.renderOutputTab(width, contentH)
+		case "summary":
+			content = m.renderSummaryTab(width, contentH)
+		case "details":
+			content = m.renderFeatureDetailsTab(width, contentH)
+		case "taskdetails":
+			content = m.renderCurrentTaskTab(width, contentH)
+		case "metrics":
+			content = m.renderMetricsTab(width, contentH)
+		default:
+			content = lipgloss.NewStyle().Width(width).Height(contentH).Render("")
+		}
 	}
 
 	full := tabBar + "\n" + sep + "\n" + content

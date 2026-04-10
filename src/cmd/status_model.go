@@ -61,9 +61,8 @@ type statusModel struct {
 	planCursor       int
 	treeCursor       int             // primary navigation index into buildTreeItems(); replaces planCursor
 	treeScrollOffset int             // scroll offset for left pane tree view
-	expandedPlans    map[string]bool // keyed by plan.ID; starts empty (all collapsed)
-	leftFocused      bool
-	activeTab        int // 0–3: Output, Feature Details, Current Task, Metrics
+	expandedPlans map[string]bool // keyed by plan.ID; starts empty (all collapsed)
+	activeTab     int            // index into availableTabs()
 
 	// Right-pane tab 3 viewport
 	currentTaskViewport viewport.Model
@@ -164,9 +163,8 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		approvals:        approvals,
 		featureStore:     featureStore,
 		bugStore:         bugStore,
-		logAutoScroll:    true,
-		leftFocused:      true,
-		activeTab:        0,
+		logAutoScroll: true,
+		activeTab:     0,
 		spinnerTicking:   true,
 	}
 	// Query actual terminal dimensions before the first render so View() always

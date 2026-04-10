@@ -1013,13 +1013,6 @@ func TestNewStatusModel_Defaults(t *testing.T) {
 		}},
 	}
 
-	t.Run("leftFocused is true by default", func(t *testing.T) {
-		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		if !m.leftFocused {
-			t.Error("leftFocused should be true after newStatusModel")
-		}
-	})
-
 	t.Run("activeTab is 0 by default", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
 		if m.activeTab != 0 {
@@ -1306,7 +1299,6 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 		got := result.(statusModel)
@@ -1319,7 +1311,6 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.planCursor = 2
 		m.treeCursor = 2 // all plans collapsed, so treeCursor == planCursor
 
@@ -1334,7 +1325,6 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.planCursor = 2
 		m.treeCursor = 2 // all plans collapsed, so treeCursor == planCursor
 
@@ -1346,19 +1336,19 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		}
 	})
 
-	t.Run("up does not navigate when right pane is focused", func(t *testing.T) {
+	t.Run("up always navigates tree regardless of activeTab", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = false
 		m.activeTab = 0
 		m.planCursor = 1
+		m.treeCursor = 1
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
 		got := result.(statusModel)
-		// Right pane focused: up scrolls log, not plan navigation
-		if got.planCursor != 1 {
-			t.Errorf("planCursor = %d, want 1 (should not change when right pane focused)", got.planCursor)
+		// Up always navigates the tree — no focus state
+		if got.planCursor != 0 {
+			t.Errorf("planCursor = %d, want 0 (up always navigates tree)", got.planCursor)
 		}
 	})
 }
@@ -1378,7 +1368,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.treeCursor = 0
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
@@ -1392,7 +1381,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.treeCursor = 0
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
@@ -1406,7 +1394,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.expandedPlans["plan_1"] = true
 		m.treeCursor = 0
 
@@ -1421,7 +1408,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.expandedPlans["plan_1"] = true
 		m.treeCursor = 0
 
@@ -1436,7 +1422,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.expandedPlans["plan_1"] = true
 		m.treeCursor = 0
 
@@ -1451,7 +1436,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.expandedPlans["plan_1"] = true
 		// Tree is: [0]=plan_1, [1]=TASK-001, [2]=TASK-002, [3]=plan_2
 		m.treeCursor = 1 // on TASK-001
@@ -1473,7 +1457,6 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 		m.expandedPlans["plan_1"] = true
 		m.treeCursor = 0 // plan_1
 
@@ -1489,73 +1472,66 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		}
 	})
 
-	t.Run("right/left not consumed when right pane focused", func(t *testing.T) {
+	t.Run("right always expands regardless of activeTab", func(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = false
 		m.activeTab = 0
 		m.treeCursor = 0
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
 		got := result.(statusModel)
-		if got.expandedPlans["plan_1"] {
-			t.Error("right arrow should not expand when right pane focused")
+		if !got.expandedPlans["plan_1"] {
+			t.Error("right arrow should always expand (no focus state)")
 		}
 	})
 }
 
-func TestStatusModel_LeftPaneEnterSwitchesFocus(t *testing.T) {
+func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 	plans := []parser.Plan{
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
 	}
 
-	t.Run("enter switches focus to right pane on Tab 2", func(t *testing.T) {
+	t.Run("enter on plan row switches to Details tab", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.leftFocused {
-			t.Error("leftFocused should be false after enter from left pane")
-		}
 		if got.activeTab != 1 {
-			t.Errorf("activeTab = %d, want 1 (Feature Details)", got.activeTab)
+			t.Errorf("activeTab = %d, want 1 (Details)", got.activeTab)
 		}
 	})
 
-	t.Run("enter in split mode sets tab 2", func(t *testing.T) {
+	t.Run("enter on plan row sets Details tab from any starting tab", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
-		m.activeTab = 3 // currently on metrics
+		m.activeTab = 2 // currently on metrics
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
 		if got.activeTab != 1 {
-			t.Errorf("activeTab = %d, want 1 after enter from left pane", got.activeTab)
+			t.Errorf("activeTab = %d, want 1 after enter on plan row", got.activeTab)
 		}
 	})
 }
 
-func TestStatusModel_TabTogglesFocus(t *testing.T) {
+func TestStatusModel_TabKeyIsNoOp(t *testing.T) {
 	plans := []parser.Plan{
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
 	}
 
-	t.Run("tab is a no-op in split mode", func(t *testing.T) {
+	t.Run("tab key does not change activeTab", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.leftFocused = true
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		got := result.(statusModel)
-		if !got.leftFocused {
-			t.Error("leftFocused should remain true after tab (tab is a no-op)")
+		if got.activeTab != m.activeTab {
+			t.Errorf("activeTab changed from %d to %d after tab key", m.activeTab, got.activeTab)
 		}
 	})
 }
@@ -1761,7 +1737,6 @@ func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{}, // no entry
 		approvalRequired: false,                // opt-out mode
-		leftFocused:      true,
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -1800,7 +1775,6 @@ func TestHandleApproveToggle_ExplicitTrue_RemovesEntry(t *testing.T) {
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{uuid: true},
 		approvalRequired: false,
-		leftFocused:      true,
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -1839,7 +1813,6 @@ func TestHandleApproveToggle_ExplicitFalse_ReapprovesWithTrue(t *testing.T) {
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{uuid: false},
 		approvalRequired: false,
-		leftFocused:      true,
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -1865,9 +1838,8 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 
 	t.Run("no completed plans — no hint", func(t *testing.T) {
 		m := statusModel{
-			plans:       []parser.Plan{activePlan},
-			leftFocused: true,
-			showAll:     false,
+			plans:   []parser.Plan{activePlan},
+			showAll: false,
 		}
 		footer := m.statusSplitFooter()
 		if strings.Contains(footer, "alt+a") {
@@ -1877,9 +1849,8 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 
 	t.Run("completed plans with showAll=false — show done hint", func(t *testing.T) {
 		m := statusModel{
-			plans:       []parser.Plan{activePlan, completedPlan},
-			leftFocused: true,
-			showAll:     false,
+			plans:   []parser.Plan{activePlan, completedPlan},
+			showAll: false,
 		}
 		footer := m.statusSplitFooter()
 		if !strings.Contains(footer, "alt+a: show done") {
@@ -1889,9 +1860,8 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 
 	t.Run("completed plans with showAll=true — hide done hint", func(t *testing.T) {
 		m := statusModel{
-			plans:       []parser.Plan{activePlan, completedPlan},
-			leftFocused: true,
-			showAll:     true,
+			plans:   []parser.Plan{activePlan, completedPlan},
+			showAll: true,
 		}
 		footer := m.statusSplitFooter()
 		if !strings.Contains(footer, "alt+a: hide done") {

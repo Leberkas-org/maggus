@@ -532,20 +532,15 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 
-	// Key 1 focuses the left pane; keys 2–5 focus the right pane and switch tabs.
-	// Tab indices are positional within availableTabs() — pressing a key beyond
-	// the available count is ignored.
+	// Number keys switch the right-pane tab positionally: 1 = first tab, 2 = second, etc.
+	// Keys beyond the available tab count are ignored.
 	switch key {
-	case "1":
-		m.leftFocused = true
-		return m, nil
-	case "2", "3", "4", "5":
-		idx := int(key[0] - '2')
+	case "1", "2", "3", "4", "5":
+		idx := int(key[0] - '1')
 		tabs := m.availableTabs()
 		if idx >= len(tabs) {
 			return m, nil // key beyond available tab count — ignore
 		}
-		m.leftFocused = false
 		m.activeTab = idx
 		if tabs[idx].key == "output" {
 			m.logAutoScroll = true
@@ -554,68 +549,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Right pane is focused in split mode: route keys by active tab.
-	if !m.leftFocused && m.width > 0 && m.height > 0 {
-		tabs := m.availableTabs()
-		activeKey := ""
-		if m.activeTab >= 0 && m.activeTab < len(tabs) {
-			activeKey = tabs[m.activeTab].key
-		}
-
-		// Details tab: delegate to the task list component.
-		if activeKey == "details" {
-			if key == "q" {
-				return m.handleQuitRequest()
-			}
-			cmd, action := m.taskListComponent.Update(msg)
-			switch action {
-			case taskListQuit:
-				return m.handleQuitRequest()
-			case taskListRun:
-				return m, m.buildRunTaskMsg()
-			case taskListDeleted:
-				m.reloadPlans()
-			}
-			// After opening detail, resize its viewport to fit the right pane.
-			if m.taskListComponent.ShowDetail && m.taskListComponent.detailReady {
-				m.resizeTab2DetailViewport()
-			}
-			return m, cmd
-		}
-
-		// Output: log scroll. Task Details: viewport scroll.
-		switch key {
-		case "q":
-			return m.handleQuitRequest()
-		case "down":
-			if activeKey == "output" {
-				m.logAutoScroll = false
-				m.logScroll = min(m.logScroll+1, m.maxLogScroll())
-			} else if activeKey == "taskdetails" {
-				m.currentTaskViewport.ScrollDown(1)
-			}
-		case "up":
-			if activeKey == "output" {
-				m.logAutoScroll = false
-				m.logScroll = max(m.logScroll-1, 0)
-			} else if activeKey == "taskdetails" {
-				m.currentTaskViewport.ScrollUp(1)
-			}
-		case "G":
-			if activeKey == "output" {
-				m.logAutoScroll = true
-				m.logScroll = m.maxLogScroll()
-			}
-		case "g":
-			if activeKey == "output" {
-				m.logAutoScroll = false
-				m.logScroll = 0
-			}
-		}
-		return m, nil
-	}
-
-	// Left pane is focused (default): feature navigation.
+	// Feature tree navigation — always active.
 	switch key {
 	case "up", "k":
 		items := m.buildTreeItems()
@@ -716,9 +650,29 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
-		// Move focus to right pane and switch to Tab 2 — Feature Details.
-		m.leftFocused = false
-		m.activeTab = 1
+		// Open task detail when a task row is selected; switch to Details tab for plan rows.
+		items := m.buildTreeItems()
+		if m.treeCursor >= 0 && m.treeCursor < len(items) {
+			item := items[m.treeCursor]
+			if item.kind == treeItemKindTask && item.task != nil {
+				for i, t := range m.taskListComponent.Tasks {
+					if t.ID == item.task.ID {
+						m.taskListComponent.Cursor = i
+						break
+					}
+				}
+				m.taskListComponent.openDetail()
+				m.resizeTab2DetailViewport()
+			} else if item.kind == treeItemKindPlan {
+				// Switch to Details tab if available in current context.
+				for i, td := range m.availableTabs() {
+					if td.key == "details" {
+						m.activeTab = i
+						break
+					}
+				}
+			}
+		}
 		return m, nil
 	case "right", "l":
 		items := m.buildTreeItems()
