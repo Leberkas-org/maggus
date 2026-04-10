@@ -863,6 +863,91 @@ func TestLoad_SessionPersistenceFalse(t *testing.T) {
 	}
 }
 
+func TestConfig_IsParallelEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  bool
+		want bool
+	}{
+		{"false defaults to disabled", false, false},
+		{"true enables parallel", true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{Parallel: tt.val}
+			if got := cfg.IsParallelEnabled(); got != tt.want {
+				t.Errorf("IsParallelEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_ParallelDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.Parallel {
+		t.Error("expected Parallel to default to false")
+	}
+	if cfg.IsParallelEnabled() {
+		t.Error("expected IsParallelEnabled() to be false by default")
+	}
+}
+
+func TestLoad_ParallelTrue(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `parallel: true
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.IsParallelEnabled() {
+		t.Error("expected IsParallelEnabled() to be true")
+	}
+}
+
+func TestLoad_ParallelFalse(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `parallel: false
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.IsParallelEnabled() {
+		t.Error("expected IsParallelEnabled() to be false when explicitly set to false")
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

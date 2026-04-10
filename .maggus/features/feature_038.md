@@ -32,14 +32,14 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Parallel:** yes — can run alongside TASK-038-002
 
 **Acceptance Criteria:**
-- [ ] `Parallel bool` field added to `Config` struct in `internal/config` with default `false`
-- [ ] `parallel: true/false` is parsed from `.maggus/config.yml` correctly
-- [ ] `--parallel` flag added to `maggus work` cobra command
-- [ ] `--parallel` flag added to `maggus start` cobra command
-- [ ] CLI `--parallel` flag overrides the config value when both are set
-- [ ] `maggus work --help` and `maggus start --help` show the new flag with a description
-- [ ] Unit tests cover config parsing for `parallel: true`, `parallel: false`, and missing field
-- [ ] Typecheck/lint passes
+- [x] `Parallel bool` field added to `Config` struct in `internal/config` with default `false`
+- [x] `parallel: true/false` is parsed from `.maggus/config.yml` correctly
+- [x] `--parallel` flag added to `maggus work` cobra command
+- [x] `--parallel` flag added to `maggus start` cobra command
+- [x] CLI `--parallel` flag overrides the config value when both are set
+- [x] `maggus work --help` and `maggus start --help` show the new flag with a description
+- [x] Unit tests cover config parsing for `parallel: true`, `parallel: false`, and missing field
+- [x] Typecheck/lint passes
 
 ### TASK-038-002: Implement `internal/gitworktree` package
 **Description:** As the work loop, I want a package that manages git worktrees so that each parallel task can operate in full filesystem isolation.

@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	startModelFlag string
-	startAgentFlag string
-	startAllFlag   bool
+	startModelFlag    string
+	startAgentFlag    string
+	startAllFlag      bool
+	startParallelFlag bool
 )
 
 var startCmd = &cobra.Command{
@@ -38,6 +39,7 @@ func init() {
 	startCmd.Flags().StringVar(&startModelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku)")
 	startCmd.Flags().StringVar(&startAgentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
 	startCmd.Flags().BoolVar(&startAllFlag, "all", false, "start daemons in all registered repositories with auto-start enabled")
+	startCmd.Flags().BoolVar(&startParallelFlag, "parallel", false, "enable parallel task execution (overrides config)")
 	rootCmd.AddCommand(startCmd)
 }
 
@@ -107,6 +109,9 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 	if startAgentFlag != "" {
 		daemonArgs = append(daemonArgs, "--agent="+startAgentFlag)
 	}
+	if startParallelFlag {
+		daemonArgs = append(daemonArgs, "--parallel")
+	}
 
 	// Launch the daemon process (platform-specific detach).
 	pid, err := launchDaemon(exe, daemonArgs, logFile, dir)
@@ -125,9 +130,9 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 }
 
 func startAllDaemons(cmd *cobra.Command) error {
-	// --model and --agent are not supported with --all; daemons use per-repo config defaults.
-	if startModelFlag != "" || startAgentFlag != "" {
-		return fmt.Errorf("--model and --agent cannot be combined with --all (daemons use per-repo config defaults)")
+	// --model, --agent, and --parallel are not supported with --all; daemons use per-repo config defaults.
+	if startModelFlag != "" || startAgentFlag != "" || startParallelFlag {
+		return fmt.Errorf("--model, --agent, and --parallel cannot be combined with --all (daemons use per-repo config defaults)")
 	}
 
 	cfg, err := globalconfig.Load()

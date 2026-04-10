@@ -140,6 +140,7 @@ type Config struct {
 	ApprovalMode       string              `yaml:"approval_mode"`
 	AutoContinue       *bool               `yaml:"auto_continue"`
 	SessionPersistence *bool               `yaml:"session_persistence"`
+	Parallel           bool                `yaml:"parallel"`
 	MaxLogFiles        int                 `yaml:"max_log_files"`
 	Notifications      NotificationsConfig `yaml:"notifications"`
 	Git                GitConfig           `yaml:"git"`
@@ -163,6 +164,12 @@ func (c Config) IsAutoContinueEnabled() bool {
 // Default is false: the --no-session-persistence flag is passed to the agent subprocess.
 func (c Config) IsSessionPersistenceEnabled() bool {
 	return c.SessionPersistence != nil && *c.SessionPersistence
+}
+
+// IsParallelEnabled returns true when parallel is set to true in config.
+// Default is false: tasks execute sequentially in the main worktree.
+func (c Config) IsParallelEnabled() bool {
+	return c.Parallel
 }
 
 // LogMaxFiles returns the maximum number of log files to retain in .maggus/runs/.

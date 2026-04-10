@@ -39,6 +39,7 @@ type runLoopConfig struct {
 	notifier           *notify.Notifier
 	hostFingerprint    string
 	sessionPersistence bool
+	parallel           bool
 }
 
 // runSetup resolves CLI flags, loads config, validates the agent, and
@@ -142,6 +143,7 @@ func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 		notifier:           notifier,
 		hostFingerprint:    hostFingerprint,
 		sessionPersistence: cfg.IsSessionPersistenceEnabled(),
+		parallel:           cfg.IsParallelEnabled() || parallelFlag,
 	}, nil
 }
 

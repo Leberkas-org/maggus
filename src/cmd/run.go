@@ -16,10 +16,11 @@ type failedTask struct {
 }
 
 var (
-	countFlag int
-	modelFlag string
-	agentFlag string
-	taskFlag  string
+	countFlag    int
+	modelFlag    string
+	agentFlag    string
+	taskFlag     string
+	parallelFlag bool
 
 	// Daemon-mode flags (hidden; set by 'maggus start', not users directly).
 	daemonRunFlag   bool
@@ -34,6 +35,7 @@ func resetRunFlags() {
 	modelFlag = ""
 	agentFlag = ""
 	taskFlag = ""
+	parallelFlag = false
 	daemonRunFlag = false
 	daemonRunIDFlag = ""
 }
@@ -75,6 +77,7 @@ func init() {
 	runCmd.Flags().StringVar(&modelFlag, "model", "", "model to use (e.g. opus, sonnet, haiku, or a full model ID)")
 	runCmd.Flags().StringVar(&agentFlag, "agent", "", "agent to use (e.g. claude, opencode)")
 	runCmd.Flags().StringVar(&taskFlag, "task", "", "run a specific task by ID (e.g. TASK-001)")
+	runCmd.Flags().BoolVar(&parallelFlag, "parallel", false, "enable parallel task execution (overrides config)")
 
 	// Hidden flags used internally by 'maggus start' to launch the daemon work loop.
 	runCmd.Flags().BoolVar(&daemonRunFlag, "daemon-run", false, "run the work loop as a daemon (no TUI)")
