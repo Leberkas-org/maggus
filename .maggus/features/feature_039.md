@@ -99,10 +99,10 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] The Skills System table column "CLI Entry Point" is renamed to "Access" or "Invocation"
-- [ ] Each skill row says "Prompt picker → `/maggus-plan`" (or similar) instead of `maggus plan`
-- [ ] The description paragraph below the table mentions that skills are launched from the interactive menu's prompt picker, not as standalone CLI commands
-- [ ] No references to `maggus plan`, `maggus bugreport`, `maggus vision`, or `maggus architecture` as CLI commands remain
+- [x] The Skills System table column "CLI Entry Point" is renamed to "Access" or "Invocation"
+- [x] Each skill row says "Prompt picker → `/maggus-plan`" (or similar) instead of `maggus plan`
+- [x] The description paragraph below the table mentions that skills are launched from the interactive menu's prompt picker, not as standalone CLI commands
+- [x] No references to `maggus plan`, `maggus bugreport`, `maggus vision`, or `maggus architecture` as CLI commands remain
 
 ### TASK-039-006: Update getting-started.md
 **Description:** As a new user, I want the getting-started guide to describe the actual current workflow so I can follow along successfully.

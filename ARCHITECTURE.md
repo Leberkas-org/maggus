@@ -211,14 +211,14 @@ Cross-task learnings are accumulated in `.maggus/MEMORY.md` by the agent.
 
 ## Skills System
 
-Three Claude Code skills extend Maggus with interactive spec-authoring:
+Four Claude Code skills extend Maggus with interactive spec-authoring. Skills are not standalone CLI commands — they are invoked from the **Prompt Picker** in the interactive menu, which launches Claude Code with the selected skill pre-loaded.
 
-| Skill | CLI Entry Point | Output |
+| Skill | Invocation | Output |
 |---|---|---|
-| `/maggus-plan` | `maggus plan` | `.maggus/features/feature_*.md` |
-| `/maggus-bugreport` | `maggus bugreport` | `.maggus/bugs/bug_*.md` |
-| `/maggus-vision` | `maggus vision` | `VISION.md` |
-| `/maggus-architecture` | `maggus architecture` | `ARCHITECTURE.md` |
+| `/maggus-plan` | Prompt picker → `/maggus-plan` | `.maggus/features/feature_*.md` |
+| `/maggus-bugreport` | Prompt picker → `/maggus-bugreport` | `.maggus/bugs/bug_*.md` |
+| `/maggus-vision` | Prompt picker → `/maggus-vision` | `VISION.md` |
+| `/maggus-architecture` | Prompt picker → `/maggus-architecture` | `ARCHITECTURE.md` |
 
 Skills are installed via the Claude Code plugin marketplace on `maggus init`.
 They run inside Claude Code's context and write files directly to the repo.
