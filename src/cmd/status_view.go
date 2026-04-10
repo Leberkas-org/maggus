@@ -200,7 +200,7 @@ func (m statusModel) statusSplitFooter() string {
 	}
 	switch activeKey {
 	case "output":
-		return tabRange + "  ↑/↓ navigate/scroll  G: bottom  q: exit"
+		return tabRange + "  ↑/↓ navigate/scroll  g: top  G: bottom  q: exit"
 	case "details":
 		c := &m.taskListComponent
 		if c.ShowDetail {

@@ -135,15 +135,15 @@ The new design makes the left pane the primary navigator: what you select determ
 **Parallel:** no — integration task after all tab implementations are done
 
 **Acceptance Criteria:**
-- [ ] Moving the cursor up/down in the left pane calls `selectionCtx()` before and after; if the context type changed, `activeTab` resets to 0
-- [ ] Collapsing a feature (Left key) while a child task is selected moves selection to the feature and resets tabs
-- [ ] `rebuildRightPane()` and `rebuildForSelectedPlan()` trigger metric reloads scoped to the new selection
-- [ ] The old `renderWorkerPanes()` card grid in `status_workers.go` is removed or kept only if still needed for a different purpose (verify and decide)
-- [ ] The old fixed `case 0: / case 1: / case 2: / case 3:` switch in `renderRightPane()` is replaced by the dynamic dispatch
-- [ ] The `1-5: tabs` footer hint dynamically reflects the actual tab count
-- [ ] All keyboard shortcuts listed in the footer are accurate for each tab
-- [ ] `go vet ./...` and `go test ./...` pass
-- [ ] Manual verification: navigate between features and tasks, observe tabs changing correctly
+- [x] Moving the cursor up/down in the left pane calls `selectionCtx()` before and after; if the context type changed, `activeTab` resets to 0
+- [x] Collapsing a feature (Left key) while a child task is selected moves selection to the feature and resets tabs
+- [x] `rebuildRightPane()` and `rebuildForSelectedPlan()` trigger metric reloads scoped to the new selection
+- [x] The old `renderWorkerPanes()` card grid in `status_workers.go` is removed or kept only if still needed for a different purpose (verify and decide)
+- [x] The old fixed `case 0: / case 1: / case 2: / case 3:` switch in `renderRightPane()` is replaced by the dynamic dispatch
+- [x] The `1-5: tabs` footer hint dynamically reflects the actual tab count
+- [x] All keyboard shortcuts listed in the footer are accurate for each tab
+- [x] `go vet ./...` and `go test ./...` pass
+- [x] Manual verification: navigate between features and tasks, observe tabs changing correctly
 
 ### TASK-040-007: Update tui.md documentation with text-rendered screenshots
 **Description:** As a user reading the TUI reference, I want the documentation to describe the new context-sensitive tab behavior and include text-rendered screenshots that can be updated without manual screenshotting.
