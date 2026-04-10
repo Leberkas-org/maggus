@@ -73,22 +73,22 @@ The new design makes the left pane the primary navigator: what you select determ
 **Parallel:** yes — can run alongside TASK-040-002, TASK-040-004, TASK-040-005
 
 **Acceptance Criteria:**
-- [ ] A new `renderSummaryTab(width, height int) string` method is added to `statusModel`
-- [ ] When a **feature** is selected, Summary shows:
+- [x] A new `renderSummaryTab(width, height int) string` method is added to `statusModel`
+- [x] When a **feature** is selected, Summary shows:
   - Feature title and filename
   - Progress bar with `done/total` count
   - Task breakdown: N done, N pending, N blocked
   - If daemon is running on this feature: current task ID, elapsed time, spinner
   - If in parallel mode: list of active workers for this feature with their status
   - Aggregate tokens and cost (from `cachedFeatureMetrics`)
-- [ ] When a **completed task** is selected, Summary shows:
+- [x] When a **completed task** is selected, Summary shows:
   - Task ID and title
   - Outcome: success/fail
   - Duration (from run log)
   - Tokens used (input/output) and cost
   - Commit hash and message (if available from run log)
-- [ ] Summary is never shown for `selNone` or `selRunningTask` (enforced by tab mapping)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Summary is never shown for `selNone` or `selRunningTask` (enforced by tab mapping)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-040-004: Implement per-task Output tab with full tool log
 **Description:** As a user viewing a running or completed task, I want the Output tab to show the full scrollable tool invocation log for that specific task, so I can see exactly what the agent did.
