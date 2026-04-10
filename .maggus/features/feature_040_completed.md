@@ -154,18 +154,18 @@ The new design makes the left pane the primary navigator: what you select determ
 **Parallel:** no — needs final implementation to document accurately
 
 **Acceptance Criteria:**
-- [ ] `docs/reference/tui.md` Status View section is rewritten to describe the context-sensitive tab system
-- [ ] The tab mapping table is documented:
+- [x] `docs/reference/tui.md` Status View section is rewritten to describe the context-sensitive tab system
+- [x] The tab mapping table is documented:
   - Nothing selected → Metrics
   - Feature selected → Summary | Details | Metrics
   - Running task → Output | Task Details | Metrics
   - Completed task → Summary | Output | Task Details | Metrics
-- [ ] Each tab's content is briefly described (what it shows for each context)
-- [ ] Keyboard shortcuts section is updated (dynamic tab numbers, selection-dependent behavior)
-- [ ] Screenshot image references (`![Status View](/screenshots/plan-view.png)` etc.) are replaced with text-rendered representations using fenced code blocks that show the TUI layout
-- [ ] Text screenshots show at least: feature-selected view (Summary tab), running-task view (Output tab), and completed-task view (Summary tab)
-- [ ] `docs/guide/concepts.md` is checked for consistency — no references to old fixed-tab behavior remain
-- [ ] No broken image references remain in any docs file
+- [x] Each tab's content is briefly described (what it shows for each context)
+- [x] Keyboard shortcuts section is updated (dynamic tab numbers, selection-dependent behavior)
+- [x] Screenshot image references (`![Status View](/screenshots/plan-view.png)` etc.) are replaced with text-rendered representations using fenced code blocks that show the TUI layout
+- [x] Text screenshots show at least: feature-selected view (Summary tab), running-task view (Output tab), and completed-task view (Summary tab)
+- [x] `docs/guide/concepts.md` is checked for consistency — no references to old fixed-tab behavior remain
+- [x] No broken image references remain in any docs file
 
 ## Task Dependency Graph
 

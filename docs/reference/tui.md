@@ -6,7 +6,27 @@ Maggus uses a full-screen terminal UI built with [Bubble Tea](https://github.com
 
 When you run `maggus` without any arguments in a terminal, the interactive main menu launches.
 
-![Main Menu](/screenshots/main-menu.png)
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│                  maggus  v1.2.0                         │
+│                                                         │
+│   3 features, 5 open tasks · 1 bug, 2 open tasks        │
+│   ● daemon running (PID 12345)                          │
+│   /home/user/my-project                                 │
+│                                                         │
+│   ── Core Workflow ──────────────────────────────────── │
+│   > status            Live log & feature management     │
+│     repos             Manage configured repositories    │
+│                                                         │
+│   ── Project Management ────────────────────────────── │
+│     clean             Remove completed features         │
+│     update            Check for and install updates     │
+│     config            Edit project settings             │
+│     exit                                                │
+│                                                         │
+└───────── ↑/↓: navigate  enter: select  q: exit ────────┘
+```
 
 ### Layout
 
@@ -91,46 +111,229 @@ See [Configuration](/reference/configuration) for details on setting the update 
 
 ## Status View
 
-The status view shows plan progress with tabbed plan sections, progress bars, and task lists.
+The status view is a split-pane interface: the left pane shows a tree of all feature and bug plans; the right pane shows context-sensitive tabs that adapt to whatever is selected in the left pane.
 
-![Status View](/screenshots/plan-view.png)
+### Layout
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  [1] Left Pane                [2] Summary  [3] Details  [4] Metrics  │
+│ ──────────────────────────  ─────────────────────────────────────── │
+│  ✓ feature_001               feature_002                             │
+│  ▸ feature_002               /features/feature_002.md                │
+│    → TASK-002-001            ████████████░░░░░░░░░░░░░░░░ 2/5        │
+│    ○ TASK-002-002                                                     │
+│    ○ TASK-002-003            Done     2                               │
+│  ○ feature_003               Pending  3                               │
+│  ┃                           Blocked  0                               │
+│  ⚠ bug_001                                                            │
+│                              ────────────────────────────────────    │
+│                              Tokens   142k                            │
+│                              Cost     $0.38                           │
+│                                                                       │
+│──────────────────────────────────────────────────────────────────────│
+│  1-4: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+The left pane displays a collapsible tree of all active plans. Each plan can be expanded to show its individual tasks with status icons:
+
+| Icon | Meaning |
+|---|---|
+| `✓` | Complete |
+| `→` | Next task the daemon will work on |
+| `○` | Pending (not yet started) |
+| `⚠` | Blocked (has a `BLOCKED:` criterion) |
+| `┃` | Separator between features and bugs |
+
+### Context-Sensitive Tabs
+
+The right pane tabs change based on what you have selected in the left pane. There are no dead tabs — every tab shown always has meaningful content.
+
+| Selection | Available Tabs |
+|---|---|
+| Nothing selected | Metrics |
+| Feature or bug plan | Summary · Details · Metrics |
+| Running task (daemon active) | Output · Task Details · Metrics |
+| Completed, pending, or blocked task | Summary · Output · Task Details · Metrics |
+
+Tab numbers always start at `[2]` (since `[1]` focuses the left pane). The footer shows the current tab range, e.g., `1-4: tabs` when there are three right-pane tabs.
+
+### Feature Selected — Summary Tab
+
+When a feature or bug plan is selected, the **Summary** tab gives a quick overview of that plan:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  [1] Left Pane                [2] Summary  [3] Details  [4] Metrics  │
+│ ──────────────────────────  ─────────────────────────────────────── │
+│  ✓ feature_001               My Authentication Feature               │
+│  ▸ feature_002               /features/feature_002.md                │
+│    → TASK-002-001                                                     │
+│    ○ TASK-002-002            ████████████░░░░░░░░░░░░░░░░ 2/5        │
+│    ○ TASK-002-003                                                     │
+│  ○ feature_003               Done     2                               │
+│  ┃                           Pending  3                               │
+│  ⚠ bug_001                   Blocked  0                               │
+│                                                                       │
+│                              ────────────────────────────────────    │
+│                              ⠸  TASK-002-001    2m 14s               │
+│                                                                       │
+│                              Tokens   142k                            │
+│                              Cost     $0.38                           │
+│──────────────────────────────────────────────────────────────────────│
+│  1-4: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Feature Summary** shows:
+- Feature title and filename
+- Progress bar with done/total count
+- Task breakdown: done, pending, blocked counts
+- If the daemon is actively working on a task in this feature: the task ID, a spinner, and elapsed time
+- If running in parallel mode: a list of active workers with their status
+- Aggregate token usage and cost across all tasks in the feature
+
+### Running Task Selected — Output Tab
+
+When you select a task that the daemon is currently working on, the **Output** tab becomes the first tab and shows the live tool invocation log:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  [1] Left Pane               [2] Output  [3] Task Details  [4] Metrics│
+│ ──────────────────────────  ─────────────────────────────────────── │
+│  ✓ feature_001               Status:  ⠸  Running                     │
+│  ▸ feature_002               Task:    TASK-002-001 - Add login page   │
+│    ▸ TASK-002-001 (running)  ────────────────────────────────────    │
+│    ○ TASK-002-002                                                     │
+│    ○ TASK-002-003            Read       src/auth/login.go             │
+│  ○ feature_003               Edit       src/auth/login.go             │
+│  ┃                           Bash       go test ./internal/auth/...   │
+│  ⚠ bug_001                   Read       src/auth/session.go           │
+│                              Edit       src/auth/session.go           │
+│                              Write      src/auth/middleware.go        │
+│                              Bash       go build ./...                │
+│                                                                       │
+│                              ────────────────────────────────────    │
+│                              Tokens   28k in / 4k out                 │
+│                              Cost     $0.09                           │
+│                              Run:     6m 42s                          │
+│                              Task:    2m 14s                          │
+│──────────────────────────────────────────────────────────────────────│
+│  1-4: tabs  ↑/↓ navigate/scroll  g: top  G: bottom  q: exit          │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Running Task Output** shows:
+- Status with spinner animation
+- Task ID and title
+- Scrollable list of tool invocations (Read, Edit, Write, Bash, etc.) in chronological order
+- Live token counts and cost
+- Elapsed time for the current run and for this task specifically
+
+The tool list auto-scrolls to follow the latest entry. Scroll up manually to pause auto-scroll and review earlier entries; scroll back to the bottom to resume.
+
+### Completed Task Selected — Summary Tab
+
+When you select a task that has already completed, the **Summary** tab shows the outcome and metrics for that specific task:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  [1] Left Pane               [2] Summary  [3] Output  [4] Task Details│
+│ ──────────────────────────  ─────────────────────────────────────── │
+│  ✓ feature_001               TASK-001-003                             │
+│  ▸ feature_002               Add password reset endpoint              │
+│  ▸ feature_001                                                        │
+│    ✓ TASK-001-001            Status    ✓ Complete                     │
+│    ✓ TASK-001-002            Duration  4m 28s                         │
+│    ✓ TASK-001-003            Tokens    51k in / 7k out                │
+│    ○ TASK-001-004            Cost      $0.17                          │
+│  ○ feature_003               Model     claude-sonnet-4-6              │
+│  ┃                           Commit    a3f9b12                        │
+│  ⚠ bug_001                                                            │
+│                                                                       │
+│                                                                       │
+│──────────────────────────────────────────────────────────────────────│
+│  1-5: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Completed Task Summary** shows:
+- Task ID and title
+- Status (Complete, Pending, or Blocked)
+- Duration of the run that completed the task
+- Token usage (input/output) and cost
+- Model used
+- Commit hash (if a commit was recorded in the run log)
+
+You can also switch to the **Output** tab for a completed task to browse its full tool invocation log, loaded from the run log files.
+
+### Tab Reference
+
+| Tab | Shown when | Content |
+|---|---|---|
+| **Summary** | Feature selected | Feature title, progress bar, task breakdown (done/pending/blocked), active daemon state, aggregate tokens/cost |
+| **Summary** | Task selected (not running) | Task ID/title, status, duration, tokens, cost, model, commit hash |
+| **Output** | Running task selected | Live tool invocation log with spinner, auto-scroll, and token/cost/elapsed display |
+| **Output** | Completed task selected | Full tool invocation history loaded from run log files |
+| **Details** | Feature selected | Flat task list for the selected plan with progress bar and task status icons |
+| **Task Details** | Running or completed task | Read-only detail view of the next pending task (same as task detail view) |
+| **Metrics** | Always | Token usage and cost broken down by selection, repository, and all-time global totals |
 
 ### Keyboard Shortcuts
 
+#### Left Pane (default focus)
+
 | Key | Action |
-|-----|--------|
-| `Up` / `Down` | Navigate plans and tasks |
-| `PgUp` / `PgDn` | Jump to previous/next plan |
-| `Left` / `Right` | Collapse/expand a plan |
-| `Home` / `End` | Jump to first/last item |
-| `Enter` | Open task detail view |
-| `Alt+A` | Toggle showing completed plans |
-| `a` | Approve/unapprove the selected plan |
-| `Alt+R` | Run the selected task |
+|---|---|
+| `Up` / `Down` | Navigate plans and tasks in the tree |
+| `PgUp` / `PgDn` | Jump to previous / next plan |
+| `Left` / `Right` | Collapse / expand a plan |
+| `Home` / `End` | Jump to first / last item |
+| `a` | Approve / unapprove the selected plan |
+| `Alt+R` | Run the selected task immediately |
 | `Alt+D` | Delete the selected plan (with confirmation) |
 | `Alt+Backspace` | Delete the selected task (with confirmation) |
+| `Alt+A` | Toggle showing completed plans |
+| `s` | Start / stop the daemon |
 | `q` | Exit |
 
-### Task Detail
-
-Press **Enter** on any task to open a detail view showing its plan file, status, criteria summary, description, and acceptance criteria.
-
-![Task Detail](/screenshots/task-detail.png)
+#### Switching Tabs
 
 | Key | Action |
-|-----|--------|
-| `PgUp` / `PgDn` | Previous/next task |
+|---|---|
+| `1` | Focus the left pane |
+| `2` | Switch to first right-pane tab |
+| `3` | Switch to second right-pane tab (if available) |
+| `4` | Switch to third right-pane tab (if available) |
+| `5` | Switch to fourth right-pane tab (if available) |
+
+The tab numbers in the footer always reflect what is currently available. Keys beyond the available tab count are ignored.
+
+#### Right Pane — Output Tab
+
+| Key | Action |
+|---|---|
+| `Up` / `Down` | Scroll the tool list |
+| `g` | Jump to top |
+| `G` | Jump to bottom (resumes auto-scroll for running tasks) |
+
+#### Right Pane — Details Tab
+
+| Key | Action |
+|---|---|
+| `Up` / `Down` | Navigate tasks / scroll detail view |
+| `PgUp` / `PgDn` | Previous / next task |
+| `Enter` | Open task detail view |
 | `Tab` | Enter criteria mode (for blocked tasks) |
-| `Alt+P` | Approve/unapprove the plan |
-| `Alt+R` | Run the task |
-| `Alt+Backspace` | Delete the task |
-| `q` / `Backspace` | Back to task list |
+| `Alt+P` | Approve / unapprove the plan |
+| `Alt+R` | Run the selected task |
+| `Alt+Backspace` | Delete the selected task |
+| `Backspace` / `q` | Back to task list |
 
 ### Managing Blocked Tasks
 
-When viewing a task with blocked criteria, press **Tab** to enter **criteria mode**. Navigate between blocked criteria with **Up/Down** and press **Enter** to open the action picker.
-
-![Blocked Handling](/screenshots/blocked-handling.png)
+When viewing the **Details** tab and a task has blocked criteria, select the task and press **Enter** to open its detail view, then press **Tab** to enter **criteria mode**. Navigate between blocked criteria with **Up/Down** and press **Enter** to open the action picker.
 
 The action picker offers four options:
 
