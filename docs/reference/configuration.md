@@ -71,13 +71,13 @@ model: anthropic/claude-opus-4-6
 The provider prefix tells Maggus (and the agent) which API to use. When using Claude Code as the agent, only the model ID portion is passed to the CLI (e.g. `claude-sonnet-4-6`). When using OpenCode, the full `provider/model` string is used as-is since OpenCode natively supports that format.
 
 ::: tip Convenience Aliases
-For common Anthropic models, you can use short aliases instead of the full `provider/model` string. These are resolved automatically.
+For common Anthropic models, you can use short aliases instead of the full model ID. These are resolved automatically to bare model IDs.
 
-| Alias    | Resolves To                          |
-|----------|--------------------------------------|
-| `sonnet` | `anthropic/claude-sonnet-4-6`        |
-| `opus`   | `anthropic/claude-opus-4-6`          |
-| `haiku`  | `anthropic/claude-haiku-4-5-20251001`|
+| Alias    | Resolves To                    |
+|----------|--------------------------------|
+| `sonnet` | `claude-sonnet-4-6`            |
+| `opus`   | `claude-opus-4-6`              |
+| `haiku`  | `claude-haiku-4-5-20251001`    |
 :::
 
 Bare model IDs without a provider prefix (e.g. `claude-sonnet-4-6`) still work for backwards compatibility and are passed through unchanged.
@@ -242,6 +242,7 @@ Global settings that apply across all projects are stored at `~/.maggus/config.y
 ```yaml
 # ~/.maggus/config.yml
 auto_update: notify
+discord_presence: false
 ```
 
 ### `auto_update`
@@ -258,6 +259,22 @@ When set to `notify` or `auto`, Maggus checks the GitHub Releases API at most on
 
 When running a dev build (version = `"dev"`), any published release is treated as newer, allowing you to update from a dev build to the latest stable version.
 
+### `discord_presence`
+
+Controls whether Maggus shows its current activity in Discord via Rich Presence.
+
+```yaml
+discord_presence: true
+```
+
+| Type | Default |
+|------|---------|
+| `bool` | `false` |
+
+When `true`, Maggus connects to the Discord client via IPC and updates your Rich Presence to show what task it is currently working on. Requires Discord to be running on the same machine.
+
+Defaults to `false`.
+
 ## Repository Registry (`~/.maggus/repositories.yml`)
 
 Maggus keeps a list of known repositories at `~/.maggus/repositories.yml`. This is used by the interactive main menu's repository switcher to quickly jump between projects.
@@ -267,6 +284,7 @@ Maggus keeps a list of known repositories at `~/.maggus/repositories.yml`. This 
 repositories:
   - path: /home/user/projects/myapp
   - path: /home/user/projects/other-repo
+    auto_start_disabled: true
 last_opened: /home/user/projects/myapp
 ```
 
@@ -275,55 +293,62 @@ last_opened: /home/user/projects/myapp
 | `repositories` | List of known repository paths |
 | `last_opened` | Path of the most recently opened repository (used for auto-resolution on startup) |
 
+Each repository entry supports the following per-repo fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | `string` | — | Absolute path to the repository |
+| `auto_start_disabled` | `bool` | `false` | When `true`, prevents the daemon from auto-starting for this repository (e.g. when using `maggus start --all`) |
+
 You don't need to edit this file manually — use the **Repos** option in the interactive menu to add, remove, and switch between repositories.
 
 ## CLI Flags
 
 ### `--model`
 
-The `--model` flag on `maggus work` overrides the `model` field from the config file.
+The `--model` flag on `maggus start` and `maggus release` overrides the `model` field from the config file.
 
 ```bash
 # Use opus for this run, regardless of config.yml
-maggus work --model opus
+maggus start --model opus
 
-# Use a full provider/model ID
-maggus work --model anthropic/claude-sonnet-4-6
+# Use a specific model for a release
+maggus release --model anthropic/claude-sonnet-4-6
 ```
 
-The same alias resolution applies: short aliases are expanded to full `provider/model` IDs.
+The same alias resolution applies: short aliases are expanded to bare model IDs.
 
 **Precedence:** `--model` flag > `config.yml` model > agent default
 
 ### `--agent`
 
-The `--agent` flag on `maggus work` overrides the `agent` field from the config file.
+The `--agent` flag on `maggus start` overrides the `agent` field from the config file.
 
 ```bash
 # Use OpenCode for this run
-maggus work --agent opencode
+maggus start --agent opencode
 
 # Combine with model override
-maggus work --agent opencode --model openai/gpt-4.1
+maggus start --agent opencode --model openai/gpt-4.1
 ```
 
 **Precedence:** `--agent` flag > `config.yml` agent > `claude` default
 
 The agent's CLI tool must be installed and available on your PATH. Maggus validates this before starting the work loop and exits with a clear error if the tool is not found.
 
-### `--worktree` / `--no-worktree`
+### `--all`
 
-The `--worktree` flag on `maggus work` runs each task in an isolated git worktree under `.maggus-work/`. This allows multiple Maggus instances to work on different tasks in parallel without interfering with each other.
+The `--all` flag is supported on `maggus start` and `maggus stop`. It operates across all registered repositories instead of only the current directory.
 
 ```bash
-# Run in an isolated worktree
-maggus work --worktree
+# Start daemons for all registered repositories with auto-start enabled
+maggus start --all
 
-# Explicitly disable worktree mode (the default)
-maggus work --no-worktree
+# Stop daemons across all registered repositories
+maggus stop --all
 ```
 
-Worktree mode is a CLI-only flag and is not configurable via `config.yml`.
+When used with `maggus start --all`, repositories with `auto_start_disabled: true` in the registry are skipped. The `--model` and `--agent` flags cannot be combined with `--all` — daemons started this way use per-repo config defaults.
 
 ## Bootstrap Context Files
 
@@ -338,21 +363,6 @@ Before each task, Maggus automatically reads the following files from the projec
 | `.maggus/MEMORY.md`   | Portable project memory (gitignored, synced separately)    |
 
 These bootstrap files are read first, before any `include` files from the config. Together they give the agent the full context it needs to work on tasks effectively.
-
-### `--no-bootstrap` Flag
-
-Use the `--no-bootstrap` flag on `maggus work` to skip reading all bootstrap context files:
-
-```bash
-maggus work --no-bootstrap
-```
-
-When this flag is set:
-- None of the bootstrap files above are read
-- Custom `include` files from config are also skipped
-- Only the task details and run metadata are included in the prompt
-
-This is useful for debugging or when you want minimal prompt context.
 
 ## Full Example
 
@@ -384,13 +394,10 @@ hooks:
 
 ```bash
 # Override model for this run
-maggus work --model opus --count 3
+maggus start --model opus
 
-# Skip bootstrap context
-maggus work --no-bootstrap
-
-# Run in isolated worktree
-maggus work --worktree
+# Start daemons for all registered repositories
+maggus start --all
 ```
 
 ### OpenCode Setup
@@ -408,10 +415,10 @@ include:
 
 ```bash
 # Run with OpenCode and a different model
-maggus work --model google/gemini-2.5-pro
+maggus start --model google/gemini-2.5-pro
 
 # Override agent on the CLI (e.g. try OpenCode without changing config)
-maggus work --agent opencode --model anthropic/claude-sonnet-4-6
+maggus start --agent opencode --model anthropic/claude-sonnet-4-6
 ```
 
 ::: info Agent Differences

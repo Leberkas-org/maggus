@@ -65,14 +65,14 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] The `--worktree` / `--no-worktree` section is removed entirely (flag no longer exists on `run` command)
-- [ ] The `--no-bootstrap` section is removed entirely (flag no longer exists on `run` command)
-- [ ] The CLI Flags section only documents flags that exist: `--model` (on `start`, `release`), `--agent` (on `start`), `--all` (on `start`, `stop`)
-- [ ] Model alias table is fixed: aliases resolve to bare model IDs (`claude-sonnet-4-6`), not `provider/model` format (`anthropic/claude-sonnet-4-6`)
-- [ ] `discord_presence` field is added to the Global Config section with type `bool`, default `false`, description about Discord Rich Presence
-- [ ] `auto_start_disabled` field is documented in the Repository Registry section (per-repo field, default `false`, prevents auto-start when true)
-- [ ] The example config blocks in the "Full Example" section use `maggus start` not `maggus work`
-- [ ] No references to `maggus work` remain in the file
+- [x] The `--worktree` / `--no-worktree` section is removed entirely (flag no longer exists on `run` command)
+- [x] The `--no-bootstrap` section is removed entirely (flag no longer exists on `run` command)
+- [x] The CLI Flags section only documents flags that exist: `--model` (on `start`, `release`), `--agent` (on `start`), `--all` (on `start`, `stop`)
+- [x] Model alias table is fixed: aliases resolve to bare model IDs (`claude-sonnet-4-6`), not `provider/model` format (`anthropic/claude-sonnet-4-6`)
+- [x] `discord_presence` field is added to the Global Config section with type `bool`, default `false`, description about Discord Rich Presence
+- [x] `auto_start_disabled` field is documented in the Repository Registry section (per-repo field, default `false`, prevents auto-start when true)
+- [x] The example config blocks in the "Full Example" section use `maggus start` not `maggus work`
+- [x] No references to `maggus work` remain in the file
 
 ### TASK-039-004: Rewrite CLAUDE.md internal packages table
 **Description:** As a developer or AI agent reading CLAUDE.md, I want the internal packages table to reflect the actual codebase so I know where to find functionality.
