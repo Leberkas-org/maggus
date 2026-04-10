@@ -134,8 +134,8 @@ Maggus provides a rich terminal UI built with Bubble Tea:
 ```
 Write spec          Execute                     Review
 ──────────────────  ──────────────────────────  ──────────────────
-/maggus-plan     →  maggus start (daemon)    →  maggus status
-/maggus-bugreport   maggus work (one shot)      git log
+/maggus-plan     →  maggus start             →  maggus status
+/maggus-bugreport                                git log
 ```
 
 The developer authors plans (manually or via skills), approves them, and starts
