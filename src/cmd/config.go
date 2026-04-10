@@ -343,6 +343,11 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		itemCount := len(*rows)
 
 		switch msg.String() {
+		case "ctrl+s":
+			if m.activeTab == 0 {
+				return m, m.executeAction(configActionSaveProject)
+			}
+			return m, m.executeAction(configActionSaveGlobal)
 		case "q":
 			return m, func() tea.Msg { return navigateBackMsg{} }
 		case "1":

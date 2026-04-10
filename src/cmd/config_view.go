@@ -152,7 +152,7 @@ func (m configModel) View() string {
 	}
 
 	content := sb.String()
-	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | q: exit")
+	footer := styles.StatusBar.Render("1/2: switch tab | up/down: navigate | left/right: change value | enter: select | ctrl+s: save | q: exit")
 
 	borderColor := styles.ThemeColor(m.isNerfed)
 	if m.width > 0 && m.height > 0 {

@@ -27,14 +27,14 @@ Add `Ctrl+S` as a keyboard shortcut to save the currently active config tab in t
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Pressing `Ctrl+S` in the config editor triggers `configActionSaveProject` when the Project tab (tab 0) is active
-- [ ] Pressing `Ctrl+S` in the config editor triggers `configActionSaveGlobal` when the Global tab (tab 1) is active
-- [ ] The status text shows "Saved project config" or "Saved global config" on success, same as the button
-- [ ] The shortcut works regardless of cursor position (not just when on the save button)
-- [ ] The shortcut works when the tab bar is focused
-- [ ] The footer hint in the config view includes `ctrl+s: save`
-- [ ] `go vet ./...` and `go test ./...` pass
-- [ ] Unit test verifies that `ctrl+s` on tab 0 triggers project save and on tab 1 triggers global save
+- [x] Pressing `Ctrl+S` in the config editor triggers `configActionSaveProject` when the Project tab (tab 0) is active
+- [x] Pressing `Ctrl+S` in the config editor triggers `configActionSaveGlobal` when the Global tab (tab 1) is active
+- [x] The status text shows "Saved project config" or "Saved global config" on success, same as the button
+- [x] The shortcut works regardless of cursor position (not just when on the save button)
+- [x] The shortcut works when the tab bar is focused
+- [x] The footer hint in the config view includes `ctrl+s: save`
+- [x] `go vet ./...` and `go test ./...` pass
+- [x] Unit test verifies that `ctrl+s` on tab 0 triggers project save and on tab 1 triggers global save
 
 ## Task Dependency Graph
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"gopkg.in/yaml.v3"
@@ -501,6 +502,68 @@ func TestBuildConfig_OnComplete(t *testing.T) {
 	}
 	if result2.OnComplete.Bug != "delete" {
 		t.Errorf("Bug = %q, want delete", result2.OnComplete.Bug)
+	}
+}
+
+func TestCtrlSSavesProjectConfig(t *testing.T) {
+	dir := t.TempDir()
+	m := newConfigModel(config.Config{Agent: "claude"}, dir)
+	m.activeTab = 0
+
+	origLoad := loadGlobalSettings
+	loadGlobalSettings = func() (globalconfig.Settings, error) { return globalconfig.Settings{}, nil }
+	t.Cleanup(func() { loadGlobalSettings = origLoad })
+
+	keyMsg := tea.KeyMsg{Type: tea.KeyCtrlS}
+	result, cmd := m.Update(keyMsg)
+	_ = result
+
+	if cmd == nil {
+		t.Fatal("ctrl+s on tab 0 should return a non-nil command")
+	}
+	msg := cmd()
+	r, ok := msg.(configResultMsg)
+	if !ok {
+		t.Fatalf("expected configResultMsg, got %T", msg)
+	}
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.text != "Saved project config" {
+		t.Errorf("status text = %q, want %q", r.text, "Saved project config")
+	}
+}
+
+func TestCtrlSSavesGlobalConfig(t *testing.T) {
+	m := newConfigModel(config.Config{Agent: "claude"}, "")
+	m.activeTab = 1
+
+	origLoad := loadGlobalSettings
+	origSave := saveGlobalSettings
+	loadGlobalSettings = func() (globalconfig.Settings, error) { return globalconfig.Settings{}, nil }
+	saveGlobalSettings = func(_ globalconfig.Settings) error { return nil }
+	t.Cleanup(func() {
+		loadGlobalSettings = origLoad
+		saveGlobalSettings = origSave
+	})
+
+	keyMsg := tea.KeyMsg{Type: tea.KeyCtrlS}
+	result, cmd := m.Update(keyMsg)
+	_ = result
+
+	if cmd == nil {
+		t.Fatal("ctrl+s on tab 1 should return a non-nil command")
+	}
+	msg := cmd()
+	r, ok := msg.(configResultMsg)
+	if !ok {
+		t.Fatalf("expected configResultMsg, got %T", msg)
+	}
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.text != "Saved global config" {
+		t.Errorf("status text = %q, want %q", r.text, "Saved global config")
 	}
 }
 
