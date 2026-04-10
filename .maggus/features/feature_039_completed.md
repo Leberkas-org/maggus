@@ -128,10 +128,10 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] `commands.md` clean section: description matches code — "Remove completed feature and bug files" (removes `_completed.md` files only, no run directory cleanup)
-- [ ] `commands.md` clean section: long description says "Removes all _completed.md files from .maggus/features/ and .maggus/bugs/" — no mention of run directories with `## End` section
-- [ ] `maggus-plan-skill.md`: the "Integration with Maggus" section at the bottom uses `maggus start` not `maggus work`, and describes skills as prompt picker items not CLI commands
-- [ ] `concepts.md`: verify no remaining references to old TUI (tabs, keyboard shortcuts, summary screen) — these were already removed in the earlier session but verify completeness
+- [x] `commands.md` clean section: description matches code — "Remove completed feature and bug files" (removes `_completed.md` files only, no run directory cleanup)
+- [x] `commands.md` clean section: long description says "Removes all _completed.md files from .maggus/features/ and .maggus/bugs/" — no mention of run directories with `## End` section
+- [x] `maggus-plan-skill.md`: the "Integration with Maggus" section at the bottom uses `maggus start` not `maggus work`, and describes skills as prompt picker items not CLI commands
+- [x] `concepts.md`: verify no remaining references to old TUI (tabs, keyboard shortcuts, summary screen) — these were already removed in the earlier session but verify completeness
 
 ## Task Dependency Graph
 

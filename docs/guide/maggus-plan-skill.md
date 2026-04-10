@@ -2,12 +2,12 @@
 
 Maggus ships with three Claude Code skills that use AI to generate project documents interactively. Instead of writing files by hand, you describe what you want and the skill guides you through clarifying questions before producing the output.
 
-| Skill | Command | Produces |
+| Skill | Invocation | Produces |
 |---|---|---|
-| `/maggus-plan` | `maggus plan <description>` | `.maggus/features/feature_*.md` — implementation plan |
-| `/maggus-bugreport` | `maggus bugreport <description>` | `.maggus/bugs/bug_*.md` — structured bug ticket |
-| `/maggus-vision` | `maggus vision <description>` | `VISION.md` — project vision document |
-| `/maggus-architecture` | `maggus architecture <description>` | `ARCHITECTURE.md` — architecture document |
+| `/maggus-plan` | Prompt picker → `/maggus-plan` | `.maggus/features/feature_*.md` — implementation plan |
+| `/maggus-bugreport` | Prompt picker → `/maggus-bugreport` | `.maggus/bugs/bug_*.md` — structured bug ticket |
+| `/maggus-vision` | Prompt picker → `/maggus-vision` | `VISION.md` — project vision document |
+| `/maggus-architecture` | Prompt picker → `/maggus-architecture` | `ARCHITECTURE.md` — architecture document |
 
 ::: info Claude Code Only
 Maggus skills are Claude Code plugins. They require Claude Code as your agent. If you're using OpenCode, you'll need to write these files manually.
@@ -28,26 +28,23 @@ claude plugin install maggus@maggus
 
 All three skills follow the same flow:
 
-1. **You** provide a description (via `maggus <command>` or the `/maggus-<skill>` slash command in Claude Code)
+1. **You** provide a description via the `/maggus-<skill>` slash command in Claude Code's prompt picker
 2. **The skill** asks 3–5 clarifying questions tailored to your description
 3. **You** answer the questions
 4. **The skill** generates the file and writes it to your project
 
-You can invoke skills either through the Maggus CLI (`maggus plan`, `maggus vision`, `maggus architecture`) or directly in a Claude Code session using the slash command (`/maggus-plan`, `/maggus-vision`, `/maggus-architecture`).
+Skills are launched from Claude Code's prompt picker — open the interactive menu, select "prompt", and choose the skill you want to run.
 
 ---
 
 ## /maggus-plan
 
-Generates Maggus feature files in the `.maggus/features/feature_*.md` format with tasks, descriptions, and acceptance criteria — ready to run with `maggus work`.
+Generates Maggus feature files in the `.maggus/features/feature_*.md` format with tasks, descriptions, and acceptance criteria — ready to run with Maggus.
 
 ### Invocation
 
 ```bash
-# Via Maggus CLI
-maggus plan Add OAuth2 login with Google and GitHub providers
-
-# Via Claude Code slash command
+# Via Claude Code prompt picker
 /maggus-plan Add OAuth2 login with Google and GitHub providers
 ```
 
@@ -119,7 +116,7 @@ so that posts can be stored and queried.
 The generated plan is immediately usable:
 
 ```bash
-maggus work
+maggus start
 ```
 
 ### Output Format
@@ -140,15 +137,12 @@ For full details on plan structure, see [Writing Plans](./writing-plans).
 
 ## /maggus-bugreport
 
-Generates structured bug tickets in the `.maggus/bugs/bug_*.md` format — ready to track and resolve with `maggus work`.
+Generates structured bug tickets in the `.maggus/bugs/bug_*.md` format — ready to track and resolve with Maggus.
 
 ### Invocation
 
 ```bash
-# Via Maggus CLI
-maggus bugreport Login button does nothing when clicked on mobile
-
-# Via Claude Code slash command
+# Via Claude Code prompt picker
 /maggus-bugreport Login button does nothing when clicked on mobile
 ```
 
@@ -235,10 +229,7 @@ Creates or improves a `VISION.md` file for your project. The vision document cap
 ### Invocation
 
 ```bash
-# Via Maggus CLI
-maggus vision A CLI tool for orchestrating AI agents
-
-# Via Claude Code slash command
+# Via Claude Code prompt picker
 /maggus-vision A CLI tool for orchestrating AI agents
 ```
 
@@ -253,11 +244,7 @@ Creates or improves an `ARCHITECTURE.md` file for your project. The architecture
 ### Invocation
 
 ```bash
-# Via Maggus CLI (full or alias)
-maggus architecture A Go CLI with plugin system and streaming output
-maggus arch "Review and improve our current architecture"
-
-# Via Claude Code slash command
+# Via Claude Code prompt picker
 /maggus-architecture A Go CLI with plugin system and streaming output
 ```
 
@@ -269,7 +256,7 @@ The skill reads your existing codebase for context. If an `ARCHITECTURE.md` alre
 
 Generated feature files are standard `.maggus/features/feature_*.md` files — Maggus treats them identically to hand-written plans:
 
-- `maggus work` picks up generated feature files automatically
+- `maggus start` picks up generated feature files automatically
 - `maggus status` shows progress across all feature files including generated ones
 - `maggus list` previews upcoming tasks from the feature file
 
