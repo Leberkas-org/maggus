@@ -16,6 +16,7 @@ var requiredEntries = []string{
 	".maggus/feature_approvals.yml",
 	".maggus/daemon.pid",
 	".maggus/interactive.lock",
+	".maggus/worktrees/",
 	"COMMIT.md",
 }
 

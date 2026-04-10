@@ -50,14 +50,14 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Parallel:** yes — can run alongside TASK-038-001
 
 **Acceptance Criteria:**
-- [ ] `CreateWorktree(repoRoot, path, branch string) error` creates a worktree at the given path; creates the branch off HEAD if it does not already exist
-- [ ] `RemoveWorktree(repoRoot, path string) error` removes the worktree via `git worktree remove --force`
-- [ ] `ListWorktrees(repoRoot string) ([]WorktreeInfo, error)` parses `git worktree list --porcelain` output
-- [ ] `WorktreeInfo` struct carries `Path`, `Branch`, and `HEAD` fields
-- [ ] Stale entries are pruned via `git worktree prune` before listing
-- [ ] `internal/gitignore` is updated to ensure `.maggus/worktrees/` is present in `.gitignore`
-- [ ] Unit tests cover create, remove, and list operations
-- [ ] Typecheck/lint passes
+- [x] `CreateWorktree(repoRoot, path, branch string) error` creates a worktree at the given path; creates the branch off HEAD if it does not already exist
+- [x] `RemoveWorktree(repoRoot, path string) error` removes the worktree via `git worktree remove --force`
+- [x] `ListWorktrees(repoRoot string) ([]WorktreeInfo, error)` parses `git worktree list --porcelain` output
+- [x] `WorktreeInfo` struct carries `Path`, `Branch`, and `HEAD` fields
+- [x] Stale entries are pruned via `git worktree prune` before listing
+- [x] `internal/gitignore` is updated to ensure `.maggus/worktrees/` is present in `.gitignore`
+- [x] Unit tests cover create, remove, and list operations
+- [x] Typecheck/lint passes
 
 ### TASK-038-003: Update branch strategy for parallel mode
 **Description:** As the work loop, I want a feature branch per plan and a task branch per parallel task so that changes are isolated and can be merged cleanly.
