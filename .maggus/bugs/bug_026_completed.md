@@ -57,11 +57,11 @@ Every other sub-screen (`statusModel`, `configModel`, `reposModel`, `updateModel
 **Description:** As a user, I want the prompt subview border to turn red during nerfed hours, consistent with all other screens.
 
 **Acceptance Criteria:**
-- [ ] `promptPickerModel` has an `isNerfed bool` field
-- [ ] `Init()` starts an async `claude2xResultMsg` fetch (matching the pattern used by `menuModel`, `configModel`, etc.)
-- [ ] `Update()` handles `claude2xResultMsg` and `claude2xTickMsg`, updating `isNerfed` and scheduling the next tick when nerfed
-- [ ] `View()` at line 297 uses `styles.ThemeColor(m.isNerfed)` instead of `styles.Primary`
-- [ ] `newPromptPickerModel` (or `initScreen`) seeds `isNerfed` synchronously via `claude2x.FetchStatus()` so the first frame renders with the correct border color
-- [ ] Prompt subview border is red during nerfed hours and cyan otherwise
-- [ ] No regression in prompt navigation, skill selection, or toggle behavior
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `promptPickerModel` has an `isNerfed bool` field
+- [x] `Init()` starts an async `claude2xResultMsg` fetch (matching the pattern used by `menuModel`, `configModel`, etc.)
+- [x] `Update()` handles `claude2xResultMsg` and `claude2xTickMsg`, updating `isNerfed` and scheduling the next tick when nerfed
+- [x] `View()` at line 297 uses `styles.ThemeColor(m.isNerfed)` instead of `styles.Primary`
+- [x] `newPromptPickerModel` (or `initScreen`) seeds `isNerfed` synchronously via `claude2x.FetchStatus()` so the first frame renders with the correct border color
+- [x] Prompt subview border is red during nerfed hours and cyan otherwise
+- [x] No regression in prompt navigation, skill selection, or toggle behavior
+- [x] `go vet ./...` and `go test ./...` pass

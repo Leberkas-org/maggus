@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/discord"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
@@ -45,6 +46,7 @@ type promptPickerModel struct {
 	skipPermissions bool
 	width           int
 	height          int
+	isNerfed        bool
 
 	// Config needed to build the interactive command on selection.
 	dir           string
@@ -53,17 +55,27 @@ type promptPickerModel struct {
 }
 
 func newPromptPickerModel(dir, resolvedModel, agentName string) promptPickerModel {
+	nerfStatus := claude2x.FetchStatus()
 	return promptPickerModel{
 		skills:          defaultSkills,
 		skipPermissions: true,
 		dir:             dir,
 		resolvedModel:   resolvedModel,
 		agentName:       agentName,
+		isNerfed:        nerfStatus.IsNerfed,
 	}
 }
 
 func (m promptPickerModel) Init() tea.Cmd {
-	return nil
+	cmds := []tea.Cmd{
+		func() tea.Msg {
+			return claude2xResultMsg{status: claude2x.FetchStatus()}
+		},
+	}
+	if m.isNerfed {
+		cmds = append(cmds, next2xTick())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -72,6 +84,19 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	case claude2xResultMsg:
+		prevNerfed := m.isNerfed
+		m.isNerfed = msg.status.IsNerfed
+		if m.isNerfed && !prevNerfed {
+			return m, next2xTick()
+		}
+		return m, nil
+
+	case claude2xTickMsg:
+		isNerfed, _, tickCmd := fetch2xAndUpdate()
+		m.isNerfed = isNerfed
+		return m, tickCmd
 
 	case tea.KeyMsg:
 		key := msg.String()
@@ -294,7 +319,7 @@ func (m promptPickerModel) View() string {
 	footer := styles.StatusBar.Render("up/down: navigate | tab: switch focus | enter: confirm | left/right: toggle | q/esc: cancel")
 
 	if m.width > 0 && m.height > 0 {
-		return styles.FullScreenColor(content, footer, m.width, m.height, styles.Primary)
+		return styles.FullScreenColor(content, footer, m.width, m.height, styles.ThemeColor(m.isNerfed))
 	}
 	return styles.Box.Render(content+"\n\n"+footer) + "\n"
 }
