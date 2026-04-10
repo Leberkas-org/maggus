@@ -11,10 +11,9 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-var rightPaneTabNames = []string{"Output", "Item Details", "Task Details", "Metrics"}
-
 // renderRightPaneTabBar renders the tab bar at the top of the right pane.
-// Format: `2 Output  3 Feature Details  4 Current Task  5 Metrics`
+// It uses the dynamic availableTabs() list so only context-relevant tabs are shown.
+// Format: `[2] Output  [3] Task Details  [4] Metrics`
 // The active tab has bold text and underline in primary color; inactive tabs are muted.
 // Number prefixes are always dimmed.
 func (m statusModel) renderRightPaneTabBar() string {
@@ -22,16 +21,17 @@ func (m statusModel) renderRightPaneTabBar() string {
 	activeStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Underline(true)
 	inactiveStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
+	tabs := m.availableTabs()
 	var parts []string
-	for i, name := range rightPaneTabNames {
+	for i, td := range tabs {
 		numStr := dimStyle.Render(fmt.Sprintf("[%d]", i+2))
 		var nameStr string
 		if m.leftFocused {
-			nameStr = inactiveStyle.Render(name)
+			nameStr = inactiveStyle.Render(td.name)
 		} else if i == m.activeTab {
-			nameStr = activeStyle.Render(name)
+			nameStr = activeStyle.Render(td.name)
 		} else {
-			nameStr = inactiveStyle.Render(name)
+			nameStr = inactiveStyle.Render(td.name)
 		}
 		parts = append(parts, numStr+" "+nameStr)
 	}
@@ -53,16 +53,27 @@ func (m statusModel) renderRightPane(width, height int) string {
 		contentH = 1
 	}
 
+	tabs := m.availableTabs()
+	tabKey := ""
+	if m.activeTab >= 0 && m.activeTab < len(tabs) {
+		tabKey = tabs[m.activeTab].key
+	}
 	var content string
-	switch m.activeTab {
-	case 0:
+	switch tabKey {
+	case "output":
 		content = m.renderOutputTab(width, contentH)
-	case 1:
+	case "summary":
+		// Summary tab is a future task; show a placeholder for now.
+		content = lipgloss.NewStyle().Width(width).Height(contentH).Render(
+			statusDimStyle.Render("  Summary (coming soon)"))
+	case "details":
 		content = m.renderFeatureDetailsTab(width, contentH)
-	case 2:
+	case "taskdetails":
 		content = m.renderCurrentTaskTab(width, contentH)
-	case 3:
+	case "metrics":
 		content = m.renderMetricsTab(width, contentH)
+	default:
+		content = lipgloss.NewStyle().Width(width).Height(contentH).Render("")
 	}
 
 	full := tabBar + "\n" + sep + "\n" + content

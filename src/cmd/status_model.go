@@ -22,6 +22,26 @@ const (
 	progressBarWidth  = 30
 )
 
+// selectionContext describes what kind of item is currently selected in the
+// left-pane tree. The right-pane tab set adapts to this context.
+type selectionContext int
+
+const (
+	selNone          selectionContext = iota // nothing selected (empty tree)
+	selFeature                              // a feature/bug plan row is selected
+	selRunningTask                          // a task currently being worked on by the daemon
+	selCompletedTask                        // a completed (done) task
+)
+
+// tabDef describes a single right-pane tab: its display name and the key used
+// to dispatch rendering. Render functions are not stored here because methods
+// on statusModel cannot be referenced as func values in a static slice; the
+// caller switches on tabDef.key instead.
+type tabDef struct {
+	name string // display name shown in the tab bar
+	key  string // stable key for dispatch (e.g. "output", "summary", "details", "metrics")
+}
+
 // Lipgloss styles for the status command.
 var (
 	statusGreenStyle = lipgloss.NewStyle().Foreground(styles.Success)
@@ -193,6 +213,106 @@ func (m statusModel) selectedPlan() parser.Plan {
 	return items[m.treeCursor].plan
 }
 
+// selectionCtx returns the selection context for the item at treeCursor.
+// It examines the tree item kind and, for task items, checks whether the
+// daemon is currently working on that task (directly or via a parallel worker).
+func (m statusModel) selectionCtx() selectionContext {
+	items := m.buildTreeItems()
+	if len(items) == 0 || m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return selNone
+	}
+	item := items[m.treeCursor]
+	switch item.kind {
+	case treeItemKindPlan:
+		return selFeature
+	case treeItemKindTask:
+		if item.task == nil {
+			return selFeature // defensive; should not happen
+		}
+		if m.isTaskRunning(item.task.ID) {
+			return selRunningTask
+		}
+		if item.task.IsComplete() {
+			return selCompletedTask
+		}
+		// Pending/blocked but not running — treat as a non-running task.
+		// The feature plan still provides the best context for a pending task,
+		// but the spec maps only four contexts. A pending task that is not
+		// running shows the same tabs as a completed task (Summary, Output,
+		// Task Details, Metrics) so the user can inspect it.
+		return selCompletedTask
+	default:
+		return selNone
+	}
+}
+
+// isTaskRunning returns true when the daemon is actively working on the given
+// task ID, either as the single sequential task or as one of the parallel workers.
+func (m statusModel) isTaskRunning(taskID string) bool {
+	if !m.daemon.Running {
+		return false
+	}
+	// Sequential mode: daemon.CurrentTask is the active task.
+	if m.daemon.CurrentTask == taskID {
+		return true
+	}
+	// Parallel mode: check worker index for a "working" entry.
+	for _, w := range m.workerIndex {
+		if w.TaskID == taskID && w.Status == "working" {
+			return true
+		}
+	}
+	return false
+}
+
+// availableTabs returns the ordered list of tab definitions for the current
+// selection context, following this mapping:
+//
+//	selNone          → [Metrics]
+//	selFeature       → [Summary, Details, Metrics]
+//	selRunningTask   → [Output, Task Details, Metrics]
+//	selCompletedTask → [Summary, Output, Task Details, Metrics]
+func (m statusModel) availableTabs() []tabDef {
+	switch m.selectionCtx() {
+	case selFeature:
+		return []tabDef{
+			{name: "Summary", key: "summary"},
+			{name: "Details", key: "details"},
+			{name: "Metrics", key: "metrics"},
+		}
+	case selRunningTask:
+		return []tabDef{
+			{name: "Output", key: "output"},
+			{name: "Task Details", key: "taskdetails"},
+			{name: "Metrics", key: "metrics"},
+		}
+	case selCompletedTask:
+		return []tabDef{
+			{name: "Summary", key: "summary"},
+			{name: "Output", key: "output"},
+			{name: "Task Details", key: "taskdetails"},
+			{name: "Metrics", key: "metrics"},
+		}
+	default: // selNone
+		return []tabDef{
+			{name: "Metrics", key: "metrics"},
+		}
+	}
+}
+
+// clampActiveTab ensures activeTab is within the bounds of the current
+// available tabs. Call this after any action that might change the tab set
+// (e.g. cursor movement in the left pane).
+func (m *statusModel) clampActiveTab() {
+	tabs := m.availableTabs()
+	if m.activeTab >= len(tabs) {
+		m.activeTab = len(tabs) - 1
+	}
+	if m.activeTab < 0 {
+		m.activeTab = 0
+	}
+}
+
 // rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
 // for the currently selected plan. It syncs treeCursor from planCursor so that
 // both cursors stay consistent while planCursor is still used for navigation.
@@ -250,6 +370,16 @@ func (m *statusModel) syncPlanCursorFromTreeCursor() {
 	} else {
 		m.planCursor = 0
 	}
+}
+
+// updateTabsForSelectionChange checks whether the selection context changed
+// relative to prevCtx and resets activeTab to 0 if so. In all cases it clamps
+// activeTab to the bounds of the current available tabs.
+func (m *statusModel) updateTabsForSelectionChange(prevCtx selectionContext) {
+	if m.selectionCtx() != prevCtx {
+		m.activeTab = 0
+	}
+	m.clampActiveTab()
 }
 
 // rebuildRightPane rebuilds the right-pane task list and metrics for the

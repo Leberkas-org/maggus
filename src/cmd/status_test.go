@@ -10,6 +10,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -644,11 +645,11 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = false
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Item Details tab shows task list
+		m.activeTab = 1 // Details tab shows task list (selFeature context: Summary, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Item Details") {
-			t.Error("view should contain 'Item Details' tab")
+		if !strings.Contains(view, "Details") {
+			t.Error("view should contain 'Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -660,11 +661,11 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = true
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Item Details tab shows task list
+		m.activeTab = 1 // Details tab shows task list (selFeature context: Summary, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
-		if !strings.Contains(view, "Item Details") {
-			t.Error("view should contain 'Item Details' tab")
+		if !strings.Contains(view, "Details") {
+			t.Error("view should contain 'Details' tab")
 		}
 		if !strings.Contains(view, "TASK-001") {
 			t.Error("view should contain task ID")
@@ -1203,15 +1204,37 @@ func TestRenderCurrentTaskTab(t *testing.T) {
 }
 
 func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
-	t.Run("Tab 3 is wired into renderRightPane", func(t *testing.T) {
-		m := statusModel{nextTaskID: "", nextTaskFile: "", activeTab: 2, width: 120, height: 30}
-		// Should render "No pending tasks" not "(coming soon)"
+	t.Run("Task Details tab is wired into renderRightPane", func(t *testing.T) {
+		// Set up a selFeature context so availableTabs = [Summary, Details, Metrics].
+		// Index 2 = Metrics (no "taskdetails" in this context).
+		// To test taskdetails, use a selRunningTask context: [Output, Task Details, Metrics].
+		// But we just want to verify taskdetails renders — use selCompletedTask:
+		// [Summary, Output, Task Details, Metrics] — index 2 = taskdetails.
+		completedTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: true}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:   "plan_1",
+				File: "plan_1.md",
+				Tasks: []parser.Task{completedTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1, // task row (plan at 0, task at 1)
+			showAll:       true,
+			activeTab:     2, // taskdetails in selCompletedTask context
+			nextTaskID:    "",
+			nextTaskFile:  "",
+			width:         120,
+			height:        30,
+		}
 		content := m.renderRightPane(80, 20)
 		if strings.Contains(content, "coming soon") {
-			t.Error("Tab 3 should not show 'coming soon' placeholder")
+			t.Error("Task Details tab should not show 'coming soon' placeholder")
 		}
 		if !strings.Contains(content, "No pending tasks") {
-			t.Errorf("Tab 3 with no task should show 'No pending tasks', got %q", content)
+			t.Errorf("Task Details with no pending task should show 'No pending tasks', got %q", content)
 		}
 	})
 }
@@ -1553,10 +1576,14 @@ func TestRenderLeftPane_LineCount(t *testing.T) {
 
 // TestRenderRightPane_LineCount verifies that renderRightPane(w, h) returns exactly
 // h+1 lines when h is large enough that tab content fits within contentH = h-2.
-// The plain log tab requires contentH >= 4 (fixed overhead: blank+title+sep+no-active),
-// so the minimum safe h is 6.
+// Uses a selFeature context (activeTab=0 → Summary placeholder) for minimal content.
 func TestRenderRightPane_LineCount(t *testing.T) {
-	m := statusModel{width: 120, height: 40}
+	m := statusModel{
+		plans:     []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+		width:     120,
+		height:    40,
+		activeTab: 0, // Summary tab (short placeholder)
+	}
 	for _, h := range []int{6, 10, 20, 34} {
 		out := m.renderRightPane(80, h)
 		got := strings.Count(out, "\n") + 1
@@ -1891,6 +1918,330 @@ func TestShouldPromptOnExit(t *testing.T) {
 		m := statusModel{daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"}}
 		if !m.shouldPromptOnExit() {
 			t.Error("shouldPromptOnExit() = false, want true when daemon is running with active task")
+		}
+	})
+}
+
+// --- Selection context and dynamic tab mapping tests ---
+
+func TestSelectionCtx(t *testing.T) {
+	t.Run("empty tree returns selNone", func(t *testing.T) {
+		m := statusModel{plans: nil, treeCursor: 0}
+		if got := m.selectionCtx(); got != selNone {
+			t.Errorf("selectionCtx() = %d, want selNone (%d)", got, selNone)
+		}
+	})
+
+	t.Run("cursor on plan row returns selFeature", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}}},
+			treeCursor: 0,
+		}
+		if got := m.selectionCtx(); got != selFeature {
+			t.Errorf("selectionCtx() = %d, want selFeature (%d)", got, selFeature)
+		}
+	})
+
+	t.Run("cursor on completed task returns selCompletedTask", func(t *testing.T) {
+		completedTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: true}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{completedTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1, // task row
+			showAll:       true,
+		}
+		if got := m.selectionCtx(); got != selCompletedTask {
+			t.Errorf("selectionCtx() = %d, want selCompletedTask (%d)", got, selCompletedTask)
+		}
+	})
+
+	t.Run("cursor on running task returns selRunningTask", func(t *testing.T) {
+		pendingTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: false}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{pendingTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1,
+			daemon:        daemonStatus{Running: true, CurrentTask: "TASK-001"},
+		}
+		if got := m.selectionCtx(); got != selRunningTask {
+			t.Errorf("selectionCtx() = %d, want selRunningTask (%d)", got, selRunningTask)
+		}
+	})
+
+	t.Run("cursor on pending non-running task returns selCompletedTask", func(t *testing.T) {
+		pendingTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: false}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{pendingTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1,
+			daemon:        daemonStatus{Running: false},
+		}
+		if got := m.selectionCtx(); got != selCompletedTask {
+			t.Errorf("selectionCtx() = %d, want selCompletedTask (%d)", got, selCompletedTask)
+		}
+	})
+
+	t.Run("cursor out of range returns selNone", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor: 99,
+		}
+		if got := m.selectionCtx(); got != selNone {
+			t.Errorf("selectionCtx() = %d, want selNone (%d)", got, selNone)
+		}
+	})
+}
+
+func TestIsTaskRunning(t *testing.T) {
+	t.Run("daemon not running returns false", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: false}}
+		if m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be false when daemon is not running")
+		}
+	})
+
+	t.Run("sequential mode matches CurrentTask", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"}}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be true when CurrentTask matches")
+		}
+		if m.isTaskRunning("TASK-002") {
+			t.Error("isTaskRunning should be false for non-matching task")
+		}
+	})
+
+	t.Run("parallel mode matches working worker", func(t *testing.T) {
+		m := statusModel{
+			daemon: daemonStatus{Running: true},
+			workerIndex: []runlog.WorkerIndexEntry{
+				{TaskID: "TASK-001", Status: "working"},
+				{TaskID: "TASK-002", Status: "done"},
+			},
+		}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be true for working worker")
+		}
+		if m.isTaskRunning("TASK-002") {
+			t.Error("isTaskRunning should be false for done worker")
+		}
+	})
+}
+
+func TestAvailableTabs(t *testing.T) {
+	t.Run("selNone returns Metrics only", func(t *testing.T) {
+		m := statusModel{plans: nil, treeCursor: 0}
+		tabs := m.availableTabs()
+		if len(tabs) != 1 {
+			t.Fatalf("len(availableTabs) = %d, want 1", len(tabs))
+		}
+		if tabs[0].key != "metrics" {
+			t.Errorf("tabs[0].key = %q, want metrics", tabs[0].key)
+		}
+		if tabs[0].name != "Metrics" {
+			t.Errorf("tabs[0].name = %q, want Metrics", tabs[0].name)
+		}
+	})
+
+	t.Run("selFeature returns Summary, Details, Metrics", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor: 0,
+		}
+		tabs := m.availableTabs()
+		if len(tabs) != 3 {
+			t.Fatalf("len(availableTabs) = %d, want 3", len(tabs))
+		}
+		expected := []struct{ key, name string }{
+			{"summary", "Summary"},
+			{"details", "Details"},
+			{"metrics", "Metrics"},
+		}
+		for i, e := range expected {
+			if tabs[i].key != e.key {
+				t.Errorf("tabs[%d].key = %q, want %q", i, tabs[i].key, e.key)
+			}
+			if tabs[i].name != e.name {
+				t.Errorf("tabs[%d].name = %q, want %q", i, tabs[i].name, e.name)
+			}
+		}
+	})
+
+	t.Run("selRunningTask returns Output, Task Details, Metrics", func(t *testing.T) {
+		pendingTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: false}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{pendingTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1,
+			daemon:        daemonStatus{Running: true, CurrentTask: "TASK-001"},
+		}
+		tabs := m.availableTabs()
+		if len(tabs) != 3 {
+			t.Fatalf("len(availableTabs) = %d, want 3", len(tabs))
+		}
+		expected := []struct{ key, name string }{
+			{"output", "Output"},
+			{"taskdetails", "Task Details"},
+			{"metrics", "Metrics"},
+		}
+		for i, e := range expected {
+			if tabs[i].key != e.key {
+				t.Errorf("tabs[%d].key = %q, want %q", i, tabs[i].key, e.key)
+			}
+			if tabs[i].name != e.name {
+				t.Errorf("tabs[%d].name = %q, want %q", i, tabs[i].name, e.name)
+			}
+		}
+	})
+
+	t.Run("selCompletedTask returns Summary, Output, Task Details, Metrics", func(t *testing.T) {
+		completedTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: true}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{completedTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1,
+			showAll:       true,
+		}
+		tabs := m.availableTabs()
+		if len(tabs) != 4 {
+			t.Fatalf("len(availableTabs) = %d, want 4", len(tabs))
+		}
+		expected := []struct{ key, name string }{
+			{"summary", "Summary"},
+			{"output", "Output"},
+			{"taskdetails", "Task Details"},
+			{"metrics", "Metrics"},
+		}
+		for i, e := range expected {
+			if tabs[i].key != e.key {
+				t.Errorf("tabs[%d].key = %q, want %q", i, tabs[i].key, e.key)
+			}
+			if tabs[i].name != e.name {
+				t.Errorf("tabs[%d].name = %q, want %q", i, tabs[i].name, e.name)
+			}
+		}
+	})
+}
+
+func TestClampActiveTab(t *testing.T) {
+	t.Run("clamps above max", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor: 0,
+			activeTab:  10,
+		}
+		m.clampActiveTab()
+		tabs := m.availableTabs() // selFeature: 3 tabs
+		if m.activeTab != len(tabs)-1 {
+			t.Errorf("activeTab = %d, want %d", m.activeTab, len(tabs)-1)
+		}
+	})
+
+	t.Run("keeps valid index", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor: 0,
+			activeTab:  1,
+		}
+		m.clampActiveTab()
+		if m.activeTab != 1 {
+			t.Errorf("activeTab = %d, want 1", m.activeTab)
+		}
+	})
+
+	t.Run("clamps negative to 0", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor: 0,
+			activeTab:  -1,
+		}
+		m.clampActiveTab()
+		if m.activeTab != 0 {
+			t.Errorf("activeTab = %d, want 0", m.activeTab)
+		}
+	})
+}
+
+func TestUpdateTabsForSelectionChange(t *testing.T) {
+	t.Run("resets to 0 when context changes", func(t *testing.T) {
+		completedTask := parser.Task{
+			ID:       "TASK-001",
+			Criteria: []parser.Criterion{{Checked: true}},
+		}
+		m := statusModel{
+			plans: []parser.Plan{{
+				ID:    "plan_1",
+				File:  "plan_1.md",
+				Tasks: []parser.Task{completedTask},
+			}},
+			expandedPlans: map[string]bool{"plan_1": true},
+			treeCursor:    1, // task row → selCompletedTask
+			showAll:       true,
+			activeTab:     2,
+		}
+		// Simulate moving from selFeature (prevCtx) to selCompletedTask (current)
+		m.updateTabsForSelectionChange(selFeature)
+		if m.activeTab != 0 {
+			t.Errorf("activeTab = %d, want 0 (should reset on context change)", m.activeTab)
+		}
+	})
+
+	t.Run("preserves activeTab when context stays the same", func(t *testing.T) {
+		m := statusModel{
+			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}, {ID: "plan_2", File: "plan_2.md"}},
+			treeCursor: 0, // plan row → selFeature
+			activeTab:  2,
+		}
+		// Same context (selFeature → selFeature)
+		m.updateTabsForSelectionChange(selFeature)
+		if m.activeTab != 2 {
+			t.Errorf("activeTab = %d, want 2 (should preserve when context unchanged)", m.activeTab)
+		}
+	})
+
+	t.Run("clamps when same context but out of range", func(t *testing.T) {
+		m := statusModel{
+			plans:      nil, // empty → selNone (1 tab: Metrics)
+			treeCursor: 0,
+			activeTab:  5,
+		}
+		m.updateTabsForSelectionChange(selNone)
+		if m.activeTab != 0 {
+			t.Errorf("activeTab = %d, want 0 (should clamp to max index)", m.activeTab)
 		}
 	})
 }
