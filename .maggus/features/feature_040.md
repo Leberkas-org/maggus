@@ -56,13 +56,13 @@ The new design makes the left pane the primary navigator: what you select determ
 **Parallel:** yes — can run alongside TASK-040-003, TASK-040-004, TASK-040-005
 
 **Acceptance Criteria:**
-- [ ] `renderRightPaneTabBar()` renders only the tabs returned by `availableTabs()` for the current selection
-- [ ] Number key labels in the tab bar start at `[2]` and increment sequentially (matching the current pattern where `[1]` focuses the left pane)
-- [ ] `renderRightPane()` dispatches to the correct render function based on `availableTabs()[activeTab]` instead of a hardcoded switch
-- [ ] Key handling in `updateList()` maps keys `2`, `3`, `4`, `5` to positional indices within `availableTabs()` (not fixed tab indices)
-- [ ] Keys beyond the available tab count are ignored (e.g., pressing `4` when only 3 tabs exist does nothing)
-- [ ] Footer hints in `statusSplitFooter()` update the tab range dynamically (e.g., `1-3: tabs` when 2 right-pane tabs exist, `1-4: tabs` when 3 exist)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `renderRightPaneTabBar()` renders only the tabs returned by `availableTabs()` for the current selection
+- [x] Number key labels in the tab bar start at `[2]` and increment sequentially (matching the current pattern where `[1]` focuses the left pane)
+- [x] `renderRightPane()` dispatches to the correct render function based on `availableTabs()[activeTab]` instead of a hardcoded switch
+- [x] Key handling in `updateList()` maps keys `2`, `3`, `4`, `5` to positional indices within `availableTabs()` (not fixed tab indices)
+- [x] Keys beyond the available tab count are ignored (e.g., pressing `4` when only 3 tabs exist does nothing)
+- [x] Footer hints in `statusSplitFooter()` update the tab range dynamically (e.g., `1-3: tabs` when 2 right-pane tabs exist, `1-4: tabs` when 3 exist)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-040-003: Implement Summary tab for features and completed tasks
 **Description:** As a user viewing a feature, I want a Summary tab showing progress, task counts, and aggregate stats so I get a quick overview without switching to Metrics.
