@@ -242,21 +242,34 @@ func startDaemon(dir string) error {
 
 // autoStartDaemon silently starts the daemon if it is not already running,
 // no work run is active, and the per-repo auto-start preference allows it.
-// Returns nil on success or if the daemon is already running or auto-start is
-// disabled. Returns an error only when the launch failed.
+// Returns nil (no-op) when the global config cannot be loaded, the repo is not
+// registered, or auto-start is disabled. Returns an error only when the launch
+// failed.
 func autoStartDaemon(dir string) error {
-	// Check per-repo auto-start preference from global config.
-	if cfg, err := globalconfig.Load(); err == nil {
-		absDir, _ := filepath.Abs(dir)
-		for _, repo := range cfg.Repositories {
-			if repo.Path == absDir {
-				if !repo.IsAutoStartEnabled() {
-					return nil
-				}
-				break
+	return autoStartDaemonUsing(dir, globalconfig.Load, startDaemon)
+}
+
+// autoStartDaemonUsing is the testable core of autoStartDaemon.
+// It returns nil when loadConfig fails, the repo is not in the config, or
+// auto-start is disabled. It calls start(dir) only when the repo is registered
+// and IsAutoStartEnabled() returns true.
+func autoStartDaemonUsing(
+	dir string,
+	loadConfig func() (globalconfig.GlobalConfig, error),
+	start func(string) error,
+) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return nil
+	}
+	absDir, _ := filepath.Abs(dir)
+	for _, repo := range cfg.Repositories {
+		if repo.Path == absDir {
+			if repo.IsAutoStartEnabled() {
+				return start(dir)
 			}
+			return nil
 		}
 	}
-
-	return startDaemon(dir)
+	return nil
 }
