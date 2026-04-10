@@ -37,38 +37,51 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 
 ### CLI Commands (src/cmd/)
 
-- **work** — Main loop: parse features → find next task → create feature branch → build prompt → run Claude Code → commit → repeat
-- **list** — Preview next N upcoming workable tasks
-- **status** — Show feature progress with progress bars and blocked task reasons
+- **start** — Launch the work loop as a background daemon
+- **stop** — Stop the running daemon
+- **run** — (Hidden) Internal command used by the daemon; parses features → finds next task → builds prompt → runs Claude Code → commits → repeats
+- **approve / unapprove** — Mark features as approved or revoke approval
+- **list** — List all active features and bugs
+- **status** — Interactive TUI showing feature progress, task details, and run logs
+- **clean** — Remove completed feature and bug files
 
 ### Internal Packages (src/internal/)
 
 | Package | Purpose |
 |---|---|
-| **parser** | Parses `.maggus/features/feature_*.md` files. Extracts tasks (`### TASK-NNN: Title`), acceptance criteria (checkboxes), and blocked status (`BLOCKED:` prefix). Skips `_completed.md` files. |
-| **prompt** | Assembles the prompt sent to Claude Code: bootstrap context files (CLAUDE.md, AGENTS.md, etc.), run metadata, task details, and behavioral instructions. Includes files specified in config. |
-| **runner** | Invokes `claude -p <prompt> --output-format stream-json` as a subprocess. Parses streaming JSON events in real-time, drives a live terminal spinner showing status/tools/elapsed time. Handles Ctrl+C gracefully. |
-| **config** | Parses `.maggus/config.yml`. Resolves model aliases (sonnet→claude-sonnet-4-6, opus→claude-opus-4-6, haiku→claude-haiku-4-5-20251001). Validates include file paths. |
-| **gitbranch** | Creates `feature/maggustask-NNN` branches when on a protected branch (main/master/dev). |
-| **gitcommit** | Reads COMMIT.md written by the agent, strips Co-Authored-By lines, runs `git commit -F`. |
-| **gitignore** | Ensures required entries exist in .gitignore. |
-| **runtracker** | Creates `.maggus/runs/<RUN_ID>/` with metadata and iteration logs. |
+| **parser** | Parses `.maggus/features/feature_*.md` and bug files. Extracts tasks (`### TASK-NNN: Title`), acceptance criteria (checkboxes), and blocked status (`BLOCKED:` prefix). Skips `_completed.md` files. |
+| **prompt** | Assembles the prompt sent to the agent: bootstrap context files (CLAUDE.md, AGENTS.md, etc.), run metadata, task details, and behavioral instructions. Includes files specified in config. |
+| **agent** | Defines the `Agent` interface for AI backend adapters (Claude Code, OpenCode, etc.). The work loop uses this to invoke whichever backend is configured without knowing its CLI specifics. |
+| **config** | Parses `.maggus/config.yml`. Resolves model aliases (sonnet→claude-sonnet-4-6, opus→claude-opus-4-6, haiku→claude-haiku-4-5-20251001), validates include file paths, and holds notification settings. |
+| **globalconfig** | Manages global Maggus settings in `~/.maggus/`: repository list, user preferences, lifetime metrics, and binary update state. |
+| **approval** | Manages feature approval state in `.maggus/feature_approvals.yml`. Supports opt-in (explicit approval required) and opt-out (approved by default) modes. |
+| **runlog** | Writes structured run events to `.maggus/runs/` log files. Tracks per-task token usage and cost; prunes old log files automatically. |
+| **stores** | File-backed and in-memory repository implementations for features and bugs. Wraps parser operations for consistent use by the work loop and TUI. |
+| **gitbranch** | Creates `feature/maggustask-NNN` branches when starting work on a protected branch (main/master/dev). |
+| **gitcommit** | Reads COMMIT.md written by the agent, strips Co-Authored-By lines, and runs `git commit -F`. |
+| **gitignore** | Ensures required entries exist in `.gitignore`. |
+| **gitsync** | Handles remote git sync: fetch, ahead/behind status, stash, pull, and force-pull operations. |
+| **hooks** | Executes lifecycle hook commands from config by writing JSON event payloads to their stdin (e.g., on task start/complete). |
+| **discord** | Implements Discord Rich Presence integration via Discord's local IPC protocol (named pipe on Windows, domain socket on Unix). |
+| **filewatcher** | Watches `.maggus/features/` and `.maggus/bugs/` for file changes, debounces rapid events, and sends Bubble Tea update messages to the TUI. |
+| **tui** | Interactive terminal UI components using Bubble Tea: status display, feature browser, and related views. |
+| **updater** | Downloads and applies binary updates from GitHub releases by replacing the currently running executable. |
 
-### Work Loop Flow (cmd/work.go)
+### Run Loop Flow (cmd/run.go)
 
 1. Load config → validate includes → resolve model alias
 2. Ensure .gitignore entries
-3. Parse all active feature files → find next workable (incomplete + not blocked) task
+3. Parse all active feature files → find next workable (incomplete + not blocked + approved) task
 4. Create feature branch if on protected branch
 5. Build prompt with bootstrap context + task details
-6. Run Claude Code subprocess with streaming output
+6. Run agent subprocess with streaming output
 7. Agent writes COMMIT.md → Maggus commits all changes
 8. Rename completed features (`feature_N.md` → `feature_N_completed.md`)
 9. Loop back to step 3
 
 ### Platform-Specific Code
 
-`runner/procattr_windows.go` and `procattr_other.go` handle OS-specific process group attributes for subprocess management.
+`agent/procattr_windows.go` and `procattr_other.go` handle OS-specific process group attributes for subprocess management.
 
 ## Release
 

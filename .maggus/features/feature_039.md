@@ -83,12 +83,12 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] `runner` package is removed from the table (no longer exists)
-- [ ] `runtracker` package is removed from the table (replaced by `runlog`)
-- [ ] The following ~15 important packages are listed with accurate descriptions: `parser`, `prompt`, `agent`, `config`, `globalconfig`, `approval`, `runlog`, `gitbranch`, `gitcommit`, `gitignore`, `gitsync`, `stores`, `hooks`, `discord`, `filewatcher`, `tui`, `updater`
-- [ ] Minor helper packages (`fingerprint`, `notify`, `claude2x`, `gitutil`, `sesslock`, `session`, `resolver`, `capabilities`, `usage`, `release`) are NOT listed individually — they are too small/internal
-- [ ] Each listed package has an accurate one-line purpose description matching current code
-- [ ] The table is sorted logically (e.g. by domain: parsing, prompt, agent, config, git, runtime, tui)
+- [x] `runner` package is removed from the table (no longer exists)
+- [x] `runtracker` package is removed from the table (replaced by `runlog`)
+- [x] The following ~15 important packages are listed with accurate descriptions: `parser`, `prompt`, `agent`, `config`, `globalconfig`, `approval`, `runlog`, `gitbranch`, `gitcommit`, `gitignore`, `gitsync`, `stores`, `hooks`, `discord`, `filewatcher`, `tui`, `updater`
+- [x] Minor helper packages (`fingerprint`, `notify`, `claude2x`, `gitutil`, `sesslock`, `session`, `resolver`, `capabilities`, `usage`, `release`) are NOT listed individually — they are too small/internal
+- [x] Each listed package has an accurate one-line purpose description matching current code
+- [x] The table is sorted logically (e.g. by domain: parsing, prompt, agent, config, git, runtime, tui)
 
 ### TASK-039-005: Fix ARCHITECTURE.md skills table
 **Description:** As a developer reading ARCHITECTURE.md, I want the skills table to correctly describe how skills are accessed so I don't look for non-existent CLI entry points.
