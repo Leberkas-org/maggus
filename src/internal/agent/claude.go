@@ -33,25 +33,49 @@ func (a *ClaudeAgent) Validate() error {
 	return nil
 }
 
-// Run invokes `claude -p <prompt>` with stream-json output and sends progress events
-// to the provided bubbletea program. If model is non-empty, --model <model> is added.
-func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *tea.Program) error {
-	path, err := exec.LookPath("claude")
-	if err != nil {
-		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
-	}
-
+// buildStreamArgs returns the CLI args for a streaming claude invocation (used by Run).
+func buildStreamArgs(model string, sessionPersistence bool, prompt string) []string {
 	args := []string{
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
 	}
-
 	if model != "" {
 		args = append(args, "--model", model)
 	}
+	if !sessionPersistence {
+		args = append(args, "--no-session-persistence")
+	}
+	return append(args, "-p", prompt)
+}
 
-	args = append(args, "-p", prompt)
+// buildTextArgs returns the CLI args for a text-output claude invocation (used by RunOnce).
+func buildTextArgs(model string, sessionPersistence bool, prompt string) []string {
+	args := []string{
+		"-p", prompt,
+		"--output-format", "text",
+		"--verbose",
+		"--dangerously-skip-permissions",
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if !sessionPersistence {
+		args = append(args, "--no-session-persistence")
+	}
+	return args
+}
+
+// Run invokes `claude -p <prompt>` with stream-json output and sends progress events
+// to the provided bubbletea program. If model is non-empty, --model <model> is added.
+// When sessionPersistence is false, --no-session-persistence is appended.
+func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p *tea.Program) error {
+	path, err := exec.LookPath("claude")
+	if err != nil {
+		return fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
+	}
+
+	args := buildStreamArgs(model, sessionPersistence, prompt)
 	cmd := exec.CommandContext(ctx, path, args...)
 	setProcAttr(cmd)
 
@@ -213,21 +237,14 @@ func (a *ClaudeAgent) Run(ctx context.Context, prompt string, model string, p *t
 }
 
 // RunOnce invokes `claude -p <prompt> --output-format text` and returns the full response.
-func (a *ClaudeAgent) RunOnce(ctx context.Context, prompt string, model string) (string, error) {
+// When sessionPersistence is false, --no-session-persistence is appended.
+func (a *ClaudeAgent) RunOnce(ctx context.Context, prompt string, model string, sessionPersistence bool) (string, error) {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return "", fmt.Errorf("claude not found on PATH: %w\nMake sure Claude Code CLI is installed and available", err)
 	}
 
-	args := []string{
-		"-p", prompt,
-		"--output-format", "text",
-		"--verbose",
-		"--dangerously-skip-permissions",
-	}
-	if model != "" {
-		args = append(args, "--model", model)
-	}
+	args := buildTextArgs(model, sessionPersistence, prompt)
 
 	cmd := exec.CommandContext(ctx, path, args...)
 	setProcAttr(cmd)

@@ -100,7 +100,7 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 	}
 
 	// Build the daemon work command arguments.
-	daemonArgs := []string{"work", "--daemon-run", "--daemon-run-id=" + runID}
+	daemonArgs := []string{"run", "--daemon-run", "--daemon-run-id=" + runID}
 	if startModelFlag != "" {
 		daemonArgs = append(daemonArgs, "--model="+startModelFlag)
 	}
@@ -219,7 +219,7 @@ func startDaemon(dir string) error {
 	}
 
 	// Build daemon args — no model/agent flags (use config defaults).
-	daemonArgs := []string{"work", "--daemon-run", "--daemon-run-id=" + runID}
+	daemonArgs := []string{"run", "--daemon-run", "--daemon-run-id=" + runID}
 
 	// Launch the daemon process (platform-specific detach).
 	pid, err := launchDaemon(exe, daemonArgs, logFile, dir)

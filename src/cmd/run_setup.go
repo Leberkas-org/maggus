@@ -25,24 +25,25 @@ var (
 	getwdFn           = os.Getwd
 )
 
-// workConfig holds all resolved configuration needed by the work loop.
-type workConfig struct {
-	count           int
-	dir             string
-	cfg             config.Config
-	globalSettings  globalconfig.Settings
-	validIncludes   []string
-	includeWarnings []string
-	activeAgent     agent.Agent
-	resolvedModel   string
-	modelDisplay    string
-	notifier        *notify.Notifier
-	hostFingerprint string
+// runLoopConfig holds all resolved configuration needed by the work loop.
+type runLoopConfig struct {
+	count              int
+	dir                string
+	cfg                config.Config
+	globalSettings     globalconfig.Settings
+	validIncludes      []string
+	includeWarnings    []string
+	activeAgent        agent.Agent
+	resolvedModel      string
+	modelDisplay       string
+	notifier           *notify.Notifier
+	hostFingerprint    string
+	sessionPersistence bool
 }
 
-// workSetup resolves CLI flags, loads config, validates the agent, and
+// runSetup resolves CLI flags, loads config, validates the agent, and
 // prepares all configuration the work loop needs to run.
-func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
+func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 	count := countFlag
 
 	if taskFlag != "" {
@@ -128,18 +129,19 @@ func workSetup(cmd *cobra.Command, args []string) (*workConfig, error) {
 
 	globalSettings, _ := globalconfig.LoadSettings()
 
-	return &workConfig{
-		count:           count,
-		dir:             dir,
-		cfg:             cfg,
-		globalSettings:  globalSettings,
-		validIncludes:   validIncludes,
-		includeWarnings: includeWarnings,
-		activeAgent:     activeAgent,
-		resolvedModel:   resolvedModel,
-		modelDisplay:    modelDisplay,
-		notifier:        notifier,
-		hostFingerprint: hostFingerprint,
+	return &runLoopConfig{
+		count:              count,
+		dir:                dir,
+		cfg:                cfg,
+		globalSettings:     globalSettings,
+		validIncludes:      validIncludes,
+		includeWarnings:    includeWarnings,
+		activeAgent:        activeAgent,
+		resolvedModel:      resolvedModel,
+		modelDisplay:       modelDisplay,
+		notifier:           notifier,
+		hostFingerprint:    hostFingerprint,
+		sessionPersistence: cfg.IsSessionPersistenceEnabled(),
 	}, nil
 }
 

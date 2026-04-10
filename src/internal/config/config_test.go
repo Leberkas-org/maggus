@@ -777,6 +777,92 @@ func TestLoad_HooksMissingSection(t *testing.T) {
 	}
 }
 
+func TestConfig_IsSessionPersistenceEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		val  *bool
+		want bool
+	}{
+		{"nil defaults to false", nil, false},
+		{"explicit true enables session persistence", boolPtr(true), true},
+		{"explicit false disables session persistence", boolPtr(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{SessionPersistence: tt.val}
+			if got := cfg.IsSessionPersistenceEnabled(); got != tt.want {
+				t.Errorf("IsSessionPersistenceEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_SessionPersistenceDefault(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `model: sonnet
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.SessionPersistence != nil {
+		t.Errorf("expected SessionPersistence to be nil by default, got %v", *cfg.SessionPersistence)
+	}
+	if cfg.IsSessionPersistenceEnabled() {
+		t.Error("expected IsSessionPersistenceEnabled() to be false by default")
+	}
+}
+
+func TestLoad_SessionPersistenceTrue(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `session_persistence: true
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.IsSessionPersistenceEnabled() {
+		t.Error("expected IsSessionPersistenceEnabled() to be true")
+	}
+}
+
+func TestLoad_SessionPersistenceFalse(t *testing.T) {
+	dir := t.TempDir()
+	maggusDir := filepath.Join(dir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `session_persistence: false
+`
+	if err := os.WriteFile(filepath.Join(maggusDir, "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.IsSessionPersistenceEnabled() {
+		t.Error("expected IsSessionPersistenceEnabled() to be false when explicitly set to false")
+	}
+}
+
 func TestLoad_InvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	maggusDir := filepath.Join(dir, ".maggus")

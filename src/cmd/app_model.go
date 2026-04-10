@@ -305,16 +305,35 @@ func (m *appModel) teardownScreen(s screenID) {
 	}
 }
 
+// refreshGlobalDaemonCache recreates the global daemonCache when the current
+// working directory has changed (e.g. after a repo switch). If the cwd matches
+// the existing cache's directory, this is a no-op.
+func refreshGlobalDaemonCache() {
+	cwd, _ := os.Getwd()
+	if daemonCache != nil && daemonCache.dir == cwd {
+		return
+	}
+	if daemonCache != nil {
+		daemonCache.Stop()
+		daemonCache = nil
+	}
+	if cache, err := NewDaemonStateCache(cwd); err == nil {
+		daemonCache = cache
+	}
+}
+
 // initScreen creates (or re-creates) the sub-model for screen s, populates it with
 // the resources it needs (watchers, daemon subscriptions), and returns Init().
 func (m *appModel) initScreen(s screenID) tea.Cmd {
 	switch s {
 	case screenMenu:
+		refreshGlobalDaemonCache()
 		mm := newMenuModel(loadFeatureSummary())
 		m.menu = &mm
 		return m.menu.Init()
 
 	case screenStatus:
+		refreshGlobalDaemonCache()
 		sm, err := buildStatusModel()
 		if err != nil {
 			// Fall back to an empty status model rather than crashing.

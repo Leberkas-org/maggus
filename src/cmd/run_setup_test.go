@@ -19,12 +19,16 @@ type fakeAgent struct {
 	validateErr error
 }
 
-func (f *fakeAgent) Run(_ context.Context, _ string, _ string, _ *tea.Program) error { return nil }
-func (f *fakeAgent) RunOnce(_ context.Context, _ string, _ string) (string, error)   { return "", nil }
+func (f *fakeAgent) Run(_ context.Context, _ string, _ string, _ bool, _ *tea.Program) error {
+	return nil
+}
+func (f *fakeAgent) RunOnce(_ context.Context, _ string, _ string, _ bool) (string, error) {
+	return "", nil
+}
 func (f *fakeAgent) Name() string                                                    { return f.name }
 func (f *fakeAgent) Validate() error                                                 { return f.validateErr }
 
-// stubSetupDeps replaces workSetup's function variables with test stubs
+// stubSetupDeps replaces runSetup's function variables with test stubs
 // and restores originals on cleanup.
 type setupStubs struct {
 	loadConfig   func(string) (config.Config, error)
@@ -115,7 +119,7 @@ func TestWorkSetup_ModelFlagOverridesConfig(t *testing.T) {
 	modelFlag = "opus"
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +141,7 @@ func TestWorkSetup_ConfigModelUsedWhenNoFlag(t *testing.T) {
 	modelFlag = ""
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +162,7 @@ func TestWorkSetup_EmptyModelShowsDefault(t *testing.T) {
 	modelFlag = ""
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +191,7 @@ func TestWorkSetup_AgentFlagOverridesConfig(t *testing.T) {
 	agentFlag = "opencode"
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,7 +221,7 @@ func TestWorkSetup_ConfigAgentUsedWhenNoFlag(t *testing.T) {
 	agentFlag = ""
 	countFlag = 1
 
-	_, err := workSetup(newDummyCmd(), nil)
+	_, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -236,7 +240,7 @@ func TestWorkSetup_TaskFlagForcesCountOne(t *testing.T) {
 	taskFlag = "TASK-001"
 	countFlag = 10
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -253,7 +257,7 @@ func TestWorkSetup_ArgsOverrideCountFlag(t *testing.T) {
 	taskFlag = ""
 	countFlag = 5
 
-	wc, err := workSetup(newDummyCmd(), []string{"3"})
+	wc, err := runSetup(newDummyCmd(), []string{"3"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,7 +274,7 @@ func TestWorkSetup_InvalidCountArg(t *testing.T) {
 	taskFlag = ""
 	countFlag = 5
 
-	_, err := workSetup(newDummyCmd(), []string{"abc"})
+	_, err := runSetup(newDummyCmd(), []string{"abc"})
 	if err == nil {
 		t.Fatal("expected error for invalid count arg")
 	}
@@ -285,7 +289,7 @@ func TestWorkSetup_ZeroCountArg(t *testing.T) {
 
 	taskFlag = ""
 
-	_, err := workSetup(newDummyCmd(), []string{"0"})
+	_, err := runSetup(newDummyCmd(), []string{"0"})
 	if err == nil {
 		t.Fatal("expected error for zero count")
 	}
@@ -300,7 +304,7 @@ func TestWorkSetup_NegativeCountArg(t *testing.T) {
 
 	taskFlag = ""
 
-	_, err := workSetup(newDummyCmd(), []string{"-1"})
+	_, err := runSetup(newDummyCmd(), []string{"-1"})
 	if err == nil {
 		t.Fatal("expected error for negative count")
 	}
@@ -332,7 +336,7 @@ func TestWorkSetup_IncludeWarningsForMissingFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -358,7 +362,7 @@ func TestWorkSetup_EmptyFingerprint_SetsUnknown(t *testing.T) {
 
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -376,13 +380,72 @@ func TestWorkSetup_Fingerprint_UsesReturnedValue(t *testing.T) {
 
 	countFlag = 1
 
-	wc, err := workSetup(newDummyCmd(), nil)
+	wc, err := runSetup(newDummyCmd(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if wc.hostFingerprint != "abc123" {
 		t.Errorf("hostFingerprint = %q, want %q", wc.hostFingerprint, "abc123")
+	}
+}
+
+// --- Session persistence tests ---
+
+func TestWorkSetup_SessionPersistenceTrue(t *testing.T) {
+	saveAndRestoreFlags(t)
+	stubs := defaultSetupStubs()
+	trueVal := true
+	stubs.loadConfig = func(string) (config.Config, error) {
+		return config.Config{SessionPersistence: &trueVal}, nil
+	}
+	stubSetupDeps(t, stubs)
+	countFlag = 1
+
+	wc, err := runSetup(newDummyCmd(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wc.sessionPersistence {
+		t.Errorf("sessionPersistence = false, want true when config sets session_persistence: true")
+	}
+}
+
+func TestWorkSetup_SessionPersistenceFalse(t *testing.T) {
+	saveAndRestoreFlags(t)
+	stubs := defaultSetupStubs()
+	falseVal := false
+	stubs.loadConfig = func(string) (config.Config, error) {
+		return config.Config{SessionPersistence: &falseVal}, nil
+	}
+	stubSetupDeps(t, stubs)
+	countFlag = 1
+
+	wc, err := runSetup(newDummyCmd(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wc.sessionPersistence {
+		t.Errorf("sessionPersistence = true, want false when config sets session_persistence: false")
+	}
+}
+
+func TestWorkSetup_SessionPersistenceDefault(t *testing.T) {
+	saveAndRestoreFlags(t)
+	stubs := defaultSetupStubs()
+	stubs.loadConfig = func(string) (config.Config, error) {
+		return config.Config{}, nil
+	}
+	stubSetupDeps(t, stubs)
+	countFlag = 1
+
+	wc, err := runSetup(newDummyCmd(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// When not set, defaults to false (--no-session-persistence will be added)
+	if wc.sessionPersistence {
+		t.Errorf("sessionPersistence = true, want false when session_persistence is unset")
 	}
 }
 

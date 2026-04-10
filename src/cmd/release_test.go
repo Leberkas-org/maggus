@@ -126,7 +126,7 @@ func TestRunReleaseWritesFile(t *testing.T) {
 
 	// Mock the Claude invocation
 	origRunner := runAgentOnce
-	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
+	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string, sessionPersistence bool) (string, error) {
 		return "- Added a great new feature for users", nil
 	}
 	defer func() { runAgentOnce = origRunner }()
@@ -186,7 +186,7 @@ func TestRunReleaseNoReleaseNotes(t *testing.T) {
 	// No .maggus/RELEASE_NOTES.md — should not error
 
 	origRunner := runAgentOnce
-	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
+	runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string, sessionPersistence bool) (string, error) {
 		return "- Summary", nil
 	}
 	defer func() { runAgentOnce = origRunner }()

@@ -18,8 +18,8 @@ var releaseModelFlag string
 
 // runAgentOnce is a package-level variable so tests can replace it.
 // It accepts an agent.Agent so the release command can use the configured agent.
-var runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string) (string, error) {
-	return a.RunOnce(ctx, prompt, model)
+var runAgentOnce = func(ctx context.Context, a agent.Agent, prompt string, model string, sessionPersistence bool) (string, error) {
+	return a.RunOnce(ctx, prompt, model, sessionPersistence)
 }
 
 var releaseCmd = &cobra.Command{
@@ -102,7 +102,7 @@ func runRelease(cmd *cobra.Command, dir string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer cancel()
 
-	summary, err := runAgentOnce(ctx, activeAgent, prompt, resolvedModel)
+	summary, err := runAgentOnce(ctx, activeAgent, prompt, resolvedModel, cfg.IsSessionPersistenceEnabled())
 	if err != nil {
 		return fmt.Errorf("generate summary: %w", err)
 	}

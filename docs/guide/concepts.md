@@ -1,12 +1,12 @@
 # Concepts
 
-This page explains Maggus's runtime behavior — what happens when you run `maggus work`, what gets logged, and how to interact with the TUI.
+This page explains Maggus's runtime behavior — what happens when you run `maggus start`, what gets logged, and how to interact with the TUI.
 
 ## Work Loop Lifecycle
 
-When you run `maggus work`, Maggus enters a loop that processes tasks one at a time:
+When you start Maggus (via `maggus start` or the interactive menu), it enters a loop that processes tasks one at a time:
 
-1. **Parse** — Load all active plan files (`.maggus/plan_*.md`), skipping completed (`_completed.md`) files
+1. **Parse** — Load all active feature files (`.maggus/features/feature_*.md`) and bug files (`.maggus/bugs/bug_*.md`), skipping completed (`_completed.md`) files
 2. **Find task** — Identify the next workable task (incomplete and not blocked) across all plans
 3. **Branch** — If on a protected branch (`main`, `master`, `dev`), create a feature branch
 4. **Prompt** — Assemble the prompt with bootstrap context files, run metadata, and task details
@@ -14,13 +14,9 @@ When you run `maggus work`, Maggus enters a loop that processes tasks one at a t
 6. **Commit** — Read the `COMMIT.md` file written by the agent, stage all changes, and commit
 7. **Repeat** — Loop back to step 2 for the next task
 
-When all tasks are complete or blocked, the loop exits. If a plan has all tasks completed, it is automatically renamed from `plan_N.md` to `plan_N_completed.md`.
+When all tasks are complete or blocked, the loop exits. If a feature file has all tasks completed, it is automatically renamed from `feature_N.md` to `feature_N_completed.md`.
 
-You can limit the number of iterations with the `--count` flag:
-
-```bash
-maggus work --count 3   # stop after 3 tasks
-```
+When all tasks are complete or blocked, the loop exits.
 
 ## Agents
 
@@ -49,7 +45,7 @@ agent: opencode
 Or override per-run with the CLI flag:
 
 ```bash
-maggus work --agent opencode
+maggus start --agent opencode
 ```
 
 If no agent is configured, Maggus defaults to `claude` (Claude Code) for backwards compatibility. See the [Configuration reference](/reference/configuration) for full details.
@@ -63,70 +59,19 @@ Maggus automatically manages branches to keep your main branch clean:
 
 This means you can either let Maggus manage branches automatically, or check out a specific branch beforehand to control where changes land.
 
-## Stopping a Run
+## Stopping the Daemon
 
-Maggus provides two ways to stop a running work session:
+Use `maggus stop` to gracefully terminate the running daemon. The in-progress task will be cancelled and the daemon shuts down.
 
-### Stop After Task (Alt+S)
+## Monitoring Progress
 
-Press **Alt+S** during execution to request a graceful stop after the current task finishes. A confirmation prompt appears (`y/n`). While active, the border turns yellow. Press **Alt+S** again to cancel the stop and continue working.
+Maggus runs as a background daemon — there is no interactive TUI attached to the work loop. To monitor progress, use the interactive menu (`maggus`) or `maggus status`, which shows live task progress, run logs, and daemon state.
 
-This is the recommended way to stop — no work is lost and the current task completes cleanly.
-
-### Ctrl+C (Immediate Stop)
-
-- **First Ctrl+C** — Signals an immediate stop. The in-progress agent subprocess is cancelled and the run transitions to the summary screen.
-- **Second Ctrl+C** — Force-kills the process immediately.
-
-## The TUI
-
-When Maggus is running, it displays a full-screen terminal UI (built with [Bubbletea](https://github.com/charmbracelet/bubbletea)) inside a bordered box that keeps you informed about progress.
-
-### Header
-
-The top section shows:
-- **Version** (left) and **host fingerprint** (right)
-- **Progress bar** showing overall task completion: `[████████░░░░] N/M Tasks`
-- **Current task** ID and title in cyan
-
-### Tab Bar
-
-Below the header, a tab bar lets you switch between four views:
-
-| Tab | Key | Content |
-|-----|-----|---------|
-| **Progress** | `1` | Live spinner, status, recent tool list, extras, model, elapsed time, token usage |
-| **Detail** | `2` | Scrollable structured log of every tool invocation — each entry shows an icon, description, timestamp, and parameters |
-| **Task** | `3` | Current task's plan file, description, and acceptance criteria with status icons (✓ done, ⚠ blocked, ○ pending) |
-| **Commits** | `4` | List of commits made during the current run |
-
-Switch tabs with `←/→` arrow keys or number keys `1`–`4`. The Detail tab supports `↑/↓/Home/End` scrolling with auto-scroll that pauses when you scroll up.
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `←/→` or `1-4` | Switch tabs |
-| `↑/↓` | Scroll (on Detail tab) |
-| `Home/End` | Jump to top/bottom |
-| `Alt+S` | Toggle stop-after-task |
-| `Ctrl+C` | Interrupt immediately |
-
-### Summary Screen
-
-After the run ends, a summary screen shows the outcome with a title reflecting the stop reason:
-
-- **✓ Work Complete** — All requested tasks finished
-- **⊘ Stopped by User** — Graceful stop via Alt+S
-- **⊘ Work Interrupted** — Cancelled via Ctrl+C
-- **✗ Work Failed** — A task or commit error (with detail)
-- **⊘ No Tasks Available** — Nothing workable found
-
-The summary includes run ID, branch, model, elapsed time, per-task token breakdown, commit list, and remaining tasks. You can choose to **Exit** or **Run again** with a custom task count.
+See the [TUI reference](/reference/tui) for details on the status view and main menu.
 
 ## Run Logs
 
-Every `maggus work` invocation creates a **run directory** under `.maggus/runs/`:
+Every Maggus run creates a **run directory** under `.maggus/runs/`:
 
 ```
 .maggus/runs/<RUN_ID>/

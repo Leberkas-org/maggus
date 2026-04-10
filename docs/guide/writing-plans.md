@@ -4,18 +4,40 @@ Plans are the core input to Maggus. A plan is a markdown file that describes a s
 
 ## Plan File Location
 
-Plan files live in the `.maggus/` directory at the root of your project. They must follow the naming pattern:
+Feature plan files live in the `.maggus/features/` directory at the root of your project. They must follow the naming pattern:
 
 ```
-.maggus/plan_*.md
+.maggus/features/feature_*.md
 ```
 
 For example:
-- `.maggus/plan_1.md`
-- `.maggus/plan_2.md`
-- `.maggus/plan_auth_refactor.md`
+- `.maggus/features/feature_001.md`
+- `.maggus/features/feature_002.md`
+- `.maggus/features/feature_auth_refactor.md`
 
 Maggus scans all files matching this pattern and processes them in order.
+
+## Bug Files
+
+Bug files follow the same task format as feature files, but live in a separate directory:
+
+```
+.maggus/bugs/bug_*.md
+```
+
+For example:
+- `.maggus/bugs/bug_001.md`
+- `.maggus/bugs/bug_login_crash.md`
+
+Bug files use identical structure — `### TASK-NNN: Title` headings with `**Acceptance Criteria:**` checkboxes. The key difference is that **Maggus works through all bug files before feature files** in the work loop, so bugs are always prioritized over new features.
+
+Instead of writing bug files by hand, use the `/maggus-bugreport` skill in Claude Code:
+
+```
+/maggus-bugreport Login crashes when email contains a plus sign
+```
+
+Similarly, use `/maggus-plan` to generate feature files rather than writing them manually.
 
 ## Plan File Structure
 
@@ -86,14 +108,14 @@ You can also use the `⚠️ BLOCKED:` prefix variant — Maggus recognizes both
 When all tasks in a plan file are complete, Maggus automatically renames the file:
 
 ```
-.maggus/plan_1.md  →  .maggus/plan_1_completed.md
+.maggus/features/feature_001.md  →  .maggus/features/feature_001_completed.md
 ```
 
 Completed plan files are preserved for reference but are no longer processed by Maggus. The `maggus status` command can show completed plans with the `--all` flag.
 
 ## Full Example Plan
 
-Here's a complete plan file you can use as a template:
+Here's a complete plan file you can use as a template (save it as `.maggus/features/feature_001.md`):
 
 ```markdown
 # Plan: Add User Authentication
@@ -161,13 +183,19 @@ routes so that only authenticated users can access them.
 
 ## Generating Plans Automatically
 
-Instead of writing plans by hand, you can use the **maggus-plan** skill in Claude Code to generate them. Simply describe the feature you want and the skill will produce a properly formatted plan file:
+Instead of writing plans by hand, use the `/maggus-plan` skill in Claude Code to generate feature files. Simply describe the feature you want and the skill will produce a properly formatted file in `.maggus/features/`:
 
 ```
 /maggus-plan Add OAuth2 support with Google and GitHub providers
 ```
 
-The skill understands the plan format and generates tasks with detailed acceptance criteria, saving you time on the structure so you can focus on reviewing the content.
+For bugs, use `/maggus-bugreport` to generate a file in `.maggus/bugs/`:
+
+```
+/maggus-bugreport OAuth login redirects to blank page on Firefox
+```
+
+Both skills understand the task format and generate detailed acceptance criteria, saving you time on structure so you can focus on reviewing the content.
 
 ## Tips for Writing Good Plans
 

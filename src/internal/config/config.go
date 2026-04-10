@@ -134,16 +134,17 @@ const (
 
 // Config holds settings read from .maggus/config.yml.
 type Config struct {
-	Agent         string              `yaml:"agent"`
-	Model         string              `yaml:"model"`
-	Include       []string            `yaml:"include"`
-	ApprovalMode  string              `yaml:"approval_mode"`
-	AutoContinue  *bool               `yaml:"auto_continue"`
-	MaxLogFiles   int                 `yaml:"max_log_files"`
-	Notifications NotificationsConfig `yaml:"notifications"`
-	Git           GitConfig           `yaml:"git"`
-	OnComplete    OnCompleteConfig    `yaml:"on_complete"`
-	Hooks         HooksConfig         `yaml:"hooks"`
+	Agent              string              `yaml:"agent"`
+	Model              string              `yaml:"model"`
+	Include            []string            `yaml:"include"`
+	ApprovalMode       string              `yaml:"approval_mode"`
+	AutoContinue       *bool               `yaml:"auto_continue"`
+	SessionPersistence *bool               `yaml:"session_persistence"`
+	MaxLogFiles        int                 `yaml:"max_log_files"`
+	Notifications      NotificationsConfig `yaml:"notifications"`
+	Git                GitConfig           `yaml:"git"`
+	OnComplete         OnCompleteConfig    `yaml:"on_complete"`
+	Hooks              HooksConfig         `yaml:"hooks"`
 }
 
 // IsApprovalRequired returns true when approval_mode is opt-in (the default).
@@ -156,6 +157,12 @@ func (c Config) IsApprovalRequired() bool {
 // Default is false: maggus stops after each feature completes.
 func (c Config) IsAutoContinueEnabled() bool {
 	return c.AutoContinue != nil && *c.AutoContinue
+}
+
+// IsSessionPersistenceEnabled returns true when session_persistence is explicitly set to true.
+// Default is false: the --no-session-persistence flag is passed to the agent subprocess.
+func (c Config) IsSessionPersistenceEnabled() bool {
+	return c.SessionPersistence != nil && *c.SessionPersistence
 }
 
 // LogMaxFiles returns the maximum number of log files to retain in .maggus/runs/.

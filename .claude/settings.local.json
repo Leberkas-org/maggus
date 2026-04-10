@@ -1,13 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(go mod:*)",
-      "Bash(go get:*)",
-      "Bash(go build:*)",
-      "Bash(go test:*)",
-      "Bash(go vet:*)",
       "Bash(go:*)",
-      "Bash(go install:*)",
       "Bash(xargs grep:*)",
       "Bash(ls:*)",
       "Bash(xargs wc:*)",
@@ -27,8 +21,7 @@
       "Bash(find:*)",
       "Bash(head:*)",
       "Bash(python3:*)",
-      "Bash(powershell -Command \"[guid]::NewGuid\\(\\).ToString\\(\\)\" 2>/dev/null)",
-      "Bash(powershell -Command \"[guid]::NewGuid\\(\\).ToString\\(\\)\")"
+      "Bash(powershell:*)"
     ]
   }
 }

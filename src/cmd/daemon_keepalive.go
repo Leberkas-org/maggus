@@ -28,7 +28,7 @@ var errStopAfterTask = errors.New("stop-after-task")
 // runDaemonLoop runs the daemon work loop with keep-alive behaviour.
 // When no work is found, it watches for feature/bug file changes and retries.
 // It exits cleanly when the context is cancelled (signal received).
-func runDaemonLoop(cmd printer, wc *workConfig) error {
+func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 	dir := wc.dir
 
 	// Write daemon PID so 'maggus stop' can find this process.
@@ -209,7 +209,7 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
-func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
 	featureStore := stores.NewFileFeatureStore(dir)
 	bugStore := stores.NewFileBugStore(dir)
 
@@ -345,23 +345,24 @@ func runOneDaemonCycle(cmd printer, wc *workConfig, dir, runID string, runLogger
 	}()
 
 	tc := taskContext{
-		workCtx:       workCtx,
-		p:             p,
-		activeAgent:   wc.activeAgent,
-		resolvedModel: wc.resolvedModel,
-		notifier:      wc.notifier,
-		validIncludes: wc.validIncludes,
-		repoDir:       repoDir,
-		workDir:       workDir,
-		runID:         runID,
-		onComplete:    wc.cfg.OnComplete,
-		hooks:         wc.cfg.Hooks,
-		logger:        runLogger,
-		featureStore:  featureStore,
-		bugStore:      bugStore,
+		workCtx:            workCtx,
+		p:                  p,
+		activeAgent:        wc.activeAgent,
+		resolvedModel:      wc.resolvedModel,
+		sessionPersistence: wc.sessionPersistence,
+		notifier:           wc.notifier,
+		validIncludes:      wc.validIncludes,
+		repoDir:            repoDir,
+		workDir:            workDir,
+		runID:              runID,
+		onComplete:         wc.cfg.OnComplete,
+		hooks:              wc.cfg.Hooks,
+		logger:             runLogger,
+		featureStore:       featureStore,
+		bugStore:           bugStore,
 	}
 
-	runWorkGoroutine(workLoopParams{
+	runWorkGoroutine(runLoopParams{
 		tc:            tc,
 		tasks:         setup.tasks,
 		featureGroups: featureGroups,

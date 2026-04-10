@@ -1,6 +1,6 @@
 # Discord Rich Presence Setup
 
-Maggus supports Discord Rich Presence to show "Running Maggus" in your Discord profile while `maggus work` is active. This document explains how the Discord Application was set up (for future maintainers).
+Maggus supports Discord Rich Presence to show "Running Maggus" in your Discord profile while Maggus is active. This document explains how the Discord Application was set up (for future maintainers).
 
 ## Discord Application
 

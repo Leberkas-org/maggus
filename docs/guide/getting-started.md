@@ -71,7 +71,7 @@ maggus init
 
 ## Writing Your First Plan
 
-Create a plan file at `.maggus/plan_1.md`:
+Create a plan file at `.maggus/features/feature_001.md`:
 
 ```markdown
 # Plan: Hello World
@@ -110,31 +110,30 @@ See [Writing Plans](./writing-plans) for the full format reference.
 
 ## Running Maggus
 
-Start the work loop:
+Run `maggus` in your project directory to open the interactive menu:
 
 ```bash
-maggus work
+maggus
 ```
 
-Maggus will:
+The menu shows your project summary (features and open tasks), the current daemon status, and available actions. From here, follow this workflow:
 
-1. **Parse** your plan and find the first incomplete task (`TASK-001`)
-2. **Branch** — create `feature/maggustask-001` if you're on a protected branch (main/master/dev)
-3. **Prompt** — build a detailed prompt with your task, acceptance criteria, and project context
-4. **Invoke** the AI agent (Claude Code by default) to complete the task
-5. **Commit** — the agent's changes are committed automatically
-6. **Loop** — move on to `TASK-002` and repeat until all tasks are done
+1. Select **status** (`alt+s`) to open the feature browser
+2. Press `a` on a plan to **approve** it — the daemon only processes approved plans
+3. Press `q` to return to the menu, then start the daemon:
 
-Sample startup output:
-
+```bash
+maggus start
 ```
-Maggus v1.0.0                            abc123
-[████████░░░░░░░░░░░░] 0/2 Tasks
 
-  TASK-001: Create a greeting file
+Once the daemon is running, it works through your tasks in order:
 
-  ◐ Working...
-```
+1. **Parse** — Load your plan and find the first incomplete, approved task (`TASK-001`)
+2. **Branch** — Create `feature/maggustask-001` if you're on a protected branch (main/master/dev)
+3. **Prompt** — Build a detailed prompt with your task, acceptance criteria, and project context
+4. **Invoke** — Run the AI agent (Claude Code by default) to complete the task
+5. **Commit** — Commit the agent's changes automatically
+6. **Loop** — Move on to `TASK-002` and repeat until all tasks are done
 
 ::: tip Choosing an agent
 By default, Maggus uses Claude Code. To use OpenCode instead, set it in your config:
@@ -148,45 +147,27 @@ model: openai/gpt-4.1
 Or pass `--agent opencode` on the command line. See the [Configuration reference](/reference/configuration) for details.
 :::
 
-## Understanding the Output
+## Monitoring Progress
 
-While Maggus runs, the TUI (terminal UI) shows:
+Maggus runs as a background daemon. To check on progress, use the interactive menu (`maggus`) or run:
 
-| Section | What it shows |
-|---|---|
-| **Header** | Version, host fingerprint, progress bar (`N/M Tasks`) |
-| **Task info** | Current task ID and title |
-| **Spinner & status** | What the agent is doing right now (reading files, writing code, running commands) |
-| **Tool history** | Recent tools the agent has used |
-| **Tokens** | Input/output token usage for the current task (Only updated after task completion) |
-| **Elapsed** | Time spent on the current task |
+```bash
+maggus status
+```
 
-**Tabs:** Press `1`–`4` to switch between Progress, Detail, Task, and Commits views. Use `←/→` arrow keys to navigate tabs.
+The status view shows live task progress, completed tasks, and daemon state. When all tasks are done (or remaining tasks are blocked), the daemon stops automatically.
 
-**When a task completes**, Maggus commits the changes and immediately moves to the next task. When all tasks are done (or remaining tasks are blocked), you'll see a summary screen with:
+To stop the daemon manually:
 
-- Total tasks completed
-- Commit range
-- Remaining/blocked tasks (if any)
-- Token usage breakdown
-
-From the summary screen you can choose **Exit** or **Run again** (with a custom task count).
-
-**Keyboard shortcuts during work:**
-
-| Key | Action |
-|---|---|
-| `←/→` or `1-4` | Switch tabs |
-| `↑/↓` | Scroll (on Detail tab) |
-| `Home/End` | Jump to top/bottom |
-| `Alt+S` | Stop after current task (with confirmation) |
-| `Ctrl+C` | Interrupt immediately |
+```bash
+maggus stop
+```
 
 ## Next Steps
 
 - [Writing Plans](./writing-plans) — learn the full plan format, blocked tasks, and multi-plan workflows
 - [Maggus Skills](./maggus-plan-skill) — generate plans, vision, and architecture docs with AI
-- [Terminal UI](/reference/tui) — explore the main menu, work view, status view, and more
+- [Terminal UI](/reference/tui) — explore the main menu, status view, and more
 - [Concepts](./concepts) — understand the work loop, git behavior, run logs, and project memory
 - [CLI Commands](/reference/commands) — explore all available commands (`status`, `list`, `clean`, and more)
 - [Configuration](/reference/configuration) — customize agent, model, includes, and notifications

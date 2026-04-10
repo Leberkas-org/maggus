@@ -41,7 +41,7 @@ cat > .maggus/plan_1.md << 'EOF'
 EOF
 
 # Let Maggus work through it
-maggus work
+maggus
 ```
 
 For detailed usage, configuration, and guides, visit the [documentation site](https://leberkas-org.github.io/maggus/).

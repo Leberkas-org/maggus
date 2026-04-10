@@ -1,13 +1,13 @@
 package cmd
 
-// dispatchWork runs `maggus work --task <id>` by invoking the work subcommand.
+// dispatchWork runs `maggus run --task <id>` by invoking the run subcommand.
 func dispatchWork(taskID string) error {
-	sub, remaining, err := rootCmd.Find([]string{"work", "--task", taskID})
+	sub, remaining, err := rootCmd.Find([]string{"run", "--task", taskID})
 	if err != nil {
 		return err
 	}
 	// Reset work command flags so previous invocations don't leak.
-	resetWorkFlags()
+	resetRunFlags()
 	if err := sub.ParseFlags(remaining); err != nil {
 		return err
 	}

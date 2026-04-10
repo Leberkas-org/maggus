@@ -39,8 +39,8 @@ func (a *OpenCodeAgent) Validate() error {
 // Run invokes `opencode -p <prompt> -f json -q` and sends progress events
 // to the provided bubbletea program. OpenCode does not stream events, so
 // StatusMsg updates are sent at process start and on completion.
-// The model parameter is ignored — OpenCode uses its config file for model selection.
-func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, p *tea.Program) error {
+// The model and sessionPersistence parameters are ignored — OpenCode uses its config file.
+func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, sessionPersistence bool, p *tea.Program) error {
 	path, err := exec.LookPath("opencode")
 	if err != nil {
 		return fmt.Errorf("opencode not found on PATH: %w\nInstall OpenCode from https://github.com/opencode-ai/opencode", err)
@@ -111,8 +111,8 @@ func (a *OpenCodeAgent) Run(ctx context.Context, prompt string, model string, p 
 }
 
 // RunOnce invokes `opencode -p <prompt> -f text -q` and returns the full response.
-// The model parameter is ignored — OpenCode uses its config file for model selection.
-func (a *OpenCodeAgent) RunOnce(ctx context.Context, prompt string, model string) (string, error) {
+// The model and sessionPersistence parameters are ignored — OpenCode uses its config file.
+func (a *OpenCodeAgent) RunOnce(ctx context.Context, prompt string, model string, sessionPersistence bool) (string, error) {
 	path, err := exec.LookPath("opencode")
 	if err != nil {
 		return "", fmt.Errorf("opencode not found on PATH: %w\nInstall OpenCode from https://github.com/opencode-ai/opencode", err)
