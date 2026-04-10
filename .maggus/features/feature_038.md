@@ -68,13 +68,13 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] When parallel mode is active: a `feature/maggus-NNN` branch is created off the current branch before any tasks start (if not already on one)
-- [ ] Each parallel task gets a `feature/maggustask-NNN-XXX` branch created off `feature/maggus-NNN` inside its own worktree
-- [ ] `Parallel: no` tasks in a parallel-mode run use the main worktree and a `feature/maggustask-NNN-XXX` branch off `feature/maggus-NNN`
-- [ ] Non-parallel mode (default): existing `feature/maggustask-NNN` single-branch behavior is entirely unchanged
-- [ ] `internal/gitbranch` is updated or extended to support the two-tier strategy without breaking the single-tier path
-- [ ] Unit tests cover parallel and non-parallel branch creation
-- [ ] Typecheck/lint passes
+- [x] When parallel mode is active: a `feature/maggus-NNN` branch is created off the current branch before any tasks start (if not already on one)
+- [x] Each parallel task gets a `feature/maggustask-NNN-XXX` branch created off `feature/maggus-NNN` inside its own worktree
+- [x] `Parallel: no` tasks in a parallel-mode run use the main worktree and a `feature/maggustask-NNN-XXX` branch off `feature/maggus-NNN`
+- [x] Non-parallel mode (default): existing `feature/maggustask-NNN` single-branch behavior is entirely unchanged
+- [x] `internal/gitbranch` is updated or extended to support the two-tier strategy without breaking the single-tier path
+- [x] Unit tests cover parallel and non-parallel branch creation
+- [x] Typecheck/lint passes
 
 ### TASK-038-004: Implement merge orchestration (`internal/gitmerge`)
 **Description:** As the work loop, I want to merge completed task branches into the feature branch so that parallel work integrates cleanly after each task finishes.
