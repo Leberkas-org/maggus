@@ -1576,15 +1576,16 @@ func TestRenderLeftPane_LineCount(t *testing.T) {
 
 // TestRenderRightPane_LineCount verifies that renderRightPane(w, h) returns exactly
 // h+1 lines when h is large enough that tab content fits within contentH = h-2.
-// Uses a selFeature context (activeTab=0 → Summary placeholder) for minimal content.
+// Uses a selFeature context (activeTab=0 → Summary tab). Heights must be large enough
+// that contentH (h-2) accommodates the ~10-line feature summary content.
 func TestRenderRightPane_LineCount(t *testing.T) {
 	m := statusModel{
 		plans:     []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
 		width:     120,
 		height:    40,
-		activeTab: 0, // Summary tab (short placeholder)
+		activeTab: 0, // Summary tab
 	}
-	for _, h := range []int{6, 10, 20, 34} {
+	for _, h := range []int{20, 34} {
 		out := m.renderRightPane(80, h)
 		got := strings.Count(out, "\n") + 1
 		want := h + 1

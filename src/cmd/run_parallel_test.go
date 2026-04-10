@@ -54,6 +54,26 @@ func TestClassifyWorkable_NoPredecessors(t *testing.T) {
 	}
 }
 
+func TestClassifyWorkable_SkipsFailedTasks(t *testing.T) {
+	orch := &parallelOrchestrator{
+		completedIDs: map[string]bool{},
+		failedIDs:    map[string]bool{"TASK-001": true},
+	}
+
+	tasks := []parser.Task{
+		{ID: "TASK-001", Parallel: true, Criteria: []parser.Criterion{{Checked: false}}},
+		{ID: "TASK-002", Parallel: true, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	par, seq := orch.classifyWorkable(tasks)
+	if len(par) != 1 || par[0].ID != "TASK-002" {
+		t.Errorf("parallel workable = %v, want [TASK-002]", taskIDs(par))
+	}
+	if len(seq) != 0 {
+		t.Errorf("sequential workable count = %d, want 0", len(seq))
+	}
+}
+
 func TestCheckCriterionInFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "feature.md")

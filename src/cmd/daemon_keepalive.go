@@ -211,6 +211,11 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
 func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+	// Hot-reload parallel setting from config so changes take effect without daemon restart.
+	if freshCfg, err := loadConfigFn(dir); err == nil {
+		wc.parallel = freshCfg.IsParallelEnabled() || parallelFlag
+	}
+
 	featureStore := stores.NewFileFeatureStore(dir)
 	bugStore := stores.NewFileBugStore(dir)
 

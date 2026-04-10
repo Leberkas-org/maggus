@@ -1,9 +1,11 @@
 agent: claude
 model: sonnet
 include: []
-worktree: false
 approval_mode: opt-in
 auto_continue: null
+session_persistence: null
+parallel: false
+max_log_files: 0
 notifications:
     sound: true
     on_task_complete: false

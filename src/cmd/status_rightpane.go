@@ -63,9 +63,7 @@ func (m statusModel) renderRightPane(width, height int) string {
 	case "output":
 		content = m.renderOutputTab(width, contentH)
 	case "summary":
-		// Summary tab is a future task; show a placeholder for now.
-		content = lipgloss.NewStyle().Width(width).Height(contentH).Render(
-			statusDimStyle.Render("  Summary (coming soon)"))
+		content = m.renderSummaryTab(width, contentH)
 	case "details":
 		content = m.renderFeatureDetailsTab(width, contentH)
 	case "taskdetails":

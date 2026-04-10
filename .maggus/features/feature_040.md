@@ -118,13 +118,13 @@ The new design makes the left pane the primary navigator: what you select determ
 **Parallel:** yes — can run alongside TASK-040-002, TASK-040-003, TASK-040-004
 
 **Acceptance Criteria:**
-- [ ] When **nothing** is selected (`selNone`): Metrics shows "This Repository" and "All Time (Global)" sections only (no "Selected Feature" section)
-- [ ] When a **feature** is selected: Metrics shows "Selected Feature" (with feature-scoped data), "This Repository", and "All Time (Global)" — same as current behavior
-- [ ] When a **task** is selected (running or completed): Metrics shows "Selected Task" (task-level tokens, cost, duration, model), "Selected Feature" (parent feature aggregate), "This Repository", and "All Time (Global)"
-- [ ] The "Selected Task" section is new and shows: task ID, tokens (in/out), cost, cache hit rate, duration, model used
-- [ ] Task-level metrics are loaded from `~/.maggus/usage/work.jsonl` by matching task ID
-- [ ] `loadMetrics()` is updated to also load task-level metrics when a task is selected
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When **nothing** is selected (`selNone`): Metrics shows "This Repository" and "All Time (Global)" sections only (no "Selected Feature" section)
+- [x] When a **feature** is selected: Metrics shows "Selected Feature" (with feature-scoped data), "This Repository", and "All Time (Global)" — same as current behavior
+- [x] When a **task** is selected (running or completed): Metrics shows "Selected Task" (task-level tokens, cost, duration, model), "Selected Feature" (parent feature aggregate), "This Repository", and "All Time (Global)"
+- [x] The "Selected Task" section is new and shows: task ID, tokens (in/out), cost, cache hit rate, duration, model used
+- [x] Task-level metrics are loaded from `~/.maggus/usage/work.jsonl` by matching task ID
+- [x] `loadMetrics()` is updated to also load task-level metrics when a task is selected
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-040-006: Wire up selection-change behavior and clean up old code
 **Description:** As a developer, I want cursor movement in the left pane to properly trigger tab resets and content updates, and old dead code to be removed, so the implementation is clean and correct.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -37,6 +38,16 @@ type featureMetrics struct {
 	avgDurationSecs float64
 	avgCostUSD      float64
 	modelBreakdown  map[string]modelStat
+}
+
+type taskMetrics struct {
+	taskID       string
+	inputTokens  int64
+	outputTokens int64
+	costUSD      float64
+	cacheHitRate float64
+	durationSecs float64
+	model        string
 }
 
 type repoMetrics struct {
@@ -111,6 +122,64 @@ func loadFeatureMetrics(itemID string) featureMetrics {
 	}
 
 	return fm
+}
+
+// loadTaskMetrics reads ~/.maggus/usage/work.jsonl, filters by task_short == taskShort,
+// and returns aggregated stats for that single task (may span multiple runs).
+func loadTaskMetrics(taskShort string) taskMetrics {
+	if taskShort == "" {
+		return taskMetrics{}
+	}
+
+	records := readWorkRecords()
+
+	var tm taskMetrics
+	tm.taskID = taskShort
+
+	var totalInput, totalCacheRead int64
+	var totalDurationSecs float64
+	var count int
+	modelCounts := make(map[string]int)
+
+	for _, r := range records {
+		if r.TaskShort != taskShort {
+			continue
+		}
+		count++
+		tm.costUSD += r.CostUSD
+		tm.inputTokens += int64(r.InputTokens) + int64(r.CacheCreationInputTokens) + int64(r.CacheReadInputTokens)
+		tm.outputTokens += int64(r.OutputTokens)
+		totalInput += int64(r.InputTokens)
+		totalCacheRead += int64(r.CacheReadInputTokens)
+
+		dur := r.EndTime.Sub(r.StartTime).Seconds()
+		if dur > 0 {
+			totalDurationSecs += dur
+		}
+
+		if r.Model != "" {
+			modelCounts[r.Model]++
+		}
+	}
+
+	if totalInput+totalCacheRead > 0 {
+		tm.cacheHitRate = float64(totalCacheRead) / float64(totalInput+totalCacheRead)
+	}
+
+	if count > 0 {
+		tm.durationSecs = totalDurationSecs
+	}
+
+	// Pick the most frequently used model.
+	bestCount := 0
+	for model, c := range modelCounts {
+		if c > bestCount {
+			bestCount = c
+			tm.model = model
+		}
+	}
+
+	return tm
 }
 
 // loadRepoMetrics reads ~/.maggus/usage/work.jsonl, filters by repository == repoURL,
@@ -190,7 +259,7 @@ func readWorkRecords() []usage.Record {
 	return records
 }
 
-// loadMetrics refreshes the cached metrics for Tab 4 based on the currently selected plan.
+// loadMetrics refreshes the cached metrics for Tab 4 based on the currently selected plan/task.
 func (m *statusModel) loadMetrics() {
 	plan := m.selectedPlan()
 	itemID := plan.ApprovalKey()
@@ -199,15 +268,28 @@ func (m *statusModel) loadMetrics() {
 	m.cachedFeatureMetrics = loadFeatureMetrics(itemID)
 	m.cachedRepoMetrics = loadRepoMetrics(repoURL)
 
+	// Load task-level metrics when a task row is selected.
+	if t := m.selectedTask(); t != nil {
+		m.cachedTaskMetrics = loadTaskMetrics(t.ID)
+	} else {
+		m.cachedTaskMetrics = taskMetrics{}
+	}
+
 	globalDir, err := globalconfig.Dir()
 	if err == nil {
 		m.cachedGlobalMetrics, _ = globalconfig.LoadMetricsFrom(filepath.Join(globalDir, "metrics.yml"))
 	}
 }
 
-// renderMetricsTab renders Tab 4: metrics sections for the selected feature,
-// this repository, all-time global stats, and model breakdown.
+// renderMetricsTab renders Tab 4: metrics sections adapt to what is selected.
+//
+//   - selNone:          "This Repository" + "All Time (Global)"
+//   - selFeature:       "Selected Feature" + "This Repository" + "All Time (Global)"
+//   - selRunningTask /
+//     selCompletedTask: "Selected Task" + "Selected Feature" + "This Repository" + "All Time (Global)"
 func (m statusModel) renderMetricsTab(width, height int) string {
+	ctx := m.selectionCtx()
+	tm := m.cachedTaskMetrics
 	fm := m.cachedFeatureMetrics
 	rm := m.cachedRepoMetrics
 	gm := m.cachedGlobalMetrics
@@ -218,17 +300,40 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 
 	var sb strings.Builder
 
-	// ── Selected Feature ──
-	sb.WriteString("\n")
-	sb.WriteString(sectionStyle.Render("  Selected Feature"))
-	sb.WriteString("\n")
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tasks completed", fmt.Sprintf("%d", fm.tasksCompleted)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", FormatCost(fm.totalCostUSD)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(fm.totalTokens))))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache hit rate", fmt.Sprintf("%.1f%%", fm.cacheHitRate*100)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache savings", FormatCost(fm.cacheSavingsUSD)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg duration", formatDurationSecs(fm.avgDurationSecs)))
-	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg cost/task", FormatCost(fm.avgCostUSD)))
+	// ── Selected Task (only when a task is selected) ──
+	if ctx == selRunningTask || ctx == selCompletedTask {
+		sb.WriteString("\n")
+		sb.WriteString(sectionStyle.Render("  Selected Task"))
+		sb.WriteString("\n")
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Task ID", tm.taskID))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tokens in", FormatTokens(int(tm.inputTokens))))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tokens out", FormatTokens(int(tm.outputTokens))))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cost", FormatCost(tm.costUSD)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache hit rate", fmt.Sprintf("%.1f%%", tm.cacheHitRate*100)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Duration", formatDurationSecs(tm.durationSecs)))
+		modelShort := tm.model
+		if idx := strings.LastIndex(tm.model, "/"); idx >= 0 {
+			modelShort = tm.model[idx+1:]
+		}
+		if modelShort == "" {
+			modelShort = "—"
+		}
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Model", modelShort))
+	}
+
+	// ── Selected Feature (when a feature or task is selected) ──
+	if ctx == selFeature || ctx == selRunningTask || ctx == selCompletedTask {
+		sb.WriteString("\n")
+		sb.WriteString(sectionStyle.Render("  Selected Feature"))
+		sb.WriteString("\n")
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Tasks completed", fmt.Sprintf("%d", fm.tasksCompleted)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total cost", FormatCost(fm.totalCostUSD)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(fm.totalTokens))))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache hit rate", fmt.Sprintf("%.1f%%", fm.cacheHitRate*100)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Cache savings", FormatCost(fm.cacheSavingsUSD)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg duration", formatDurationSecs(fm.avgDurationSecs)))
+		sb.WriteString(metricsRow(labelStyle, valueStyle, "  Avg cost/task", FormatCost(fm.avgCostUSD)))
+	}
 
 	// ── This Repository ──
 	sb.WriteString("\n")
@@ -252,12 +357,18 @@ func (m statusModel) renderMetricsTab(width, height int) string {
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Total tokens", FormatTokens(int(gm.TokensUsed))))
 	sb.WriteString(metricsRow(labelStyle, valueStyle, "  Git commits", fmt.Sprintf("%d", gm.GitCommits)))
 
-	// ── Model Breakdown ──
-	if len(fm.modelBreakdown) > 0 {
+	// ── Model Breakdown (only when a feature or task is selected) ──
+	if (ctx == selFeature || ctx == selRunningTask || ctx == selCompletedTask) && len(fm.modelBreakdown) > 0 {
 		sb.WriteString("\n")
 		sb.WriteString(sectionStyle.Render("  Model Breakdown"))
 		sb.WriteString("\n")
-		for model, stat := range fm.modelBreakdown {
+		models := make([]string, 0, len(fm.modelBreakdown))
+		for model := range fm.modelBreakdown {
+			models = append(models, model)
+		}
+		sort.Strings(models)
+		for _, model := range models {
+			stat := fm.modelBreakdown[model]
 			short := model
 			// Shorten common model names
 			if idx := strings.LastIndex(model, "/"); idx >= 0 {

@@ -44,6 +44,7 @@ type parallelOrchestrator struct {
 	bugStore       stores.BugStore
 	mu             sync.Mutex
 	completedIDs   map[string]bool
+	failedIDs      map[string]bool
 	iteration      int
 	runStartedAt   time.Time
 
@@ -102,6 +103,7 @@ func runParallelWorkGoroutine(params runLoopParams, planBranch string) {
 			parentLogger: params.tc.logger,
 			featureStore: params.featureStore, bugStore: params.bugStore,
 			completedIDs: make(map[string]bool),
+			failedIDs:    make(map[string]bool),
 			runStartedAt: params.startTime,
 		}
 		for _, t := range group.Tasks {
@@ -169,6 +171,16 @@ func (o *parallelOrchestrator) run(group parser.Plan) parallelWorkResult {
 		result.completed += batch.completed
 		result.failed = append(result.failed, batch.failed...)
 		result.warnings = append(result.warnings, batch.warnings...)
+
+		// Record failed task IDs so classifyWorkable skips them on subsequent iterations.
+		if len(batch.failed) > 0 {
+			o.mu.Lock()
+			for _, f := range batch.failed {
+				o.failedIDs[f.ID] = true
+			}
+			o.mu.Unlock()
+		}
+
 		if batch.stopReason == StopReasonInterrupted {
 			result.stopReason = StopReasonInterrupted
 			break
@@ -186,6 +198,9 @@ func (o *parallelOrchestrator) classifyWorkable(tasks []parser.Task) (parallel, 
 	defer o.mu.Unlock()
 	for _, t := range tasks {
 		if t.IsComplete() || t.IsBlocked() {
+			continue
+		}
+		if o.failedIDs[t.ID] {
 			continue
 		}
 		if !o.predecessorsComplete(t) {

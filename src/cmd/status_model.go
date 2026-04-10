@@ -120,6 +120,7 @@ type statusModel struct {
 	presence *discord.Presence
 
 	// Cached metrics for Tab 4
+	cachedTaskMetrics    taskMetrics
 	cachedFeatureMetrics featureMetrics
 	cachedRepoMetrics    repoMetrics
 	cachedGlobalMetrics  globalconfig.Metrics
@@ -211,6 +212,16 @@ func (m statusModel) selectedPlan() parser.Plan {
 		return parser.Plan{}
 	}
 	return items[m.treeCursor].plan
+}
+
+// selectedTask returns the task for the tree row at treeCursor.
+// Returns nil when the selected item is not a task row.
+func (m statusModel) selectedTask() *parser.Task {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return nil
+	}
+	return items[m.treeCursor].task
 }
 
 // selectionCtx returns the selection context for the item at treeCursor.
