@@ -113,11 +113,11 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] The sample startup output section is replaced with a description of the interactive menu (what the user sees when running `maggus`)
-- [ ] The flow description mentions: launch `maggus` → interactive menu → approve features → start daemon (or use `maggus start`)
-- [ ] No old TUI spinner/progress bar output remains
-- [ ] The "Running Maggus" section accurately describes the daemon-based workflow
-- [ ] The "Next Steps" links are accurate (no references to removed features)
+- [x] The sample startup output section is replaced with a description of the interactive menu (what the user sees when running `maggus`)
+- [x] The flow description mentions: launch `maggus` → interactive menu → approve features → start daemon (or use `maggus start`)
+- [x] No old TUI spinner/progress bar output remains
+- [x] The "Running Maggus" section accurately describes the daemon-based workflow
+- [x] The "Next Steps" links are accurate (no references to removed features)
 
 ### TASK-039-007: Fix clean command description and maggus-plan-skill.md
 **Description:** As a user, I want minor doc inaccuracies fixed so everything is consistent.
