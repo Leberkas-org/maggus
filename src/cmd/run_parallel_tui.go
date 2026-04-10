@@ -184,8 +184,12 @@ func (o *parallelOrchestrator) ensureWorkerMaps() {
 }
 
 // registerWorker adds a worker to the tracking maps. Must be called with o.mu held.
+// If the task ID is already registered, this is a no-op (prevents duplicate entries on retry).
 func (o *parallelOrchestrator) registerWorker(taskID, taskTitle string) {
 	o.ensureWorkerMaps()
+	if _, exists := o.workerStatuses[taskID]; exists {
+		return
+	}
 	o.workerOrder = append(o.workerOrder, taskID)
 	o.workerTitles[taskID] = taskTitle
 	o.workerStatuses[taskID] = "working"
