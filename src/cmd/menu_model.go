@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/stores"
@@ -287,6 +288,10 @@ func newMenuModel(summary featureSummary) menuModel {
 		initialDaemon = daemonStatus{PID: s.PID, Running: s.Running, StoppingAfterTask: s.StoppingAfterTask}
 	}
 
+	// Seed nerf state synchronously so the first rendered frame uses the correct border
+	// color. claude2x.FetchStatus is a pure local time computation with no I/O.
+	nerfStatus := claude2x.FetchStatus()
+
 	return menuModel{
 		items:         activeMenuItems(),
 		summary:       summary,
@@ -298,6 +303,8 @@ func newMenuModel(summary featureSummary) menuModel {
 		height:        termH,
 		daemon:        initialDaemon,
 		daemonCacheCh: daemonCacheCh,
+		isNerfed:      nerfStatus.IsNerfed,
+		twoXExpiresIn: nerfStatus.TwoXWindowExpiresIn,
 	}
 }
 

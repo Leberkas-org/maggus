@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/updater"
 )
@@ -1244,5 +1245,45 @@ func TestLoadFeatureSummary_ApprovalsFilter(t *testing.T) {
 	// Only the approved feature contributes a workable task.
 	if s.workable != 1 {
 		t.Errorf("expected 1 workable task (approved only), got %d", s.workable)
+	}
+}
+
+func TestNewMenuModel_SeedsNerfedStateEagerly(t *testing.T) {
+	claude2x.SetTestCache(true, 3600)
+	t.Cleanup(func() { claude2x.ResetTestCache() })
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	m := newMenuModel(featureSummary{})
+	if m.watcher != nil {
+		defer m.watcher.Close()
+	}
+
+	if !m.isNerfed {
+		t.Error("expected isNerfed to be seeded as true in newMenuModel during nerfed hours")
+	}
+	if m.twoXExpiresIn == "" {
+		t.Error("expected twoXExpiresIn to be set in newMenuModel during nerfed hours")
+	}
+}
+
+func TestNewMenuModel_NotNerfedOutsideHours(t *testing.T) {
+	claude2x.SetTestCache(false, 0)
+	t.Cleanup(func() { claude2x.ResetTestCache() })
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	m := newMenuModel(featureSummary{})
+	if m.watcher != nil {
+		defer m.watcher.Close()
+	}
+
+	if m.isNerfed {
+		t.Error("expected isNerfed to be false in newMenuModel outside nerfed hours")
+	}
+	if m.twoXExpiresIn != "" {
+		t.Errorf("expected twoXExpiresIn to be empty outside nerfed hours, got %q", m.twoXExpiresIn)
 	}
 }

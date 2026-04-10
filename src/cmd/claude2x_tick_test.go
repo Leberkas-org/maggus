@@ -94,6 +94,30 @@ func TestMenuUpdate_Claude2xResultMsg_NoTickWhenNormal(t *testing.T) {
 	assertNoTickScheduled(t, cmd)
 }
 
+// TestMenuUpdate_Claude2xResultMsg_AlreadyNerfed_NoDoubleTick verifies that when
+// isNerfed was eagerly seeded in newMenuModel (so Init already started next2xTick),
+// a subsequent claude2xResultMsg with the same nerfed=true state does NOT start a
+// second concurrent tick chain.
+func TestMenuUpdate_Claude2xResultMsg_AlreadyNerfed_NoDoubleTick(t *testing.T) {
+	m := menuModel{
+		items:    activeMenuItems(),
+		isNerfed: true, // simulates state seeded eagerly in newMenuModel
+	}
+
+	model, cmd := m.Update(claude2xResultMsg{status: claude2x.Status{
+		IsNerfed:            true,
+		TwoXWindowExpiresIn: "1h 0m 0s",
+	}})
+	mm := model.(menuModel)
+
+	if !mm.isNerfed {
+		t.Error("expected isNerfed to remain true")
+	}
+	// When already nerfed (tick started from Init), claude2xResultMsg must NOT
+	// schedule another tick to avoid duplicate concurrent tick chains.
+	assertNoTickScheduled(t, cmd)
+}
+
 func TestStatusUpdate_Claude2xTickMsg_StillActive(t *testing.T) {
 	claude2x.SetTestCache(true, 3600)
 	t.Cleanup(func() { claude2x.ResetTestCache() })

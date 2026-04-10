@@ -119,6 +119,12 @@ func (m menuModel) Init() tea.Cmd {
 		listenForWatcherUpdate(m.watcherCh),
 		listenForDaemonCacheUpdate(m.daemonCacheCh),
 	}
+	// When isNerfed was seeded eagerly in newMenuModel, start the tick chain immediately
+	// so the countdown updates from the first rendered frame without waiting for the
+	// async claude2xResultMsg round-trip.
+	if m.isNerfed {
+		cmds = append(cmds, next2xTick())
+	}
 	return tea.Batch(cmds...)
 }
 
@@ -129,9 +135,13 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case claude2xResultMsg:
+		prevNerfed := m.isNerfed
 		m.isNerfed = msg.status.IsNerfed
 		m.twoXExpiresIn = msg.status.TwoXWindowExpiresIn
-		if m.isNerfed {
+		// Only start the tick chain if we just transitioned into nerfed state.
+		// When isNerfed was already true (seeded in newMenuModel and tick started
+		// from Init), skip scheduling another tick to avoid duplicate tick chains.
+		if m.isNerfed && !prevNerfed {
 			return m, next2xTick()
 		}
 		return m, nil
