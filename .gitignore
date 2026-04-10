@@ -20,3 +20,4 @@ docs/node_modules
 .maggus/feature_approvals.yml
 .maggus/daemon.pid
 .maggus/interactive.lock
+.maggus/worktrees/

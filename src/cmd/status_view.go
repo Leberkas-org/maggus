@@ -176,12 +176,13 @@ func (m statusModel) statusSplitFooter() string {
 		stoppingStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
 		return stoppingStyle.Render("⏳ Stopping after task…")
 	}
+	tabRange := fmt.Sprintf("1-%d: tabs", len(m.availableTabs())+1)
 	if m.leftFocused {
 		daemonHint := "s: start"
 		if m.daemon.Running {
 			daemonHint = "s: stop"
 		}
-		footer := "1-5: tabs  ↑/↓ navigate/scroll  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
+		footer := tabRange + "  ↑/↓ navigate/scroll  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d delete  " + daemonHint + "  q: exit"
 		if m.hasCompletedPlans() {
 			if m.showAll {
 				footer += "  alt+a: hide done"
@@ -191,10 +192,16 @@ func (m statusModel) statusSplitFooter() string {
 		}
 		return footer
 	}
-	switch m.activeTab {
-	case 0:
-		return "1-5: tabs  ↑/↓ navigate/scroll  G: bottom  q: exit"
-	case 1:
+
+	tabs := m.availableTabs()
+	activeKey := ""
+	if m.activeTab >= 0 && m.activeTab < len(tabs) {
+		activeKey = tabs[m.activeTab].key
+	}
+	switch activeKey {
+	case "output":
+		return tabRange + "  ↑/↓ navigate/scroll  G: bottom  q: exit"
+	case "details":
 		c := &m.taskListComponent
 		if c.ShowDetail {
 			ds := &c.Detail
@@ -214,10 +221,10 @@ func (m statusModel) statusSplitFooter() string {
 			parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
 			return strings.Join(parts, " · ")
 		}
-		return "1-5: tabs  ↑/↓ navigate/scroll  enter: detail  q: exit"
-	case 2:
-		return "1-5: tabs  ↑/↓ navigate/scroll  q: exit"
+		return tabRange + "  ↑/↓ navigate/scroll  enter: detail  q: exit"
+	case "taskdetails":
+		return tabRange + "  ↑/↓ navigate/scroll  q: exit"
 	default:
-		return "1-5: tabs  q: exit"
+		return tabRange + "  q: exit"
 	}
 }

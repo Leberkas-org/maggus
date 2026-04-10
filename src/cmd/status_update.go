@@ -513,14 +513,21 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	// Key 1 focuses the left pane; keys 2–5 focus the right pane and switch tabs.
+	// Tab indices are positional within availableTabs() — pressing a key beyond
+	// the available count is ignored.
 	switch key {
 	case "1":
 		m.leftFocused = true
 		return m, nil
 	case "2", "3", "4", "5":
+		idx := int(key[0] - '2')
+		tabs := m.availableTabs()
+		if idx >= len(tabs) {
+			return m, nil // key beyond available tab count — ignore
+		}
 		m.leftFocused = false
-		m.activeTab = int(key[0] - '2')
-		if m.activeTab == 0 {
+		m.activeTab = idx
+		if tabs[idx].key == "output" {
 			m.logAutoScroll = true
 			m.logScroll = m.maxLogScroll()
 		}
@@ -529,8 +536,14 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Right pane is focused in split mode: route keys by active tab.
 	if !m.leftFocused && m.width > 0 && m.height > 0 {
-		// Tab 2 — Feature Details: delegate to the task list component.
-		if m.activeTab == 1 {
+		tabs := m.availableTabs()
+		activeKey := ""
+		if m.activeTab >= 0 && m.activeTab < len(tabs) {
+			activeKey = tabs[m.activeTab].key
+		}
+
+		// Details tab: delegate to the task list component.
+		if activeKey == "details" {
 			if key == "q" {
 				return m.handleQuitRequest()
 			}
@@ -550,31 +563,31 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-		// Tab 1 — Output: log scroll. Tab 3 — Current Task: viewport scroll.
+		// Output: log scroll. Task Details: viewport scroll.
 		switch key {
 		case "q":
 			return m.handleQuitRequest()
 		case "down":
-			if m.activeTab == 0 {
+			if activeKey == "output" {
 				m.logAutoScroll = false
 				m.logScroll = min(m.logScroll+1, m.maxLogScroll())
-			} else if m.activeTab == 2 {
+			} else if activeKey == "taskdetails" {
 				m.currentTaskViewport.ScrollDown(1)
 			}
 		case "up":
-			if m.activeTab == 0 {
+			if activeKey == "output" {
 				m.logAutoScroll = false
 				m.logScroll = max(m.logScroll-1, 0)
-			} else if m.activeTab == 2 {
+			} else if activeKey == "taskdetails" {
 				m.currentTaskViewport.ScrollUp(1)
 			}
 		case "G":
-			if m.activeTab == 0 {
+			if activeKey == "output" {
 				m.logAutoScroll = true
 				m.logScroll = m.maxLogScroll()
 			}
 		case "g":
-			if m.activeTab == 0 {
+			if activeKey == "output" {
 				m.logAutoScroll = false
 				m.logScroll = 0
 			}
@@ -588,9 +601,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = skipSeparatorUp(styles.CursorUp(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -600,9 +615,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = skipSeparatorDown(styles.CursorDown(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -612,9 +629,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = findNextPlanRow(items, m.treeCursor)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -624,9 +643,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = findPrevPlanRow(items, m.treeCursor)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -636,9 +657,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = 0
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -648,9 +671,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = len(items) - 1
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -660,9 +685,11 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.buildTreeItems()
 		if len(items) > 0 {
 			prevPlan := m.selectedPlan()
+			prevCtx := m.selectionCtx()
 			m.treeCursor = skipSeparatorUp(styles.CursorUp(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
+			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
 			}
@@ -694,6 +721,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				delete(m.expandedPlans, item.plan.ID)
 				m.clampTreeScroll()
 			} else if item.kind == treeItemKindTask {
+				prevCtx := m.selectionCtx()
 				parentID := item.plan.ID
 				delete(m.expandedPlans, parentID)
 				// After collapsing, find and select the parent plan row.
@@ -705,6 +733,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.syncPlanCursorFromTreeCursor()
+				m.updateTabsForSelectionChange(prevCtx)
 				m.clampTreeScroll()
 			}
 		}
