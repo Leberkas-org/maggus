@@ -86,13 +86,13 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error` merges `taskBranch` into `featureBranch` using a standard merge commit (no rebase, no fast-forward squash)
-- [ ] Fast-forward and clean three-way merges succeed and return nil
-- [ ] On conflict: the merge is aborted (`git merge --abort`), the function injects `BLOCKED: Merge conflict merging <taskBranch> into <featureBranch> — resolve manually, then uncheck this criterion` as an unchecked criterion into the task's plan file, and returns a typed `MergeConflictError`
-- [ ] On conflict: the task's worktree is preserved (not removed) so the developer can inspect the changes
-- [ ] On success: `taskBranch` is deleted (`git branch -d`) and the worktree is removed via `internal/gitworktree.RemoveWorktree`
-- [ ] Unit tests cover fast-forward merge, clean three-way merge, and conflict paths
-- [ ] Typecheck/lint passes
+- [x] `MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error` merges `taskBranch` into `featureBranch` using a standard merge commit (no rebase, no fast-forward squash)
+- [x] Fast-forward and clean three-way merges succeed and return nil
+- [x] On conflict: the merge is aborted (`git merge --abort`), the function injects `BLOCKED: Merge conflict merging <taskBranch> into <featureBranch> — resolve manually, then uncheck this criterion` as an unchecked criterion into the task's plan file, and returns a typed `MergeConflictError`
+- [x] On conflict: the task's worktree is preserved (not removed) so the developer can inspect the changes
+- [x] On success: `taskBranch` is deleted (`git branch -d`) and the worktree is removed via `internal/gitworktree.RemoveWorktree`
+- [x] Unit tests cover fast-forward merge, clean three-way merge, and conflict paths
+- [x] Typecheck/lint passes
 
 ### TASK-038-005: Implement parallel work loop
 **Description:** As a developer running Maggus in parallel mode, I want the work loop to execute all currently-workable parallel tasks concurrently so that my plans finish faster.
