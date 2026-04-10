@@ -864,13 +864,15 @@ func TestLoad_SessionPersistenceFalse(t *testing.T) {
 }
 
 func TestConfig_IsParallelEnabled(t *testing.T) {
+	boolPtr := func(b bool) *bool { return &b }
 	tests := []struct {
 		name string
-		val  bool
+		val  *bool
 		want bool
 	}{
-		{"false defaults to disabled", false, false},
-		{"true enables parallel", true, true},
+		{"nil defaults to enabled", nil, true},
+		{"false pointer disables parallel", boolPtr(false), false},
+		{"true pointer enables parallel", boolPtr(true), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -898,11 +900,11 @@ func TestLoad_ParallelDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if cfg.Parallel {
-		t.Error("expected Parallel to default to false")
+	if cfg.Parallel != nil {
+		t.Error("expected Parallel to be nil (unset) by default")
 	}
-	if cfg.IsParallelEnabled() {
-		t.Error("expected IsParallelEnabled() to be false by default")
+	if !cfg.IsParallelEnabled() {
+		t.Error("expected IsParallelEnabled() to be true by default")
 	}
 }
 
