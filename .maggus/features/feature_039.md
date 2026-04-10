@@ -49,12 +49,12 @@ A comprehensive documentation cleanup to bring all docs in sync with the current
 **Parallel:** yes — can run alongside all other tasks
 
 **Acceptance Criteria:**
-- [ ] The `maggus list` section documents: `Use: "list"`, no flags, `cobra.NoArgs`
-- [ ] The description matches code: "List all active features and bugs as tab-separated lines"
-- [ ] Output format documented as tab-separated: `filename\tid\ttitle\tapproved`
-- [ ] Old flags (`--count`, `-c`, `--all`, `--plain`, positional `[N]`) are all removed
-- [ ] Old TUI mode description and keyboard shortcuts are removed
-- [ ] Example output shows actual tab-separated format
+- [x] The `maggus list` section documents: `Use: "list"`, no flags, `cobra.NoArgs`
+- [x] The description matches code: "List all active features and bugs as tab-separated lines"
+- [x] Output format documented as tab-separated: `filename\tid\ttitle\tapproved`
+- [x] Old flags (`--count`, `-c`, `--all`, `--plain`, positional `[N]`) are all removed
+- [x] Old TUI mode description and keyboard shortcuts are removed
+- [x] Example output shows actual tab-separated format
 
 ### TASK-039-003: Rewrite configuration.md — remove stale flags and fix fields
 **Description:** As a user reading the configuration reference, I want all documented CLI flags and config fields to match what actually exists in code.

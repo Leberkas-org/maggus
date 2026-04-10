@@ -105,7 +105,7 @@ maggus unapprove 3
 
 ## maggus list
 
-Preview upcoming tasks without running them.
+List all active features and bugs as tab-separated lines.
 
 ### Usage
 
@@ -113,20 +113,29 @@ Preview upcoming tasks without running them.
 maggus list
 ```
 
-### Behavior
+No flags. Takes no arguments.
 
-Lists all active features and bugs as tab-separated lines. Output columns: `filename`, `id`, `title`, `approved`.
+### Output Format
+
+Each active (non-completed) feature and bug is printed as one tab-separated line with four columns:
+
+```
+filename<TAB>id<TAB>title<TAB>approved
+```
+
+| Column | Description |
+|--------|-------------|
+| `filename` | Base name of the plan file (e.g. `feature_001.md`) |
+| `id` | Plan ID (e.g. `TASK-001` or `BUG-001`) |
+| `title` | Plan title |
+| `approved` | `approved` or `unapproved` |
 
 ### Example Output
 
 ```
-Next 5 task(s):
-
- #1  TASK-005: Create "CLI Commands" reference page
- #2  TASK-006: Create "Configuration" reference page
- #3  TASK-007: Create "Concepts" page covering run logs, memory, and TUI
- #4  TASK-008: Configure sidebar navigation and header nav
- #5  TASK-009: Add GitHub Actions workflow for deployment on release
+feature_001.md	TASK-001	Add login screen	approved
+feature_002.md	TASK-002	Fix logout bug	unapproved
+bug_001.md	BUG-001	Crash on startup	approved
 ```
 
 ---
