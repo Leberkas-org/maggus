@@ -104,16 +104,16 @@ Enable Maggus to execute multiple tasks from the same plan in parallel, using gi
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] When `parallel` is enabled, the work loop finds all workable tasks (`Parallel: yes` + incomplete + not blocked + approved + all predecessors completed) and launches them concurrently using `errgroup`
-- [ ] Each concurrent task runs in its own worktree (via `internal/gitworktree`) on its own branch (via `internal/gitbranch`)
-- [ ] When a task completes: merge to feature branch (via `internal/gitmerge`), check off acceptance criteria in the plan file, then re-evaluate the dependency graph for newly-workable tasks
-- [ ] Plan file mutations (checkbox updates, BLOCKED injection) are serialized — no concurrent writes to the same file
-- [ ] `Parallel: no` tasks execute sequentially in the main worktree after all their predecessors complete
-- [ ] `runtracker` supports per-worker iteration logs, namespaced by task ID (e.g. `<iter>-<task-id>.log`)
-- [ ] `Ctrl+C` cancels all active workers gracefully: 5-second wait, then force kill
-- [ ] `cmd/run.go` stays under 500 lines — parallel orchestration logic is extracted into `cmd/run_parallel.go`
-- [ ] Non-parallel mode path is entirely unchanged
-- [ ] Typecheck/lint passes
+- [x] When `parallel` is enabled, the work loop finds all workable tasks (`Parallel: yes` + incomplete + not blocked + approved + all predecessors completed) and launches them concurrently using `errgroup`
+- [x] Each concurrent task runs in its own worktree (via `internal/gitworktree`) on its own branch (via `internal/gitbranch`)
+- [x] When a task completes: merge to feature branch (via `internal/gitmerge`), check off acceptance criteria in the plan file, then re-evaluate the dependency graph for newly-workable tasks
+- [x] Plan file mutations (checkbox updates, BLOCKED injection) are serialized — no concurrent writes to the same file
+- [x] `Parallel: no` tasks execute sequentially in the main worktree after all their predecessors complete
+- [x] `runtracker` supports per-worker iteration logs, namespaced by task ID (e.g. `<iter>-<task-id>.log`)
+- [x] `Ctrl+C` cancels all active workers gracefully: 5-second wait, then force kill
+- [x] `cmd/run.go` stays under 500 lines — parallel orchestration logic is extracted into `cmd/run_parallel.go`
+- [x] Non-parallel mode path is entirely unchanged
+- [x] Typecheck/lint passes
 
 ### TASK-038-006: TUI split view for parallel workers
 **Description:** As a developer monitoring a parallel run, I want to see a live status pane per active worker so that I can track all tasks at a glance without switching views.

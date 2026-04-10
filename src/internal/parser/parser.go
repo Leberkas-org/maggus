@@ -87,12 +87,14 @@ type Criterion struct {
 }
 
 type Task struct {
-	ID          string
-	Title       string
-	Description string
-	Model       string
-	Criteria    []Criterion
-	SourceFile  string
+	ID           string
+	Title        string
+	Description  string
+	Model        string
+	Parallel     bool     // true when "Parallel: yes" is set in the task metadata
+	Predecessors []string // task IDs from "Predecessors:" line (e.g. ["TASK-038-001", "TASK-038-004"])
+	Criteria     []Criterion
+	SourceFile   string
 }
 
 type Feature struct {
@@ -207,6 +209,30 @@ func ParseFile(path string) ([]Task, error) {
 				value = value[:idx]
 			}
 			current.Model = value
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Parallel:**") {
+			inDescription = false
+			value := strings.TrimPrefix(line, "**Parallel:**")
+			value = strings.TrimSpace(value)
+			// Accept "yes" at the start (may have trailing comments like "— can run alongside TASK-002")
+			current.Parallel = strings.HasPrefix(strings.ToLower(value), "yes")
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Predecessors:**") {
+			inDescription = false
+			value := strings.TrimPrefix(line, "**Predecessors:**")
+			value = strings.TrimSpace(value)
+			if strings.ToLower(value) != "none" && value != "" {
+				for _, part := range strings.Split(value, ",") {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						current.Predecessors = append(current.Predecessors, part)
+					}
+				}
+			}
 			continue
 		}
 

@@ -311,8 +311,8 @@ func TestSaveConfig(t *testing.T) {
 	dir := t.TempDir()
 
 	cfg := config.Config{
-		Agent: "claude",
-		Model: "sonnet",
+		Agent:   "claude",
+		Model:   "sonnet",
 		Include: []string{"README.md"},
 		Notifications: config.NotificationsConfig{
 			Sound: true,

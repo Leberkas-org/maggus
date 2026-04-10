@@ -34,13 +34,13 @@ func spinnerTick() tea.Cmd {
 
 // daemonStatus holds the current daemon state for display in the status header and log panel.
 type daemonStatus struct {
-	PID                int
-	Running            bool
-	StoppingAfterTask  bool
-	RunID              string
-	LogPath            string
-	CurrentFeature     string
-	CurrentTask        string
+	PID               int
+	Running           bool
+	StoppingAfterTask bool
+	RunID             string
+	LogPath           string
+	CurrentFeature    string
+	CurrentTask       string
 }
 
 // findLatestRunLog returns the run ID (from the fixed-path state.json snapshot)
@@ -145,4 +145,3 @@ func formatHumanDuration(d time.Duration) string {
 		return fmt.Sprintf("%ds", s)
 	}
 }
-

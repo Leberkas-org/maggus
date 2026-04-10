@@ -246,7 +246,7 @@ type menuModel struct {
 	// Daemon state
 	daemon            daemonStatus
 	daemonCacheCh     chan daemonPIDState // subscription channel into daemonCache
-	daemonAutoWarning string             // non-fatal warning if auto-start failed
+	daemonAutoWarning string              // non-fatal warning if auto-start failed
 
 	// Stop-daemon confirmation state
 	confirmStopDaemon bool

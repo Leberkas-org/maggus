@@ -9,13 +9,13 @@ import (
 // Plan represents a single feature or bug file with its parsed tasks and metadata.
 // Approval status is NOT stored here — callers look it up separately via approval.Load().
 type Plan struct {
-	ID        string  // base filename without extension or _completed suffix (e.g. "feature_001", "bug_002")
-	MaggusID  string  // UUID from <!-- maggus-id: ... --> comment; empty if absent
-	File      string  // full path to the source file
-	Title     string  // parsed from top-level heading (e.g. "Feature 001: Discord Rich Presence Integration")
-	Tasks     []Task  // all tasks from this file (may include complete/blocked)
-	IsBug     bool    // true for bug files (from .maggus/bugs/)
-	Completed bool    // true if the filename contains _completed suffix
+	ID        string // base filename without extension or _completed suffix (e.g. "feature_001", "bug_002")
+	MaggusID  string // UUID from <!-- maggus-id: ... --> comment; empty if absent
+	File      string // full path to the source file
+	Title     string // parsed from top-level heading (e.g. "Feature 001: Discord Rich Presence Integration")
+	Tasks     []Task // all tasks from this file (may include complete/blocked)
+	IsBug     bool   // true for bug files (from .maggus/bugs/)
+	Completed bool   // true if the filename contains _completed suffix
 }
 
 // ApprovalKey returns the MaggusID if set, otherwise falls back to the filename-based ID.

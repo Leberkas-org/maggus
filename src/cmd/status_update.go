@@ -231,7 +231,6 @@ func (m *statusModel) resizeTab2DetailViewport() {
 	m.taskListComponent.detailViewport.Height = vpH
 }
 
-
 // treeAvailableHeight returns the number of item rows visible in the left pane
 // after subtracting the fixed header lines (label + separator + daemon status + separator).
 // Used by both clampTreeScroll and renderLeftPane to keep scroll math consistent.

@@ -21,20 +21,20 @@ type SnapshotToolEntry struct {
 // StateSnapshot is the live state written to state.json by the daemon work loop.
 // The status view reads this file to render a rich TUI without IPC.
 type StateSnapshot struct {
-	RunID          string                      `json:"run_id"`
-	TaskID         string                      `json:"task_id"`
-	TaskTitle      string                      `json:"task_title"`
-	ItemTitle      string                      `json:"item_title"`
-	Status         string                      `json:"status"`
-	ToolEntries    []SnapshotToolEntry         `json:"tool_entries"`
-	TokenInput     int                         `json:"token_input"`
-	TokenOutput    int                         `json:"token_output"`
-	TokenCost      float64                     `json:"token_cost"`
+	RunID          string                       `json:"run_id"`
+	TaskID         string                       `json:"task_id"`
+	TaskTitle      string                       `json:"task_title"`
+	ItemTitle      string                       `json:"item_title"`
+	Status         string                       `json:"status"`
+	ToolEntries    []SnapshotToolEntry          `json:"tool_entries"`
+	TokenInput     int                          `json:"token_input"`
+	TokenOutput    int                          `json:"token_output"`
+	TokenCost      float64                      `json:"token_cost"`
 	ModelBreakdown map[string]agent.ModelTokens `json:"model_breakdown"`
-	Commits        []string                    `json:"commits"`
-	RunStartedAt   string                      `json:"run_started_at,omitempty"`
-	TaskStartedAt  string                      `json:"task_started_at,omitempty"`
-	UpdatedAt      string                      `json:"updated_at"`
+	Commits        []string                     `json:"commits"`
+	RunStartedAt   string                       `json:"run_started_at,omitempty"`
+	TaskStartedAt  string                       `json:"task_started_at,omitempty"`
+	UpdatedAt      string                       `json:"updated_at"`
 }
 
 // snapshotPath returns the fixed path to state.json.

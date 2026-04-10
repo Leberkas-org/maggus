@@ -37,13 +37,13 @@ type statusModel struct {
 	taskListComponent
 
 	// Split-pane layout fields
-	plans         []parser.Plan
-	planCursor    int
+	plans            []parser.Plan
+	planCursor       int
 	treeCursor       int             // primary navigation index into buildTreeItems(); replaces planCursor
 	treeScrollOffset int             // scroll offset for left pane tree view
 	expandedPlans    map[string]bool // keyed by plan.ID; starts empty (all collapsed)
-	leftFocused   bool
-	activeTab     int // 0–3: Output, Feature Details, Current Task, Metrics
+	leftFocused      bool
+	activeTab        int // 0–3: Output, Feature Details, Current Task, Metrics
 
 	// Right-pane tab 3 viewport
 	currentTaskViewport viewport.Model
@@ -58,10 +58,10 @@ type statusModel struct {
 	nextTaskFile string
 	agentName    string
 
-	dir          string                // working directory for file operations
-	approvals    approval.Approvals    // cached approvals; reloaded on reloadPlans
-	featureStore stores.FeatureStore   // store for feature plan file operations
-	bugStore     stores.BugStore       // store for bug plan file operations
+	dir          string              // working directory for file operations
+	approvals    approval.Approvals  // cached approvals; reloaded on reloadPlans
+	featureStore stores.FeatureStore // store for feature plan file operations
+	bugStore     stores.BugStore     // store for bug plan file operations
 
 	approvalRequired bool // from config; used when reloading plans
 
@@ -134,10 +134,10 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		approvals:        approvals,
 		featureStore:     featureStore,
 		bugStore:         bugStore,
-		logAutoScroll:   true,
-		leftFocused:     true,
-		activeTab:       0,
-		spinnerTicking:  true,
+		logAutoScroll:    true,
+		leftFocused:      true,
+		activeTab:        0,
+		spinnerTicking:   true,
 	}
 	// Query actual terminal dimensions before the first render so View() always
 	// has a non-zero size and the split-pane is visible on the first frame

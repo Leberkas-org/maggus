@@ -17,9 +17,9 @@ import (
 
 // Opus pricing approximation for cache savings calculation.
 const (
-	opusFullInputPricePerToken  = 15.0 / 1_000_000  // $15 per 1M input tokens
-	opusCacheReadPricePerToken  = 1.50 / 1_000_000   // $1.50 per 1M cache read tokens
-	opusCacheSavingPerToken     = opusFullInputPricePerToken - opusCacheReadPricePerToken
+	opusFullInputPricePerToken = 15.0 / 1_000_000 // $15 per 1M input tokens
+	opusCacheReadPricePerToken = 1.50 / 1_000_000 // $1.50 per 1M cache read tokens
+	opusCacheSavingPerToken    = opusFullInputPricePerToken - opusCacheReadPricePerToken
 )
 
 type modelStat struct {

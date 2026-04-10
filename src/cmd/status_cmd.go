@@ -160,4 +160,3 @@ func runStatus() error {
 	_, err = prog.Run()
 	return err
 }
-

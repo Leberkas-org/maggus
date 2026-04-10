@@ -462,7 +462,6 @@ func (m configModel) executeAction(action configAction) tea.Cmd {
 	return nil
 }
 
-
 func saveConfig(dir string, cfg config.Config) error {
 	maggusDir := filepath.Join(dir, ".maggus")
 	if err := os.MkdirAll(maggusDir, 0o755); err != nil {

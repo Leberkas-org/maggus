@@ -103,9 +103,9 @@ func TestIsPlanBranch(t *testing.T) {
 		{"master", false},
 		{"main", false},
 		{"feature/something-else", false},
-		{"feature/maggus-", false},     // no digits
-		{"bugfix/maggus-bug-", false},  // no digits
-		{"feature/maggus-abc", false},  // non-digit suffix
+		{"feature/maggus-", false},    // no digits
+		{"bugfix/maggus-bug-", false}, // no digits
+		{"feature/maggus-abc", false}, // non-digit suffix
 	}
 	for _, tt := range tests {
 		got := IsPlanBranch(tt.branch)

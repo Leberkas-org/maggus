@@ -237,13 +237,13 @@ func newFakeConn() *fakeConn {
 	return fc
 }
 
-func (f *fakeConn) Read(b []byte) (int, error)  { return f.readBuf.Read(b) }
-func (f *fakeConn) Write(b []byte) (int, error)  { return f.written.Write(b) }
-func (f *fakeConn) Close() error                 { return nil }
-func (f *fakeConn) LocalAddr() net.Addr          { return nil }
-func (f *fakeConn) RemoteAddr() net.Addr         { return nil }
-func (f *fakeConn) SetDeadline(time.Time) error  { return nil }
-func (f *fakeConn) SetReadDeadline(time.Time) error { return nil }
+func (f *fakeConn) Read(b []byte) (int, error)       { return f.readBuf.Read(b) }
+func (f *fakeConn) Write(b []byte) (int, error)      { return f.written.Write(b) }
+func (f *fakeConn) Close() error                     { return nil }
+func (f *fakeConn) LocalAddr() net.Addr              { return nil }
+func (f *fakeConn) RemoteAddr() net.Addr             { return nil }
+func (f *fakeConn) SetDeadline(time.Time) error      { return nil }
+func (f *fakeConn) SetReadDeadline(time.Time) error  { return nil }
 func (f *fakeConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestPresenceCloseWritesClearAndOpClose(t *testing.T) {
@@ -503,7 +503,7 @@ func (b *blockingConn) Read([]byte) (int, error) {
 	return 0, net.ErrClosed
 }
 
-func (b *blockingConn) Write(p []byte) (int, error)     { return len(p), nil }
+func (b *blockingConn) Write(p []byte) (int, error)      { return len(p), nil }
 func (b *blockingConn) Close() error                     { close(b.closed); return nil }
 func (b *blockingConn) LocalAddr() net.Addr              { return nil }
 func (b *blockingConn) RemoteAddr() net.Addr             { return nil }

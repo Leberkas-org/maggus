@@ -9,32 +9,32 @@ import (
 
 func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 	tests := []struct {
-		name           string
-		taskTitle      string
-		width          int
+		name            string
+		taskTitle       string
+		width           int
 		expectTruncated bool
-		expectOmitted  bool
+		expectOmitted   bool
 	}{
 		{
-			name:           "short title fits completely",
-			taskTitle:      "Short task",
-			width:          100,
+			name:            "short title fits completely",
+			taskTitle:       "Short task",
+			width:           100,
 			expectTruncated: false,
-			expectOmitted:  false,
+			expectOmitted:   false,
 		},
 		{
-			name:           "long title gets truncated",
-			taskTitle:      "This is a very long task title that should be truncated when displayed in a narrow pane",
-			width:          50,
+			name:            "long title gets truncated",
+			taskTitle:       "This is a very long task title that should be truncated when displayed in a narrow pane",
+			width:           50,
 			expectTruncated: true,
-			expectOmitted:  false,
+			expectOmitted:   false,
 		},
 		{
-			name:           "very narrow width omits title entirely",
-			taskTitle:      "Task title",
-			width:          20,
+			name:            "very narrow width omits title entirely",
+			taskTitle:       "Task title",
+			width:           20,
 			expectTruncated: false,
-			expectOmitted:  true,
+			expectOmitted:   true,
 		},
 	}
 

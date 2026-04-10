@@ -11,9 +11,9 @@ import (
 
 // daemonPIDState holds the cached daemon PID, running flag, and stop-after-task sentinel.
 type daemonPIDState struct {
-	PID                int
-	Running            bool
-	StoppingAfterTask  bool
+	PID               int
+	Running           bool
+	StoppingAfterTask bool
 }
 
 // DaemonStateCache watches the .maggus/ directory for changes to daemon.pid,

@@ -37,12 +37,12 @@ const (
 // taskResult holds the outcome of a single task iteration.
 type taskResult struct {
 	action     taskAction
-	stopReason StopReason // only set when action == taskBreak
-	committed  bool              // true if a commit was made
-	warning    string            // non-empty if commit succeeded but with a caveat
-	failed     *failedTask       // non-nil if the task failed
-	tasks      []parser.Task     // updated task list after re-parse (nil if unchanged)
-	taskID     string            // ID of the task that was worked on
+	stopReason StopReason    // only set when action == taskBreak
+	committed  bool          // true if a commit was made
+	warning    string        // non-empty if commit succeeded but with a caveat
+	failed     *failedTask   // non-nil if the task failed
+	tasks      []parser.Task // updated task list after re-parse (nil if unchanged)
+	taskID     string        // ID of the task that was worked on
 }
 
 // taskContext bundles the shared state needed by runTask.

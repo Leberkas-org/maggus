@@ -38,23 +38,23 @@ type TaskUsageData struct {
 
 // Entry represents a single JSONL log entry written to the log file.
 type Entry struct {
-	Ts                       string            `json:"ts"`
-	Level                    string            `json:"level"`
-	Event                    string            `json:"event"`
-	MaggusID                 string            `json:"maggus_id,omitempty"`
-	FeatureID                string            `json:"feature_id,omitempty"`
-	TaskID                   string            `json:"task_id,omitempty"`
-	Title                    string            `json:"title,omitempty"`
-	Commit                   string            `json:"commit,omitempty"`
-	Tool                     string            `json:"tool,omitempty"`
-	Input                    map[string]string `json:"input,omitempty"`
-	Text                     string            `json:"text,omitempty"`
-	Reason                   string            `json:"reason,omitempty"`
-	InputTokens              int               `json:"input_tokens,omitempty"`
-	OutputTokens             int               `json:"output_tokens,omitempty"`
-	CacheCreationInputTokens int               `json:"cache_creation_input_tokens,omitempty"`
-	CacheReadInputTokens     int               `json:"cache_read_input_tokens,omitempty"`
-	CostUSD                  float64           `json:"cost_usd,omitempty"`
+	Ts                       string                      `json:"ts"`
+	Level                    string                      `json:"level"`
+	Event                    string                      `json:"event"`
+	MaggusID                 string                      `json:"maggus_id,omitempty"`
+	FeatureID                string                      `json:"feature_id,omitempty"`
+	TaskID                   string                      `json:"task_id,omitempty"`
+	Title                    string                      `json:"title,omitempty"`
+	Commit                   string                      `json:"commit,omitempty"`
+	Tool                     string                      `json:"tool,omitempty"`
+	Input                    map[string]string           `json:"input,omitempty"`
+	Text                     string                      `json:"text,omitempty"`
+	Reason                   string                      `json:"reason,omitempty"`
+	InputTokens              int                         `json:"input_tokens,omitempty"`
+	OutputTokens             int                         `json:"output_tokens,omitempty"`
+	CacheCreationInputTokens int                         `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int                         `json:"cache_read_input_tokens,omitempty"`
+	CostUSD                  float64                     `json:"cost_usd,omitempty"`
 	ModelUsage               map[string]ModelTokensEntry `json:"model_usage,omitempty"`
 }
 
@@ -83,6 +83,25 @@ func Open(maggusID, dir string, maxFiles int) (*Logger, error) {
 	}
 
 	pruneLogFiles(runsDir, maxFiles)
+
+	return &Logger{w: f, dir: dir}, nil
+}
+
+// OpenWorker creates a per-worker log file at .maggus/runs/<iteration>-<taskID>.log.
+// This is used in parallel mode to give each concurrent worker its own log file,
+// namespaced by task ID to avoid collisions.
+func OpenWorker(iteration int, taskID, dir string) (*Logger, error) {
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	if err := os.MkdirAll(runsDir, 0755); err != nil {
+		return nil, fmt.Errorf("create runs dir: %w", err)
+	}
+
+	name := fmt.Sprintf("%d-%s.log", iteration, taskID)
+	logPath := filepath.Join(runsDir, name)
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open worker log file: %w", err)
+	}
 
 	return &Logger{w: f, dir: dir}, nil
 }

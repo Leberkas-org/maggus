@@ -1105,3 +1105,67 @@ func TestParseFile_ModelField(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFile_ParallelAndPredecessors(t *testing.T) {
+	content := `# Feature 038: Parallel Test
+
+### TASK-038-001: First task
+**Description:** First task
+**Predecessors:** none
+**Parallel:** yes — can run alongside TASK-038-002
+
+**Acceptance Criteria:**
+- [ ] Something
+
+### TASK-038-002: Second task
+**Description:** Second task
+**Predecessors:** TASK-038-001, TASK-038-003
+**Parallel:** no
+
+**Acceptance Criteria:**
+- [ ] Something else
+
+### TASK-038-003: Third task
+**Description:** Third task
+
+**Acceptance Criteria:**
+- [ ] Another thing
+`
+
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_038.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_038.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	// Task 1: Parallel=yes, no predecessors
+	if !tasks[0].Parallel {
+		t.Error("TASK-038-001 should have Parallel=true")
+	}
+	if len(tasks[0].Predecessors) != 0 {
+		t.Errorf("TASK-038-001 predecessors = %v, want empty", tasks[0].Predecessors)
+	}
+
+	// Task 2: Parallel=no, two predecessors
+	if tasks[1].Parallel {
+		t.Error("TASK-038-002 should have Parallel=false")
+	}
+	if len(tasks[1].Predecessors) != 2 {
+		t.Fatalf("TASK-038-002 predecessors count = %d, want 2", len(tasks[1].Predecessors))
+	}
+	if tasks[1].Predecessors[0] != "TASK-038-001" || tasks[1].Predecessors[1] != "TASK-038-003" {
+		t.Errorf("TASK-038-002 predecessors = %v", tasks[1].Predecessors)
+	}
+
+	// Task 3: defaults (no Parallel or Predecessors lines)
+	if tasks[2].Parallel {
+		t.Error("TASK-038-003 should have Parallel=false (default)")
+	}
+	if len(tasks[2].Predecessors) != 0 {
+		t.Errorf("TASK-038-003 predecessors = %v, want empty", tasks[2].Predecessors)
+	}
+}

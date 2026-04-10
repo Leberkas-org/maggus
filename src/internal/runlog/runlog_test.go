@@ -421,6 +421,45 @@ func TestClose_Idempotent(t *testing.T) {
 	// Second close should not panic but may return an error (file already closed).
 }
 
+func TestOpenWorker_CreatesNamespacedLogFile(t *testing.T) {
+	dir := t.TempDir()
+	l, err := runlog.OpenWorker(3, "TASK-038-002", dir)
+	if err != nil {
+		t.Fatalf("OpenWorker: %v", err)
+	}
+	defer l.Close()
+
+	l.TaskStart("TASK-038-002", "Some task")
+
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	entries, readErr := os.ReadDir(runsDir)
+	if readErr != nil {
+		t.Fatalf("read runs dir: %v", readErr)
+	}
+	var logFiles []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logFiles = append(logFiles, e.Name())
+		}
+	}
+	if len(logFiles) != 1 {
+		t.Fatalf("expected 1 log file, got %d: %v", len(logFiles), logFiles)
+	}
+	want := "3-TASK-038-002.log"
+	if logFiles[0] != want {
+		t.Errorf("log filename = %q, want %q", logFiles[0], want)
+	}
+
+	// Verify the log entry was written.
+	logEntries := readLogEntries(t, filepath.Join(runsDir, logFiles[0]))
+	if len(logEntries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(logEntries))
+	}
+	if logEntries[0].Event != "task_start" {
+		t.Errorf("event = %q, want task_start", logEntries[0].Event)
+	}
+}
+
 func TestJSONLFormat(t *testing.T) {
 	dir := t.TempDir()
 	l, _ := runlog.Open("run1", dir, 50)
@@ -447,4 +486,3 @@ func TestJSONLFormat(t *testing.T) {
 		}
 	}
 }
-

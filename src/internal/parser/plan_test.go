@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 const testBugContent = `<!-- maggus-id: aaaabbbb-1111-2222-3333-ccccddddeeee -->
 # Bug 001: Test Bug
 

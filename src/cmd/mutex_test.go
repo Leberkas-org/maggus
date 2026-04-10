@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-
 func TestLiveProcessDetected(t *testing.T) {
 	// Our own process should be detected as running.
 	if !isProcessRunning(os.Getpid()) {

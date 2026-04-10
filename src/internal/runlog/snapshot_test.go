@@ -14,11 +14,11 @@ func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 	dir := t.TempDir()
 
 	snap := StateSnapshot{
-		RunID:       "test-run-001",
-		TaskID:      "TASK-001",
-		TaskTitle:   "Test task",
+		RunID:     "test-run-001",
+		TaskID:    "TASK-001",
+		TaskTitle: "Test task",
 		ItemTitle: "feature_001.md",
-		Status:      "Running tool",
+		Status:    "Running tool",
 		ToolEntries: []SnapshotToolEntry{
 			{Type: "Read", Icon: "📖", Description: "Read: foo.go", Timestamp: "2026-01-01T00:00:00Z"},
 			{Type: "Bash", Icon: "⚡", Description: "go test ./...", Timestamp: "2026-01-01T00:00:01Z"},

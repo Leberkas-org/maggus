@@ -12,9 +12,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
-	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/usage"
@@ -53,8 +54,8 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 
 	// Watch for stop signal file (used on Windows where OS signals cannot
 	// reach a detached daemon process; harmless no-op on Unix).
-	removeDaemonStopFile(dir)       // clean up leftover from previous run
-	removeStopAfterTaskFile(dir)    // clean up leftover stop-after-task signal from previous run
+	removeDaemonStopFile(dir)    // clean up leftover from previous run
+	removeStopAfterTaskFile(dir) // clean up leftover stop-after-task signal from previous run
 	go func() {
 		stopFile := daemonStopFilePath(dir)
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -250,9 +251,24 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	repoDir := dir
 	workDir := dir
 
-	branchMsg, brErr := setupBranch(repoDir, branchTask, wc.cfg.Git)
-	if brErr != nil {
-		return false, fmt.Errorf("setup branch: %w", brErr)
+	var branchMsg string
+	var planBranch string
+
+	if wc.parallel {
+		// Parallel mode: set up a plan-level branch (feature/maggus-NNN).
+		var planBranchMsg string
+		var pbErr error
+		planBranch, planBranchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID)
+		if pbErr != nil {
+			return false, fmt.Errorf("setup plan branch: %w", pbErr)
+		}
+		branchMsg = planBranchMsg
+	} else {
+		var brErr error
+		branchMsg, brErr = setupBranch(repoDir, branchTask, wc.cfg.Git)
+		if brErr != nil {
+			return false, fmt.Errorf("setup branch: %w", brErr)
+		}
 	}
 
 	// Create tea.Program with nullTUIModel for this cycle.
@@ -362,7 +378,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 		bugStore:           bugStore,
 	}
 
-	runWorkGoroutine(runLoopParams{
+	loopParams := runLoopParams{
 		tc:            tc,
 		tasks:         setup.tasks,
 		featureGroups: featureGroups,
@@ -380,7 +396,13 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 		dir:           dir,
 		featureStore:  featureStore,
 		bugStore:      bugStore,
-	})
+	}
+
+	if wc.parallel {
+		runParallelWorkGoroutine(loopParams, planBranch)
+	} else {
+		runWorkGoroutine(loopParams)
+	}
 
 	_, tuiErr := p.Run()
 	if tuiErr != nil {
