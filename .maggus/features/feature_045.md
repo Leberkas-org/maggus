@@ -55,13 +55,13 @@ Currently, `Alt+R` in the status view runs a task by launching `maggus run --tas
 **Parallel:** yes — can run alongside TASK-045-003
 
 **Acceptance Criteria:**
-- [ ] Pressing `Alt+R` on a task while the daemon is running triggers `dispatchTask()` instead of the current foreground `maggus run --task` behavior
-- [ ] Pressing `Alt+R` while the daemon is NOT running keeps the current foreground behavior (launch `maggus run --task` via `tea.ExecProcess`)
-- [ ] A status note shows "Dispatched <TASK-ID>" briefly after dispatch
-- [ ] If the task is already running (in the worker index), `Alt+R` shows "Task already running" and does nothing
-- [ ] If the task is complete or blocked, `Alt+R` does nothing
-- [ ] Footer hint updates to show `alt+r: dispatch` when daemon is running (was `alt+r: run`)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Pressing `Alt+R` on a task while the daemon is running triggers `dispatchTask()` instead of the current foreground `maggus run --task` behavior
+- [x] Pressing `Alt+R` while the daemon is NOT running keeps the current foreground behavior (launch `maggus run --task` via `tea.ExecProcess`)
+- [x] A status note shows "Dispatched <TASK-ID>" briefly after dispatch
+- [x] If the task is already running (in the worker index), `Alt+R` shows "Task already running" and does nothing
+- [x] If the task is complete or blocked, `Alt+R` does nothing
+- [x] Footer hint updates to show `alt+r: dispatch` when daemon is running (was `alt+r: run`)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-045-003: Ensure dispatched workers appear in status TUI worker view
 **Description:** As a user, I want dispatched tasks to appear in the status view alongside daemon workers so I can monitor all running work in one place.
@@ -72,12 +72,12 @@ Currently, `Alt+R` in the status view runs a task by launching `maggus run --tas
 **Parallel:** yes — can run alongside TASK-045-002
 
 **Acceptance Criteria:**
-- [ ] The dispatched process writes to the same `state-workers.json` index that the parallel orchestrator uses
-- [ ] `refreshWorkerSnapshots()` in `status_workers.go` picks up dispatched workers alongside daemon workers
-- [ ] The worker pane shows dispatched tasks with the same card format (spinner, task ID, tool, tokens, elapsed)
-- [ ] When a dispatched task completes, its worker card shows `✓` (done) or `✗` (failed)
-- [ ] After completion, the worktree is cleaned up automatically (or flagged for `maggus clean`)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The dispatched process writes to the same `state-workers.json` index that the parallel orchestrator uses
+- [x] `refreshWorkerSnapshots()` in `status_workers.go` picks up dispatched workers alongside daemon workers
+- [x] The worker pane shows dispatched tasks with the same card format (spinner, task ID, tool, tokens, elapsed)
+- [x] When a dispatched task completes, its worker card shows `✓` (done) or `✗` (failed)
+- [x] After completion, the worktree is cleaned up automatically (or flagged for `maggus clean`)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-045-004: Handle merge-back and cleanup for dispatched workers
 **Description:** As a developer, I want dispatched tasks to merge their changes back to the plan branch and clean up their worktree so the result integrates cleanly.
@@ -89,12 +89,12 @@ Currently, `Alt+R` in the status view runs a task by launching `maggus run --tas
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] When the dispatched task completes successfully, its commits are merged back to the plan branch (same merge strategy as parallel orchestrator's `runSingleTask`)
-- [ ] If the merge has conflicts, the task is marked as failed and the worktree is preserved for manual resolution
-- [ ] On success, the worktree is removed and the task branch is deleted
-- [ ] On failure, the worktree is preserved and a status note indicates manual intervention needed
-- [ ] The daemon's work loop is not affected by merge-back — it continues independently
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When the dispatched task completes successfully, its commits are merged back to the plan branch (same merge strategy as parallel orchestrator's `runSingleTask`)
+- [x] If the merge has conflicts, the task is marked as failed and the worktree is preserved for manual resolution
+- [x] On success, the worktree is removed and the task branch is deleted
+- [x] On failure, the worktree is preserved and a status note indicates manual intervention needed
+- [x] The daemon's work loop is not affected by merge-back — it continues independently
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

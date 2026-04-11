@@ -290,11 +290,12 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
-		snapshotDir:     dir,
-		snapshotRunID:   runID,
-		runStartedAt:    setup.startTime,
-		dispatchRepoDir: dispatchRepoFlag,
-		dispatchTaskID:  taskFlag,
+		snapshotDir:        dir,
+		snapshotRunID:      runID,
+		runStartedAt:       setup.startTime,
+		dispatchRepoDir:    dispatchRepoFlag,
+		dispatchTaskID:     taskFlag,
+		dispatchBaseBranch: dispatchBaseBranchFlag,
 	}
 	dm.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
 		runLogger.ToolUse(taskID, toolType, params)

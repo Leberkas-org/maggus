@@ -6,6 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/gitmerge"
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
@@ -38,8 +40,9 @@ type nullTUIModel struct {
 
 	// Dispatch mode — when set, writes per-worker snapshots to the main repo
 	// instead of the daemon's state.json. Set by --dispatch-repo.
-	dispatchRepoDir string // main repo dir for per-worker state files
-	dispatchTaskID  string // task ID for per-worker snapshot filename
+	dispatchRepoDir    string // main repo dir for per-worker state files
+	dispatchTaskID     string // task ID for per-worker snapshot filename
+	dispatchBaseBranch string // base branch to merge task branch back into
 
 	// Token accumulation for current iteration.
 	iterInput         int
@@ -203,22 +206,55 @@ func (m *nullTUIModel) flushUsage() {
 
 // finalizeDispatchWorker updates the worker status in the shared workers index
 // when a dispatched worker process exits. It determines done/failed based on
-// whether any commits were made.
+// whether any commits were made, then attempts to merge the task branch back
+// into the base branch.
 func (m *nullTUIModel) finalizeDispatchWorker() {
 	if m.dispatchRepoDir == "" || m.dispatchTaskID == "" {
 		return
 	}
-	status := "done"
-	snapStatus := "Done"
+
+	// No commits means the task failed — skip merge-back.
 	if len(m.commits) == 0 {
-		status = "failed"
-		snapStatus = "Failed"
+		m.status = "Failed"
+		m.writeSnapshot()
+		_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, "failed")
+		return
 	}
-	// Write final snapshot with terminal status.
-	m.status = snapStatus
+
+	// Task succeeded — attempt to merge the task branch back into the base branch.
+	mergeErr := m.mergeDispatchedTaskBack()
+	if mergeErr != nil {
+		// Merge failed (conflict or other error) — mark as failed and preserve worktree.
+		m.status = "Failed — merge-back failed, manual resolution needed"
+		m.writeSnapshot()
+		_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, "failed")
+		return
+	}
+
+	// Merge succeeded — worktree and branch are cleaned up by MergeTaskBranch.
+	m.status = "Done"
 	m.writeSnapshot()
-	// Update the shared workers index.
-	_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, status)
+	_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, "done")
+}
+
+// mergeDispatchedTaskBack merges the dispatched task's branch back into the
+// base branch in the main repo. Uses the same merge strategy as the parallel
+// orchestrator's runSingleTask. On success the worktree is removed and the
+// task branch is deleted. On conflict the worktree is preserved.
+//
+// mergeDispatchedTaskBackFn is a package-level var so tests can replace it.
+var mergeDispatchedTaskBackFn = mergeDispatchedTaskBackImpl
+
+func (m *nullTUIModel) mergeDispatchedTaskBack() error {
+	return mergeDispatchedTaskBackFn(m.dispatchRepoDir, m.dispatchBaseBranch, m.dispatchTaskID)
+}
+
+func mergeDispatchedTaskBackImpl(repoDir, baseBranch, taskID string) error {
+	if baseBranch == "" || repoDir == "" {
+		return nil // no base branch info — skip merge (graceful degradation)
+	}
+	taskBranch := gitbranch.BranchName(taskID)
+	return gitmerge.MergeTaskBranch(repoDir, baseBranch, taskBranch)
 }
 
 func (m nullTUIModel) View() string { return "" }

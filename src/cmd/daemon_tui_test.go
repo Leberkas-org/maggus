@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -270,6 +272,207 @@ func TestNullTUIModel_DispatchMode_FinalizeWorkerFailed(t *testing.T) {
 	}
 	if workers[0].Status != "failed" {
 		t.Errorf("worker status = %q, want %q (no commits = failed)", workers[0].Status, "failed")
+	}
+}
+
+func TestNullTUIModel_DispatchMode_MergeBackSuccess(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-010"
+
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	// Stub merge-back to succeed.
+	origFn := mergeDispatchedTaskBackFn
+	defer func() { mergeDispatchedTaskBackFn = origFn }()
+	var mergeCalled bool
+	var mergeRepoDir, mergeBaseBranch, mergeTaskID string
+	mergeDispatchedTaskBackFn = func(repoDir, baseBranch, tID string) error {
+		mergeCalled = true
+		mergeRepoDir = repoDir
+		mergeBaseBranch = baseBranch
+		mergeTaskID = tID
+		return nil
+	}
+
+	dm := nullTUIModel{
+		snapshotRunID:      "dispatch-merge-ok",
+		dispatchRepoDir:    dir,
+		dispatchTaskID:     taskID,
+		dispatchBaseBranch: "feature/maggus-045",
+		runStartedAt:       time.Now(),
+		commits:            []string{"feat: done"},
+	}
+
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	if !mergeCalled {
+		t.Fatal("merge-back function was not called")
+	}
+	if mergeRepoDir != dir {
+		t.Errorf("merge repoDir = %q, want %q", mergeRepoDir, dir)
+	}
+	if mergeBaseBranch != "feature/maggus-045" {
+		t.Errorf("merge baseBranch = %q, want %q", mergeBaseBranch, "feature/maggus-045")
+	}
+	if mergeTaskID != taskID {
+		t.Errorf("merge taskID = %q, want %q", mergeTaskID, taskID)
+	}
+
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "done" {
+		t.Errorf("worker status = %q, want %q", workers[0].Status, "done")
+	}
+}
+
+func TestNullTUIModel_DispatchMode_MergeBackConflict(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-011"
+
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	// Stub merge-back to return a conflict error.
+	origFn := mergeDispatchedTaskBackFn
+	defer func() { mergeDispatchedTaskBackFn = origFn }()
+	mergeDispatchedTaskBackFn = func(repoDir, baseBranch, tID string) error {
+		return errors.New("merge conflict")
+	}
+
+	dm := nullTUIModel{
+		snapshotRunID:      "dispatch-merge-conflict",
+		dispatchRepoDir:    dir,
+		dispatchTaskID:     taskID,
+		dispatchBaseBranch: "feature/maggus-045",
+		runStartedAt:       time.Now(),
+		commits:            []string{"feat: done"},
+	}
+
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	// Merge failed — worker should be marked as failed.
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "failed" {
+		t.Errorf("worker status = %q, want %q (merge conflict = failed)", workers[0].Status, "failed")
+	}
+
+	// Verify the snapshot status indicates manual intervention needed.
+	snap, err := runlog.ReadWorkerSnapshot(dir, taskID)
+	if err != nil {
+		t.Fatalf("per-worker snapshot not found: %v", err)
+	}
+	if !strings.Contains(snap.Status, "manual resolution") {
+		t.Errorf("snapshot status should mention manual resolution, got %q", snap.Status)
+	}
+}
+
+func TestNullTUIModel_DispatchMode_NoBaseBranch_SkipsMerge(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-012"
+
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	// Stub merge-back to track if it's called.
+	origFn := mergeDispatchedTaskBackFn
+	defer func() { mergeDispatchedTaskBackFn = origFn }()
+	var mergeCalled bool
+	mergeDispatchedTaskBackFn = func(repoDir, baseBranch, tID string) error {
+		mergeCalled = true
+		// mergeDispatchedTaskBackImpl returns nil for empty baseBranch.
+		return mergeDispatchedTaskBackImpl(repoDir, baseBranch, tID)
+	}
+
+	dm := nullTUIModel{
+		snapshotRunID:   "dispatch-no-base",
+		dispatchRepoDir: dir,
+		dispatchTaskID:  taskID,
+		// No dispatchBaseBranch — merge should be skipped gracefully.
+		runStartedAt: time.Now(),
+		commits:      []string{"feat: done"},
+	}
+
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	if !mergeCalled {
+		t.Fatal("merge-back function should have been called")
+	}
+
+	// Should still be marked as done (merge returned nil).
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "done" {
+		t.Errorf("worker status = %q, want %q (no base branch = graceful skip)", workers[0].Status, "done")
+	}
+}
+
+func TestNullTUIModel_DispatchMode_NoCommits_SkipsMerge(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-013"
+
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	// Stub merge-back — should NOT be called when there are no commits.
+	origFn := mergeDispatchedTaskBackFn
+	defer func() { mergeDispatchedTaskBackFn = origFn }()
+	var mergeCalled bool
+	mergeDispatchedTaskBackFn = func(repoDir, baseBranch, tID string) error {
+		mergeCalled = true
+		return nil
+	}
+
+	dm := nullTUIModel{
+		snapshotRunID:      "dispatch-no-commits",
+		dispatchRepoDir:    dir,
+		dispatchTaskID:     taskID,
+		dispatchBaseBranch: "feature/maggus-045",
+		runStartedAt:       time.Now(),
+		// No commits — task failed before producing output.
+	}
+
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	if mergeCalled {
+		t.Error("merge-back should NOT be called when there are no commits")
+	}
+
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "failed" {
+		t.Errorf("worker status = %q, want %q (no commits = failed)", workers[0].Status, "failed")
+	}
+}
+
+func TestMergeDispatchedTaskBackImpl_EmptyBaseBranch(t *testing.T) {
+	// Empty base branch should be a no-op (returns nil).
+	if err := mergeDispatchedTaskBackImpl("/tmp/test", "", "TASK-045-001"); err != nil {
+		t.Errorf("expected nil for empty baseBranch, got: %v", err)
+	}
+}
+
+func TestMergeDispatchedTaskBackImpl_EmptyRepoDir(t *testing.T) {
+	// Empty repoDir should be a no-op (returns nil).
+	if err := mergeDispatchedTaskBackImpl("", "feature/maggus-045", "TASK-045-001"); err != nil {
+		t.Errorf("expected nil for empty repoDir, got: %v", err)
 	}
 }
 

@@ -193,7 +193,11 @@ func (m statusModel) statusSplitFooter() string {
 		}
 		parts = append(parts, "pgup/pgdn: prev/next task")
 		parts = append(parts, "tab: manage blocked")
-		parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
+		altRHint := "alt+r: run"
+		if m.daemon.Running {
+			altRHint = "alt+r: dispatch"
+		}
+		parts = append(parts, altRHint+" · alt+bksp: delete · q: back")
 		return strings.Join(parts, " · ")
 	}
 
@@ -215,6 +219,11 @@ func (m statusModel) statusSplitFooter() string {
 	parts = append(parts, "a: approve")
 	if m.selectedTask() != nil {
 		parts = append(parts, "x: skip/unskip")
+		if m.daemon.Running {
+			parts = append(parts, "alt+r: dispatch")
+		} else {
+			parts = append(parts, "alt+r: run")
+		}
 	}
 	parts = append(parts, "alt+d: delete")
 	parts = append(parts, daemonHint)

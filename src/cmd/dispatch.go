@@ -27,6 +27,10 @@ func dispatchWork(taskID string) error {
 	return sub.RunE(sub, sub.Flags().Args())
 }
 
+// dispatchTaskFn is the function used to dispatch a task as a background worker.
+// It is a package-level var so tests can replace it without starting real git processes.
+var dispatchTaskFn func(dir, taskID, model, agentName string) error = dispatchTask
+
 // dispatchTask spawns a single task as an isolated background worker in its
 // own worktree and branch. It creates the worktree, registers the worker in
 // the shared workers index, launches a detached `maggus run` process, and
@@ -80,7 +84,7 @@ func dispatchTask(dir, taskID, model, agentName string) error {
 	}
 
 	// Launch the worker as a detached background process.
-	if err := launchDispatchedWorker(dir, worktreePath, taskID, model, agentName); err != nil {
+	if err := launchDispatchedWorker(dir, worktreePath, taskID, model, agentName, baseBranch); err != nil {
 		// Clean up on launch failure: remove worker from index and worktree.
 		_ = runlog.UpdateWorkerStatus(dir, taskID, "failed")
 		_ = gitworktree.RemoveWorktree(dir, worktreePath)
@@ -139,7 +143,7 @@ func cleanupExistingWorktree(repoDir, worktreePath string) error {
 }
 
 // launchDispatchedWorker starts a detached `maggus run` process in the worktree.
-func launchDispatchedWorker(repoDir, worktreeDir, taskID, model, agentName string) error {
+func launchDispatchedWorker(repoDir, worktreeDir, taskID, model, agentName, baseBranch string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -147,6 +151,9 @@ func launchDispatchedWorker(repoDir, worktreeDir, taskID, model, agentName strin
 
 	runID := generateDaemonRunID()
 	args := []string{"run", "--task", taskID, "--daemon-run", "--daemon-run-id=" + runID, "--dispatch-repo=" + repoDir}
+	if baseBranch != "" {
+		args = append(args, "--dispatch-base-branch="+baseBranch)
+	}
 	if model != "" {
 		args = append(args, "--model="+model)
 	}

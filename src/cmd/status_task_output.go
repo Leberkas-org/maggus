@@ -150,20 +150,18 @@ func (m statusModel) renderScrollableToolList(sb *strings.Builder, toolLines []s
 // ── Snapshot selection helpers ───────────────────────────────────────────────
 
 // snapshotForSelectedTask returns the live StateSnapshot for the currently
-// selected running task. In parallel mode it returns the per-worker snapshot;
-// in sequential mode it returns the main snapshot.
+// selected running task. Per-worker snapshots (from parallel orchestrator or
+// dispatched workers) take precedence; falls back to the main daemon snapshot.
 func (m statusModel) snapshotForSelectedTask() *runlog.StateSnapshot {
 	task := m.selectedTask()
 	if task == nil {
 		return m.snapshot
 	}
-	// Parallel mode: prefer per-worker snapshot.
-	if m.isParallelMode() {
-		if snap, ok := m.workerSnapshots[task.ID]; ok {
-			return snap
-		}
+	// Per-worker snapshot takes precedence (parallel orchestrator or dispatched workers).
+	if snap, ok := m.workerSnapshots[task.ID]; ok {
+		return snap
 	}
-	// Sequential mode: use main snapshot if it matches (or as fallback).
+	// Sequential daemon mode: use main snapshot.
 	return m.snapshot
 }
 

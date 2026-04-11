@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/leberkas-org/maggus/internal/gitworktree"
 )
 
 // --- test helpers ---
@@ -67,31 +65,22 @@ func TestMergeTaskBranch_FastForward(t *testing.T) {
 	// as refs simultaneously (file vs directory conflict).
 	run(t, repo, "git", "checkout", "-b", "feature/plan-038")
 
-	// Create task branch worktree.
+	// Create task branch off feature/plan-038.
 	taskBranch := "feature/maggus-038/task-001"
-	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
-		t.Fatalf("CreateWorktree: %v", err)
-	}
-
-	// Add a commit in the worktree (on the task branch).
-	writeFile(t, filepath.Join(wtPath, "task.txt"), "task content")
-	run(t, wtPath, "git", "add", ".")
-	run(t, wtPath, "git", "commit", "-m", "task commit")
+	run(t, repo, "git", "checkout", "-b", taskBranch)
+	writeFile(t, filepath.Join(repo, "task.txt"), "task content")
+	run(t, repo, "git", "add", ".")
+	run(t, repo, "git", "commit", "-m", "task commit")
+	run(t, repo, "git", "checkout", "feature/plan-038")
 
 	// Merge (feature branch has no new commits — fast-forward scenario).
 	if err := MergeTaskBranch(repo, "feature/plan-038", taskBranch); err != nil {
 		t.Fatalf("MergeTaskBranch: %v", err)
 	}
 
-	// Task branch should be deleted.
-	if branchExists(t, repo, taskBranch) {
-		t.Error("task branch should be deleted after successful merge")
-	}
-
-	// Worktree directory should be gone.
-	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
-		t.Errorf("worktree directory should be removed, stat err = %v", err)
+	// Task branch should NOT be deleted — cleanup is now the caller's responsibility.
+	if !branchExists(t, repo, taskBranch) {
+		t.Error("task branch should still exist after MergeTaskBranch (cleanup is caller's responsibility)")
 	}
 
 	// The merged file should exist on the feature branch.
@@ -109,36 +98,31 @@ func TestMergeTaskBranch_ThreeWayMerge(t *testing.T) {
 	// as refs simultaneously (file vs directory conflict).
 	run(t, repo, "git", "checkout", "-b", "feature/plan-038")
 
-	// Create task branch worktree.
+	// Create task branch off feature/plan-038.
 	taskBranch := "feature/maggus-038/task-002"
-	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
-		t.Fatalf("CreateWorktree: %v", err)
-	}
+	run(t, repo, "git", "checkout", "-b", taskBranch)
 
 	// Add commit on feature branch (diverge from task branch).
+	run(t, repo, "git", "checkout", "feature/plan-038")
 	writeFile(t, filepath.Join(repo, "feature.txt"), "feature content")
 	run(t, repo, "git", "add", ".")
 	run(t, repo, "git", "commit", "-m", "feature commit")
 
 	// Add commit on task branch (different file — no conflict).
-	writeFile(t, filepath.Join(wtPath, "task.txt"), "task content")
-	run(t, wtPath, "git", "add", ".")
-	run(t, wtPath, "git", "commit", "-m", "task commit")
+	run(t, repo, "git", "checkout", taskBranch)
+	writeFile(t, filepath.Join(repo, "task.txt"), "task content")
+	run(t, repo, "git", "add", ".")
+	run(t, repo, "git", "commit", "-m", "task commit")
+	run(t, repo, "git", "checkout", "feature/plan-038")
 
 	// Merge.
 	if err := MergeTaskBranch(repo, "feature/plan-038", taskBranch); err != nil {
 		t.Fatalf("MergeTaskBranch: %v", err)
 	}
 
-	// Task branch should be deleted.
-	if branchExists(t, repo, taskBranch) {
-		t.Error("task branch should be deleted after successful merge")
-	}
-
-	// Worktree directory should be gone.
-	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
-		t.Errorf("worktree directory should be removed, stat err = %v", err)
+	// Task branch should NOT be deleted — cleanup is now the caller's responsibility.
+	if !branchExists(t, repo, taskBranch) {
+		t.Error("task branch should still exist after MergeTaskBranch (cleanup is caller's responsibility)")
 	}
 
 	// Both files should exist on the feature branch.
@@ -169,22 +153,20 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	run(t, repo, "git", "add", ".")
 	run(t, repo, "git", "commit", "-m", "add plan file")
 
-	// Create task branch worktree.
+	// Create task branch off feature/plan-038.
 	taskBranch := "feature/maggus-038/task-003"
-	wtPath := filepath.Join(t.TempDir(), "wt")
-	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
-		t.Fatalf("CreateWorktree: %v", err)
-	}
+	run(t, repo, "git", "checkout", "-b", taskBranch)
 
-	// Add conflicting commit on feature branch.
+	// Add conflicting commit on task branch.
+	writeFile(t, filepath.Join(repo, "conflict.txt"), "task version")
+	run(t, repo, "git", "add", ".")
+	run(t, repo, "git", "commit", "-m", "task change")
+
+	// Switch back to feature branch and add a conflicting commit.
+	run(t, repo, "git", "checkout", "feature/plan-038")
 	writeFile(t, filepath.Join(repo, "conflict.txt"), "feature version")
 	run(t, repo, "git", "add", ".")
 	run(t, repo, "git", "commit", "-m", "feature change")
-
-	// Add conflicting commit on task branch (same file, different content).
-	writeFile(t, filepath.Join(wtPath, "conflict.txt"), "task version")
-	run(t, wtPath, "git", "add", ".")
-	run(t, wtPath, "git", "commit", "-m", "task change")
 
 	// Merge — should fail with conflict.
 	err := MergeTaskBranch(repo, "feature/plan-038", taskBranch)
@@ -218,11 +200,6 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	// Task branch should still exist (not deleted on conflict).
 	if !branchExists(t, repo, taskBranch) {
 		t.Error("task branch should NOT be deleted on conflict")
-	}
-
-	// Worktree should be preserved for inspection.
-	if _, statErr := os.Stat(wtPath); statErr != nil {
-		t.Errorf("worktree should be preserved on conflict: %v", statErr)
 	}
 
 	// Merge should be cleanly aborted — conflict.txt at feature version.

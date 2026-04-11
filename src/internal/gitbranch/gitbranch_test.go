@@ -253,6 +253,76 @@ func TestEnsureFeatureBranch_ExistingBranch_ReturnsCorrectMessage(t *testing.T) 
 	}
 }
 
+func TestDeleteBranch_Normal(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+
+	// Create a feature branch and add a commit.
+	checkoutBranch(t, tmp, "feature/cleanup-test")
+	cmd := exec.Command("git", "commit", "--allow-empty", "-m", "feature commit")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("commit on feature branch: %v\n%s", err, out)
+	}
+
+	// Merge into master, then switch back.
+	cmd = exec.Command("git", "checkout", "master")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout master: %v\n%s", err, out)
+	}
+	cmd = exec.Command("git", "merge", "--no-ff", "feature/cleanup-test")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("merge: %v\n%s", err, out)
+	}
+
+	// Branch is fully merged — DeleteBranch should succeed.
+	if err := DeleteBranch(tmp, "feature/cleanup-test"); err != nil {
+		t.Fatalf("DeleteBranch: %v", err)
+	}
+
+	// Verify the branch is gone.
+	if branchExists(tmp, "feature/cleanup-test") {
+		t.Error("branch should not exist after DeleteBranch")
+	}
+}
+
+func TestDeleteBranch_AlreadyDeleted(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+
+	// Trying to delete a non-existent branch must return an error.
+	if err := DeleteBranch(tmp, "feature/does-not-exist"); err == nil {
+		t.Error("expected error when deleting non-existent branch, got nil")
+	}
+}
+
+func TestDeleteBranch_Unmerged(t *testing.T) {
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+
+	// Create a branch with an unmerged commit.
+	checkoutBranch(t, tmp, "feature/unmerged")
+	cmd := exec.Command("git", "commit", "--allow-empty", "-m", "unmerged commit")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("commit on feature branch: %v\n%s", err, out)
+	}
+
+	// Switch back to master without merging.
+	cmd = exec.Command("git", "checkout", "master")
+	cmd.Dir = tmp
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout master: %v\n%s", err, out)
+	}
+
+	// DeleteBranch uses -d (not -D): must refuse to delete an unmerged branch.
+	if err := DeleteBranch(tmp, "feature/unmerged"); err == nil {
+		t.Error("expected error when deleting unmerged branch with -d, got nil")
+	}
+}
+
 func initGitRepo(t *testing.T, dir string) {
 	t.Helper()
 	cmds := [][]string{

@@ -199,6 +199,27 @@ func TestSnapshotForSelectedTask_Parallel(t *testing.T) {
 	}
 }
 
+func TestSnapshotForSelectedTask_DispatchedWorker(t *testing.T) {
+	// Dispatched worker: daemon is NOT running, but there is a per-worker snapshot.
+	workerSnap := &runlog.StateSnapshot{TaskID: "TASK-001", Status: "Working"}
+	m := statusModel{
+		expandedPlans:   make(map[string]bool),
+		workerIndex:     []runlog.WorkerIndexEntry{{TaskID: "TASK-001", Status: "working"}},
+		workerSnapshots: map[string]*runlog.StateSnapshot{"TASK-001": workerSnap},
+		plans: []parser.Plan{
+			{ID: "f1", Tasks: []parser.Task{{ID: "TASK-001", Title: "T1"}}},
+		},
+		daemon: daemonStatus{Running: false}, // daemon not running
+	}
+	m.expandedPlans["f1"] = true
+	m.treeCursor = 1 // task row
+
+	got := m.snapshotForSelectedTask()
+	if got != workerSnap {
+		t.Errorf("expected worker snapshot for dispatched TASK-001, got %v", got)
+	}
+}
+
 func TestEnsureCompletedTaskOutput_CachesAndInvalidates(t *testing.T) {
 	dir := t.TempDir()
 	runsDir := filepath.Join(dir, ".maggus", "runs")

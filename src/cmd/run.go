@@ -26,10 +26,11 @@ var (
 	daemonRunFlag   bool
 	daemonRunIDFlag string
 
-	// Dispatch-mode flag (hidden; set by dispatchTask, not users directly).
+	// Dispatch-mode flags (hidden; set by dispatchTask, not users directly).
 	// When non-empty, this process is a dispatched worker and should write
 	// per-worker state files to this directory (the main repo root).
-	dispatchRepoFlag string
+	dispatchRepoFlag       string
+	dispatchBaseBranchFlag string
 )
 
 // resetRunFlags resets all run command flags to their zero/default values.
@@ -44,6 +45,7 @@ func resetRunFlags() {
 	daemonRunFlag = false
 	daemonRunIDFlag = ""
 	dispatchRepoFlag = ""
+	dispatchBaseBranchFlag = ""
 }
 
 var runCmd = &cobra.Command{
@@ -89,9 +91,11 @@ func init() {
 	runCmd.Flags().BoolVar(&daemonRunFlag, "daemon-run", false, "run the work loop as a daemon (no TUI)")
 	runCmd.Flags().StringVar(&daemonRunIDFlag, "daemon-run-id", "", "run ID to use in daemon mode")
 	runCmd.Flags().StringVar(&dispatchRepoFlag, "dispatch-repo", "", "main repo dir for dispatched worker state files")
+	runCmd.Flags().StringVar(&dispatchBaseBranchFlag, "dispatch-base-branch", "", "base branch to merge back into after dispatch completes")
 	_ = runCmd.Flags().MarkHidden("daemon-run")
 	_ = runCmd.Flags().MarkHidden("daemon-run-id")
 	_ = runCmd.Flags().MarkHidden("dispatch-repo")
+	_ = runCmd.Flags().MarkHidden("dispatch-base-branch")
 
 	rootCmd.AddCommand(runCmd)
 }

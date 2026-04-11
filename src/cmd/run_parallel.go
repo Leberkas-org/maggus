@@ -288,9 +288,9 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		wsw = newWorkerSnapshotWriter(o.repoDir, o.runID, task.ID, task.Title, group.Title, o.runStartedAt)
 	}
 
+	worktreePath := filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)
 	workDir := o.repoDir
 	if useWorktree {
-		worktreePath := filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting in worktree", task.ID)})
 
 		if err := gitbranch.CreateBranchFrom(o.repoDir, taskBranch, o.planBranch); err != nil {
@@ -375,9 +375,21 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 			o.markWorkerBlocked(task.ID, wsw, mergeErr)
 			return o.handleMergeErr(&result, workerLogger, task, mergeErr)
 		}
+		// Best-effort cleanup: remove worktree then delete branch.
+		// Order matters: worktree must be removed before branch can be deleted.
+		if err := gitworktree.RemoveWorktree(o.repoDir, worktreePath); err != nil {
+			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", task.ID, err)})
+		}
+		if err := gitbranch.DeleteBranch(o.repoDir, taskBranch); err != nil {
+			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: branch cleanup failed: %v", task.ID, err)})
+		}
 	} else {
 		if mergeErr := gitmerge.MergeTaskBranch(o.repoDir, o.planBranch, taskBranch); mergeErr != nil {
 			return o.handleMergeErr(&result, workerLogger, task, mergeErr)
+		}
+		// Best-effort cleanup: delete task branch (no worktree for sequential tasks).
+		if err := gitbranch.DeleteBranch(o.repoDir, taskBranch); err != nil {
+			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: branch cleanup failed: %v", task.ID, err)})
 		}
 	}
 

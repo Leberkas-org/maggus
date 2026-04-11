@@ -84,8 +84,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, spinnerTick()
 		}
-		// Advance worker spinners even without main snapshot in parallel mode.
-		if m.daemon.Running && m.isParallelMode() {
+		// Advance worker spinners when active workers exist (parallel orchestrator or
+		// dispatched workers). Dispatched workers may run without a daemon, so we
+		// check isParallelMode() rather than requiring m.daemon.Running.
+		if m.isParallelMode() {
 			m.advanceWorkerSpinners()
 			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
 			return m, spinnerTick()
@@ -502,10 +504,44 @@ func (m statusModel) buildRunTaskMsg() tea.Cmd {
 	}
 }
 
+// handleAltRunDispatch handles the Alt+R key press for the given task.
+// When the daemon is running, it dispatches the task as a background worker.
+// When the daemon is NOT running, it falls back to a foreground run.
+// No-ops when: task is nil, complete, blocked, or already running in a worker.
+func (m statusModel) handleAltRunDispatch(task *parser.Task) (statusModel, tea.Cmd) {
+	if task == nil {
+		return m, nil
+	}
+	if task.IsComplete() || task.IsBlocked() {
+		return m, nil
+	}
+	if m.isTaskRunning(task.ID) {
+		m.statusNote = "Task already running"
+		m.syncDetailSuffix()
+		return m, nil
+	}
+	if m.daemon.Running {
+		err := dispatchTaskFn(m.dir, task.ID, "", m.agentName)
+		if err != nil {
+			m.statusNote = "Dispatch failed: " + err.Error()
+		} else {
+			m.statusNote = "Dispatched " + task.ID
+		}
+		m.syncDetailSuffix()
+		return m, nil
+	}
+	// Daemon not running — run in the foreground via tea.ExecProcess.
+	m.taskListComponent.RunTaskID = task.ID
+	return m, m.buildRunTaskMsg()
+}
+
 func (m statusModel) updateStatusDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Intercept status-specific keys before delegating to component
 	if msg.String() == "alt+p" {
 		return m.handleApproveToggle()
+	}
+	if msg.String() == "alt+r" {
+		return m.handleAltRunDispatch(m.taskListComponent.CurrentTask())
 	}
 	cmd, action := m.taskListComponent.Update(msg)
 	switch action {
@@ -797,6 +833,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "alt+r":
+		return m.handleAltRunDispatch(m.selectedTask())
 	case "alt+up":
 		return m.movePlanUp()
 	case "alt+down":

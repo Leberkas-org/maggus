@@ -9,7 +9,6 @@ import (
 
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitutil"
-	"github.com/leberkas-org/maggus/internal/gitworktree"
 )
 
 // MergeConflictError is returned when merging a task branch encounters conflicts.
@@ -25,7 +24,9 @@ func (e *MergeConflictError) Error() string {
 // MergeTaskBranch merges taskBranch into featureBranch in the repository at repoRoot
 // using a standard merge commit (no rebase, no fast-forward squash).
 //
-// On success the task branch is deleted and its worktree (if any) is removed.
+// On success nil is returned. Branch deletion and worktree removal are the
+// responsibility of the caller; use gitbranch.DeleteBranch and
+// gitworktree.RemoveWorktree for best-effort cleanup.
 // On conflict the merge is aborted, a BLOCKED criterion is injected into the
 // task's plan file, and a *MergeConflictError is returned. The worktree is
 // preserved so the developer can inspect the changes.
@@ -41,7 +42,7 @@ func MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error {
 		return handleMergeFailure(repoRoot, featureBranch, taskBranch, out, err)
 	}
 
-	return cleanup(repoRoot, taskBranch)
+	return nil
 }
 
 func checkout(repoRoot, branch string) error {
@@ -72,38 +73,6 @@ func handleMergeFailure(repoRoot, featureBranch, taskBranch string, mergeOutput 
 	_ = injectBlockedCriterion(repoRoot, featureBranch, taskBranch)
 
 	return &MergeConflictError{FeatureBranch: featureBranch, TaskBranch: taskBranch}
-}
-
-func cleanup(repoRoot, taskBranch string) error {
-	// Remove the worktree first so the branch is no longer checked out anywhere.
-	if wtPath := findWorktreeForBranch(repoRoot, taskBranch); wtPath != "" {
-		if err := gitworktree.RemoveWorktree(repoRoot, wtPath); err != nil {
-			return fmt.Errorf("remove worktree for %s: %w", taskBranch, err)
-		}
-	}
-
-	// Delete the task branch (safe because it is fully merged).
-	cmd := gitutil.Command("branch", "-d", taskBranch)
-	cmd.Dir = repoRoot
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("delete branch %s: %w: %s", taskBranch, err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// findWorktreeForBranch returns the filesystem path of the worktree that has
-// branch checked out, or "" if none is found.
-func findWorktreeForBranch(repoRoot, branch string) string {
-	wts, err := gitworktree.ListWorktrees(repoRoot)
-	if err != nil {
-		return ""
-	}
-	for _, wt := range wts {
-		if wt.Branch == branch {
-			return wt.Path
-		}
-	}
-	return ""
 }
 
 // --- BLOCKED criterion injection ---

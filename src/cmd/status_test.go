@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2018,6 +2019,22 @@ func TestIsTaskRunning(t *testing.T) {
 			t.Error("isTaskRunning should be false for done worker")
 		}
 	})
+
+	t.Run("dispatched worker detected when daemon not running", func(t *testing.T) {
+		m := statusModel{
+			daemon: daemonStatus{Running: false},
+			workerIndex: []runlog.WorkerIndexEntry{
+				{TaskID: "TASK-001", Status: "working"},
+				{TaskID: "TASK-002", Status: "done"},
+			},
+		}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be true for dispatched working worker even when daemon is not running")
+		}
+		if m.isTaskRunning("TASK-002") {
+			t.Error("isTaskRunning should be false for completed dispatched worker")
+		}
+	})
 }
 
 func TestAvailableTabs(t *testing.T) {
@@ -2434,5 +2451,222 @@ func TestStatusSplitFooter_ContainsSkipHint(t *testing.T) {
 	footerPlan := mPlan.statusSplitFooter()
 	if strings.Contains(footerPlan, "x: skip") {
 		t.Errorf("expected footer to NOT contain 'x: skip/unskip' hint when plan row selected, got: %q", footerPlan)
+	}
+}
+
+// ── handleAltRunDispatch tests ────────────────────────────────────────────────
+
+func TestHandleAltRunDispatch_NilTaskIsNoop(t *testing.T) {
+	m := statusModel{}
+	result, cmd := m.handleAltRunDispatch(nil)
+	if result.statusNote != "" {
+		t.Errorf("expected empty status note, got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for nil task")
+	}
+}
+
+func TestHandleAltRunDispatch_CompleteTaskIsNoop(t *testing.T) {
+	task := &parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Text: "done", Checked: true}},
+	}
+	m := statusModel{}
+	result, cmd := m.handleAltRunDispatch(task)
+	if result.statusNote != "" {
+		t.Errorf("expected empty status note for complete task, got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for complete task")
+	}
+}
+
+func TestHandleAltRunDispatch_BlockedTaskIsNoop(t *testing.T) {
+	task := &parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Text: "BLOCKED: waiting", Checked: false, Blocked: true}},
+	}
+	m := statusModel{}
+	result, cmd := m.handleAltRunDispatch(task)
+	if result.statusNote != "" {
+		t.Errorf("expected empty status note for blocked task, got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for blocked task")
+	}
+}
+
+func TestHandleAltRunDispatch_AlreadyRunningShowsNote(t *testing.T) {
+	task := &parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"},
+	}
+	result, cmd := m.handleAltRunDispatch(task)
+	if result.statusNote != "Task already running" {
+		t.Errorf("expected 'Task already running', got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd when task already running")
+	}
+}
+
+func TestHandleAltRunDispatch_DaemonRunning_Dispatches(t *testing.T) {
+	origFn := dispatchTaskFn
+	defer func() { dispatchTaskFn = origFn }()
+
+	var capturedTaskID string
+	dispatchTaskFn = func(dir, taskID, model, agentName string) error {
+		capturedTaskID = taskID
+		return nil
+	}
+
+	task := &parser.Task{
+		ID:       "TASK-045-001",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		daemon: daemonStatus{Running: true},
+	}
+	result, cmd := m.handleAltRunDispatch(task)
+	if capturedTaskID != "TASK-045-001" {
+		t.Errorf("expected dispatch called with TASK-045-001, got: %q", capturedTaskID)
+	}
+	if result.statusNote != "Dispatched TASK-045-001" {
+		t.Errorf("expected 'Dispatched TASK-045-001', got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd after dispatch (background, fire-and-forget)")
+	}
+}
+
+func TestHandleAltRunDispatch_DaemonRunning_DispatchError(t *testing.T) {
+	origFn := dispatchTaskFn
+	defer func() { dispatchTaskFn = origFn }()
+
+	dispatchTaskFn = func(dir, taskID, model, agentName string) error {
+		return fmt.Errorf("worktree error")
+	}
+
+	task := &parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		daemon: daemonStatus{Running: true},
+	}
+	result, _ := m.handleAltRunDispatch(task)
+	if !strings.Contains(result.statusNote, "Dispatch failed") {
+		t.Errorf("expected 'Dispatch failed' in status note, got: %q", result.statusNote)
+	}
+}
+
+func TestHandleAltRunDispatch_DaemonNotRunning_ReturnsForegroundCmd(t *testing.T) {
+	task := &parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		daemon: daemonStatus{Running: false},
+	}
+	result, cmd := m.handleAltRunDispatch(task)
+	if result.taskListComponent.RunTaskID != "TASK-001" {
+		t.Errorf("expected RunTaskID=TASK-001, got: %q", result.taskListComponent.RunTaskID)
+	}
+	if cmd == nil {
+		t.Error("expected non-nil cmd for foreground run when daemon not running")
+	}
+}
+
+// ── Footer alt+r hint tests ───────────────────────────────────────────────────
+
+func TestStatusSplitFooter_AltRHint_DaemonRunning(t *testing.T) {
+	task := parser.Task{ID: "TASK-001", Title: "Test",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+		daemon:        daemonStatus{Running: true},
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "alt+r: dispatch") {
+		t.Errorf("expected 'alt+r: dispatch' when daemon running, got: %q", footer)
+	}
+	if strings.Contains(footer, "alt+r: run") {
+		t.Errorf("expected no 'alt+r: run' when daemon running, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_AltRHint_DaemonNotRunning(t *testing.T) {
+	task := parser.Task{ID: "TASK-001", Title: "Test",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+		daemon:        daemonStatus{Running: false},
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "alt+r: run") {
+		t.Errorf("expected 'alt+r: run' when daemon not running, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_AltRHint_NoPlanRow(t *testing.T) {
+	// No alt+r hint when a plan row (not task) is selected.
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md",
+		Tasks: []parser.Task{{ID: "TASK-001", Criteria: []parser.Criterion{{Text: "do", Checked: false}}}}}
+	m := statusModel{
+		plans:      []parser.Plan{plan},
+		treeCursor: 0, // plan row
+	}
+	footer := m.statusSplitFooter()
+	if strings.Contains(footer, "alt+r") {
+		t.Errorf("expected no alt+r hint when plan row selected, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_DetailView_AltRHint_DaemonRunning(t *testing.T) {
+	task := parser.Task{ID: "TASK-001", Title: "Test",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1,
+		daemon:        daemonStatus{Running: true},
+	}
+	m.taskListComponent.Tasks = []parser.Task{task}
+	m.taskListComponent.ShowDetail = true
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "alt+r: dispatch") {
+		t.Errorf("expected 'alt+r: dispatch' in detail footer when daemon running, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_DetailView_AltRHint_DaemonNotRunning(t *testing.T) {
+	task := parser.Task{ID: "TASK-001", Title: "Test",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1,
+		daemon:        daemonStatus{Running: false},
+	}
+	m.taskListComponent.Tasks = []parser.Task{task}
+	m.taskListComponent.ShowDetail = true
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "alt+r: run") {
+		t.Errorf("expected 'alt+r: run' in detail footer when daemon not running, got: %q", footer)
+	}
+	if strings.Contains(footer, "alt+r: dispatch") {
+		t.Errorf("expected no 'alt+r: dispatch' when daemon not running, got: %q", footer)
 	}
 }

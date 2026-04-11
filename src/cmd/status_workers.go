@@ -7,14 +7,10 @@ import (
 )
 
 // refreshWorkerSnapshots reads the workers index and per-worker snapshots.
-// Sets m.workerIndex to nil when no parallel workers are active.
+// Sets m.workerIndex to nil when no workers are active (parallel orchestrator
+// or dispatched workers). Does not require the daemon to be running — dispatched
+// workers write to the same index independently of the daemon.
 func (m *statusModel) refreshWorkerSnapshots() {
-	if !m.daemon.Running {
-		m.workerIndex = nil
-		m.workerSnapshots = nil
-		m.workerSpinners = nil
-		return
-	}
 	idx := runlog.ReadWorkersIndex(m.dir)
 	if len(idx) == 0 {
 		m.workerIndex = nil
@@ -41,7 +37,8 @@ func (m *statusModel) refreshWorkerSnapshots() {
 	}
 }
 
-// isParallelMode returns true when the daemon is running parallel workers.
+// isParallelMode returns true when there are active workers (parallel
+// orchestrator workers or dispatched workers).
 func (m statusModel) isParallelMode() bool {
 	return len(m.workerIndex) > 0
 }

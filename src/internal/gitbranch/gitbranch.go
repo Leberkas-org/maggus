@@ -110,3 +110,15 @@ func createAndCheckout(dir string, branch string) error {
 	}
 	return nil
 }
+
+// DeleteBranch deletes branchName in the repository at repoDir using git branch -d.
+// It only deletes fully-merged branches; unmerged branches and non-existent branches
+// are rejected with an error. Cleanup callers should treat errors as advisory.
+func DeleteBranch(repoDir, branchName string) error {
+	cmd := gitutil.Command("branch", "-d", branchName)
+	cmd.Dir = repoDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git branch -d %s: %w: %s", branchName, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
