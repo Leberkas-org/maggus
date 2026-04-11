@@ -425,6 +425,7 @@ func (m *statusModel) rebuildRightPane() {
 	m.Cursor = 0
 	m.ScrollOffset = 0
 	m.loadMetrics()
+	m.loadCurrentTaskDetail()
 }
 
 // reloadPlans reloads all plans and approvals from disk and rebuilds the current view.

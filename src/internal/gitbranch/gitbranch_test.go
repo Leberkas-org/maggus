@@ -39,14 +39,15 @@ func TestFeatureBranchName(t *testing.T) {
 		taskID string
 		want   string
 	}{
-		{"TASK-001", "feature/maggustask-001"},
-		{"TASK-003", "feature/maggustask-003"},
-		{"TASK-042", "feature/maggustask-042"},
-		{"TASK-100", "feature/maggustask-100"},
-		{"TASK-008", "feature/maggustask-008"},
-		{"TASK-1-E05", "feature/maggustask-1-e05"},
-		{"TASK-2-A01", "feature/maggustask-2-a01"},
-		{"INVALID", "feature/maggustask-000"},
+		{"TASK-001", "feature/maggus-001/task-001"},
+		{"TASK-003", "feature/maggus-003/task-003"},
+		{"TASK-042", "feature/maggus-042/task-042"},
+		{"TASK-100", "feature/maggus-100/task-100"},
+		{"TASK-008", "feature/maggus-008/task-008"},
+		{"TASK-038-003", "feature/maggus-038/task-003"},
+		{"TASK-1-E05", "feature/maggus-1/task-e05"},
+		{"TASK-2-A01", "feature/maggus-2/task-a01"},
+		{"INVALID", "feature/maggus-000/task-000"},
 	}
 
 	for _, tt := range tests {
@@ -63,16 +64,16 @@ func TestBranchName(t *testing.T) {
 		want   string
 	}{
 		// Bug task IDs
-		{"BUG-001-001", "bugfix/maggus-bug-001"},
-		{"BUG-002-003", "bugfix/maggus-bug-002"},
-		{"BUG-123-456", "bugfix/maggus-bug-123"},
-		{"BUG-001", "bugfix/maggus-bug-001"},
+		{"BUG-001-001", "bugfix/maggus-bug-001/task-001"},
+		{"BUG-002-003", "bugfix/maggus-bug-002/task-003"},
+		{"BUG-123-456", "bugfix/maggus-bug-123/task-456"},
+		{"BUG-001", "bugfix/maggus-bug-001/task-001"},
 		// Feature task IDs (delegated to FeatureBranchName)
-		{"TASK-001", "feature/maggustask-001"},
-		{"TASK-003", "feature/maggustask-003"},
-		{"TASK-1-E05", "feature/maggustask-1-e05"},
+		{"TASK-001", "feature/maggus-001/task-001"},
+		{"TASK-003", "feature/maggus-003/task-003"},
+		{"TASK-1-E05", "feature/maggus-1/task-e05"},
 		// Invalid
-		{"INVALID", "feature/maggustask-000"},
+		{"INVALID", "feature/maggus-000/task-000"},
 	}
 
 	for _, tt := range tests {
@@ -91,16 +92,16 @@ func TestEnsureFeatureBranch_BugTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "bugfix/maggus-bug-001" {
-		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001")
+	if branch != "bugfix/maggus-bug-001/task-001" {
+		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001/task-001")
 	}
 	if msg == "" {
 		t.Error("expected a message about switching branches")
 	}
 
 	got := getCurrentBranch(t, tmp)
-	if got != "bugfix/maggus-bug-001" {
-		t.Errorf("actual git branch = %q, want %q", got, "bugfix/maggus-bug-001")
+	if got != "bugfix/maggus-bug-001/task-001" {
+		t.Errorf("actual git branch = %q, want %q", got, "bugfix/maggus-bug-001/task-001")
 	}
 }
 
@@ -131,8 +132,8 @@ func TestEnsureFeatureBranch_Protected(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if branch != "feature/maggustask-003" {
-				t.Errorf("branch = %q, want %q", branch, "feature/maggustask-003")
+			if branch != "feature/maggus-003/task-003" {
+				t.Errorf("branch = %q, want %q", branch, "feature/maggus-003/task-003")
 			}
 			if msg == "" {
 				t.Error("expected a message about switching branches")
@@ -140,8 +141,8 @@ func TestEnsureFeatureBranch_Protected(t *testing.T) {
 
 			// Verify we're actually on the new branch
 			got := getCurrentBranch(t, tmp)
-			if got != "feature/maggustask-003" {
-				t.Errorf("actual git branch = %q, want %q", got, "feature/maggustask-003")
+			if got != "feature/maggus-003/task-003" {
+				t.Errorf("actual git branch = %q, want %q", got, "feature/maggus-003/task-003")
 			}
 		})
 	}
@@ -170,8 +171,8 @@ func TestEnsureFeatureBranch_CustomProtectedList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggustask-005" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-005")
+	if branch != "feature/maggus-005/task-005" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-005/task-005")
 	}
 }
 
@@ -185,8 +186,8 @@ func TestEnsureFeatureBranch_ExistingBranch_CalledTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first call: unexpected error: %v", err)
 	}
-	if branch1 != "feature/maggustask-007" {
-		t.Errorf("first call: branch = %q, want %q", branch1, "feature/maggustask-007")
+	if branch1 != "feature/maggus-007/task-007" {
+		t.Errorf("first call: branch = %q, want %q", branch1, "feature/maggus-007/task-007")
 	}
 	if msg1 == "" {
 		t.Error("first call: expected a message")
@@ -204,16 +205,16 @@ func TestEnsureFeatureBranch_ExistingBranch_CalledTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second call: unexpected error: %v", err)
 	}
-	if branch2 != "feature/maggustask-007" {
-		t.Errorf("second call: branch = %q, want %q", branch2, "feature/maggustask-007")
+	if branch2 != "feature/maggus-007/task-007" {
+		t.Errorf("second call: branch = %q, want %q", branch2, "feature/maggus-007/task-007")
 	}
 	if msg2 == "" {
 		t.Error("second call: expected a message")
 	}
 
 	got := getCurrentBranch(t, tmp)
-	if got != "feature/maggustask-007" {
-		t.Errorf("actual git branch = %q, want %q", got, "feature/maggustask-007")
+	if got != "feature/maggus-007/task-007" {
+		t.Errorf("actual git branch = %q, want %q", got, "feature/maggus-007/task-007")
 	}
 }
 
@@ -240,14 +241,14 @@ func TestEnsureFeatureBranch_ExistingBranch_ReturnsCorrectMessage(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggustask-008" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-008")
+	if branch != "feature/maggus-008/task-008" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-008/task-008")
 	}
 	if msg == "" {
 		t.Error("expected a message about switching branches")
 	}
 	// Message should mention switching from protected branch
-	if !strings.Contains(msg, "master") || !strings.Contains(msg, "feature/maggustask-008") {
+	if !strings.Contains(msg, "master") || !strings.Contains(msg, "feature/maggus-008/task-008") {
 		t.Errorf("message should mention both branches, got: %q", msg)
 	}
 }

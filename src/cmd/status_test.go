@@ -1159,11 +1159,11 @@ func TestRenderCurrentTaskContent(t *testing.T) {
 }
 
 func TestRenderCurrentTaskTab(t *testing.T) {
-	t.Run("no pending task shows No pending tasks message", func(t *testing.T) {
+	t.Run("no pending task shows No task selected message", func(t *testing.T) {
 		m := statusModel{nextTaskID: "", nextTaskFile: ""}
 		content := m.renderCurrentTaskTab(80, 20)
-		if !strings.Contains(content, "No pending tasks") {
-			t.Errorf("expected 'No pending tasks', got %q", content)
+		if !strings.Contains(content, "No task selected") {
+			t.Errorf("expected 'No task selected', got %q", content)
 		}
 	})
 
@@ -1226,8 +1226,9 @@ func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
 		if strings.Contains(content, "coming soon") {
 			t.Error("Task Details tab should not show 'coming soon' placeholder")
 		}
-		if !strings.Contains(content, "No pending tasks") {
-			t.Errorf("Task Details with no pending task should show 'No pending tasks', got %q", content)
+		// A task is selected (treeCursor=1 → completed task), so "No task selected" should NOT appear.
+		if strings.Contains(content, "No task selected") {
+			t.Errorf("Task Details tab should not show 'No task selected' when a task is selected, got %q", content)
 		}
 	})
 }

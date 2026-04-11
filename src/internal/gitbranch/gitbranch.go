@@ -8,8 +8,11 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitutil"
 )
 
-var taskIDSuffixRe = regexp.MustCompile(`^TASK-(.+)$`)
-var bugIDSuffixRe = regexp.MustCompile(`^BUG-(\d+)`)
+// taskSegRe matches TASK-<plan>[−<task>] and captures plan and optional task segments.
+var taskSegRe = regexp.MustCompile(`^TASK-([^-]+)(?:-(.+))?$`)
+
+// bugSegRe matches BUG-<plan>[−<task>] and captures plan number and optional task segment.
+var bugSegRe = regexp.MustCompile(`^BUG-(\d+)(?:-(.+))?$`)
 
 // IsProtected returns true if the branch name is in the protected list.
 func IsProtected(branch string, protectedList []string) bool {
@@ -21,25 +24,39 @@ func IsProtected(branch string, protectedList []string) bool {
 	return false
 }
 
-// BranchName generates a branch name from a task ID.
-// BUG-NNN task IDs produce "bugfix/maggus-bug-NNN" branches.
-// TASK-NNN task IDs produce "feature/maggustask-NNN" branches.
+// BranchName generates a hierarchical branch name from a task ID.
+// BUG-NNN-MMM produces "bugfix/maggus-bug-NNN/task-MMM".
+// TASK-NNN-MMM produces "feature/maggus-NNN/task-MMM".
 func BranchName(taskID string) string {
-	if m := bugIDSuffixRe.FindStringSubmatch(taskID); m != nil {
-		return fmt.Sprintf("bugfix/maggus-bug-%s", strings.ToLower(m[1]))
+	if m := bugSegRe.FindStringSubmatch(taskID); m != nil {
+		planNum := strings.ToLower(m[1])
+		taskSeg := m[2]
+		if taskSeg == "" {
+			taskSeg = planNum
+		} else {
+			taskSeg = strings.ToLower(taskSeg)
+		}
+		return fmt.Sprintf("bugfix/maggus-bug-%s/task-%s", planNum, taskSeg)
 	}
 	return FeatureBranchName(taskID)
 }
 
-// FeatureBranchName generates a feature branch name from a task ID.
-// For example, "TASK-003" becomes "feature/maggustask-003",
-// and "TASK-1-E05" becomes "feature/maggustask-1-e05".
+// FeatureBranchName generates a hierarchical feature branch name from a task ID.
+// For example, "TASK-038-003" becomes "feature/maggus-038/task-003",
+// and "TASK-003" (single-segment) becomes "feature/maggus-003/task-003".
 func FeatureBranchName(taskID string) string {
-	m := taskIDSuffixRe.FindStringSubmatch(taskID)
+	m := taskSegRe.FindStringSubmatch(taskID)
 	if m == nil {
-		return "feature/maggustask-000"
+		return "feature/maggus-000/task-000"
 	}
-	return fmt.Sprintf("feature/maggustask-%s", strings.ToLower(m[1]))
+	planNum := strings.ToLower(m[1])
+	taskSeg := m[2]
+	if taskSeg == "" {
+		taskSeg = planNum
+	} else {
+		taskSeg = strings.ToLower(taskSeg)
+	}
+	return fmt.Sprintf("feature/maggus-%s/task-%s", planNum, taskSeg)
 }
 
 // EnsureFeatureBranch checks the current branch and creates a feature branch if on a protected branch.

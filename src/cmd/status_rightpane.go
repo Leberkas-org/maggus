@@ -241,31 +241,40 @@ func (m statusModel) renderSnapshotInPane(snap *runlog.StateSnapshot, spinnerFra
 	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
 }
 
-// renderCurrentTaskContent returns the rendered detail content for the next workable task.
-// Returns an empty string when nextTaskID is empty or the task cannot be found.
-func renderCurrentTaskContent(nextTaskID, nextTaskFile string) string {
-	if nextTaskID == "" {
+// renderCurrentTaskContent returns the rendered detail content for a task.
+// Returns an empty string when taskID is empty or the task cannot be found.
+func renderCurrentTaskContent(taskID, taskFile string) string {
+	if taskID == "" {
 		return ""
 	}
-	t := reloadTask(nextTaskFile, nextTaskID)
+	t := reloadTask(taskFile, taskID)
 	if t == nil {
 		return ""
 	}
 	return renderDetailContent(*t, nil)
 }
 
-// loadCurrentTaskDetail loads the next workable task into the currentTaskViewport.
+// loadCurrentTaskDetail loads the selected task (or fallback to next workable) into the currentTaskViewport.
 func (m *statusModel) loadCurrentTaskDetail() {
-	content := renderCurrentTaskContent(m.nextTaskID, m.nextTaskFile)
+	taskID := m.nextTaskID
+	taskFile := m.nextTaskFile
+	// If a task is selected in the tree, show that task instead of the global next.
+	if t := m.selectedTask(); t != nil {
+		taskID = t.ID
+		taskFile = t.SourceFile
+	}
+	content := renderCurrentTaskContent(taskID, taskFile)
 	m.currentTaskViewport.SetContent(content)
 }
 
-// renderCurrentTaskTab renders Tab 3: a read-only detail view of the next workable task.
-// When no task is pending, shows a centered "No pending tasks" message.
+// renderCurrentTaskTab renders the Task Details tab: detail view of the selected task,
+// or the next workable task if no task is selected. Shows a placeholder when nothing applies.
 func (m statusModel) renderCurrentTaskTab(width, height int) string {
-	if m.nextTaskID == "" {
+	// Check if a task is selected or if there's a next workable task.
+	hasTask := m.selectedTask() != nil || m.nextTaskID != ""
+	if !hasTask {
 		mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-		msg := mutedStyle.Render("No pending tasks")
+		msg := mutedStyle.Render("No task selected")
 		return lipgloss.NewStyle().Width(width).Height(height).
 			Align(lipgloss.Center, lipgloss.Center).Render(msg)
 	}

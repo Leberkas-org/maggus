@@ -110,16 +110,24 @@ func findWorktreeForBranch(repoRoot, branch string) string {
 
 var taskHeadingRe = regexp.MustCompile(`^###\s+((?:TASK|BUG)-[\w-]+?):\s`)
 
+// featureTaskBranchRe matches task branches in the new hierarchical format:
+// feature/maggus-<plan>/task-<task>
+var featureTaskBranchRe = regexp.MustCompile(`^feature/maggus-([^/]+)/task-(.+)$`)
+
+// bugTaskBranchRe matches bug task branches in the new hierarchical format:
+// bugfix/maggus-bug-<plan>/task-<task>
+var bugTaskBranchRe = regexp.MustCompile(`^bugfix/maggus-bug-([^/]+)/task-(.+)$`)
+
 // taskIDFromBranch derives the task ID from a task branch name.
 //
-//	feature/maggustask-038-003  ->  TASK-038-003
-//	bugfix/maggus-bug-001       ->  BUG-001
+//	feature/maggus-038/task-003      ->  TASK-038-003
+//	bugfix/maggus-bug-001/task-003   ->  BUG-001-003
 func taskIDFromBranch(branch string) string {
-	if after, ok := strings.CutPrefix(branch, "feature/maggustask-"); ok {
-		return "TASK-" + after
+	if m := featureTaskBranchRe.FindStringSubmatch(branch); m != nil {
+		return "TASK-" + strings.ToUpper(m[1]) + "-" + strings.ToUpper(m[2])
 	}
-	if after, ok := strings.CutPrefix(branch, "bugfix/maggus-bug-"); ok {
-		return "BUG-" + after
+	if m := bugTaskBranchRe.FindStringSubmatch(branch); m != nil {
+		return "BUG-" + strings.ToUpper(m[1]) + "-" + strings.ToUpper(m[2])
 	}
 	return ""
 }

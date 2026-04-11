@@ -98,8 +98,8 @@ func TestIsPlanBranch(t *testing.T) {
 		{"bugfix/maggus-bug-001", true},
 		{"bugfix/maggus-bug-042", true},
 		// Not plan branches
-		{"feature/maggustask-038-003", false},
-		{"feature/maggustask-001", false},
+		{"feature/maggus-038/task-003", false},
+		{"feature/maggus-001/task-001", false},
 		{"master", false},
 		{"main", false},
 		{"feature/something-else", false},
@@ -272,111 +272,121 @@ func TestCreateBranchFrom_ExistingBranch_NoOp(t *testing.T) {
 
 func TestCreateBranchFrom_BranchCreatedOffCorrectBase(t *testing.T) {
 	// Verify the new branch points at fromBranch's HEAD, not the current HEAD.
+	// Note: we use "feature/base-038" as the base (not "feature/maggus-038") because
+	// git cannot have refs/heads/feature/maggus-038 (file) and
+	// refs/heads/feature/maggus-038/task-003 (file in dir) simultaneously.
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
-	addEmptyCommit(t, tmp, "plan branch commit")
+	checkoutBranch(t, tmp, "feature/base-038")
+	addEmptyCommit(t, tmp, "base branch commit")
 
-	// HEAD is now 1 commit ahead of master on feature/maggus-038.
-	planHead := getBranchHead(t, tmp, "feature/maggus-038")
+	// HEAD is now 1 commit ahead of master on feature/base-038.
+	baseHead := getBranchHead(t, tmp, "feature/base-038")
 	masterHead := getBranchHead(t, tmp, "master")
-	if planHead == masterHead {
-		t.Fatal("test setup error: plan branch not ahead of master")
+	if baseHead == masterHead {
+		t.Fatal("test setup error: base branch not ahead of master")
 	}
 
-	// Create task branch off plan branch while still checked out on plan branch.
-	if err := CreateBranchFrom(tmp, "feature/maggustask-038-003", "feature/maggus-038"); err != nil {
+	// Create task branch off base branch while still checked out on base branch.
+	if err := CreateBranchFrom(tmp, "feature/maggus-038/task-003", "feature/base-038"); err != nil {
 		t.Fatalf("CreateBranchFrom failed: %v", err)
 	}
 
-	taskHead := getBranchHead(t, tmp, "feature/maggustask-038-003")
-	if taskHead != planHead {
-		t.Errorf("task branch HEAD %q != plan branch HEAD %q; not based on plan branch", taskHead, planHead)
+	taskHead := getBranchHead(t, tmp, "feature/maggus-038/task-003")
+	if taskHead != baseHead {
+		t.Errorf("task branch HEAD %q != base branch HEAD %q; not based on base branch", taskHead, baseHead)
 	}
 }
 
 // ── EnsureTaskBranchFromBase integration tests ────────────────────────────────
 
 func TestEnsureTaskBranchFromBase_NewBranch(t *testing.T) {
+	// Note: we use master as base (not "feature/maggus-038") because git cannot
+	// have refs/heads/feature/maggus-038 and refs/heads/feature/maggus-038/task-003
+	// as refs simultaneously (file vs directory conflict in .git/refs/heads/).
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
 
-	branch, msg, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "feature/maggus-038")
+	branch, msg, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "master")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggustask-038-003" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-038-003")
+	if branch != "feature/maggus-038/task-003" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038/task-003")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggustask-038-003" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggustask-038-003")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038/task-003" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038/task-003")
 	}
 }
 
 func TestEnsureTaskBranchFromBase_ExistingBranch(t *testing.T) {
+	// Note: the task branch is created directly off master to avoid the git ref
+	// conflict that would occur if "feature/maggus-038" (plan branch) and
+	// "feature/maggus-038/task-003" (task branch) both existed as refs.
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
-	checkoutBranch(t, tmp, "feature/maggustask-038-003")
+	checkoutBranch(t, tmp, "feature/maggus-038/task-003")
 
-	cmd := exec.Command("git", "checkout", "feature/maggus-038")
+	cmd := exec.Command("git", "checkout", "master")
 	cmd.Dir = tmp
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("checkout plan branch: %v\n%s", err, out)
+		t.Fatalf("checkout master: %v\n%s", err, out)
 	}
 
-	branch, _, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "feature/maggus-038")
+	branch, _, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "master")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggustask-038-003" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggustask-038-003")
+	if branch != "feature/maggus-038/task-003" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038/task-003")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggustask-038-003" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggustask-038-003")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038/task-003" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038/task-003")
 	}
 }
 
 func TestEnsureTaskBranchFromBase_BranchCreatedOffBase(t *testing.T) {
+	// Verify the task branch is created at baseBranch's HEAD.
+	// Note: we use a non-conflicting base ("feature/base-038") because git cannot
+	// have refs/heads/feature/maggus-038 and refs/heads/feature/maggus-038/task-003
+	// as refs simultaneously.
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
-	addEmptyCommit(t, tmp, "plan branch commit")
+	checkoutBranch(t, tmp, "feature/base-038")
+	addEmptyCommit(t, tmp, "base branch commit")
 
-	planHead := getBranchHead(t, tmp, "feature/maggus-038")
+	baseHead := getBranchHead(t, tmp, "feature/base-038")
 	masterHead := getBranchHead(t, tmp, "master")
-	if planHead == masterHead {
-		t.Fatal("test setup error: plan branch not ahead of master")
+	if baseHead == masterHead {
+		t.Fatal("test setup error: base branch not ahead of master")
 	}
 
-	_, _, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "feature/maggus-038")
+	_, _, err := EnsureTaskBranchFromBase(tmp, "TASK-038-003", "feature/base-038")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	taskHead := getBranchHead(t, tmp, "feature/maggustask-038-003")
-	if taskHead != planHead {
-		t.Errorf("task branch HEAD %q != plan branch HEAD %q; not based on plan branch", taskHead, planHead)
+	taskHead := getBranchHead(t, tmp, "feature/maggus-038/task-003")
+	if taskHead != baseHead {
+		t.Errorf("task branch HEAD %q != base branch HEAD %q; not based on base branch", taskHead, baseHead)
 	}
 }
 
 func TestEnsureTaskBranchFromBase_BugTask(t *testing.T) {
+	// Note: we use master as base to avoid the git ref conflict between
+	// "bugfix/maggus-bug-001" (plan branch) and "bugfix/maggus-bug-001/task-003" (task branch).
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "bugfix/maggus-bug-001")
 
-	branch, msg, err := EnsureTaskBranchFromBase(tmp, "BUG-001-003", "bugfix/maggus-bug-001")
+	branch, msg, err := EnsureTaskBranchFromBase(tmp, "BUG-001-003", "master")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// BUG-001-003 produces "bugfix/maggus-bug-001" from BranchName — same as plan branch.
-	// Just verify no error and a branch is returned.
-	if branch == "" {
-		t.Error("expected non-empty branch")
+	if branch != "bugfix/maggus-bug-001/task-003" {
+		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001/task-003")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")

@@ -62,10 +62,13 @@ func TestMergeTaskBranch_FastForward(t *testing.T) {
 	repo := initRepo(t)
 
 	// Create and switch to feature branch.
-	run(t, repo, "git", "checkout", "-b", "feature/maggus-038")
+	// Note: we use "feature/plan-038" (not "feature/maggus-038") because git cannot
+	// have refs/heads/feature/maggus-038 and refs/heads/feature/maggus-038/task-001
+	// as refs simultaneously (file vs directory conflict).
+	run(t, repo, "git", "checkout", "-b", "feature/plan-038")
 
 	// Create task branch worktree.
-	taskBranch := "feature/maggustask-038-001"
+	taskBranch := "feature/maggus-038/task-001"
 	wtPath := filepath.Join(t.TempDir(), "wt")
 	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
 		t.Fatalf("CreateWorktree: %v", err)
@@ -77,7 +80,7 @@ func TestMergeTaskBranch_FastForward(t *testing.T) {
 	run(t, wtPath, "git", "commit", "-m", "task commit")
 
 	// Merge (feature branch has no new commits — fast-forward scenario).
-	if err := MergeTaskBranch(repo, "feature/maggus-038", taskBranch); err != nil {
+	if err := MergeTaskBranch(repo, "feature/plan-038", taskBranch); err != nil {
 		t.Fatalf("MergeTaskBranch: %v", err)
 	}
 
@@ -101,10 +104,13 @@ func TestMergeTaskBranch_ThreeWayMerge(t *testing.T) {
 	repo := initRepo(t)
 
 	// Create and switch to feature branch.
-	run(t, repo, "git", "checkout", "-b", "feature/maggus-038")
+	// Note: we use "feature/plan-038" (not "feature/maggus-038") because git cannot
+	// have refs/heads/feature/maggus-038 and refs/heads/feature/maggus-038/task-002
+	// as refs simultaneously (file vs directory conflict).
+	run(t, repo, "git", "checkout", "-b", "feature/plan-038")
 
 	// Create task branch worktree.
-	taskBranch := "feature/maggustask-038-002"
+	taskBranch := "feature/maggus-038/task-002"
 	wtPath := filepath.Join(t.TempDir(), "wt")
 	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
 		t.Fatalf("CreateWorktree: %v", err)
@@ -121,7 +127,7 @@ func TestMergeTaskBranch_ThreeWayMerge(t *testing.T) {
 	run(t, wtPath, "git", "commit", "-m", "task commit")
 
 	// Merge.
-	if err := MergeTaskBranch(repo, "feature/maggus-038", taskBranch); err != nil {
+	if err := MergeTaskBranch(repo, "feature/plan-038", taskBranch); err != nil {
 		t.Fatalf("MergeTaskBranch: %v", err)
 	}
 
@@ -148,7 +154,10 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	repo := initRepo(t)
 
 	// Create and switch to feature branch.
-	run(t, repo, "git", "checkout", "-b", "feature/maggus-038")
+	// Note: we use "feature/plan-038" (not "feature/maggus-038") because git cannot
+	// have refs/heads/feature/maggus-038 and refs/heads/feature/maggus-038/task-003
+	// as refs simultaneously (file vs directory conflict).
+	run(t, repo, "git", "checkout", "-b", "feature/plan-038")
 
 	// Set up plan file (commit it so it exists on both branches).
 	planContent := "### TASK-038-003: Test task\n\n" +
@@ -161,7 +170,7 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	run(t, repo, "git", "commit", "-m", "add plan file")
 
 	// Create task branch worktree.
-	taskBranch := "feature/maggustask-038-003"
+	taskBranch := "feature/maggus-038/task-003"
 	wtPath := filepath.Join(t.TempDir(), "wt")
 	if err := gitworktree.CreateWorktree(repo, wtPath, taskBranch); err != nil {
 		t.Fatalf("CreateWorktree: %v", err)
@@ -178,15 +187,15 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	run(t, wtPath, "git", "commit", "-m", "task change")
 
 	// Merge — should fail with conflict.
-	err := MergeTaskBranch(repo, "feature/maggus-038", taskBranch)
+	err := MergeTaskBranch(repo, "feature/plan-038", taskBranch)
 
 	// Verify MergeConflictError.
 	var conflictErr *MergeConflictError
 	if !errors.As(err, &conflictErr) {
 		t.Fatalf("expected *MergeConflictError, got: %v", err)
 	}
-	if conflictErr.FeatureBranch != "feature/maggus-038" {
-		t.Errorf("FeatureBranch = %q, want %q", conflictErr.FeatureBranch, "feature/maggus-038")
+	if conflictErr.FeatureBranch != "feature/plan-038" {
+		t.Errorf("FeatureBranch = %q, want %q", conflictErr.FeatureBranch, "feature/plan-038")
 	}
 	if conflictErr.TaskBranch != taskBranch {
 		t.Errorf("TaskBranch = %q, want %q", conflictErr.TaskBranch, taskBranch)
@@ -197,7 +206,7 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
-	expectedBlocked := "BLOCKED: Merge conflict merging feature/maggustask-038-003 into feature/maggus-038"
+	expectedBlocked := "BLOCKED: Merge conflict merging feature/maggus-038/task-003 into feature/plan-038"
 	if !strings.Contains(string(data), expectedBlocked) {
 		t.Errorf("expected BLOCKED criterion in plan file.\ngot:\n%s", data)
 	}
@@ -230,10 +239,10 @@ func TestTaskIDFromBranch(t *testing.T) {
 		branch string
 		want   string
 	}{
-		{"feature/maggustask-038-003", "TASK-038-003"},
-		{"feature/maggustask-001", "TASK-001"},
-		{"bugfix/maggus-bug-001", "BUG-001"},
-		{"bugfix/maggus-bug-001-003", "BUG-001-003"},
+		{"feature/maggus-038/task-003", "TASK-038-003"},
+		{"feature/maggus-001/task-001", "TASK-001-001"},
+		{"bugfix/maggus-bug-001/task-003", "BUG-001-003"},
+		{"bugfix/maggus-bug-001/task-001", "BUG-001-001"},
 		{"main", ""},
 		{"feature/other", ""},
 	}

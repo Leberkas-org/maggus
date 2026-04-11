@@ -255,12 +255,12 @@ func (m *statusModel) resizeTab2DetailViewport() {
 }
 
 // treeAvailableHeight returns the number of item rows visible in the left pane
-// after subtracting the fixed header lines (label + separator + daemon status + separator).
+// after subtracting the fixed header lines (label + separator + empty + daemon + separator).
 // Used by both clampTreeScroll and renderLeftPane to keep scroll math consistent.
 func (m *statusModel) treeAvailableHeight() int {
 	_, innerH := styles.FullScreenInnerSize(m.width, m.height)
-	// innerH-1 (renderLeftPane receives innerH-1) + 5 header lines (label + sep + empty + daemon + sep)
-	const treeOverhead = 6
+	// renderLeftPane receives innerH-2, then 5 header lines (label + sep + empty + daemon + sep)
+	const treeOverhead = 7
 	availH := innerH - treeOverhead
 	if availH < 1 {
 		availH = 1
@@ -609,6 +609,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
+			} else {
+				m.loadCurrentTaskDetail()
 			}
 		}
 		return m, nil
@@ -623,6 +625,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateTabsForSelectionChange(prevCtx)
 			if m.selectedPlan().ID != prevPlan.ID {
 				m.rebuildRightPane()
+			} else {
+				m.loadCurrentTaskDetail()
 			}
 		}
 		return m, nil
