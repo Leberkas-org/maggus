@@ -79,3 +79,13 @@ func (s *FileBugStore) ResolveCriterion(filePath string, c parser.Criterion) err
 func (s *FileBugStore) DeleteCriterion(filePath string, c parser.Criterion) error {
 	return parser.DeleteCriterion(filePath, c)
 }
+
+// SkipCriterion adds a SKIPPED: prefix to the criterion and changes its checkbox to [>].
+func (s *FileBugStore) SkipCriterion(filePath string, c parser.Criterion) error {
+	return parser.SkipCriterion(filePath, c)
+}
+
+// UnskipCriterion removes the SKIPPED: prefix from the criterion and restores its checkbox to [ ].
+func (s *FileBugStore) UnskipCriterion(filePath string, c parser.Criterion) error {
+	return parser.UnskipCriterion(filePath, c)
+}

@@ -146,6 +146,30 @@ func (m *memStore) deleteCriterion(filePath string, c parser.Criterion) error {
 	return nil
 }
 
+func (m *memStore) skipCriterion(filePath string, c parser.Criterion) error {
+	pi, ti, ci, err := m.findCriterion(filePath, c)
+	if err != nil {
+		return err
+	}
+	cr := &m.plans[pi].Tasks[ti].Criteria[ci]
+	if !strings.HasPrefix(cr.Text, "SKIPPED: ") {
+		cr.Text = "SKIPPED: " + cr.Text
+	}
+	cr.Skipped = true
+	return nil
+}
+
+func (m *memStore) unskipCriterion(filePath string, c parser.Criterion) error {
+	pi, ti, ci, err := m.findCriterion(filePath, c)
+	if err != nil {
+		return err
+	}
+	cr := &m.plans[pi].Tasks[ti].Criteria[ci]
+	cr.Text = strings.TrimPrefix(cr.Text, "SKIPPED: ")
+	cr.Skipped = false
+	return nil
+}
+
 // MemFeatureStore is an in-memory fake implementation of FeatureStore for use in tests.
 type MemFeatureStore struct{ s *memStore }
 
@@ -185,6 +209,14 @@ func (f *MemFeatureStore) DeleteCriterion(filePath string, c parser.Criterion) e
 	return f.s.deleteCriterion(filePath, c)
 }
 
+func (f *MemFeatureStore) SkipCriterion(filePath string, c parser.Criterion) error {
+	return f.s.skipCriterion(filePath, c)
+}
+
+func (f *MemFeatureStore) UnskipCriterion(filePath string, c parser.Criterion) error {
+	return f.s.unskipCriterion(filePath, c)
+}
+
 // MemBugStore is an in-memory fake implementation of BugStore for use in tests.
 type MemBugStore struct{ s *memStore }
 
@@ -222,4 +254,12 @@ func (b *MemBugStore) ResolveCriterion(filePath string, c parser.Criterion) erro
 
 func (b *MemBugStore) DeleteCriterion(filePath string, c parser.Criterion) error {
 	return b.s.deleteCriterion(filePath, c)
+}
+
+func (b *MemBugStore) SkipCriterion(filePath string, c parser.Criterion) error {
+	return b.s.skipCriterion(filePath, c)
+}
+
+func (b *MemBugStore) UnskipCriterion(filePath string, c parser.Criterion) error {
+	return b.s.unskipCriterion(filePath, c)
 }

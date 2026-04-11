@@ -777,6 +777,8 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		return m.handleApproveToggle()
+	case "x":
+		return m.handleSkipToggle()
 	case "alt+d":
 		visible := m.visiblePlans()
 		if len(visible) > 0 && m.planCursor < len(visible) && !m.ConfirmDelete {
@@ -868,6 +870,62 @@ func swapPlansByFile(plans []parser.Plan, fileA, fileB string) {
 	if idxA >= 0 && idxB >= 0 {
 		plans[idxA], plans[idxB] = plans[idxB], plans[idxA]
 	}
+}
+
+// handleSkipToggle toggles the skip status of the first unchecked criterion on the
+// currently selected task row. It is a no-op when a plan row is selected or when
+// the task has no unchecked criteria (i.e. the task is already complete).
+func (m statusModel) handleSkipToggle() (tea.Model, tea.Cmd) {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return m, nil
+	}
+	item := items[m.treeCursor]
+	if item.kind != treeItemKindTask || item.task == nil {
+		return m, nil // no-op for plan/separator rows
+	}
+	task := item.task
+
+	// Find the first unchecked criterion.
+	var target *parser.Criterion
+	for i := range task.Criteria {
+		if !task.Criteria[i].Checked {
+			target = &task.Criteria[i]
+			break
+		}
+	}
+	if target == nil {
+		return m, nil // task complete (all criteria checked), no-op
+	}
+
+	store := m.storeForFile(task.SourceFile)
+	var err error
+	if target.Skipped {
+		err = store.UnskipCriterion(task.SourceFile, *target)
+		if err == nil {
+			m.statusNote = "task unskipped"
+		}
+	} else {
+		err = store.SkipCriterion(task.SourceFile, *target)
+		if err == nil {
+			m.statusNote = "task skipped"
+		}
+	}
+	if err != nil {
+		m.statusNote = "error: " + err.Error()
+		return m, nil
+	}
+
+	// Preserve cursor position across reload so the user stays on the task row.
+	prevTreeCursor := m.treeCursor
+	m.reloadPlans()
+	newItems := m.buildTreeItems()
+	if prevTreeCursor < len(newItems) {
+		m.treeCursor = prevTreeCursor
+	}
+	m.syncPlanCursorFromTreeCursor()
+	m.syncDetailSuffix()
+	return m, nil
 }
 
 func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {

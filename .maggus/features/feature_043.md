@@ -93,14 +93,14 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** yes — can run alongside TASK-043-003, TASK-043-005
 
 **Acceptance Criteria:**
-- [ ] Pressing `x` when a task row is selected in the left pane toggles the first unchecked criterion's skip status (adds or removes `SKIPPED:` prefix)
-- [ ] If the task has no unchecked criteria (already complete), `x` is a no-op
-- [ ] If the task is already skipped (has a `SKIPPED:` criterion), `x` unskips it (removes the prefix)
-- [ ] After toggling, the plan file is written immediately and the view refreshes
-- [ ] A status note briefly shows "task skipped" or "task unskipped"
-- [ ] Pressing `x` on a feature row (not a task) is a no-op
-- [ ] `go vet ./...` and `go test ./...` pass
-- [ ] Unit test verifies `x` key sends the correct skip/unskip action
+- [x] Pressing `x` when a task row is selected in the left pane toggles the first unchecked criterion's skip status (adds or removes `SKIPPED:` prefix)
+- [x] If the task has no unchecked criteria (already complete), `x` is a no-op
+- [x] If the task is already skipped (has a `SKIPPED:` criterion), `x` unskips it (removes the prefix)
+- [x] After toggling, the plan file is written immediately and the view refreshes
+- [x] A status note briefly shows "task skipped" or "task unskipped"
+- [x] Pressing `x` on a feature row (not a task) is a no-op
+- [x] `go vet ./...` and `go test ./...` pass
+- [x] Unit test verifies `x` key sends the correct skip/unskip action
 
 ### TASK-043-005: Add skip action to task detail criteria picker
 **Description:** As a user in the task detail view, I want a "Skip" option in the criteria action picker so I can skip individual criteria from the detail view.

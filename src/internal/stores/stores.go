@@ -12,6 +12,8 @@ type FeatureStore interface {
 	UnblockCriterion(filePath string, c parser.Criterion) error
 	ResolveCriterion(filePath string, c parser.Criterion) error
 	DeleteCriterion(filePath string, c parser.Criterion) error
+	SkipCriterion(filePath string, c parser.Criterion) error
+	UnskipCriterion(filePath string, c parser.Criterion) error
 }
 
 // BugStore manages reading and mutating bug plan files.
@@ -23,4 +25,6 @@ type BugStore interface {
 	UnblockCriterion(filePath string, c parser.Criterion) error
 	ResolveCriterion(filePath string, c parser.Criterion) error
 	DeleteCriterion(filePath string, c parser.Criterion) error
+	SkipCriterion(filePath string, c parser.Criterion) error
+	UnskipCriterion(filePath string, c parser.Criterion) error
 }

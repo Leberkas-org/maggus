@@ -2217,3 +2217,205 @@ func TestUpdateTabsForSelectionChange(t *testing.T) {
 		}
 	})
 }
+
+// --- Skip toggle tests ---
+
+func TestHandleSkipToggle_SkipsFirstUncheckedCriterion(t *testing.T) {
+	dir := setupApproveDir(t)
+
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+		Tasks: []parser.Task{
+			{
+				ID:         "TASK-001-001",
+				Title:      "First task",
+				SourceFile: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+				Criteria: []parser.Criterion{
+					{Text: "Do the thing", Checked: false, Blocked: false, Skipped: false},
+				},
+			},
+		},
+	}
+
+	fs := stores.NewMemFeatureStore([]parser.Plan{plan})
+	bs := stores.NewMemBugStore(nil)
+
+	m := statusModel{
+		taskListComponent: taskListComponent{
+			featureStore: fs,
+			bugStore:     bs,
+		},
+		dir:           dir,
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row (plan row = 0, first task row = 1)
+		featureStore:  fs,
+		bugStore:      bs,
+	}
+
+	result, _ := m.handleSkipToggle()
+	newM := result.(statusModel)
+
+	if newM.statusNote != "task skipped" {
+		t.Errorf("expected 'task skipped' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleSkipToggle_UnskipsSkippedCriterion(t *testing.T) {
+	dir := setupApproveDir(t)
+
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+		Tasks: []parser.Task{
+			{
+				ID:         "TASK-001-001",
+				Title:      "First task",
+				SourceFile: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+				Criteria: []parser.Criterion{
+					{Text: "SKIPPED: Do the thing", Checked: false, Blocked: false, Skipped: true},
+				},
+			},
+		},
+	}
+
+	fs := stores.NewMemFeatureStore([]parser.Plan{plan})
+	bs := stores.NewMemBugStore(nil)
+
+	m := statusModel{
+		taskListComponent: taskListComponent{
+			featureStore: fs,
+			bugStore:     bs,
+		},
+		dir:           dir,
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+		featureStore:  fs,
+		bugStore:      bs,
+	}
+
+	result, _ := m.handleSkipToggle()
+	newM := result.(statusModel)
+
+	if newM.statusNote != "task unskipped" {
+		t.Errorf("expected 'task unskipped' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleSkipToggle_PlanRowIsNoop(t *testing.T) {
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{
+				ID:       "TASK-001-001",
+				Criteria: []parser.Criterion{{Text: "Do the thing", Checked: false}},
+			},
+		},
+	}
+
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{}, // not expanded; cursor 0 = plan row
+		treeCursor:    0,
+	}
+
+	result, _ := m.handleSkipToggle()
+	newM := result.(statusModel)
+
+	if newM.statusNote != "" {
+		t.Errorf("expected empty note for plan row, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleSkipToggle_CompleteTaskIsNoop(t *testing.T) {
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{
+				ID:         "TASK-001-001",
+				SourceFile: "feature_001.md",
+				Criteria:   []parser.Criterion{{Text: "Done", Checked: true}},
+			},
+		},
+	}
+
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+	}
+
+	result, _ := m.handleSkipToggle()
+	newM := result.(statusModel)
+
+	if newM.statusNote != "" {
+		t.Errorf("expected empty note for complete task, got: %q", newM.statusNote)
+	}
+}
+
+func TestUpdateList_XKey_SkipsTask(t *testing.T) {
+	dir := setupApproveDir(t)
+
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+		Tasks: []parser.Task{
+			{
+				ID:         "TASK-001-001",
+				Title:      "First task",
+				SourceFile: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+				Criteria: []parser.Criterion{
+					{Text: "Do the thing", Checked: false, Blocked: false, Skipped: false},
+				},
+			},
+		},
+	}
+
+	fs := stores.NewMemFeatureStore([]parser.Plan{plan})
+	bs := stores.NewMemBugStore(nil)
+
+	m := statusModel{
+		taskListComponent: taskListComponent{
+			featureStore: fs,
+			bugStore:     bs,
+		},
+		dir:           dir,
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+		featureStore:  fs,
+		bugStore:      bs,
+	}
+
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	newM := result.(statusModel)
+
+	if newM.statusNote != "task skipped" {
+		t.Errorf("x key: expected 'task skipped' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestStatusSplitFooter_ShowsStatusNote(t *testing.T) {
+	m := statusModel{
+		plans:      []parser.Plan{{ID: "feature_001", File: "feature_001.md"}},
+		statusNote: "task skipped",
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "task skipped") {
+		t.Errorf("expected footer to contain 'task skipped', got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_ContainsSkipHint(t *testing.T) {
+	m := statusModel{
+		plans: []parser.Plan{{ID: "feature_001", File: "feature_001.md"}},
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "x: skip") {
+		t.Errorf("expected footer to contain 'x: skip/unskip' hint, got: %q", footer)
+	}
+}

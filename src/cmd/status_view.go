@@ -213,6 +213,7 @@ func (m statusModel) statusSplitFooter() string {
 	parts = append(parts, "pgup/pgdn: prev/next feature")
 	parts = append(parts, "enter: details")
 	parts = append(parts, "a: approve")
+	parts = append(parts, "x: skip/unskip")
 	parts = append(parts, "alt+d: delete")
 	parts = append(parts, daemonHint)
 	parts = append(parts, "q: exit")
@@ -223,6 +224,11 @@ func (m statusModel) statusSplitFooter() string {
 		} else {
 			footer += "  alt+a: show done"
 		}
+	}
+	// Show status note briefly after an action (cleared on the next key press).
+	if m.statusNote != "" {
+		noteStyle := lipgloss.NewStyle().Foreground(styles.Success)
+		footer = noteStyle.Render("✓ "+m.statusNote) + "  " + footer
 	}
 	return footer
 }
