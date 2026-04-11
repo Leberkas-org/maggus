@@ -2843,3 +2843,68 @@ func TestRenderLeftPane_BadgeOptOut_NeverShowsUnapprovedBadge(t *testing.T) {
 		t.Errorf("expected no ○ badge on plan line in opt-out mode, got: %q", planLine)
 	}
 }
+
+// BUG-039-004: refreshWorkerSnapshots must skip index entries without snapshot files.
+
+// TestRefreshWorkerSnapshots_SkipsEntriesWithMissingSnapshot verifies that index
+// entries whose per-worker snapshot file does not exist are not surfaced in the TUI.
+func TestRefreshWorkerSnapshots_SkipsEntriesWithMissingSnapshot(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write an index with two workers — only one will have a snapshot file.
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: "BUG-039-004-001", Status: "working"},
+		{TaskID: "BUG-039-004-002", Status: "done"}, // no snapshot file
+	})
+
+	// Write a snapshot only for the first worker.
+	_ = runlog.WriteWorkerSnapshot(dir, "BUG-039-004-001", runlog.StateSnapshot{
+		TaskID: "BUG-039-004-001",
+		Status: "Working",
+	})
+
+	m := statusModel{dir: dir}
+	m.refreshWorkerSnapshots()
+
+	// Only the worker with a snapshot should appear.
+	if len(m.workerIndex) != 1 {
+		t.Fatalf("workerIndex len = %d, want 1 (ghost entry should be skipped)", len(m.workerIndex))
+	}
+	if m.workerIndex[0].TaskID != "BUG-039-004-001" {
+		t.Errorf("workerIndex[0].TaskID = %q, want %q", m.workerIndex[0].TaskID, "BUG-039-004-001")
+	}
+	// The missing-snapshot entry must not appear in the snapshot map.
+	if _, ok := m.workerSnapshots["BUG-039-004-002"]; ok {
+		t.Error("ghost worker snapshot must not be in workerSnapshots map")
+	}
+}
+
+// TestRefreshWorkerSnapshots_NilIndexWhenAllMissingSnapshots verifies that when
+// every index entry lacks a snapshot file, workerIndex is set to nil (not parallel mode).
+func TestRefreshWorkerSnapshots_NilIndexWhenAllMissingSnapshots(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write an index with two workers — neither has a snapshot file.
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: "BUG-039-004-003", Status: "done"},
+		{TaskID: "BUG-039-004-004", Status: "failed"},
+	})
+
+	m := statusModel{dir: dir}
+	m.refreshWorkerSnapshots()
+
+	if m.workerIndex != nil {
+		t.Errorf("workerIndex should be nil when no snapshot files exist, got len=%d", len(m.workerIndex))
+	}
+}
+
+// TestRefreshWorkerSnapshots_NilWhenEmptyIndex verifies the empty-index path.
+func TestRefreshWorkerSnapshots_NilWhenEmptyIndex(t *testing.T) {
+	dir := t.TempDir()
+	m := statusModel{dir: dir}
+	m.refreshWorkerSnapshots()
+
+	if m.workerIndex != nil {
+		t.Error("workerIndex should be nil when no index file exists")
+	}
+}

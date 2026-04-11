@@ -968,6 +968,10 @@ func (m statusModel) handleSkipToggle() (tea.Model, tea.Cmd) {
 
 func (m statusModel) handleApproveToggle() (tea.Model, tea.Cmd) {
 	m.statusNote = ""
+	if !m.approvalRequired {
+		m.statusNote = "approval not required (opt-out mode)"
+		return m, nil
+	}
 	visible := m.visiblePlans()
 	if m.planCursor >= len(visible) {
 		return m, nil

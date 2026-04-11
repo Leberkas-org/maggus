@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leberkas-org/maggus/internal/agent"
 )
@@ -278,6 +279,121 @@ func TestUpdateWorkerStatus_NoopForUnknownTaskID(t *testing.T) {
 	}
 	if workers[0].Status != "working" {
 		t.Errorf("Status should be unchanged: %q", workers[0].Status)
+	}
+}
+
+// BUG-039-004: tests for PruneStaleWorkerEntries.
+
+func TestPruneStaleWorkerEntries_RemovesOldTerminalEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	old := time.Now().Add(-10 * time.Minute).UTC().Format(time.RFC3339)
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "done", StartedAt: old},
+		{TaskID: "TASK-001-002", Status: "failed", StartedAt: old},
+		{TaskID: "TASK-001-003", Status: "working", StartedAt: old},
+	})
+
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker after prune (only 'working'), got %d", len(workers))
+	}
+	if workers[0].TaskID != "TASK-001-003" {
+		t.Errorf("retained worker = %q, want %q", workers[0].TaskID, "TASK-001-003")
+	}
+}
+
+func TestPruneStaleWorkerEntries_KeepsRecentTerminalEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	recent := time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "done", StartedAt: recent},
+		{TaskID: "TASK-001-002", Status: "failed", StartedAt: recent},
+	})
+
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries failed: %v", err)
+	}
+
+	// Recent terminal entries should be kept (still within 5-minute window).
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 2 {
+		t.Fatalf("expected 2 workers kept (recent terminal), got %d", len(workers))
+	}
+}
+
+func TestPruneStaleWorkerEntries_AlwaysPrunesEmptyStartedAt(t *testing.T) {
+	dir := t.TempDir()
+
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "done", StartedAt: ""},   // no timestamp
+		{TaskID: "TASK-001-002", Status: "failed", StartedAt: ""}, // no timestamp
+		{TaskID: "TASK-001-003", Status: "working", StartedAt: ""},
+	})
+
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker after prune (empty StartedAt terminal entries removed), got %d", len(workers))
+	}
+	if workers[0].TaskID != "TASK-001-003" {
+		t.Errorf("retained worker = %q, want %q", workers[0].TaskID, "TASK-001-003")
+	}
+}
+
+func TestPruneStaleWorkerEntries_PrunesBlockedEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	old := time.Now().Add(-10 * time.Minute).UTC().Format(time.RFC3339)
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "blocked", StartedAt: old},
+		{TaskID: "TASK-001-002", Status: "working", StartedAt: old},
+	})
+
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker after prune (blocked removed), got %d", len(workers))
+	}
+	if workers[0].Status != "working" {
+		t.Errorf("retained worker status = %q, want %q", workers[0].Status, "working")
+	}
+}
+
+func TestPruneStaleWorkerEntries_NoopWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// No index file — should not error.
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries should not fail with no index: %v", err)
+	}
+}
+
+func TestPruneStaleWorkerEntries_NoopWhenNothingStale(t *testing.T) {
+	dir := t.TempDir()
+
+	recent := time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "working", StartedAt: recent},
+	})
+
+	if err := PruneStaleWorkerEntries(dir, 5*time.Minute); err != nil {
+		t.Fatalf("PruneStaleWorkerEntries failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker unchanged, got %d", len(workers))
 	}
 }
 

@@ -13,6 +13,61 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// writeOptOutConfig writes a minimal .maggus/config.yml with approval_mode: opt-out.
+func writeOptOutConfig(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "approval_mode: opt-out\n"
+	if err := os.WriteFile(filepath.Join(dir, ".maggus", "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCheckOptOut_OptOutMode_ReturnsTrueAndPrintsMessage(t *testing.T) {
+	dir := t.TempDir()
+	writeOptOutConfig(t, dir)
+	cmd, stdout, _ := newTestCmd(t)
+	got := checkOptOut(cmd, dir)
+	if !got {
+		t.Error("expected checkOptOut to return true in opt-out mode")
+	}
+	if !strings.Contains(stdout.String(), "approval not required (opt-out mode)") {
+		t.Errorf("expected opt-out message, got: %q", stdout.String())
+	}
+}
+
+func TestCheckOptOut_OptInMode_ReturnsFalse(t *testing.T) {
+	dir := t.TempDir()
+	// No config file — defaults to opt-in.
+	cmd, stdout, _ := newTestCmd(t)
+	got := checkOptOut(cmd, dir)
+	if got {
+		t.Error("expected checkOptOut to return false in opt-in mode (default)")
+	}
+	if strings.Contains(stdout.String(), "approval not required") {
+		t.Errorf("expected no message in opt-in mode, got: %q", stdout.String())
+	}
+}
+
+func TestCheckOptOut_ExplicitOptIn_ReturnsFalse(t *testing.T) {
+	dir := t.TempDir()
+	// Write explicit opt-in config.
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "approval_mode: opt-in\n"
+	if err := os.WriteFile(filepath.Join(dir, ".maggus", "config.yml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _, _ := newTestCmd(t)
+	got := checkOptOut(cmd, dir)
+	if got {
+		t.Error("expected checkOptOut to return false for explicit opt-in config")
+	}
+}
+
 // newTestCmd creates a cobra.Command with captured stdout/stderr for testing.
 func newTestCmd(t *testing.T) (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
