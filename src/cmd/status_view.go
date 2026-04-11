@@ -202,7 +202,21 @@ func (m statusModel) statusSplitFooter() string {
 	if m.daemon.Running {
 		daemonHint = "s: stop"
 	}
-	footer := tabRange + "  ↑/↓: navigate  pgup/pgdn: prev/next feature  enter: details  a: approve  alt+d: delete  " + daemonHint + "  q: exit"
+	var parts []string
+	parts = append(parts, tabRange)
+	parts = append(parts, "↑/↓: navigate")
+	activeKey := m.activeTabKey()
+	if activeKey == "output" || activeKey == "taskdetails" {
+		parts = append(parts, "shift+↑/↓: scroll")
+		parts = append(parts, "g: top  G: bottom")
+	}
+	parts = append(parts, "pgup/pgdn: prev/next feature")
+	parts = append(parts, "enter: details")
+	parts = append(parts, "a: approve")
+	parts = append(parts, "alt+d: delete")
+	parts = append(parts, daemonHint)
+	parts = append(parts, "q: exit")
+	footer := strings.Join(parts, "  ")
 	if m.hasCompletedPlans() {
 		if m.showAll {
 			footer += "  alt+a: hide done"

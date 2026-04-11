@@ -68,11 +68,11 @@ This is a follow-up iteration to feature 040 that simplifies the interaction mod
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Footer no longer shows `1-5: tabs` — instead shows `1-N: tabs` where N is the count of available right-pane tabs
-- [ ] Footer shows scroll hint (e.g. `shift+↑/↓: scroll`) when the active tab has scrollable content
-- [ ] Footer no longer mentions left/right pane focus
-- [ ] `docs/reference/tui.md` is updated: remove any mention of left pane focus, document the always-active tree and tab content scroll keys
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Footer no longer shows `1-5: tabs` — instead shows `1-N: tabs` where N is the count of available right-pane tabs
+- [x] Footer shows scroll hint (e.g. `shift+↑/↓: scroll`) when the active tab has scrollable content
+- [x] Footer no longer mentions left/right pane focus
+- [x] `docs/reference/tui.md` is updated: remove any mention of left pane focus, document the always-active tree and tab content scroll keys
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

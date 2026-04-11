@@ -117,7 +117,7 @@ The status view is a split-pane interface: the left pane shows a tree of all fea
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [1] Left Pane                [2] Summary  [3] Details  [4] Metrics  │
+│  Items                        [1] Summary  [2] Details  [3] Metrics  │
 │ ──────────────────────────  ─────────────────────────────────────── │
 │  ✓ feature_001               feature_002                             │
 │  ▸ feature_002               /features/feature_002.md                │
@@ -132,7 +132,7 @@ The status view is a split-pane interface: the left pane shows a tree of all fea
 │                              Cost     $0.38                           │
 │                                                                       │
 │──────────────────────────────────────────────────────────────────────│
-│  1-4: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+│  1-3: tabs  ↑/↓: navigate  pgup/pgdn: prev/next feature  q: exit     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -157,7 +157,7 @@ The right pane tabs change based on what you have selected in the left pane. The
 | Running task (daemon active) | Output · Task Details · Metrics |
 | Completed, pending, or blocked task | Summary · Output · Task Details · Metrics |
 
-Tab numbers always start at `[2]` (since `[1]` focuses the left pane). The footer shows the current tab range, e.g., `1-4: tabs` when there are three right-pane tabs.
+Tab numbers start at `[1]`. The footer shows the current tab range, e.g., `1-3: tabs` when there are three right-pane tabs.
 
 ### Feature Selected — Summary Tab
 
@@ -165,7 +165,7 @@ When a feature or bug plan is selected, the **Summary** tab gives a quick overvi
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [1] Left Pane                [2] Summary  [3] Details  [4] Metrics  │
+│  Items                        [1] Summary  [2] Details  [3] Metrics  │
 │ ──────────────────────────  ─────────────────────────────────────── │
 │  ✓ feature_001               My Authentication Feature               │
 │  ▸ feature_002               /features/feature_002.md                │
@@ -182,7 +182,7 @@ When a feature or bug plan is selected, the **Summary** tab gives a quick overvi
 │                              Tokens   142k                            │
 │                              Cost     $0.38                           │
 │──────────────────────────────────────────────────────────────────────│
-│  1-4: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+│  1-3: tabs  ↑/↓: navigate  pgup/pgdn: prev/next feature  q: exit     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -200,7 +200,7 @@ When you select a task that the daemon is currently working on, the **Output** t
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [1] Left Pane               [2] Output  [3] Task Details  [4] Metrics│
+│  Items                        [1] Output  [2] Task Details  [3] Metrics│
 │ ──────────────────────────  ─────────────────────────────────────── │
 │  ✓ feature_001               Status:  ⠸  Running                     │
 │  ▸ feature_002               Task:    TASK-002-001 - Add login page   │
@@ -220,7 +220,7 @@ When you select a task that the daemon is currently working on, the **Output** t
 │                              Run:     6m 42s                          │
 │                              Task:    2m 14s                          │
 │──────────────────────────────────────────────────────────────────────│
-│  1-4: tabs  ↑/↓ navigate/scroll  g: top  G: bottom  q: exit          │
+│  1-3: tabs  ↑/↓: navigate  shift+↑/↓: scroll  g: top  G: bottom  q: exit│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -239,7 +239,7 @@ When you select a task that has already completed, the **Summary** tab shows the
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [1] Left Pane               [2] Summary  [3] Output  [4] Task Details│
+│  Items              [1] Summary  [2] Output  [3] Task Details  [4] Metrics│
 │ ──────────────────────────  ─────────────────────────────────────── │
 │  ✓ feature_001               TASK-001-003                             │
 │  ▸ feature_002               Add password reset endpoint              │
@@ -254,7 +254,7 @@ When you select a task that has already completed, the **Summary** tab shows the
 │                                                                       │
 │                                                                       │
 │──────────────────────────────────────────────────────────────────────│
-│  1-5: tabs  ↑/↓ navigate  pgup/pgdn: prev/next feature  q: exit      │
+│  1-4: tabs  ↑/↓: navigate  pgup/pgdn: prev/next feature  q: exit     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -282,7 +282,7 @@ You can also switch to the **Output** tab for a completed task to browse its ful
 
 ### Keyboard Shortcuts
 
-#### Left Pane (default focus)
+#### Navigation (always active)
 
 | Key | Action |
 |---|---|
@@ -302,34 +302,35 @@ You can also switch to the **Output** tab for a completed task to browse its ful
 
 | Key | Action |
 |---|---|
-| `1` | Focus the left pane |
-| `2` | Switch to first right-pane tab |
-| `3` | Switch to second right-pane tab (if available) |
-| `4` | Switch to third right-pane tab (if available) |
-| `5` | Switch to fourth right-pane tab (if available) |
+| `1` | Switch to first right-pane tab |
+| `2` | Switch to second right-pane tab (if available) |
+| `3` | Switch to third right-pane tab (if available) |
+| `4` | Switch to fourth right-pane tab (if available) |
 
 The tab numbers in the footer always reflect what is currently available. Keys beyond the available tab count are ignored.
 
-#### Right Pane — Output Tab
+#### Content Scrolling (Output and Task Details tabs)
 
 | Key | Action |
 |---|---|
-| `Up` / `Down` | Scroll the tool list |
+| `Shift+Up` / `Shift+Down` | Scroll content one line |
 | `g` | Jump to top |
 | `G` | Jump to bottom (resumes auto-scroll for running tasks) |
 
-#### Right Pane — Details Tab
+The footer shows `shift+↑/↓: scroll` when the active tab has scrollable content.
+
+#### Task Detail View (opened with Enter)
+
+When you press `Enter` on a task row, an inline detail view opens in the right pane.
 
 | Key | Action |
 |---|---|
-| `Up` / `Down` | Navigate tasks / scroll detail view |
+| `Up` / `Down` | Scroll the detail view |
 | `PgUp` / `PgDn` | Previous / next task |
-| `Enter` | Open task detail view |
 | `Tab` | Enter criteria mode (for blocked tasks) |
-| `Alt+P` | Approve / unapprove the plan |
 | `Alt+R` | Run the selected task |
 | `Alt+Backspace` | Delete the selected task |
-| `Backspace` / `q` | Back to task list |
+| `Backspace` / `q` | Back to tree |
 
 ### Managing Blocked Tasks
 
