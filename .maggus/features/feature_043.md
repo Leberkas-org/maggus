@@ -79,10 +79,10 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** yes — can run alongside TASK-043-004, TASK-043-005
 
 **Acceptance Criteria:**
-- [ ] `run_parallel.go` `runSingleTask()` creates branches like `feature/maggus-038/task-003` instead of `feature/maggustask-038-003`
-- [ ] Worktree paths remain at `.maggus/worktrees/TASK-ID/` (only the branch name changes, not the directory)
-- [ ] Sequential mode (`daemon_keepalive.go`) also uses the new branch naming via `EnsureFeatureBranch()`
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `run_parallel.go` `runSingleTask()` creates branches like `feature/maggus-038/task-003` instead of `feature/maggustask-038-003`
+- [x] Worktree paths remain at `.maggus/worktrees/TASK-ID/` (only the branch name changes, not the directory)
+- [x] Sequential mode (`daemon_keepalive.go`) also uses the new branch naming via `EnsureFeatureBranch()`
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-043-004: Add skip toggle keyboard shortcut to status TUI left pane
 **Description:** As a user viewing the status TUI, I want to press `x` on a task to toggle its skip status so I can quickly exclude tasks without opening the detail view.

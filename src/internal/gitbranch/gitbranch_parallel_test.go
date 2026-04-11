@@ -92,6 +92,13 @@ func TestIsPlanBranch(t *testing.T) {
 		branch string
 		want   bool
 	}{
+		// New "-plan" suffix format (parallel mode integration branches)
+		{"feature/maggus-038-plan", true},
+		{"feature/maggus-001-plan", true},
+		{"feature/maggus-000-plan", true},
+		{"bugfix/maggus-bug-001-plan", true},
+		{"bugfix/maggus-bug-042-plan", true},
+		// Legacy flat format (branches created by older versions)
 		{"feature/maggus-038", true},
 		{"feature/maggus-001", true},
 		{"feature/maggus-000", true},
@@ -120,20 +127,20 @@ func TestIsPlanBranch(t *testing.T) {
 func TestEnsurePlanBranch_AlreadyOnPlanBranch(t *testing.T) {
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
+	checkoutBranch(t, tmp, "feature/maggus-038-plan")
 
 	branch, msg, err := EnsurePlanBranch(tmp, "TASK-038-003")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggus-038" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038")
+	if branch != "feature/maggus-038-plan" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038-plan")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038-plan" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038-plan")
 	}
 }
 
@@ -145,14 +152,14 @@ func TestEnsurePlanBranch_OnProtectedBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggus-038" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038")
+	if branch != "feature/maggus-038-plan" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038-plan")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038-plan" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038-plan")
 	}
 }
 
@@ -165,14 +172,14 @@ func TestEnsurePlanBranch_OnOtherBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggus-038" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038")
+	if branch != "feature/maggus-038-plan" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038-plan")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038-plan" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038-plan")
 	}
 }
 
@@ -180,7 +187,7 @@ func TestEnsurePlanBranch_ExistingPlanBranch_SwitchesBack(t *testing.T) {
 	// Plan branch was created earlier; we went back to master and now re-enter.
 	tmp := t.TempDir()
 	initGitRepoWithBranch(t, tmp, "master")
-	checkoutBranch(t, tmp, "feature/maggus-038")
+	checkoutBranch(t, tmp, "feature/maggus-038-plan")
 
 	cmd := exec.Command("git", "checkout", "master")
 	cmd.Dir = tmp
@@ -192,14 +199,14 @@ func TestEnsurePlanBranch_ExistingPlanBranch_SwitchesBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "feature/maggus-038" {
-		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038")
+	if branch != "feature/maggus-038-plan" {
+		t.Errorf("branch = %q, want %q", branch, "feature/maggus-038-plan")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038" {
-		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038")
+	if got := getCurrentBranch(t, tmp); got != "feature/maggus-038-plan" {
+		t.Errorf("git branch = %q, want %q", got, "feature/maggus-038-plan")
 	}
 }
 
@@ -226,14 +233,47 @@ func TestEnsurePlanBranch_BugTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if branch != "bugfix/maggus-bug-001" {
-		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001")
+	if branch != "bugfix/maggus-bug-001-plan" {
+		t.Errorf("branch = %q, want %q", branch, "bugfix/maggus-bug-001-plan")
 	}
 	if msg == "" {
 		t.Error("expected non-empty message")
 	}
-	if got := getCurrentBranch(t, tmp); got != "bugfix/maggus-bug-001" {
-		t.Errorf("git branch = %q, want %q", got, "bugfix/maggus-bug-001")
+	if got := getCurrentBranch(t, tmp); got != "bugfix/maggus-bug-001-plan" {
+		t.Errorf("git branch = %q, want %q", got, "bugfix/maggus-bug-001-plan")
+	}
+}
+
+func TestEnsurePlanBranch_CoexistsWithTaskBranches(t *testing.T) {
+	// Verify the plan branch (-plan suffix) can coexist with task branches
+	// (feature/maggus-038/task-*) without a git ref hierarchy conflict.
+	tmp := t.TempDir()
+	initGitRepoWithBranch(t, tmp, "master")
+
+	// Create the plan branch.
+	planBranch, _, err := EnsurePlanBranch(tmp, "TASK-038-003")
+	if err != nil {
+		t.Fatalf("EnsurePlanBranch: %v", err)
+	}
+	if planBranch != "feature/maggus-038-plan" {
+		t.Errorf("planBranch = %q, want %q", planBranch, "feature/maggus-038-plan")
+	}
+
+	// Creating task branches alongside the plan branch must not fail.
+	if err := CreateBranchFrom(tmp, "feature/maggus-038/task-001", planBranch); err != nil {
+		t.Fatalf("CreateBranchFrom task-001: %v", err)
+	}
+	if err := CreateBranchFrom(tmp, "feature/maggus-038/task-002", planBranch); err != nil {
+		t.Fatalf("CreateBranchFrom task-002: %v", err)
+	}
+
+	// All three refs must exist.
+	for _, ref := range []string{"feature/maggus-038-plan", "feature/maggus-038/task-001", "feature/maggus-038/task-002"} {
+		cmd := exec.Command("git", "rev-parse", "--verify", ref)
+		cmd.Dir = tmp
+		if err := cmd.Run(); err != nil {
+			t.Errorf("ref %q should exist after creation, got error: %v", ref, err)
+		}
 	}
 }
 

@@ -4,7 +4,7 @@ include: []
 approval_mode: opt-in
 auto_continue: null
 session_persistence: null
-parallel: false
+parallel: null
 max_log_files: 0
 notifications:
     sound: true

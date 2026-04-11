@@ -11,8 +11,12 @@ import (
 // planNumRe matches the leading plan number in TASK-NNN... or BUG-NNN...
 var planNumRe = regexp.MustCompile(`^(?:TASK|BUG)-(\d+)`)
 
-// planBranchRe matches plan-level branch names: feature/maggus-NNN or bugfix/maggus-bug-NNN.
-var planBranchRe = regexp.MustCompile(`^(?:feature/maggus-\d+|bugfix/maggus-bug-\d+)$`)
+// planBranchRe matches plan-level branch names used in parallel mode.
+// Matches "feature/maggus-NNN-plan" and "bugfix/maggus-bug-NNN-plan" (the
+// "-plan" suffix avoids the git ref hierarchy conflict with task branches
+// "feature/maggus-NNN/task-XXX"). Also matches the legacy flat format for
+// branches created by older versions.
+var planBranchRe = regexp.MustCompile(`^(?:feature/maggus-\d+(?:-plan)?|bugfix/maggus-bug-\d+(?:-plan)?)$`)
 
 // PlanBranchName generates a plan-level feature branch name from a plan number.
 // For example, "038" becomes "feature/maggus-038".
@@ -59,13 +63,32 @@ func IsPlanBranch(branch string) bool {
 	return planBranchRe.MatchString(branch)
 }
 
-// EnsurePlanBranch ensures the repository in workDir is checked out on the plan-level
-// branch for the plan containing taskID.
+// parallelPlanBranchName returns the integration branch name used in parallel mode.
+// It uses a "-plan" suffix (e.g. "feature/maggus-038-plan") rather than the flat
+// "feature/maggus-038" to avoid a git ref hierarchy conflict: git cannot have
+// refs/heads/feature/maggus-038 (a file) and refs/heads/feature/maggus-038/task-003
+// (a file inside a directory of the same name) simultaneously.
+func parallelPlanBranchName(taskID string) string {
+	planNum := PlanNumFromTaskID(taskID)
+	if planNum == "" {
+		return "feature/maggus-000-plan"
+	}
+	if strings.HasPrefix(taskID, "BUG-") {
+		return fmt.Sprintf("bugfix/maggus-bug-%s-plan", planNum)
+	}
+	return fmt.Sprintf("feature/maggus-%s-plan", planNum)
+}
+
+// EnsurePlanBranch ensures the repository in workDir is checked out on the
+// parallel-mode integration branch for the plan containing taskID.
 //
 // In parallel mode, call this once before starting any task work.
 //
 //   - If already on the correct plan branch, it stays put and returns that branch.
 //   - Otherwise it creates (or switches to) the plan branch off the current branch.
+//
+// The integration branch uses a "-plan" suffix (e.g. "feature/maggus-038-plan")
+// so it does not conflict with task branches ("feature/maggus-038/task-003").
 //
 // If git is not available or workDir is not a repository, a warning message is
 // returned without an error, mirroring the behaviour of EnsureFeatureBranch.
@@ -75,7 +98,7 @@ func EnsurePlanBranch(workDir, taskID string) (branch, msg string, err error) {
 		return "", fmt.Sprintf("Warning: could not detect git branch: %v. Continuing without branch switching.", err), nil
 	}
 
-	target := PlanBranchNameFromTaskID(taskID)
+	target := parallelPlanBranchName(taskID)
 
 	if current == target {
 		return current, fmt.Sprintf("Already on plan branch %s", current), nil
