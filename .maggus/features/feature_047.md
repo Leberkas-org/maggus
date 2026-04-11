@@ -49,14 +49,14 @@ Also renames plan branch prefixes: `feature/feat-NNN` for features and `fix/bug-
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `daemon_keepalive.go` passes the protected branch list from config to `EnsurePlanBranch`
-- [ ] When on a non-protected branch, `planBranch` is set to the current branch (no new branch created)
-- [ ] Task branches in `run_parallel.go` are created off `planBranch` (which is now the current branch when non-protected)
-- [ ] After task completion, task branches merge back to `planBranch` (which is the current branch)
-- [ ] Sequential mode in `daemon_keepalive.go` also respects the non-protected branch passthrough
-- [ ] Starting the daemon on `master` still creates a `feature/feat-NNN` plan branch
-- [ ] Starting the daemon on `my-feature-branch` does NOT create a plan branch
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `daemon_keepalive.go` passes the protected branch list from config to `EnsurePlanBranch`
+- [x] When on a non-protected branch, `planBranch` is set to the current branch (no new branch created)
+- [x] Task branches in `run_parallel.go` are created off `planBranch` (which is now the current branch when non-protected)
+- [x] After task completion, task branches merge back to `planBranch` (which is the current branch)
+- [x] Sequential mode in `daemon_keepalive.go` also respects the non-protected branch passthrough
+- [x] Starting the daemon on `master` still creates a `feature/feat-NNN` plan branch
+- [x] Starting the daemon on `my-feature-branch` does NOT create a plan branch
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-047-003: Update docs for new branching behavior
 **Description:** As a user reading the docs, I want the branching documentation to reflect the new naming and non-protected branch behavior.

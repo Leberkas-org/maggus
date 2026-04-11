@@ -51,7 +51,7 @@ func TestShouldSkipResolver(t *testing.T) {
 		{"stop skips resolver", []string{"maggus", "stop"}, true},
 		{"start --all skips resolver", []string{"maggus", "start", "--all"}, true},
 		{"stop --all skips resolver", []string{"maggus", "stop", "--all"}, true},
-		{"run does not skip", []string{"maggus", "run"}, false},
+		{"run skips resolver", []string{"maggus", "run"}, true},
 		{"list does not skip", []string{"maggus", "list"}, false},
 		{"status does not skip", []string{"maggus", "status"}, false},
 		{"no args does not skip", []string{"maggus"}, false},
