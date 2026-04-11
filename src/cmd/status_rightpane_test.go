@@ -366,3 +366,168 @@ func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 		})
 	}
 }
+
+// ── pressSpecialKey presses a non-rune key through updateList ────────────────
+
+func pressSpecialKey(m statusModel, keyType tea.KeyType) statusModel {
+	msg := tea.KeyMsg{Type: keyType}
+	result, _ := m.updateList(msg)
+	updated, ok := result.(statusModel)
+	if !ok {
+		return m
+	}
+	return updated
+}
+
+// makeOutputModel builds a statusModel on the Output tab of a running task
+// with a live snapshot containing n tool entries.
+func makeOutputModel(n int) statusModel {
+	m := makeModelForCtx(selRunningTask)
+	// Switch to the Output tab (index 0 for selRunningTask).
+	m.activeTab = 0
+	// Build a snapshot with n tool entries.
+	entries := make([]runlog.SnapshotToolEntry, n)
+	for i := range entries {
+		entries[i] = runlog.SnapshotToolEntry{Type: "Read", Description: fmt.Sprintf("file%d.go", i)}
+	}
+	snap := &runlog.StateSnapshot{
+		TaskID:      "TASK-001",
+		Status:      "Running",
+		ToolEntries: entries,
+	}
+	m.snapshot = snap
+	m.logScroll = 0
+	m.logAutoScroll = true
+	return m
+}
+
+// ── TestScrollKeys_OutputTab ─────────────────────────────────────────────────
+
+func TestScrollKeys_OutputTab_ShiftDownScrolls(t *testing.T) {
+	m := makeOutputModel(50)
+	m.logScroll = 0
+	m.logAutoScroll = true
+
+	result := pressSpecialKey(m, tea.KeyShiftDown)
+	if result.logScroll != 1 {
+		t.Errorf("shift+down should increment logScroll from 0 to 1, got %d", result.logScroll)
+	}
+	// After scrolling down from 0, auto-scroll should remain off since we're not at max.
+	if result.logAutoScroll {
+		t.Error("logAutoScroll should be false after shift+down when not at bottom")
+	}
+}
+
+func TestScrollKeys_OutputTab_ShiftUpScrolls(t *testing.T) {
+	m := makeOutputModel(50)
+	m.logScroll = 5
+	m.logAutoScroll = false
+
+	result := pressSpecialKey(m, tea.KeyShiftUp)
+	if result.logScroll != 4 {
+		t.Errorf("shift+up should decrement logScroll from 5 to 4, got %d", result.logScroll)
+	}
+	if result.logAutoScroll {
+		t.Error("logAutoScroll should remain false after shift+up")
+	}
+}
+
+func TestScrollKeys_OutputTab_ShiftUpAtTopIsNoop(t *testing.T) {
+	m := makeOutputModel(50)
+	m.logScroll = 0
+	m.logAutoScroll = false
+
+	result := pressSpecialKey(m, tea.KeyShiftUp)
+	if result.logScroll != 0 {
+		t.Errorf("shift+up at top should stay at 0, got %d", result.logScroll)
+	}
+}
+
+func TestScrollKeys_OutputTab_gJumpsToTop(t *testing.T) {
+	m := makeOutputModel(50)
+	m.logScroll = 10
+	m.logAutoScroll = false
+
+	result := pressKey(m, "g")
+	if result.logScroll != 0 {
+		t.Errorf("g should set logScroll to 0, got %d", result.logScroll)
+	}
+	if result.logAutoScroll {
+		t.Error("logAutoScroll should be false after g (top)")
+	}
+}
+
+func TestScrollKeys_OutputTab_GJumpsToBottom(t *testing.T) {
+	m := makeOutputModel(50)
+	m.logScroll = 0
+	m.logAutoScroll = false
+
+	result := pressKey(m, "G")
+	maxS := result.maxLogScroll()
+	if result.logScroll != maxS {
+		t.Errorf("G should set logScroll to maxLogScroll (%d), got %d", maxS, result.logScroll)
+	}
+	if !result.logAutoScroll {
+		t.Error("logAutoScroll should be true after G (bottom)")
+	}
+}
+
+// ── TestScrollKeys_NoopOnNonScrollableTabs ───────────────────────────────────
+
+func TestScrollKeys_NoopOnNonScrollableTabs(t *testing.T) {
+	// Summary, Details, and Metrics tabs have no scrollable content.
+	// Pressing scroll keys should not change logScroll.
+	tests := []struct {
+		desc string
+		ctx  selectionContext
+		tab  int
+	}{
+		{desc: "selFeature Summary tab", ctx: selFeature, tab: 0},
+		{desc: "selFeature Details tab", ctx: selFeature, tab: 1},
+		{desc: "selFeature Metrics tab", ctx: selFeature, tab: 2},
+		{desc: "selNone Metrics tab", ctx: selNone, tab: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			m := makeModelForCtx(tt.ctx)
+			m.activeTab = tt.tab
+			m.logScroll = 3
+			m.logAutoScroll = false
+
+			type keyFn func(statusModel) statusModel
+			for _, fn := range []keyFn{
+				func(m statusModel) statusModel { return pressSpecialKey(m, tea.KeyShiftUp) },
+				func(m statusModel) statusModel { return pressSpecialKey(m, tea.KeyShiftDown) },
+				func(m statusModel) statusModel { return pressKey(m, "g") },
+				func(m statusModel) statusModel { return pressKey(m, "G") },
+			} {
+				result := fn(m)
+				if result.logScroll != 3 {
+					t.Errorf("logScroll should remain 3 on non-scrollable tab, got %d", result.logScroll)
+				}
+				if result.logAutoScroll {
+					t.Errorf("logAutoScroll should remain false on non-scrollable tab")
+				}
+			}
+		})
+	}
+}
+
+// ── TestScrollKeys_AutoScrollReenabledAtBottom ───────────────────────────────
+
+func TestScrollKeys_AutoScrollReenabledAtBottom(t *testing.T) {
+	// When shift+down reaches the bottom, auto-scroll should be re-enabled.
+	// Use 100 entries to ensure maxLogScroll() > 0 (visible lines ≈ 26 with width=120/height=40).
+	m := makeOutputModel(100)
+	maxS := m.maxLogScroll()
+	if maxS <= 0 {
+		t.Fatalf("expected maxLogScroll > 0 with 100 entries, got %d", maxS)
+	}
+	m.logScroll = maxS - 1
+	m.logAutoScroll = false
+
+	result := pressSpecialKey(m, tea.KeyShiftDown)
+	if !result.logAutoScroll {
+		t.Error("logAutoScroll should be re-enabled when shift+down reaches the bottom")
+	}
+}

@@ -313,6 +313,15 @@ func (m statusModel) availableTabs() []tabDef {
 	}
 }
 
+// activeTabKey returns the key of the currently active tab, or "" if none.
+func (m statusModel) activeTabKey() string {
+	tabs := m.availableTabs()
+	if m.activeTab >= 0 && m.activeTab < len(tabs) {
+		return tabs[m.activeTab].key
+	}
+	return ""
+}
+
 // clampActiveTab ensures activeTab is within the bounds of the current
 // available tabs. Call this after any action that might change the tab set
 // (e.g. cursor movement in the left pane).

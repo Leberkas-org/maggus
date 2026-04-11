@@ -549,6 +549,53 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Content scroll keys — always consumed, but only act on scrollable tabs.
+	// shift+up/shift+down scroll one line; g/G jump to top/bottom.
+	switch key {
+	case "shift+up":
+		switch m.activeTabKey() {
+		case "output":
+			if m.logScroll > 0 {
+				m.logScroll--
+				m.logAutoScroll = false
+			}
+		case "taskdetails":
+			m.currentTaskViewport.ScrollUp(1)
+		}
+		return m, nil
+	case "shift+down":
+		switch m.activeTabKey() {
+		case "output":
+			maxS := m.maxLogScroll()
+			if m.logScroll < maxS {
+				m.logScroll++
+			}
+			// Re-enable auto-scroll when we reach the bottom; disable it otherwise.
+			m.logAutoScroll = m.logScroll >= m.maxLogScroll()
+		case "taskdetails":
+			m.currentTaskViewport.ScrollDown(1)
+		}
+		return m, nil
+	case "g":
+		switch m.activeTabKey() {
+		case "output":
+			m.logScroll = 0
+			m.logAutoScroll = false
+		case "taskdetails":
+			m.currentTaskViewport.GotoTop()
+		}
+		return m, nil
+	case "G":
+		switch m.activeTabKey() {
+		case "output":
+			m.logScroll = m.maxLogScroll()
+			m.logAutoScroll = true
+		case "taskdetails":
+			m.currentTaskViewport.GotoBottom()
+		}
+		return m, nil
+	}
+
 	// Feature tree navigation — always active.
 	switch key {
 	case "up", "k":

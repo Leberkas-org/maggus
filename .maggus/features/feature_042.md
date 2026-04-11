@@ -51,13 +51,13 @@ This is a follow-up iteration to feature 040 that simplifies the interaction mod
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Output tab (tool log): `Shift+Up` / `Shift+Down` scrolls the tool log (or alternatively `{` / `}` — pick a pair that doesn't conflict)
-- [ ] Output tab: `g` jumps to top, `G` jumps to bottom (same as current)
-- [ ] Output tab: auto-scroll behavior for running tasks is preserved
-- [ ] Task Details tab: `Shift+Up` / `Shift+Down` scrolls the viewport (same keys as Output)
-- [ ] Summary and Metrics tabs: no scrolling needed (content fits)
-- [ ] Scrolling keys are no-ops when the active tab has no scrollable content
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Output tab (tool log): `Shift+Up` / `Shift+Down` scrolls the tool log (or alternatively `{` / `}` — pick a pair that doesn't conflict)
+- [x] Output tab: `g` jumps to top, `G` jumps to bottom (same as current)
+- [x] Output tab: auto-scroll behavior for running tasks is preserved
+- [x] Task Details tab: `Shift+Up` / `Shift+Down` scrolls the viewport (same keys as Output)
+- [x] Summary and Metrics tabs: no scrolling needed (content fits)
+- [x] Scrolling keys are no-ops when the active tab has no scrollable content
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-042-003: Update footer hints and documentation
 **Description:** As a user, I want the footer to show the correct key hints for the new unified model, and the docs to reflect the change.
