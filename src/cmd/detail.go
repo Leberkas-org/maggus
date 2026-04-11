@@ -15,19 +15,22 @@ type planMutationStore interface {
 	UnblockCriterion(filePath string, c parser.Criterion) error
 	ResolveCriterion(filePath string, c parser.Criterion) error
 	DeleteCriterion(filePath string, c parser.Criterion) error
+	SkipCriterion(filePath string, c parser.Criterion) error
+	UnskipCriterion(filePath string, c parser.Criterion) error
 }
 
-// criteriaAction represents the user's choice for a blocked criterion.
+// criteriaAction represents the user's choice for a blocked or skipped criterion.
 type criteriaAction int
 
 const (
-	criteriaActionUnblock criteriaAction = iota
+	criteriaActionUnblock  criteriaAction = iota
 	criteriaActionResolve
 	criteriaActionDelete
+	criteriaActionSkipTask
 	criteriaActionSkip
 )
 
-var criteriaActions = []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkip}
+var criteriaActions = []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkipTask, criteriaActionSkip}
 
 func (a criteriaAction) String() string {
 	switch a {
@@ -37,6 +40,8 @@ func (a criteriaAction) String() string {
 		return "Resolve"
 	case criteriaActionDelete:
 		return "Delete"
+	case criteriaActionSkipTask:
+		return "Skip Task"
 	case criteriaActionSkip:
 		return "Skip"
 	}
@@ -51,6 +56,8 @@ func (a criteriaAction) Description() string {
 		return "Mark as done (remove block + check)"
 	case criteriaActionDelete:
 		return "Remove criterion entirely"
+	case criteriaActionSkipTask:
+		return "Mark as skipped (won't be worked on)"
 	case criteriaActionSkip:
 		return "Do nothing"
 	}
@@ -61,18 +68,18 @@ func (a criteriaAction) Description() string {
 type detailState struct {
 	criteriaMode     bool
 	criteriaCursor   int
-	blockedIndices   []int // indices into task.Criteria that are blocked
+	blockedIndices   []int // indices into task.Criteria that are blocked or skipped
 	showActionPicker bool
 	actionCursor     int
 	noBlockedMsg     bool // briefly show "no blocked criteria" message
 }
 
 // initCriteriaMode sets up criteria mode for the given task.
-// Returns false if the task has no blocked criteria.
+// Returns false if the task has no blocked or skipped criteria.
 func (d *detailState) initCriteriaMode(task parser.Task) bool {
 	d.blockedIndices = nil
 	for i, c := range task.Criteria {
-		if c.Blocked {
+		if c.Blocked || c.Skipped {
 			d.blockedIndices = append(d.blockedIndices, i)
 		}
 	}
@@ -95,7 +102,7 @@ func (d *detailState) exitCriteriaMode() {
 	d.blockedIndices = nil
 }
 
-// performAction executes the selected action on the blocked criterion.
+// performAction executes the selected action on the blocked or skipped criterion.
 // Returns true if the plan file was modified (needs refresh).
 func (d *detailState) performAction(task parser.Task, action criteriaAction, store planMutationStore) (modified bool, err error) {
 	if d.criteriaCursor >= len(d.blockedIndices) {
@@ -118,6 +125,17 @@ func (d *detailState) performAction(task parser.Task, action criteriaAction, sto
 	case criteriaActionDelete:
 		if err := store.DeleteCriterion(task.SourceFile, c); err != nil {
 			return false, err
+		}
+		return true, nil
+	case criteriaActionSkipTask:
+		if c.Skipped {
+			if err := store.UnskipCriterion(task.SourceFile, c); err != nil {
+				return false, err
+			}
+		} else {
+			if err := store.SkipCriterion(task.SourceFile, c); err != nil {
+				return false, err
+			}
 		}
 		return true, nil
 	case criteriaActionSkip:
@@ -197,8 +215,8 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 				checkbox = mutedStyle.Render("○")
 			}
 
-			// In criteria mode, highlight the selected blocked criterion
-			if ds != nil && ds.criteriaMode && c.Blocked {
+			// In criteria mode, highlight the selected blocked or skipped criterion
+			if ds != nil && ds.criteriaMode && (c.Blocked || c.Skipped) {
 				blockedIdx := -1
 				for bi, idx := range ds.blockedIndices {
 					if idx == i {
@@ -210,7 +228,7 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 					if ds.showActionPicker {
 						// Show action picker inline below this criterion
 						sb.WriteString(fmt.Sprintf("  %s %s\n", warningStyle.Render("▸"), lipgloss.NewStyle().Bold(true).Foreground(styles.Warning).Render(c.Text)))
-						sb.WriteString(renderInlineActionPicker(ds.actionCursor))
+						sb.WriteString(renderInlineActionPicker(ds.actionCursor, c))
 					} else {
 						sb.WriteString(fmt.Sprintf("  %s %s\n", warningStyle.Render("▸"), lipgloss.NewStyle().Bold(true).Foreground(styles.Warning).Render(c.Text)))
 					}
@@ -233,11 +251,14 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 }
 
 // renderInlineActionPicker renders the action picker inline.
-func renderInlineActionPicker(cursor int) string {
+// c is the currently selected criterion; it is used to show "Unskip" instead of
+// "Skip Task" when the criterion already has the SKIPPED: prefix.
+func renderInlineActionPicker(cursor int, c parser.Criterion) string {
 	successStyle := lipgloss.NewStyle().Foreground(styles.Success)
 	warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
 	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	primaryStyle := lipgloss.NewStyle().Foreground(styles.Primary)
 
 	var sb strings.Builder
 	for i, a := range criteriaActions {
@@ -246,17 +267,30 @@ func renderInlineActionPicker(cursor int) string {
 			prefix = "> "
 		}
 		var label string
+		var descText string
 		switch a {
 		case criteriaActionUnblock:
 			label = successStyle.Render(a.String())
+			descText = a.Description()
 		case criteriaActionResolve:
 			label = warningStyle.Render(a.String())
+			descText = a.Description()
 		case criteriaActionDelete:
 			label = errorStyle.Render(a.String())
+			descText = a.Description()
+		case criteriaActionSkipTask:
+			if c.Skipped {
+				label = successStyle.Render("Unskip")
+				descText = "Restore to workable state"
+			} else {
+				label = primaryStyle.Render(a.String())
+				descText = a.Description()
+			}
 		default:
 			label = mutedStyle.Render(a.String())
+			descText = a.Description()
 		}
-		desc := mutedStyle.Render(" " + a.Description())
+		desc := mutedStyle.Render(" " + descText)
 		sb.WriteString(fmt.Sprintf("      %s%s%s\n", prefix, label, desc))
 	}
 	return sb.String()

@@ -18,6 +18,7 @@ func TestCriteriaAction_String(t *testing.T) {
 		{criteriaActionUnblock, "Unblock"},
 		{criteriaActionResolve, "Resolve"},
 		{criteriaActionDelete, "Delete"},
+		{criteriaActionSkipTask, "Skip Task"},
 		{criteriaActionSkip, "Skip"},
 		{criteriaAction(99), ""},
 	}
@@ -39,6 +40,7 @@ func TestCriteriaAction_Description(t *testing.T) {
 		{criteriaActionUnblock, "Remove BLOCKED: prefix, keep unchecked"},
 		{criteriaActionResolve, "Mark as done (remove block + check)"},
 		{criteriaActionDelete, "Remove criterion entirely"},
+		{criteriaActionSkipTask, "Mark as skipped (won't be worked on)"},
 		{criteriaActionSkip, "Do nothing"},
 		{criteriaAction(99), ""},
 	}
@@ -53,10 +55,10 @@ func TestCriteriaAction_Description(t *testing.T) {
 }
 
 func TestCriteriaActions_AllPresent(t *testing.T) {
-	if len(criteriaActions) != 4 {
-		t.Errorf("criteriaActions has %d entries, want 4", len(criteriaActions))
+	if len(criteriaActions) != 5 {
+		t.Errorf("criteriaActions has %d entries, want 5", len(criteriaActions))
 	}
-	expected := []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkip}
+	expected := []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkipTask, criteriaActionSkip}
 	for i, want := range expected {
 		if criteriaActions[i] != want {
 			t.Errorf("criteriaActions[%d] = %d, want %d", i, criteriaActions[i], want)
@@ -112,10 +114,38 @@ func TestDetailState_InitCriteriaMode_NoBlocked(t *testing.T) {
 	ok := ds.initCriteriaMode(task)
 
 	if ok {
-		t.Fatal("initCriteriaMode should return false when no blocked criteria")
+		t.Fatal("initCriteriaMode should return false when no blocked or skipped criteria")
 	}
 	if ds.criteriaMode {
 		t.Error("criteriaMode should be false")
+	}
+}
+
+func TestDetailState_InitCriteriaMode_WithSkipped(t *testing.T) {
+	task := parser.Task{
+		Criteria: []parser.Criterion{
+			{Text: "done", Checked: true},
+			{Text: "SKIPPED: something", Skipped: true},
+			{Text: "pending"},
+			{Text: "BLOCKED: another", Blocked: true},
+		},
+	}
+
+	ds := &detailState{}
+	ok := ds.initCriteriaMode(task)
+
+	if !ok {
+		t.Fatal("initCriteriaMode should return true when skipped criteria exist")
+	}
+	if !ds.criteriaMode {
+		t.Error("criteriaMode should be true")
+	}
+	if len(ds.blockedIndices) != 2 {
+		t.Fatalf("blockedIndices len = %d, want 2", len(ds.blockedIndices))
+	}
+	// index 1 = skipped, index 3 = blocked
+	if ds.blockedIndices[0] != 1 || ds.blockedIndices[1] != 3 {
+		t.Errorf("blockedIndices = %v, want [1, 3]", ds.blockedIndices)
 	}
 }
 
@@ -174,6 +204,75 @@ func TestDetailState_PerformAction_Skip(t *testing.T) {
 	}
 	if modified {
 		t.Error("skip should not modify")
+	}
+}
+
+func TestDetailState_PerformAction_SkipTask(t *testing.T) {
+	dir := t.TempDir()
+	setupPlanDir(t, dir)
+	planContent := "### TASK-001: Test\n\n- [ ] BLOCKED: needs fix\n"
+	writePlanFile(t, dir, "plan_1.md", planContent)
+	planFile := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	task := parser.Task{
+		SourceFile: planFile,
+		Criteria: []parser.Criterion{
+			{Text: "BLOCKED: needs fix", Blocked: true},
+		},
+	}
+	ds := &detailState{
+		blockedIndices: []int{0},
+		criteriaCursor: 0,
+	}
+	store := stores.NewFileFeatureStore(dir)
+
+	modified, err := ds.performAction(task, criteriaActionSkipTask, store)
+	if err != nil {
+		t.Fatalf("performAction(skipTask) error: %v", err)
+	}
+	if !modified {
+		t.Error("skipTask should return modified=true")
+	}
+
+	data, _ := os.ReadFile(planFile)
+	if !strings.Contains(string(data), "- [>] SKIPPED:") {
+		t.Errorf("file should contain skipped criterion, got:\n%s", string(data))
+	}
+}
+
+func TestDetailState_PerformAction_UnskipTask(t *testing.T) {
+	dir := t.TempDir()
+	setupPlanDir(t, dir)
+	planContent := "### TASK-001: Test\n\n- [>] SKIPPED: something\n"
+	writePlanFile(t, dir, "plan_1.md", planContent)
+	planFile := filepath.Join(dir, ".maggus", "plan_1.md")
+
+	task := parser.Task{
+		SourceFile: planFile,
+		Criteria: []parser.Criterion{
+			{Text: "SKIPPED: something", Skipped: true},
+		},
+	}
+	ds := &detailState{
+		blockedIndices: []int{0},
+		criteriaCursor: 0,
+	}
+	store := stores.NewFileFeatureStore(dir)
+
+	modified, err := ds.performAction(task, criteriaActionSkipTask, store)
+	if err != nil {
+		t.Fatalf("performAction(unskipTask) error: %v", err)
+	}
+	if !modified {
+		t.Error("unskipTask should return modified=true")
+	}
+
+	data, _ := os.ReadFile(planFile)
+	if strings.Contains(string(data), "SKIPPED:") {
+		t.Error("file should not contain SKIPPED: after unskip")
+	}
+	if !strings.Contains(string(data), "- [ ] something") {
+		t.Errorf("file should contain unblocked criterion, got:\n%s", string(data))
 	}
 }
 
@@ -517,9 +616,10 @@ func TestRenderDetailContent_NoBlockedMessage(t *testing.T) {
 }
 
 func TestRenderInlineActionPicker(t *testing.T) {
-	// Test each cursor position highlights the correct action
+	// Test each cursor position highlights the correct action (non-skipped criterion)
+	nonSkipped := parser.Criterion{Text: "BLOCKED: something", Blocked: true}
 	for cursor := 0; cursor < len(criteriaActions); cursor++ {
-		result := renderInlineActionPicker(cursor)
+		result := renderInlineActionPicker(cursor, nonSkipped)
 
 		// Should contain all action names
 		for _, a := range criteriaActions {
@@ -543,6 +643,22 @@ func TestRenderInlineActionPicker(t *testing.T) {
 		if selectedCount != 1 {
 			t.Errorf("cursor=%d: expected 1 selected line, got %d", cursor, selectedCount)
 		}
+	}
+}
+
+func TestRenderInlineActionPicker_SkippedCriterion(t *testing.T) {
+	// When the criterion is already skipped, "Unskip" should appear instead of "Skip Task"
+	skipped := parser.Criterion{Text: "SKIPPED: something", Skipped: true}
+	result := renderInlineActionPicker(0, skipped)
+
+	if !strings.Contains(result, "Unskip") {
+		t.Error("picker for skipped criterion should contain 'Unskip'")
+	}
+	if strings.Contains(result, "Skip Task") {
+		t.Error("picker for skipped criterion should not contain 'Skip Task'")
+	}
+	if !strings.Contains(result, "Restore to workable state") {
+		t.Error("picker for skipped criterion should contain 'Restore to workable state' description")
 	}
 }
 

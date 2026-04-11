@@ -111,11 +111,11 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** yes — can run alongside TASK-043-003, TASK-043-004
 
 **Acceptance Criteria:**
-- [ ] The criteria action picker in `detail.go` gains a new `criteriaActionSkipTask` action (distinct from the existing `criteriaActionSkip` which means "do nothing")
-- [ ] When selected, it calls `parser.SkipCriterion()` on the selected criterion
-- [ ] An "Unskip" action appears instead when the criterion already has `SKIPPED:` prefix
-- [ ] After the action, the plan file is reloaded and the detail view refreshes
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The criteria action picker in `detail.go` gains a new `criteriaActionSkipTask` action (distinct from the existing `criteriaActionSkip` which means "do nothing")
+- [x] When selected, it calls `parser.SkipCriterion()` on the selected criterion
+- [x] An "Unskip" action appears instead when the criterion already has `SKIPPED:` prefix
+- [x] After the action, the plan file is reloaded and the detail view refreshes
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-043-006: Render skipped tasks with [>] marker in TUI
 **Description:** As a user, I want skipped tasks to display with a `[>]` marker so I can visually distinguish them from blocked, complete, and pending tasks.
