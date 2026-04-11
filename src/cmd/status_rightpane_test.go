@@ -367,6 +367,57 @@ func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 	}
 }
 
+// ── TestRenderRightPane_TaskDetails_DoesNotOverflowHeight ────────────────────
+
+// TestRenderRightPane_TaskDetails_DoesNotOverflowHeight verifies that the Task Details
+// tab never produces more lines than the specified height, even when the viewport
+// contains very long lines that lipgloss would word-wrap. This guards against
+// the outer border frame being pushed off-screen (BUG-033-001).
+func TestRenderRightPane_TaskDetails_DoesNotOverflowHeight(t *testing.T) {
+	tests := []struct {
+		name   string
+		ctx    selectionContext
+		tabIdx int // index of "Task Details" tab for that context
+	}{
+		{name: "selRunningTask Tab Details", ctx: selRunningTask, tabIdx: 1},
+		{name: "selCompletedTask Tab Details", ctx: selCompletedTask, tabIdx: 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := makeModelForCtx(tt.ctx)
+			m.activeTab = tt.tabIdx
+
+			width := 80
+			height := 20
+			contentH := height - 2 // matches renderRightPane's contentH computation
+
+			// Populate the viewport with long lines that would word-wrap at width=80.
+			// Each line is 200 characters — well beyond the pane width.
+			longLine := strings.Repeat("A", 200)
+			var sb strings.Builder
+			// Write more lines than contentH so both overflow axes are tested.
+			for i := 0; i < contentH+10; i++ {
+				sb.WriteString(longLine + "\n")
+			}
+			m.currentTaskViewport.Width = width
+			m.currentTaskViewport.Height = contentH
+			m.currentTaskViewport.SetContent(sb.String())
+
+			out := m.renderRightPane(width, height)
+
+			// renderRightPane returns: rendered (height lines) + "\n" + borderLine
+			// = height newlines total. Allow one extra for a possible trailing newline.
+			newlines := strings.Count(out, "\n")
+			maxAllowed := height + 1
+			if newlines > maxAllowed {
+				t.Errorf("%s: renderRightPane produced %d newlines, want at most %d (width=%d, height=%d)",
+					tt.name, newlines, maxAllowed, width, height)
+			}
+		})
+	}
+}
+
 // ── pressSpecialKey presses a non-rune key through updateList ────────────────
 
 func pressSpecialKey(m statusModel, keyType tea.KeyType) statusModel {

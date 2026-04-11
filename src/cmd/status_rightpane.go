@@ -80,7 +80,9 @@ func (m statusModel) renderRightPane(width, height int) string {
 	}
 
 	full := tabBar + "\n" + sep + "\n" + content
-	rendered := lipgloss.NewStyle().Width(width).Height(height).Render(full)
+	// MaxHeight clips any overflow that word-wrapping (from Width) may introduce,
+	// preventing content from pushing the outer border off-screen.
+	rendered := lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(full)
 	borderStyle := lipgloss.NewStyle().Foreground(styles.ThemeColor(m.isNerfed))
 	borderLine := strings.Repeat(borderStyle.Render("─"), width)
 	return rendered + "\n" + borderLine
@@ -270,6 +272,8 @@ func (m *statusModel) loadCurrentTaskDetail() {
 
 // renderCurrentTaskTab renders the Task Details tab: detail view of the selected task,
 // or the next workable task if no task is selected. Shows a placeholder when nothing applies.
+// Returns raw content without Width/Height wrapping — renderRightPane applies final sizing
+// with MaxHeight so that long lines (e.g. acceptance criteria) do not push the border off-screen.
 func (m statusModel) renderCurrentTaskTab(width, height int) string {
 	// Check if a task is selected or if there's a next workable task.
 	hasTask := m.selectedTask() != nil || m.nextTaskID != ""
@@ -279,7 +283,7 @@ func (m statusModel) renderCurrentTaskTab(width, height int) string {
 		return lipgloss.NewStyle().Width(width).Height(height).
 			Align(lipgloss.Center, lipgloss.Center).Render(msg)
 	}
-	return lipgloss.NewStyle().Width(width).Height(height).Render(m.currentTaskViewport.View())
+	return m.currentTaskViewport.View()
 }
 
 // resizeCurrentTaskViewport resizes the currentTaskViewport to the right pane content area.
@@ -317,13 +321,15 @@ func (m statusModel) renderFeatureDetailsTab(width, height int) string {
 }
 
 // renderTab2Detail renders the task detail view inline within the right pane.
+// Returns raw viewport content without Width/Height wrapping — renderRightPane applies
+// final sizing with MaxHeight so that long lines do not push the border off-screen.
 func (m statusModel) renderTab2Detail(width, height int) string {
 	c := &m.taskListComponent
 	if !c.detailReady || height < 2 {
 		return lipgloss.NewStyle().Width(width).Height(height).Render("")
 	}
 
-	return lipgloss.NewStyle().Width(width).Height(height).Render(c.detailViewport.View())
+	return c.detailViewport.View()
 }
 
 // renderTab2ConfirmDelete renders the task delete confirmation inline.
