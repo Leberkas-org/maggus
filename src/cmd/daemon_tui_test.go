@@ -462,6 +462,69 @@ func TestNullTUIModel_DispatchMode_NoCommits_SkipsMerge(t *testing.T) {
 	}
 }
 
+// BUG-039-003: tests for task_id snapshot correctness.
+
+// TestNullTUIModel_IterationStartMsg_SetsTaskIDBeforeSnapshot verifies that
+// the snapshot written by IterationStartMsg always carries the new task ID
+// (criteria 1 & 2: snap.TaskID is set from m.taskID, and m.taskID is set
+// before the first writeSnapshot call in the IterationStartMsg handler).
+func TestNullTUIModel_IterationStartMsg_SetsTaskIDBeforeSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	dm := nullTUIModel{
+		snapshotDir:   dir,
+		snapshotRunID: "run-039-003",
+		runStartedAt:  time.Now(),
+	}
+
+	updated, _ := dm.Update(IterationStartMsg{
+		TaskID:    "TASK-039-003",
+		TaskTitle: "Ensure taskID in snapshot",
+	})
+	dm = updated.(nullTUIModel)
+	_ = dm
+
+	snap, err := runlog.ReadSnapshot(dir)
+	if err != nil {
+		t.Fatalf("snapshot not found after IterationStartMsg: %v", err)
+	}
+	if snap.TaskID == "" {
+		t.Error("snapshot TaskID is empty after IterationStartMsg — m.taskID must be set before writeSnapshot()")
+	}
+	if snap.TaskID != "TASK-039-003" {
+		t.Errorf("snapshot TaskID = %q, want %q", snap.TaskID, "TASK-039-003")
+	}
+	if snap.Status == "Idle" {
+		t.Error("snapshot Status must not be Idle after IterationStartMsg sets a valid taskID")
+	}
+}
+
+// TestNullTUIModel_WriteSnapshot_EmptyTaskID_StatusIsIdle verifies criterion 3:
+// if writeSnapshot() is called before any IterationStartMsg has set m.taskID,
+// the snapshot must carry Status="Idle" rather than silently writing task_id:"".
+func TestNullTUIModel_WriteSnapshot_EmptyTaskID_StatusIsIdle(t *testing.T) {
+	dir := t.TempDir()
+	dm := nullTUIModel{
+		snapshotDir:   dir,
+		snapshotRunID: "run-idle",
+		runStartedAt:  time.Now(),
+		status:        "Starting", // status set but no taskID
+		// taskID intentionally left empty
+	}
+
+	dm.writeSnapshot()
+
+	snap, err := runlog.ReadSnapshot(dir)
+	if err != nil {
+		t.Fatalf("snapshot not found: %v", err)
+	}
+	if snap.TaskID != "" {
+		t.Errorf("snapshot TaskID = %q, want empty string", snap.TaskID)
+	}
+	if snap.Status != "Idle" {
+		t.Errorf("snapshot Status = %q, want %q — empty taskID must produce Idle status, not silently empty", snap.Status, "Idle")
+	}
+}
+
 func TestMergeDispatchedTaskBackImpl_EmptyBaseBranch(t *testing.T) {
 	// Empty base branch should be a no-op (returns nil).
 	if err := mergeDispatchedTaskBackImpl("/tmp/test", "", "TASK-045-001"); err != nil {
