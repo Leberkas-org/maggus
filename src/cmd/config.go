@@ -495,7 +495,6 @@ func saveConfig(dir string, cfg config.Config) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	fmt.Printf("Saved %s\n", path)
 	return nil
 }
 
