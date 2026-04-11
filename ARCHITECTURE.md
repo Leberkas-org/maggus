@@ -98,7 +98,7 @@ find next workable task
   │
   ▼
 create feature branch if on protected branch
-  (feature/maggustask-NNN)
+  (feature/maggus-NNN/task-MMM or bugfix/maggus-bug-NNN/task-MMM)
   │
   ▼
 build prompt

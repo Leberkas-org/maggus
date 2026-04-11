@@ -103,6 +103,24 @@ Blocked tasks show up in `maggus status` with a distinct indicator, and you can 
 You can also use the `⚠️ BLOCKED:` prefix variant — Maggus recognizes both forms.
 :::
 
+## Skipped Tasks
+
+Sometimes you want to permanently exclude a criterion from work without removing it from the plan. Use the `SKIPPED:` prefix with a `[>]` checkbox:
+
+```markdown
+- [>] SKIPPED: Add dark mode support — out of scope for this release
+```
+
+When all unchecked criteria in a task are skipped, Maggus treats the task as **skipped** — it won't attempt to work on it. Skipped tasks appear with the `[>]` marker in `maggus status`.
+
+The easiest way to skip a task is interactively: in the status view, navigate to a task row and press **`x`** to toggle its skip state. You can also open a task's detail view, enter criteria mode with **Tab**, and select **Skip Task** from the action picker.
+
+To reverse a skip, press **`x`** again on the task row, or select **Unskip** from the action picker — the criterion is restored to a normal unchecked state.
+
+::: tip
+The difference between `BLOCKED:` and `SKIPPED:`: a blocked criterion signals a temporary external obstacle you intend to resolve; a skipped criterion signals a deliberate decision to exclude it from the current scope.
+:::
+
 ## Completed Plans
 
 When all tasks in a plan file are complete, Maggus automatically renames the file:

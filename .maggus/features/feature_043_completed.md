@@ -142,12 +142,12 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `CLAUDE.md` — gitbranch package description updated to mention new naming format
-- [ ] `docs/guide/concepts.md` — Git Branch Behavior section updated with new format (`feature/maggus-NNN/task-XXX`)
-- [ ] `docs/reference/tui.md` — Status View shortcuts table includes `x` for skip; task markers list includes `[>]` for skipped
-- [ ] `docs/guide/writing-plans.md` — documents `SKIPPED:` prefix alongside `BLOCKED:`
-- [ ] `ARCHITECTURE.md` — gitbranch row updated if branch naming is mentioned
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `CLAUDE.md` — gitbranch package description updated to mention new naming format
+- [x] `docs/guide/concepts.md` — Git Branch Behavior section updated with new format (`feature/maggus-NNN/task-XXX`)
+- [x] `docs/reference/tui.md` — Status View shortcuts table includes `x` for skip; task markers list includes `[>]` for skipped
+- [x] `docs/guide/writing-plans.md` — documents `SKIPPED:` prefix alongside `BLOCKED:`
+- [x] `ARCHITECTURE.md` — gitbranch row updated if branch naming is mentioned
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

@@ -144,6 +144,7 @@ The left pane displays a collapsible tree of all active plans. Each plan can be 
 | `→` | Next task the daemon will work on |
 | `○` | Pending (not yet started) |
 | `⚠` | Blocked (has a `BLOCKED:` criterion) |
+| `[>]` | Skipped (has a `SKIPPED:` criterion) |
 | `┃` | Separator between features and bugs |
 
 ### Context-Sensitive Tabs
@@ -291,6 +292,7 @@ You can also switch to the **Output** tab for a completed task to browse its ful
 | `Left` / `Right` | Collapse / expand a plan |
 | `Home` / `End` | Jump to first / last item |
 | `a` | Approve / unapprove the selected plan |
+| `x` | Skip / unskip the selected task |
 | `Alt+R` | Run the selected task immediately |
 | `Alt+D` | Delete the selected plan (with confirmation) |
 | `Alt+Backspace` | Delete the selected task (with confirmation) |
@@ -336,13 +338,15 @@ When you press `Enter` on a task row, an inline detail view opens in the right p
 
 When viewing the **Details** tab and a task has blocked criteria, select the task and press **Enter** to open its detail view, then press **Tab** to enter **criteria mode**. Navigate between blocked criteria with **Up/Down** and press **Enter** to open the action picker.
 
-The action picker offers four options:
+The action picker offers options that vary depending on the criterion state:
 
 | Action | Description |
 |--------|-------------|
 | **Unblock** | Removes the `BLOCKED:` prefix, turning it back into a normal unchecked criterion |
 | **Resolve** | Marks the criterion as done (removes the block and checks it) |
 | **Delete** | Removes the criterion entirely from the plan file |
+| **Skip Task** | Adds a `SKIPPED:` prefix and marks the criterion with `[>]`; Maggus will not work on the task |
+| **Unskip** | Restores a `SKIPPED:` criterion to a normal unchecked criterion (shown in place of Skip Task) |
 | **Skip** | Leaves the criterion unchanged |
 
 Changes are applied immediately to the plan file. Press **Esc** to go back.

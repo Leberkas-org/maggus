@@ -57,7 +57,7 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 | **approval** | Manages feature approval state in `.maggus/feature_approvals.yml`. Supports opt-in (explicit approval required) and opt-out (approved by default) modes. |
 | **runlog** | Writes structured run events to `.maggus/runs/` log files. Tracks per-task token usage and cost; prunes old log files automatically. |
 | **stores** | File-backed and in-memory repository implementations for features and bugs. Wraps parser operations for consistent use by the work loop and TUI. |
-| **gitbranch** | Creates `feature/maggustask-NNN` branches when starting work on a protected branch (main/master/dev). |
+| **gitbranch** | Creates hierarchical branches when starting work on a protected branch (main/master/dev). Feature tasks use `feature/maggus-NNN/task-MMM`; bug tasks use `bugfix/maggus-bug-NNN/task-MMM`. |
 | **gitcommit** | Reads COMMIT.md written by the agent, strips Co-Authored-By lines, and runs `git commit -F`. |
 | **gitignore** | Ensures required entries exist in `.gitignore`. |
 | **gitsync** | Handles remote git sync: fetch, ahead/behind status, stash, pull, and force-pull operations. |

@@ -54,7 +54,7 @@ If no agent is configured, Maggus defaults to `claude` (Claude Code) for backwar
 
 Maggus automatically manages branches to keep your main branch clean:
 
-- If you're on a **protected branch** (`main`, `master`, or `dev`), Maggus creates a new branch named `feature/maggustask-NNN` (where NNN is the task number) before starting work.
+- If you're on a **protected branch** (`main`, `master`, or `dev`), Maggus creates a new branch before starting work. Feature tasks land on `feature/maggus-NNN/task-MMM` (e.g., `feature/maggus-042/task-003`); bug tasks land on `bugfix/maggus-bug-NNN/task-MMM` (e.g., `bugfix/maggus-bug-001/task-001`).
 - If you're already on a **non-protected branch**, Maggus works directly on it without creating a new one.
 
 This means you can either let Maggus manage branches automatically, or check out a specific branch beforehand to control where changes land.
