@@ -84,6 +84,7 @@ type Criterion struct {
 	Text    string
 	Checked bool
 	Blocked bool // unchecked criterion containing "BLOCKED:" — a checked BLOCKED: means resolved
+	Skipped bool // unchecked criterion containing "SKIPPED:" — marked with [>] checkbox
 }
 
 type Task struct {
@@ -124,9 +125,19 @@ func (t *Task) IsBlocked() bool {
 	return false
 }
 
-// IsWorkable returns true if the task is incomplete and not blocked.
+// IsSkipped returns true if any criterion is marked as skipped.
+func (t *Task) IsSkipped() bool {
+	for _, c := range t.Criteria {
+		if c.Skipped {
+			return true
+		}
+	}
+	return false
+}
+
+// IsWorkable returns true if the task is incomplete, not blocked, and not skipped.
 func (t *Task) IsWorkable() bool {
-	return !t.IsComplete() && !t.IsBlocked()
+	return !t.IsComplete() && !t.IsBlocked() && !t.IsSkipped()
 }
 
 // featureTitleRe matches the top-level heading in feature/bug files, e.g.
@@ -251,6 +262,20 @@ func ParseFile(path string) ([]Task, error) {
 				Text:    strings.TrimPrefix(trimmed, "- [x] "),
 				Checked: true,
 				Blocked: false, // checked items are resolved; never count as blocked
+				Skipped: false,
+			})
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- [>] ") {
+
+			inDescription = false
+			text := strings.TrimPrefix(trimmed, "- [>] ")
+			skipped := strings.HasPrefix(text, "SKIPPED:")
+			current.Criteria = append(current.Criteria, Criterion{
+				Text:    text,
+				Checked: false,
+				Blocked: false,
+				Skipped: skipped,
 			})
 			continue
 		}
@@ -262,6 +287,7 @@ func ParseFile(path string) ([]Task, error) {
 				Text:    text,
 				Checked: false,
 				Blocked: strings.HasPrefix(text, "BLOCKED:") || strings.HasPrefix(text, "⚠️ BLOCKED:"),
+				Skipped: strings.HasPrefix(text, "SKIPPED:"),
 			})
 			continue
 		}
@@ -564,6 +590,66 @@ func DeleteCriterion(filePath string, c Criterion) error {
 	}
 
 	return os.WriteFile(filePath, []byte(strings.Join(result, "\n")), 0o644)
+}
+
+// SkipCriterion reads the feature file, adds a "SKIPPED: " prefix to the matching
+// criterion, changes its checkbox from [x] or [ ] to [>], and writes the file back.
+// Returns an error if the exact line cannot be found.
+func SkipCriterion(filePath string, c Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read feature file: %w", err)
+	}
+
+	content := string(data)
+
+	// Try to find as checked criterion first, then unchecked
+	checkedLine := "- [x] " + c.Text
+	uncheckedLine := "- [ ] " + c.Text
+	newLine := "- [>] SKIPPED: " + c.Text
+
+	if strings.Contains(content, checkedLine) {
+		content = strings.Replace(content, checkedLine, newLine, 1)
+	} else if strings.Contains(content, uncheckedLine) {
+		content = strings.Replace(content, uncheckedLine, newLine, 1)
+	} else {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// UnskipCriterion reads the feature file, removes the "SKIPPED: " prefix from the
+// matching criterion, changes its checkbox from [>] to [ ], and writes the file back.
+// Returns an error if the exact line cannot be found.
+func UnskipCriterion(filePath string, c Criterion) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read feature file: %w", err)
+	}
+
+	content := string(data)
+
+	// The criterion text includes the "SKIPPED: " prefix
+	skippedBracketLine := "- [>] " + c.Text
+	skippedUncheckedLine := "- [ ] " + c.Text
+
+	// Strip SKIPPED: prefix to form the restored text
+	restoredText := c.Text
+	if strings.HasPrefix(restoredText, "SKIPPED: ") {
+		restoredText = strings.TrimPrefix(restoredText, "SKIPPED: ")
+	}
+	newLine := "- [ ] " + restoredText
+
+	if strings.Contains(content, skippedBracketLine) {
+		content = strings.Replace(content, skippedBracketLine, newLine, 1)
+	} else if strings.Contains(content, skippedUncheckedLine) {
+		content = strings.Replace(content, skippedUncheckedLine, newLine, 1)
+	} else {
+		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+	}
+
+	return os.WriteFile(filePath, []byte(content), 0o644)
 }
 
 // bugNumberRe extracts the numeric part from bug filenames like "bug_001.md" or "bug_003_completed.md".

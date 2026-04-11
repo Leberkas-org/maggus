@@ -60,15 +60,15 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** yes — can run alongside TASK-043-001
 
 **Acceptance Criteria:**
-- [ ] `Criterion` struct gains a `Skipped bool` field
-- [ ] Parser detects `- [ ] SKIPPED:` and `- [>] SKIPPED:` prefixes on unchecked criteria, setting `Skipped: true`
-- [ ] `Task` gains an `IsSkipped() bool` method that returns true if ANY criterion has `Skipped == true`
-- [ ] `Task.IsWorkable()` returns false when `IsSkipped()` is true (skipped tasks are not workable, same as blocked)
-- [ ] `parser.SkipCriterion(filePath, criterion)` adds `SKIPPED: ` prefix to a criterion and changes `[x]`/`[ ]` to `[>]`
-- [ ] `parser.UnskipCriterion(filePath, criterion)` removes `SKIPPED: ` prefix and changes `[>]` to `[ ]`
-- [ ] Existing `FindNextIncomplete` skips tasks where `IsSkipped()` is true
-- [ ] Unit tests cover: parsing `SKIPPED:` prefix, `IsSkipped()` method, skip/unskip file mutations, interaction with `IsBlocked()` (a task can be both blocked and skipped)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `Criterion` struct gains a `Skipped bool` field
+- [x] Parser detects `- [ ] SKIPPED:` and `- [>] SKIPPED:` prefixes on unchecked criteria, setting `Skipped: true`
+- [x] `Task` gains an `IsSkipped() bool` method that returns true if ANY criterion has `Skipped == true`
+- [x] `Task.IsWorkable()` returns false when `IsSkipped()` is true (skipped tasks are not workable, same as blocked)
+- [x] `parser.SkipCriterion(filePath, criterion)` adds `SKIPPED: ` prefix to a criterion and changes `[x]`/`[ ]` to `[>]`
+- [x] `parser.UnskipCriterion(filePath, criterion)` removes `SKIPPED: ` prefix and changes `[>]` to `[ ]`
+- [x] Existing `FindNextIncomplete` skips tasks where `IsSkipped()` is true
+- [x] Unit tests cover: parsing `SKIPPED:` prefix, `IsSkipped()` method, skip/unskip file mutations, interaction with `IsBlocked()` (a task can be both blocked and skipped)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-043-003: Update parallel orchestrator to use new branch naming
 **Description:** As a developer, I want the parallel work loop to create branches with the new hierarchical naming so parallel tasks get properly nested branches.

@@ -1169,3 +1169,302 @@ func TestParseFile_ParallelAndPredecessors(t *testing.T) {
 		t.Errorf("TASK-038-003 predecessors = %v, want empty", tasks[2].Predecessors)
 	}
 }
+
+// --- SKIPPED criterion tests ---
+
+func TestParseFile_SkippedCriteria(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", `# Feature 001: Skipped Test
+
+### TASK-001: Task with skipped criteria
+**Description:** Has both skip markers.
+
+**Acceptance Criteria:**
+- [ ] Normal criterion
+- [ ] SKIPPED: Skip via unchecked
+- [>] SKIPPED: Skip via [>] marker
+- [x] Done criterion
+`)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	task := tasks[0]
+	if len(task.Criteria) != 4 {
+		t.Fatalf("expected 4 criteria, got %d", len(task.Criteria))
+	}
+
+	// Criterion 0: normal
+	if task.Criteria[0].Skipped {
+		t.Error("criterion 0 should not be skipped")
+	}
+
+	// Criterion 1: - [ ] SKIPPED:
+	if !task.Criteria[1].Skipped {
+		t.Errorf("criterion 1 should be skipped: %q", task.Criteria[1].Text)
+	}
+	if task.Criteria[1].Checked {
+		t.Error("criterion 1 should not be checked")
+	}
+	if task.Criteria[1].Blocked {
+		t.Error("criterion 1 should not be blocked")
+	}
+
+	// Criterion 2: - [>] SKIPPED:
+	if !task.Criteria[2].Skipped {
+		t.Errorf("criterion 2 should be skipped: %q", task.Criteria[2].Text)
+	}
+	if task.Criteria[2].Checked {
+		t.Error("criterion 2 should not be checked")
+	}
+	if task.Criteria[2].Blocked {
+		t.Error("criterion 2 should not be blocked")
+	}
+
+	// Criterion 3: - [x] checked
+	if task.Criteria[3].Skipped {
+		t.Error("criterion 3 should not be skipped")
+	}
+	if !task.Criteria[3].Checked {
+		t.Error("criterion 3 should be checked")
+	}
+}
+
+func TestParseFile_SkippedCriteria_NonSkipBracket(t *testing.T) {
+	// [>] without SKIPPED: prefix — not considered skipped
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", `# Feature 001
+
+### TASK-001: Edge case
+**Acceptance Criteria:**
+- [>] Not a skipped criterion (no SKIPPED: prefix)
+`)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].Criteria[0].Skipped {
+		t.Error("[>] without SKIPPED: prefix should not be skipped")
+	}
+}
+
+func TestIsSkipped(t *testing.T) {
+	notSkipped := Task{Criteria: []Criterion{
+		{Text: "Normal", Checked: false, Skipped: false},
+		{Text: "Done", Checked: true, Skipped: false},
+	}}
+	if notSkipped.IsSkipped() {
+		t.Error("expected not skipped")
+	}
+
+	skipped := Task{Criteria: []Criterion{
+		{Text: "Normal", Checked: false, Skipped: false},
+		{Text: "SKIPPED: something", Checked: false, Skipped: true},
+	}}
+	if !skipped.IsSkipped() {
+		t.Error("expected skipped")
+	}
+
+	empty := Task{}
+	if empty.IsSkipped() {
+		t.Error("task with no criteria should not be skipped")
+	}
+}
+
+func TestIsWorkable_SkippedNotWorkable(t *testing.T) {
+	task := Task{
+		ID: "TASK-001",
+		Criteria: []Criterion{
+			{Text: "Normal", Checked: false, Skipped: false},
+			{Text: "SKIPPED: skip this", Checked: false, Skipped: true},
+		},
+	}
+
+	if task.IsWorkable() {
+		t.Error("skipped task should not be workable")
+	}
+	if task.IsComplete() {
+		t.Error("skipped task should not be complete")
+	}
+	if task.IsBlocked() {
+		t.Error("skipped task should not be blocked")
+	}
+	if !task.IsSkipped() {
+		t.Error("expected IsSkipped() true")
+	}
+}
+
+func TestFindNextIncomplete_SkipsSkippedTasks(t *testing.T) {
+	tasks := []Task{
+		{
+			ID: "TASK-001",
+			Criteria: []Criterion{
+				{Text: "SKIPPED: user skipped this", Checked: false, Skipped: true},
+			},
+		},
+		{
+			ID:       "TASK-002",
+			Criteria: []Criterion{{Text: "Do the thing", Checked: false}},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next == nil {
+		t.Fatal("expected a task, got nil")
+	}
+	if next.ID != "TASK-002" {
+		t.Errorf("expected TASK-002, got %s", next.ID)
+	}
+}
+
+func TestFindNextIncomplete_AllSkipped(t *testing.T) {
+	tasks := []Task{
+		{
+			ID: "TASK-001",
+			Criteria: []Criterion{
+				{Text: "SKIPPED: done later", Checked: false, Skipped: true},
+			},
+		},
+	}
+
+	next := FindNextIncomplete(tasks)
+	if next != nil {
+		t.Errorf("expected nil when all tasks are skipped, got %s", next.ID)
+	}
+}
+
+func TestSkipAndUnskipCriterion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	content := "# Feature 001\n\n### TASK-001: Skippable task\n**Acceptance Criteria:**\n- [ ] Do something important\n- [ ] Another criterion\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	c := Criterion{Text: "Do something important", Checked: false, Skipped: false}
+
+	// Skip it
+	if err := SkipCriterion(path, c); err != nil {
+		t.Fatalf("SkipCriterion error: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "- [>] SKIPPED: Do something important") {
+		t.Errorf("after SkipCriterion, expected [>] SKIPPED: marker, got:\n%s", string(data))
+	}
+	if strings.Contains(string(data), "- [ ] Do something important") {
+		t.Error("original unchecked line should be gone after skip")
+	}
+
+	// Parse back and verify
+	tasks, err := ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile after skip: %v", err)
+	}
+	if len(tasks) != 1 || len(tasks[0].Criteria) != 2 {
+		t.Fatalf("expected 1 task with 2 criteria, got %d tasks", len(tasks))
+	}
+	if !tasks[0].Criteria[0].Skipped {
+		t.Error("criterion 0 should be skipped after SkipCriterion")
+	}
+	if !tasks[0].IsSkipped() {
+		t.Error("task should be IsSkipped() after SkipCriterion")
+	}
+
+	// Unskip it
+	skippedC := tasks[0].Criteria[0]
+	if err := UnskipCriterion(path, skippedC); err != nil {
+		t.Fatalf("UnskipCriterion error: %v", err)
+	}
+
+	data, _ = os.ReadFile(path)
+	if !strings.Contains(string(data), "- [ ] Do something important") {
+		t.Errorf("after UnskipCriterion, expected original [ ] line, got:\n%s", string(data))
+	}
+	if strings.Contains(string(data), "[>]") {
+		t.Error("after UnskipCriterion, [>] marker should be gone")
+	}
+}
+
+func TestSkipCriterion_CheckedCriterion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	content := "# Feature 001\n\n### TASK-001: Task\n**Acceptance Criteria:**\n- [x] Already done\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	c := Criterion{Text: "Already done", Checked: true}
+	if err := SkipCriterion(path, c); err != nil {
+		t.Fatalf("SkipCriterion error: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "- [>] SKIPPED: Already done") {
+		t.Errorf("expected [>] SKIPPED: marker after skipping checked criterion, got:\n%s", string(data))
+	}
+}
+
+func TestSkipCriterion_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	content := "# Feature 001\n### TASK-001: Task\n**Acceptance Criteria:**\n- [ ] Existing criterion\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	c := Criterion{Text: "Nonexistent criterion", Checked: false}
+	err := SkipCriterion(path, c)
+	if err == nil {
+		t.Error("expected error when criterion not found")
+	}
+}
+
+func TestUnskipCriterion_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "feature_001.md")
+	content := "# Feature 001\n### TASK-001: Task\n**Acceptance Criteria:**\n- [ ] Normal criterion\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	c := Criterion{Text: "SKIPPED: Nonexistent", Checked: false, Skipped: true}
+	err := UnskipCriterion(path, c)
+	if err == nil {
+		t.Error("expected error when skipped criterion not found")
+	}
+}
+
+func TestIsSkipped_And_IsBlocked_Interaction(t *testing.T) {
+	// A task can be both blocked and skipped
+	task := Task{
+		ID: "TASK-001",
+		Criteria: []Criterion{
+			{Text: "BLOCKED: needs API", Checked: false, Blocked: true},
+			{Text: "SKIPPED: defer this", Checked: false, Skipped: true},
+			{Text: "Normal", Checked: false},
+		},
+	}
+
+	if !task.IsBlocked() {
+		t.Error("task should be blocked")
+	}
+	if !task.IsSkipped() {
+		t.Error("task should be skipped")
+	}
+	if task.IsWorkable() {
+		t.Error("task should not be workable when both blocked and skipped")
+	}
+	if task.IsComplete() {
+		t.Error("task should not be complete")
+	}
+}
