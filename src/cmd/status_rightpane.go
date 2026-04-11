@@ -68,6 +68,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 			content = m.renderOutputTab(width, contentH)
 		case "summary":
 			content = m.renderSummaryTab(width, contentH)
+		case "plan":
+			content = m.renderPlanTab(width, contentH)
 		case "details":
 			content = m.renderFeatureDetailsTab(width, contentH)
 		case "taskdetails":
