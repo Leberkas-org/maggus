@@ -15,6 +15,7 @@ type Logger struct {
 	w               *os.File
 	dir             string
 	currentMaggusID string
+	currentTaskID   string
 }
 
 // ModelTokensEntry holds per-model token counts and cost for a task_usage event.
@@ -28,6 +29,7 @@ type ModelTokensEntry struct {
 
 // TaskUsageData is the parameter type for Logger.TaskUsage.
 type TaskUsageData struct {
+	TaskID                   string
 	InputTokens              int
 	OutputTokens             int
 	CacheCreationInputTokens int
@@ -166,6 +168,9 @@ func (l *Logger) emit(entry Entry) {
 	if entry.MaggusID == "" {
 		entry.MaggusID = l.currentMaggusID
 	}
+	if entry.TaskID == "" && l.currentTaskID != "" {
+		entry.TaskID = l.currentTaskID
+	}
 	entry.Ts = time.Now().UTC().Format(time.RFC3339)
 	data, err := json.Marshal(entry)
 	if err != nil {
@@ -185,19 +190,30 @@ func (l *Logger) FeatureComplete(featureID string) {
 	l.emit(Entry{Level: "info", Event: "feature_complete", FeatureID: featureID})
 }
 
-// TaskStart logs the start of a task.
+// TaskStart logs the start of a task and sets the current task ID so that
+// subsequent Info entries are tagged with the active task.
 func (l *Logger) TaskStart(taskID, title string) {
+	if l != nil {
+		l.currentTaskID = taskID
+	}
 	l.emit(Entry{Level: "info", Event: "task_start", TaskID: taskID, Title: title})
 }
 
-// TaskComplete logs successful task completion with the resulting commit hash.
+// TaskComplete logs successful task completion with the resulting commit hash
+// and clears the current task ID.
 func (l *Logger) TaskComplete(taskID, commitHash string) {
 	l.emit(Entry{Level: "info", Event: "task_complete", TaskID: taskID, Commit: commitHash})
+	if l != nil {
+		l.currentTaskID = ""
+	}
 }
 
-// TaskFailed logs a task failure with a reason.
+// TaskFailed logs a task failure with a reason and clears the current task ID.
 func (l *Logger) TaskFailed(taskID, reason string) {
 	l.emit(Entry{Level: "error", Event: "task_failed", TaskID: taskID, Reason: reason})
+	if l != nil {
+		l.currentTaskID = ""
+	}
 }
 
 // ToolUse logs a tool use event from the agent with structured input params.
@@ -210,6 +226,7 @@ func (l *Logger) TaskUsage(data TaskUsageData) {
 	l.emit(Entry{
 		Level:                    "info",
 		Event:                    "task_usage",
+		TaskID:                   data.TaskID,
 		InputTokens:              data.InputTokens,
 		OutputTokens:             data.OutputTokens,
 		CacheCreationInputTokens: data.CacheCreationInputTokens,

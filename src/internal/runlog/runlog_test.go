@@ -299,6 +299,68 @@ func TestToolUse(t *testing.T) {
 	if e.Input["file"] != "src/main.go" {
 		t.Errorf("input[file] = %q, want src/main.go", e.Input["file"])
 	}
+	if e.TaskID != "TASK-001-001" {
+		t.Errorf("task_id = %q, want TASK-001-001", e.TaskID)
+	}
+}
+
+func TestInfo_WritesTaskIDWhenTaskActive(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir, 50)
+	defer l.Close()
+
+	l.TaskStart("TASK-002-001", "Some task")
+	l.Info("something happened during the task")
+
+	entries := readLogEntries(t, findLogFile(t, dir))
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	infoEntry := entries[1]
+	if infoEntry.Event != "info" {
+		t.Errorf("event = %q, want info", infoEntry.Event)
+	}
+	if infoEntry.TaskID != "TASK-002-001" {
+		t.Errorf("task_id = %q, want TASK-002-001", infoEntry.TaskID)
+	}
+}
+
+func TestInfo_NoTaskIDWhenNoTaskActive(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir, 50)
+	defer l.Close()
+
+	l.Info("daemon started")
+
+	entries := readLogEntries(t, findLogFile(t, dir))
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].TaskID != "" {
+		t.Errorf("task_id = %q, want empty (no active task)", entries[0].TaskID)
+	}
+}
+
+func TestInfo_TaskIDClearedAfterTaskComplete(t *testing.T) {
+	dir := t.TempDir()
+	l, _ := runlog.Open("run1", dir, 50)
+	defer l.Close()
+
+	l.TaskStart("TASK-003-001", "A task")
+	l.TaskComplete("TASK-003-001", "abc123")
+	l.Info("post-task info")
+
+	entries := readLogEntries(t, findLogFile(t, dir))
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	postInfo := entries[2]
+	if postInfo.Event != "info" {
+		t.Errorf("event = %q, want info", postInfo.Event)
+	}
+	if postInfo.TaskID != "" {
+		t.Errorf("task_id = %q, want empty after task_complete", postInfo.TaskID)
+	}
 }
 
 func TestMultipleEventsOrdered(t *testing.T) {

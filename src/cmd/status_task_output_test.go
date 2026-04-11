@@ -98,6 +98,40 @@ func TestLoadCompletedTaskOutput_FailedTask(t *testing.T) {
 	}
 }
 
+func TestLoadCompletedTaskOutput_TaskUsageWithTaskID(t *testing.T) {
+	// Verifies that scanLogForTask correctly handles task_usage entries that
+	// carry a task_id field (the fixed behaviour after BUG-035).
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, ".maggus", "runs")
+	os.MkdirAll(runsDir, 0755)
+
+	entries := []runlog.Entry{
+		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "Fixed task"},
+		{Ts: "2025-01-01T00:00:10Z", Event: "tool_use", TaskID: "TASK-001", Tool: "Read", Input: map[string]string{"file_path": "/foo/bar.go"}},
+		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001", Commit: "abc1234"},
+		// task_usage now carries task_id — matches the entry and enters the switch.
+		{Ts: "2025-01-01T00:01:01Z", Event: "task_usage", TaskID: "TASK-001", InputTokens: 7000, OutputTokens: 3000, CostUSD: 0.07},
+	}
+	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+
+	snap := loadCompletedTaskOutput(dir, "TASK-001")
+	if snap == nil {
+		t.Fatal("expected snapshot, got nil")
+	}
+	if snap.TokenInput != 7000 {
+		t.Errorf("TokenInput = %d, want 7000", snap.TokenInput)
+	}
+	if snap.TokenOutput != 3000 {
+		t.Errorf("TokenOutput = %d, want 3000", snap.TokenOutput)
+	}
+	if snap.TokenCost != 0.07 {
+		t.Errorf("TokenCost = %f, want 0.07", snap.TokenCost)
+	}
+	if len(snap.ToolEntries) != 1 {
+		t.Errorf("ToolEntries count = %d, want 1", len(snap.ToolEntries))
+	}
+}
+
 func TestLoadCompletedTaskOutput_ScansNewestLogFirst(t *testing.T) {
 	dir := t.TempDir()
 	runsDir := filepath.Join(dir, ".maggus", "runs")

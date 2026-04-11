@@ -346,6 +346,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 			}
 		}
 		runLogger.TaskUsage(runlog.TaskUsageData{
+			TaskID:                   tu.TaskShort,
 			InputTokens:              tu.InputTokens,
 			OutputTokens:             tu.OutputTokens,
 			CacheCreationInputTokens: tu.CacheCreationInputTokens,
