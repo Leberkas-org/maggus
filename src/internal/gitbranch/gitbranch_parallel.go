@@ -12,22 +12,21 @@ import (
 var planNumRe = regexp.MustCompile(`^(?:TASK|BUG)-(\d+)`)
 
 // planBranchRe matches plan-level branch names used in parallel mode.
-// Matches "feature/maggus-NNN-plan" and "bugfix/maggus-bug-NNN-plan" (the
-// "-plan" suffix avoids the git ref hierarchy conflict with task branches
-// "feature/maggus-NNN/task-XXX"). Also matches the legacy flat format for
-// branches created by older versions.
-var planBranchRe = regexp.MustCompile(`^(?:feature/maggus-\d+(?:-plan)?|bugfix/maggus-bug-\d+(?:-plan)?)$`)
+// Matches current format: "feature/feat-NNN-plan" and "fix/bug-NNN-plan"
+// (the "-plan" suffix avoids the git ref hierarchy conflict with task branches).
+// Also matches legacy formats: "feature/maggus-NNN(-plan)?" and "bugfix/maggus-bug-NNN(-plan)?".
+var planBranchRe = regexp.MustCompile(`^(?:feature/feat-\d+(?:-plan)?|fix/bug-\d+(?:-plan)?|feature/maggus-\d+(?:-plan)?|bugfix/maggus-bug-\d+(?:-plan)?)$`)
 
 // PlanBranchName generates a plan-level feature branch name from a plan number.
-// For example, "038" becomes "feature/maggus-038".
+// For example, "038" becomes "feature/feat-038".
 func PlanBranchName(planNum string) string {
-	return fmt.Sprintf("feature/maggus-%s", strings.ToLower(planNum))
+	return fmt.Sprintf("feature/feat-%s", strings.ToLower(planNum))
 }
 
 // BugPlanBranchName generates a plan-level bugfix branch name from a bug plan number.
-// For example, "001" becomes "bugfix/maggus-bug-001".
+// For example, "001" becomes "fix/bug-001".
 func BugPlanBranchName(planNum string) string {
-	return fmt.Sprintf("bugfix/maggus-bug-%s", strings.ToLower(planNum))
+	return fmt.Sprintf("fix/bug-%s", strings.ToLower(planNum))
 }
 
 // PlanNumFromTaskID extracts the numeric plan number from a task or bug ID.
@@ -43,13 +42,13 @@ func PlanNumFromTaskID(taskID string) string {
 }
 
 // PlanBranchNameFromTaskID returns the plan-level branch name for the plan containing taskID.
-// For "TASK-038-003" returns "feature/maggus-038".
-// For "BUG-001-003" returns "bugfix/maggus-bug-001".
-// Returns "feature/maggus-000" for unrecognised IDs.
+// For "TASK-038-003" returns "feature/feat-038".
+// For "BUG-001-003" returns "fix/bug-001".
+// Returns "feature/feat-000" for unrecognised IDs.
 func PlanBranchNameFromTaskID(taskID string) string {
 	planNum := PlanNumFromTaskID(taskID)
 	if planNum == "" {
-		return "feature/maggus-000"
+		return "feature/feat-000"
 	}
 	if strings.HasPrefix(taskID, "BUG-") {
 		return BugPlanBranchName(planNum)
@@ -64,38 +63,48 @@ func IsPlanBranch(branch string) bool {
 }
 
 // parallelPlanBranchName returns the integration branch name used in parallel mode.
-// It uses a "-plan" suffix (e.g. "feature/maggus-038-plan") rather than the flat
-// "feature/maggus-038" to avoid a git ref hierarchy conflict: git cannot have
-// refs/heads/feature/maggus-038 (a file) and refs/heads/feature/maggus-038/task-003
+// It uses a "-plan" suffix (e.g. "feature/feat-038-plan") rather than the flat
+// "feature/feat-038" to avoid a git ref hierarchy conflict: git cannot have
+// refs/heads/feature/feat-038 (a file) and refs/heads/feature/feat-038/task-003
 // (a file inside a directory of the same name) simultaneously.
 func parallelPlanBranchName(taskID string) string {
 	planNum := PlanNumFromTaskID(taskID)
 	if planNum == "" {
-		return "feature/maggus-000-plan"
+		return "feature/feat-000-plan"
 	}
 	if strings.HasPrefix(taskID, "BUG-") {
-		return fmt.Sprintf("bugfix/maggus-bug-%s-plan", planNum)
+		return fmt.Sprintf("fix/bug-%s-plan", planNum)
 	}
-	return fmt.Sprintf("feature/maggus-%s-plan", planNum)
+	return fmt.Sprintf("feature/feat-%s-plan", planNum)
+}
+
+// ShouldCreatePlanBranch returns true when currentBranch is in protectedList,
+// indicating that a new plan branch should be created rather than working
+// directly on the current branch.
+func ShouldCreatePlanBranch(currentBranch string, protectedList []string) bool {
+	return IsProtected(currentBranch, protectedList)
 }
 
 // EnsurePlanBranch ensures the repository in workDir is checked out on the
 // parallel-mode integration branch for the plan containing taskID.
 //
-// In parallel mode, call this once before starting any task work.
+// If the current branch is not in protectedList, the function returns the
+// current branch unchanged — no plan branch is created.
 //
-//   - If already on the correct plan branch, it stays put and returns that branch.
-//   - Otherwise it creates (or switches to) the plan branch off the current branch.
-//
-// The integration branch uses a "-plan" suffix (e.g. "feature/maggus-038-plan")
-// so it does not conflict with task branches ("feature/maggus-038/task-003").
+// If the current branch is protected, a plan branch is created (or switched to).
+// The integration branch uses a "-plan" suffix (e.g. "feature/feat-038-plan")
+// so it does not conflict with task branches ("feature/feat-038/task-003").
 //
 // If git is not available or workDir is not a repository, a warning message is
 // returned without an error, mirroring the behaviour of EnsureFeatureBranch.
-func EnsurePlanBranch(workDir, taskID string) (branch, msg string, err error) {
+func EnsurePlanBranch(workDir, taskID string, protectedList []string) (branch, msg string, err error) {
 	current, err := currentBranch(workDir)
 	if err != nil {
 		return "", fmt.Sprintf("Warning: could not detect git branch: %v. Continuing without branch switching.", err), nil
+	}
+
+	if !ShouldCreatePlanBranch(current, protectedList) {
+		return current, fmt.Sprintf("On branch %s (not protected, staying here)", current), nil
 	}
 
 	target := parallelPlanBranchName(taskID)
