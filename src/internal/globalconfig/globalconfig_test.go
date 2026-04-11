@@ -147,10 +147,20 @@ func TestRemoveRepository_KeepsLastOpened(t *testing.T) {
 }
 
 func TestSetLastOpened(t *testing.T) {
-	var cfg GlobalConfig
+	cfg := GlobalConfig{
+		Repositories: []Repository{{Path: "/some/path"}},
+	}
 	cfg.SetLastOpened("/some/path")
 	if cfg.LastOpened != "/some/path" {
 		t.Fatalf("expected /some/path, got %q", cfg.LastOpened)
+	}
+}
+
+func TestSetLastOpened_IgnoresUnregisteredPath(t *testing.T) {
+	var cfg GlobalConfig
+	cfg.SetLastOpened("/not/registered")
+	if cfg.LastOpened != "" {
+		t.Fatalf("expected empty last_opened for unregistered path, got %q", cfg.LastOpened)
 	}
 }
 

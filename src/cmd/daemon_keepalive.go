@@ -223,16 +223,24 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
 func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+	// Use planDir for loading plans/config/approvals (main repo root).
+	// For normal daemon mode, planDir == dir. For dispatched workers, planDir
+	// points to the main repo while dir is the worktree.
+	planDir := wc.planDir
+	if planDir == "" {
+		planDir = dir
+	}
+
 	// Hot-reload parallel setting from config so changes take effect without daemon restart.
-	if freshCfg, err := loadConfigFn(dir); err == nil {
+	if freshCfg, err := loadConfigFn(planDir); err == nil {
 		wc.parallel = freshCfg.IsParallelEnabled() || parallelFlag
 	}
 
-	featureStore := stores.NewFileFeatureStore(dir)
-	bugStore := stores.NewFileBugStore(dir)
+	featureStore := stores.NewFileFeatureStore(planDir)
+	bugStore := stores.NewFileBugStore(planDir)
 
 	// Parse tasks and check for work.
-	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0, featureStore, bugStore)
+	setup, err := initIteration(cmd, planDir, wc.modelDisplay, 0, featureStore, bugStore)
 	if err != nil {
 		return false, err
 	}
@@ -241,7 +249,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	}
 
 	// Build approved plans with approval filtering.
-	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg, featureStore, bugStore)
+	featureGroups, fgErr := buildApprovedPlans(planDir, wc.cfg, featureStore, bugStore)
 	if fgErr != nil {
 		return false, fmt.Errorf("build approved plans: %w", fgErr)
 	}

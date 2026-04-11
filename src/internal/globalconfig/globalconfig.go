@@ -539,8 +539,12 @@ func (cfg *GlobalConfig) RemoveRepository(absPath string) bool {
 }
 
 // SetLastOpened updates the last_opened field to the given path.
+// Only sets last_opened if the path is a registered repository,
+// preventing worktree or other transient paths from being persisted.
 func (cfg *GlobalConfig) SetLastOpened(absPath string) {
-	cfg.LastOpened = absPath
+	if cfg.HasRepository(absPath) {
+		cfg.LastOpened = absPath
+	}
 }
 
 // HasRepository returns true if the given path is in the repository list.

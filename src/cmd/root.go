@@ -181,7 +181,7 @@ func shouldSkipResolver() bool {
 		return false
 	}
 	switch os.Args[1] {
-	case "start", "stop":
+	case "start", "stop", "run":
 		return true
 	}
 	return false
