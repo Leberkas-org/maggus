@@ -167,7 +167,9 @@ func countWorkable(tasks []parser.Task) int {
 }
 
 // buildApprovedPlans loads all plans (bugs first, then features), filters by
-// approval state, prunes stale approvals, and returns the ordered list.
+// approval state, and returns the ordered list. The daemon is read-only with
+// respect to feature_approvals.yml — pruning stale entries is left to the TUI
+// (pruneStaleApprovals in status_model.go / menu_model.go / app_model.go).
 func buildApprovedPlans(dir string, cfg config.Config, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]parser.Plan, error) {
 	plans, err := loadAllPlans(featureStore, bugStore)
 	if err != nil {
@@ -180,18 +182,11 @@ func buildApprovedPlans(dir string, cfg config.Config, featureStore stores.Featu
 	}
 	approvalRequired := cfg.IsApprovalRequired()
 
-	// Collect all known IDs for pruning, then filter by approval.
-	var knownIDs []string
 	var approved []parser.Plan
 	for _, p := range plans {
-		knownIDs = append(knownIDs, p.ApprovalKey())
 		if isPlanApproved(p, approvals, approvalRequired) {
 			approved = append(approved, p)
 		}
-	}
-
-	if err := approval.Prune(dir, knownIDs); err != nil {
-		return nil, fmt.Errorf("prune approvals: %w", err)
 	}
 
 	return approved, nil

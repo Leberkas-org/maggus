@@ -943,12 +943,14 @@ func TestBuildApprovedPlans_UUIDNotApprovedByFilename(t *testing.T) {
 	}
 }
 
-// TestBuildApprovedPlans_PruneStaleEntries verifies that stale entries
-// are removed from feature_approvals.yml after building groups.
-func TestBuildApprovedPlans_PruneStaleEntries(t *testing.T) {
+// TestBuildApprovedPlans_DoesNotPruneApprovalFile verifies that the daemon work
+// loop does not write to feature_approvals.yml. Pruning is a TUI-only operation;
+// the daemon must remain read-only with respect to the approval file so that
+// concurrent writes from the TUI cannot corrupt each other's state.
+func TestBuildApprovedPlans_DoesNotPruneApprovalFile(t *testing.T) {
 	dir := setupCleanDir(t)
 	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
-	// Write approvals with a stale entry.
+	// Write approvals including a stale entry that does not correspond to any file.
 	a := approval.Approvals{
 		"feature_001": true,
 		"stale_entry": true,
@@ -963,16 +965,16 @@ func TestBuildApprovedPlans_PruneStaleEntries(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Reload approvals and verify stale entry was pruned.
+	// The daemon must not prune stale entries — the file should be unchanged.
 	after, err := approval.Load(dir)
 	if err != nil {
 		t.Fatalf("load approvals: %v", err)
 	}
-	if _, ok := after["stale_entry"]; ok {
-		t.Errorf("expected stale_entry to be pruned")
+	if _, ok := after["stale_entry"]; !ok {
+		t.Errorf("buildApprovedPlans must not prune stale_entry from the approval file (daemon is read-only)")
 	}
 	if _, ok := after["feature_001"]; !ok {
-		t.Errorf("expected feature_001 to be kept")
+		t.Errorf("expected feature_001 to remain in approval file")
 	}
 }
 
