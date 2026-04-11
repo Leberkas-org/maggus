@@ -212,6 +212,41 @@ func RemoveWorkerSnapshot(dir, taskID string) {
 	os.Remove(target + ".tmp")
 }
 
+// UpsertWorkerEntry reads the workers index, adds or updates the entry for
+// taskID, and writes the result back. This is safe for use by external
+// processes (dispatched workers) that need to register alongside the daemon's
+// own workers. The read-modify-write is not locked, but the write is atomic
+// (temp+rename) so concurrent readers never see a partial file.
+func UpsertWorkerEntry(dir string, entry WorkerIndexEntry) error {
+	existing := ReadWorkersIndex(dir)
+	found := false
+	for i, w := range existing {
+		if w.TaskID == entry.TaskID {
+			existing[i] = entry
+			found = true
+			break
+		}
+	}
+	if !found {
+		existing = append(existing, entry)
+	}
+	return WriteWorkersIndex(dir, existing)
+}
+
+// UpdateWorkerStatus reads the workers index, updates the status of the
+// given taskID, and writes the result back. If the taskID is not found
+// the call is a no-op and nil is returned.
+func UpdateWorkerStatus(dir, taskID, status string) error {
+	existing := ReadWorkersIndex(dir)
+	for i, w := range existing {
+		if w.TaskID == taskID {
+			existing[i].Status = status
+			return WriteWorkersIndex(dir, existing)
+		}
+	}
+	return nil
+}
+
 // RemoveAllWorkerSnapshots removes all per-worker snapshot files and the index.
 func RemoveAllWorkerSnapshots(dir string) {
 	runsDir := filepath.Join(dir, ".maggus", "runs")

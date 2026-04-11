@@ -36,6 +36,11 @@ type nullTUIModel struct {
 	toolEntries   []runlog.SnapshotToolEntry
 	commits       []string
 
+	// Dispatch mode — when set, writes per-worker snapshots to the main repo
+	// instead of the daemon's state.json. Set by --dispatch-repo.
+	dispatchRepoDir string // main repo dir for per-worker state files
+	dispatchTaskID  string // task ID for per-worker snapshot filename
+
 	// Token accumulation for current iteration.
 	iterInput         int
 	iterOutput        int
@@ -67,6 +72,7 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case QuitMsg:
 		_ = msg
 		m.flushUsage()
+		m.finalizeDispatchWorker()
 		return m, tea.Quit
 	case SyncCheckMsg:
 		// Auto-continue in daemon mode: skip the interactive sync screen.
@@ -133,11 +139,9 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// writeSnapshot writes the current state to state.json.
+// writeSnapshot writes the current state to state.json (normal daemon) or
+// per-worker snapshot state-<taskID>.json (dispatched worker).
 func (m *nullTUIModel) writeSnapshot() {
-	if m.snapshotDir == "" || m.snapshotRunID == "" {
-		return
-	}
 	snap := runlog.StateSnapshot{
 		RunID:          m.snapshotRunID,
 		TaskID:         m.taskID,
@@ -153,7 +157,17 @@ func (m *nullTUIModel) writeSnapshot() {
 		RunStartedAt:   m.runStartedAt.UTC().Format(time.RFC3339),
 		TaskStartedAt:  m.startTime.UTC().Format(time.RFC3339),
 	}
-	// Best-effort write; errors are not fatal for the daemon.
+
+	// Dispatch mode: write per-worker snapshot to the main repo dir.
+	if m.dispatchRepoDir != "" && m.dispatchTaskID != "" {
+		_ = runlog.WriteWorkerSnapshot(m.dispatchRepoDir, m.dispatchTaskID, snap)
+		return
+	}
+
+	// Normal daemon mode: write to state.json in the local dir.
+	if m.snapshotDir == "" || m.snapshotRunID == "" {
+		return
+	}
 	_ = runlog.WriteSnapshot(m.snapshotDir, snap)
 }
 
@@ -185,6 +199,26 @@ func (m *nullTUIModel) flushUsage() {
 	m.iterCacheRead = 0
 	m.iterCost = 0
 	m.iterModelUsage = nil
+}
+
+// finalizeDispatchWorker updates the worker status in the shared workers index
+// when a dispatched worker process exits. It determines done/failed based on
+// whether any commits were made.
+func (m *nullTUIModel) finalizeDispatchWorker() {
+	if m.dispatchRepoDir == "" || m.dispatchTaskID == "" {
+		return
+	}
+	status := "done"
+	snapStatus := "Done"
+	if len(m.commits) == 0 {
+		status = "failed"
+		snapStatus = "Failed"
+	}
+	// Write final snapshot with terminal status.
+	m.status = snapStatus
+	m.writeSnapshot()
+	// Update the shared workers index.
+	_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, status)
 }
 
 func (m nullTUIModel) View() string { return "" }

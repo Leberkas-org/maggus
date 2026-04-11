@@ -38,13 +38,13 @@ Currently, `Alt+R` in the status view runs a task by launching `maggus run --tas
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] A new function `dispatchTask(dir, taskID, model, agent string) error` is created (in `cmd/dispatch.go` or a new file)
-- [ ] The function: creates a worktree at `.maggus/worktrees/<taskID>/`, creates a task branch (using the new hierarchical naming from feature 043 if available, else current naming), launches `maggus run --task <taskID> --daemon-run` as a detached background process with stdout/stderr redirected to a log file
-- [ ] The dispatched process writes its own per-worker state file (`state-<taskID>.json`) so the status TUI can track it
-- [ ] The dispatched process registers itself in the workers index file so it appears alongside daemon workers
-- [ ] If the worktree already exists (e.g., from a previous interrupted dispatch), the function cleans it up first or reuses it
-- [ ] The function returns immediately after spawning — it does not wait for the task to complete
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] A new function `dispatchTask(dir, taskID, model, agent string) error` is created (in `cmd/dispatch.go` or a new file)
+- [x] The function: creates a worktree at `.maggus/worktrees/<taskID>/`, creates a task branch (using the new hierarchical naming from feature 043 if available, else current naming), launches `maggus run --task <taskID> --daemon-run` as a detached background process with stdout/stderr redirected to a log file
+- [x] The dispatched process writes its own per-worker state file (`state-<taskID>.json`) so the status TUI can track it
+- [x] The dispatched process registers itself in the workers index file so it appears alongside daemon workers
+- [x] If the worktree already exists (e.g., from a previous interrupted dispatch), the function cleans it up first or reuses it
+- [x] The function returns immediately after spawning — it does not wait for the task to complete
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-045-002: Wire up dispatch shortcut in status TUI
 **Description:** As a user viewing the status TUI, I want to press a key to dispatch the selected task as a parallel worker so I can start urgent bugs without stopping the daemon.

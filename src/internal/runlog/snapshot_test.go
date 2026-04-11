@@ -167,6 +167,120 @@ func TestWriteSnapshot_TimestampsPresent(t *testing.T) {
 	}
 }
 
+func TestUpsertWorkerEntry_AddsNew(t *testing.T) {
+	dir := t.TempDir()
+
+	entry := WorkerIndexEntry{
+		TaskID:    "TASK-001-001",
+		TaskTitle: "First task",
+		Status:    "working",
+		StartedAt: "2026-01-01T00:00:00Z",
+	}
+	if err := UpsertWorkerEntry(dir, entry); err != nil {
+		t.Fatalf("UpsertWorkerEntry failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].TaskID != "TASK-001-001" {
+		t.Errorf("TaskID = %q, want %q", workers[0].TaskID, "TASK-001-001")
+	}
+	if workers[0].Status != "working" {
+		t.Errorf("Status = %q, want %q", workers[0].Status, "working")
+	}
+}
+
+func TestUpsertWorkerEntry_UpdatesExisting(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write initial entry.
+	_ = UpsertWorkerEntry(dir, WorkerIndexEntry{
+		TaskID: "TASK-001-001", TaskTitle: "First", Status: "working",
+	})
+
+	// Upsert same task with new status.
+	_ = UpsertWorkerEntry(dir, WorkerIndexEntry{
+		TaskID: "TASK-001-001", TaskTitle: "First updated", Status: "done",
+	})
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker (upserted, not duplicated), got %d", len(workers))
+	}
+	if workers[0].Status != "done" {
+		t.Errorf("Status = %q, want %q", workers[0].Status, "done")
+	}
+	if workers[0].TaskTitle != "First updated" {
+		t.Errorf("TaskTitle = %q, want %q", workers[0].TaskTitle, "First updated")
+	}
+}
+
+func TestUpsertWorkerEntry_PreservesOtherWorkers(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write two workers.
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "done"},
+		{TaskID: "TASK-001-002", Status: "working"},
+	})
+
+	// Upsert a third worker.
+	_ = UpsertWorkerEntry(dir, WorkerIndexEntry{
+		TaskID: "TASK-001-003", Status: "working",
+	})
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 3 {
+		t.Fatalf("expected 3 workers, got %d", len(workers))
+	}
+}
+
+func TestUpdateWorkerStatus_UpdatesMatchingEntry(t *testing.T) {
+	dir := t.TempDir()
+
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "working"},
+		{TaskID: "TASK-001-002", Status: "working"},
+	})
+
+	if err := UpdateWorkerStatus(dir, "TASK-001-001", "done"); err != nil {
+		t.Fatalf("UpdateWorkerStatus failed: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 2 {
+		t.Fatalf("expected 2 workers, got %d", len(workers))
+	}
+	if workers[0].Status != "done" {
+		t.Errorf("workers[0].Status = %q, want %q", workers[0].Status, "done")
+	}
+	if workers[1].Status != "working" {
+		t.Errorf("workers[1].Status = %q, want %q", workers[1].Status, "working")
+	}
+}
+
+func TestUpdateWorkerStatus_NoopForUnknownTaskID(t *testing.T) {
+	dir := t.TempDir()
+
+	_ = WriteWorkersIndex(dir, []WorkerIndexEntry{
+		{TaskID: "TASK-001-001", Status: "working"},
+	})
+
+	if err := UpdateWorkerStatus(dir, "TASK-999-001", "done"); err != nil {
+		t.Fatalf("UpdateWorkerStatus should not fail for unknown task: %v", err)
+	}
+
+	workers := ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "working" {
+		t.Errorf("Status should be unchanged: %q", workers[0].Status)
+	}
+}
+
 func TestWriteSnapshot_NoTempFileLeftBehind(t *testing.T) {
 	dir := t.TempDir()
 
