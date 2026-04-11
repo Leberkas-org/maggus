@@ -293,6 +293,7 @@ func (m statusModel) availableTabs() []tabDef {
 	case selFeature:
 		return []tabDef{
 			{name: "Summary", key: "summary"},
+			{name: "Plan", key: "plan"},
 			{name: "Details", key: "details"},
 			{name: "Metrics", key: "metrics"},
 		}

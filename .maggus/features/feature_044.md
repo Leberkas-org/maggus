@@ -73,11 +73,11 @@ Add a "Plan" tab to the status view that appears when a feature is selected in t
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `availableTabs()` for `selFeature` returns `[Summary, Plan, Details, Metrics]` (Plan inserted after Summary)
-- [ ] The Plan tab renders via `renderPlanTab()` in the tab dispatch switch
-- [ ] Tab number keys map correctly with the new tab count
-- [ ] The Plan tab does NOT appear for task selections or no-selection (only features)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `availableTabs()` for `selFeature` returns `[Summary, Plan, Details, Metrics]` (Plan inserted after Summary)
+- [x] The Plan tab renders via `renderPlanTab()` in the tab dispatch switch
+- [x] Tab number keys map correctly with the new tab count
+- [x] The Plan tab does NOT appear for task selections or no-selection (only features)
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

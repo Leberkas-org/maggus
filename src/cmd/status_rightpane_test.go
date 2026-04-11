@@ -72,7 +72,7 @@ func TestRenderRightPaneTabBar_RendersOnlyAvailableTabs(t *testing.T) {
 		tabCount int
 	}{
 		{ctx: selNone, wantTabNames: []string{"Metrics"}, tabCount: 1},
-		{ctx: selFeature, wantTabNames: []string{"Summary", "Details", "Metrics"}, tabCount: 3},
+		{ctx: selFeature, wantTabNames: []string{"Summary", "Plan", "Details", "Metrics"}, tabCount: 4},
 		{ctx: selRunningTask, wantTabNames: []string{"Output", "Task Details", "Metrics"}, tabCount: 3},
 		{ctx: selCompletedTask, wantTabNames: []string{"Summary", "Output", "Task Details", "Metrics"}, tabCount: 4},
 	}
@@ -112,8 +112,8 @@ func TestRenderRightPaneTabBar_NumberLabelsStartAt1(t *testing.T) {
 		},
 		{
 			ctx:        selFeature,
-			wantLabels: []string{"[1]", "[2]", "[3]"},
-			noLabels:   []string{"[4]"},
+			wantLabels: []string{"[1]", "[2]", "[3]", "[4]"},
+			noLabels:   []string{"[5]"},
 		},
 		{
 			ctx:        selRunningTask,
@@ -172,9 +172,19 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 		}
 	})
 
-	t.Run("selFeature tab 1 dispatches Details tab (not Summary)", func(t *testing.T) {
+	t.Run("selFeature tab 1 dispatches Plan tab", func(t *testing.T) {
 		m := makeModelForCtx(selFeature)
-		m.activeTab = 1 // Details
+		m.activeTab = 1 // Plan
+		out := m.renderRightPane(80, 20)
+		// Plan tab renders execution steps; Summary placeholder must not appear
+		if strings.Contains(out, "coming soon") {
+			t.Errorf("selFeature/Plan should NOT render 'coming soon' placeholder")
+		}
+	})
+
+	t.Run("selFeature tab 2 dispatches Details tab", func(t *testing.T) {
+		m := makeModelForCtx(selFeature)
+		m.activeTab = 2 // Details
 		out := m.renderRightPane(80, 20)
 		// Details renders the task list; Summary placeholder must not appear
 		if strings.Contains(out, "coming soon") {
@@ -212,10 +222,11 @@ func TestUpdateList_NumberKeysMappedPositionally(t *testing.T) {
 		key     string
 		wantTab int
 	}{
-		// selFeature has 3 tabs (Summary=0, Details=1, Metrics=2)
+		// selFeature has 4 tabs (Summary=0, Plan=1, Details=2, Metrics=3)
 		{ctx: selFeature, key: "1", wantTab: 0},
 		{ctx: selFeature, key: "2", wantTab: 1},
 		{ctx: selFeature, key: "3", wantTab: 2},
+		{ctx: selFeature, key: "4", wantTab: 3},
 		// selCompletedTask has 4 tabs
 		{ctx: selCompletedTask, key: "1", wantTab: 0},
 		{ctx: selCompletedTask, key: "4", wantTab: 3},
@@ -248,9 +259,8 @@ func TestUpdateList_KeysBeyondTabCountIgnored(t *testing.T) {
 		{ctx: selNone, key: "2", desc: "selNone: key 2 beyond 1 tab"},
 		{ctx: selNone, key: "3", desc: "selNone: key 3 beyond 1 tab"},
 		{ctx: selNone, key: "4", desc: "selNone: key 4 beyond 1 tab"},
-		// selFeature has 3 tabs; key 4,5 are beyond count
-		{ctx: selFeature, key: "4", desc: "selFeature: key 4 beyond 3 tabs"},
-		{ctx: selFeature, key: "5", desc: "selFeature: key 5 beyond 3 tabs"},
+		// selFeature has 4 tabs; key 5 is beyond count
+		{ctx: selFeature, key: "5", desc: "selFeature: key 5 beyond 4 tabs"},
 		// selRunningTask has 3 tabs; key 4,5 are beyond count
 		{ctx: selRunningTask, key: "4", desc: "selRunningTask: key 4 beyond 3 tabs"},
 	}
@@ -277,8 +287,8 @@ func TestStatusSplitFooter_DynamicTabRange(t *testing.T) {
 	}{
 		// selNone: 1 tab → key range is 1-1
 		{ctx: selNone, wantRange: "1-1: tabs"},
-		// selFeature: 3 tabs → key range is 1-3
-		{ctx: selFeature, wantRange: "1-3: tabs"},
+		// selFeature: 4 tabs → key range is 1-4
+		{ctx: selFeature, wantRange: "1-4: tabs"},
 		// selRunningTask: 3 tabs → key range is 1-3
 		{ctx: selRunningTask, wantRange: "1-3: tabs"},
 		// selCompletedTask: 4 tabs → key range is 1-4

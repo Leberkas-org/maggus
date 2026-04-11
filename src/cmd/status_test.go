@@ -645,7 +645,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = false
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Details tab shows task list (selFeature context: Summary, Details, Metrics)
+		m.activeTab = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
 		if !strings.Contains(view, "Details") {
@@ -661,7 +661,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = true
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Details tab shows task list (selFeature context: Summary, Details, Metrics)
+		m.activeTab = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
 		if !strings.Contains(view, "Details") {
@@ -1198,8 +1198,8 @@ func TestRenderCurrentTaskTab(t *testing.T) {
 
 func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
 	t.Run("Task Details tab is wired into renderRightPane", func(t *testing.T) {
-		// Set up a selFeature context so availableTabs = [Summary, Details, Metrics].
-		// Index 2 = Metrics (no "taskdetails" in this context).
+		// Set up a selFeature context so availableTabs = [Summary, Plan, Details, Metrics].
+		// Index 3 = Metrics (no "taskdetails" in this context).
 		// To test taskdetails, use a selRunningTask context: [Output, Task Details, Metrics].
 		// But we just want to verify taskdetails renders — use selCompletedTask:
 		// [Summary, Output, Task Details, Metrics] — index 2 = taskdetails.
@@ -1500,8 +1500,8 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTab != 1 {
-			t.Errorf("activeTab = %d, want 1 (Details)", got.activeTab)
+		if got.activeTab != 2 {
+			t.Errorf("activeTab = %d, want 2 (Details)", got.activeTab)
 		}
 	})
 
@@ -1509,12 +1509,12 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTab = 2 // currently on metrics
+		m.activeTab = 3 // currently on metrics
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTab != 1 {
-			t.Errorf("activeTab = %d, want 1 after enter on plan row", got.activeTab)
+		if got.activeTab != 2 {
+			t.Errorf("activeTab = %d, want 2 after enter on plan row", got.activeTab)
 		}
 	})
 }
@@ -2035,17 +2035,18 @@ func TestAvailableTabs(t *testing.T) {
 		}
 	})
 
-	t.Run("selFeature returns Summary, Details, Metrics", func(t *testing.T) {
+	t.Run("selFeature returns Summary, Plan, Details, Metrics", func(t *testing.T) {
 		m := statusModel{
 			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
 			treeCursor: 0,
 		}
 		tabs := m.availableTabs()
-		if len(tabs) != 3 {
-			t.Fatalf("len(availableTabs) = %d, want 3", len(tabs))
+		if len(tabs) != 4 {
+			t.Fatalf("len(availableTabs) = %d, want 4", len(tabs))
 		}
 		expected := []struct{ key, name string }{
 			{"summary", "Summary"},
+			{"plan", "Plan"},
 			{"details", "Details"},
 			{"metrics", "Metrics"},
 		}
@@ -2137,7 +2138,7 @@ func TestClampActiveTab(t *testing.T) {
 			activeTab:  10,
 		}
 		m.clampActiveTab()
-		tabs := m.availableTabs() // selFeature: 3 tabs
+		tabs := m.availableTabs() // selFeature: 4 tabs
 		if m.activeTab != len(tabs)-1 {
 			t.Errorf("activeTab = %d, want %d", m.activeTab, len(tabs)-1)
 		}
