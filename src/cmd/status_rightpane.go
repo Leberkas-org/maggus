@@ -105,9 +105,9 @@ func (m *statusModel) rightPaneContentHeight() int {
 func (m *statusModel) outputTabScrollableLines() int {
 	contentH := m.rightPaneContentHeight()
 	// Fixed lines consumed by the rich snapshot view:
-	//   top:    blank(1) + status(1) + task(1) + separator(1) = 4
+	//   top:    status(1) + task(1) + separator(1) = 3
 	//   bottom: separator(1) + tokens(1) + cost(1) + run(1) + task(1) = 5
-	overhead := 9
+	overhead := 8
 	avail := contentH - overhead
 	if avail < 3 {
 		avail = 3
@@ -183,7 +183,8 @@ func (m statusModel) renderSnapshotInPane(snap *runlog.StateSnapshot, spinnerFra
 	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	// ── Middle zone (scrollable tool list) ──
-	available := height - 9
+	// Overhead: top=3 (status+task+sep) + bottom=5 (sep+tokens+cost+run+task) = 8
+	available := height - 8
 	if available < 3 {
 		available = 3
 	}
@@ -238,7 +239,7 @@ func (m statusModel) renderSnapshotInPane(snap *runlog.StateSnapshot, spinnerFra
 	}
 	sb.WriteString(fmt.Sprintf("  %s    %s", statusBoldStyle.Render("Task:"), statusDimStyle.Render(taskElapsed)))
 
-	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+	return sb.String()
 }
 
 // renderCurrentTaskContent returns the rendered detail content for a task.

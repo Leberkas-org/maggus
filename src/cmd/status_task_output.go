@@ -17,6 +17,43 @@ import (
 
 // ── Shared tool-line rendering helpers ──────────────────────────────────────
 
+// truncateToWidth truncates a plain-text string to fit within maxWidth visible
+// columns, appending "..." if truncated. Column widths are measured via
+// lipgloss.Width so wide characters (CJK, emoji) are counted correctly.
+func truncateToWidth(s string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= maxWidth {
+		return s
+	}
+	if maxWidth <= 3 {
+		// Not enough room for ellipsis; hard-cut at maxWidth columns.
+		var out []rune
+		w := 0
+		for _, r := range s {
+			rw := lipgloss.Width(string(r))
+			if w+rw > maxWidth {
+				break
+			}
+			out = append(out, r)
+			w += rw
+		}
+		return string(out)
+	}
+	var out []rune
+	w := 0
+	for _, r := range s {
+		rw := lipgloss.Width(string(r))
+		if w+rw > maxWidth-3 {
+			break
+		}
+		out = append(out, r)
+		w += rw
+	}
+	return string(out) + "..."
+}
+
 // buildToolLines renders snapshot tool entries into styled strings for display.
 // Extracted from renderSnapshotInPane so both running and completed task views
 // share the same formatting logic.
@@ -45,7 +82,7 @@ func buildToolLines(entries []runlog.SnapshotToolEntry, contentWidth int) []stri
 		if maxDesc < 0 {
 			maxDesc = 0
 		}
-		desc := styles.Truncate(entry.Description, maxDesc)
+		desc := truncateToWidth(entry.Description, maxDesc)
 		leftPart := fmt.Sprintf("  %s %s %s", icon, statusBlueStyle.Render(bracketedType), statusDimStyle.Render(desc))
 		toolLines[i] = styles.RightAlign(leftPart, styledTs, contentWidth)
 	}
@@ -314,17 +351,16 @@ func formatToolDescription(toolType string, input map[string]string) string {
 
 // renderCompletedTaskOutput renders the Output tab for a completed or pending task.
 // It uses tool history loaded from run log JSONL files.
+// Returns raw string without wrapping — caller (renderRightPane) applies final sizing.
 func (m statusModel) renderCompletedTaskOutput(width, height int) string {
 	task := m.selectedTask()
 	if task == nil {
-		msg := statusDimStyle.Render("  No task selected")
-		return lipgloss.NewStyle().Width(width).Height(height).Render(msg)
+		return statusDimStyle.Render("  No task selected")
 	}
 
 	snap := m.cachedTaskOutput
 	if snap == nil || snap.TaskID != task.ID {
-		msg := statusDimStyle.Render("  No output history available")
-		return lipgloss.NewStyle().Width(width).Height(height).Render(msg)
+		return statusDimStyle.Render("  No output history available")
 	}
 
 	var sb strings.Builder
@@ -361,7 +397,8 @@ func (m statusModel) renderCompletedTaskOutput(width, height int) string {
 	sb.WriteString(" " + styles.Separator(width-1) + "\n")
 
 	// ── Middle zone (scrollable tool list) ──
-	available := height - 9
+	// Overhead: top=3 (status+task+sep) + bottom=5 (sep+tokens+cost+duration+tools) = 8
+	available := height - 8
 	if available < 3 {
 		available = 3
 	}
@@ -398,5 +435,5 @@ func (m statusModel) renderCompletedTaskOutput(width, height int) string {
 	sb.WriteString(fmt.Sprintf("  %s    %s\n", statusBoldStyle.Render("Task:"), statusDimStyle.Render(duration)))
 	sb.WriteString(fmt.Sprintf("  %s   %s", statusBoldStyle.Render("Tools:"), statusDimStyle.Render(fmt.Sprintf("%d", totalTools))))
 
-	return lipgloss.NewStyle().Width(width).Height(height).Render(sb.String())
+	return sb.String()
 }

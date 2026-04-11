@@ -402,6 +402,146 @@ func TestLogItemCount_CompletedTask(t *testing.T) {
 	}
 }
 
+// TestRenderCompletedTaskOutput_LineCountMatchesHeight verifies that
+// renderCompletedTaskOutput produces exactly `height` lines of output (i.e.
+// height-1 newlines) for both 0 and 100+ tool entries, ensuring the outer
+// renderRightPane wrapper can size the content without overflow.
+func TestRenderCompletedTaskOutput_LineCountMatchesHeight(t *testing.T) {
+	makeSnap := func(n int) *runlog.StateSnapshot {
+		entries := make([]runlog.SnapshotToolEntry, n)
+		for i := range entries {
+			entries[i] = runlog.SnapshotToolEntry{
+				Type:        "Bash",
+				Icon:        "⚡",
+				Description: strings.Repeat("x", 40),
+				Timestamp:   "2025-01-01T00:00:10Z",
+			}
+		}
+		return &runlog.StateSnapshot{
+			TaskID:        "TASK-001",
+			TaskTitle:     "Test",
+			Status:        "Done",
+			ToolEntries:   entries,
+			TokenInput:    1000,
+			TokenOutput:   500,
+			TaskStartedAt: "2025-01-01T00:00:00Z",
+			UpdatedAt:     "2025-01-01T00:01:00Z",
+		}
+	}
+
+	task := parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Checked: true, Text: "done"}},
+	}
+	baseModel := statusModel{
+		expandedPlans:      make(map[string]bool),
+		cachedTaskOutputID: "TASK-001",
+		plans:              []parser.Plan{{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{task}}},
+		width:              120,
+		height:             40,
+	}
+	baseModel.expandedPlans["f1"] = true
+	baseModel.treeCursor = 1
+
+	tests := []struct {
+		name   string
+		nTools int
+		width  int
+		height int
+	}{
+		{"zero tools", 0, 80, 25},
+		{"few tools", 5, 80, 25},
+		{"many tools 100+", 120, 80, 30},
+		{"many tools narrow", 50, 40, 20},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := baseModel
+			m.cachedTaskOutput = makeSnap(tt.nTools)
+
+			out := m.renderCompletedTaskOutput(tt.width, tt.height)
+
+			// renderCompletedTaskOutput returns raw text; outer renderRightPane applies
+			// final sizing. The raw output must have exactly height-1 newlines so the
+			// pane wrapper can accommodate it without overflow.
+			got := strings.Count(out, "\n")
+			want := tt.height - 1
+			if got != want {
+				t.Errorf("renderCompletedTaskOutput(%d, %d) with %d tools: got %d newlines, want %d",
+					tt.width, tt.height, tt.nTools, got, want)
+			}
+		})
+	}
+}
+
+// TestRenderCompletedTaskOutput_ZeroToolsMessage verifies the "No tool
+// invocations recorded" message is shown when there are no tool entries.
+func TestRenderCompletedTaskOutput_ZeroToolsMessage(t *testing.T) {
+	snap := &runlog.StateSnapshot{
+		TaskID:  "TASK-001",
+		Status:  "Done",
+		TaskStartedAt: "2025-01-01T00:00:00Z",
+		UpdatedAt:     "2025-01-01T00:01:00Z",
+	}
+	task := parser.Task{
+		ID:       "TASK-001",
+		Criteria: []parser.Criterion{{Checked: true, Text: "done"}},
+	}
+	m := statusModel{
+		expandedPlans:      make(map[string]bool),
+		cachedTaskOutput:   snap,
+		cachedTaskOutputID: "TASK-001",
+		plans:              []parser.Plan{{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{task}}},
+		width:              120,
+		height:             40,
+	}
+	m.expandedPlans["f1"] = true
+	m.treeCursor = 1
+
+	out := m.renderCompletedTaskOutput(80, 25)
+	if !strings.Contains(out, "No tool invocations recorded") {
+		t.Errorf("expected 'No tool invocations recorded' in output; got: %q", out)
+	}
+}
+
+// TestTruncateToWidth verifies that truncateToWidth correctly limits text to
+// maxWidth visible columns including for multi-byte/wide characters.
+func TestTruncateToWidth(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxWidth int
+		wantLen  int // expected visible width of result
+		wantSufx string
+	}{
+		{"empty string", "", 10, 0, ""},
+		{"short fits", "hello", 10, 5, ""},
+		{"exact fit", "hello", 5, 5, ""},
+		{"truncated ascii", "hello world", 8, 8, "..."},
+		{"zero max", "hello", 0, 0, ""},
+		{"max 1", "hello", 1, 1, ""},
+		{"max 3", "hello", 3, 3, ""},
+		{"max 4 with ellipsis", "hello", 4, 4, "..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateToWidth(tt.input, tt.maxWidth)
+
+			if tt.wantSufx != "" && !strings.HasSuffix(got, tt.wantSufx) {
+				t.Errorf("truncateToWidth(%q, %d) = %q; want suffix %q", tt.input, tt.maxWidth, got, tt.wantSufx)
+			}
+			if tt.wantLen > 0 {
+				gotW := len(got) // for ASCII inputs, len == visible width
+				if gotW != tt.wantLen {
+					t.Errorf("truncateToWidth(%q, %d) = %q (len %d); want len %d", tt.input, tt.maxWidth, got, gotW, tt.wantLen)
+				}
+			}
+		})
+	}
+}
+
 // writeLogFile writes JSONL entries to a log file in the runs directory.
 func writeLogFile(t *testing.T, runsDir, name string, entries []runlog.Entry) {
 	t.Helper()
