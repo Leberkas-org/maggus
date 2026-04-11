@@ -18,6 +18,7 @@ func TestTaskUsage(t *testing.T) {
 	defer l.Close()
 
 	l.TaskUsage(runlog.TaskUsageData{
+		TaskID:                   "TASK-001-001",
 		InputTokens:              12000,
 		OutputTokens:             800,
 		CacheCreationInputTokens: 500,
@@ -56,6 +57,9 @@ func TestTaskUsage(t *testing.T) {
 
 	if raw["event"] != "task_usage" {
 		t.Errorf("event = %q, want task_usage", raw["event"])
+	}
+	if raw["task_id"] != "TASK-001-001" {
+		t.Errorf("task_id = %q, want TASK-001-001", raw["task_id"])
 	}
 	if raw["input_tokens"] != float64(12000) {
 		t.Errorf("input_tokens = %v, want 12000", raw["input_tokens"])
