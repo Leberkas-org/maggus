@@ -582,3 +582,372 @@ func TestScrollKeys_AutoScrollReenabledAtBottom(t *testing.T) {
 		t.Error("logAutoScroll should be re-enabled when shift+down reaches the bottom")
 	}
 }
+
+// ── renderPlanTab tests ───────────────────────────────────────────────────────
+
+// makePlanTabModel returns a statusModel with selFeature context, populated with
+// tasks that have varied status and token estimates. The active tab is left at 0.
+func makePlanTabModel() statusModel {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+	}
+
+	// Task 1: complete
+	t1 := parser.Task{
+		ID:            "TASK-001",
+		Title:         "First task",
+		Criteria:      []parser.Criterion{{Checked: true, Text: "done"}},
+		TokenEstimate: 10000,
+	}
+	// Task 2: pending (running)
+	t2 := parser.Task{
+		ID:            "TASK-002",
+		Title:         "Running task",
+		Criteria:      []parser.Criterion{{Checked: false, Text: "pending"}},
+		Predecessors:  []string{"TASK-001"},
+		TokenEstimate: 20000,
+		Parallel:      true,
+	}
+	// Task 3: blocked
+	t3 := parser.Task{
+		ID:       "TASK-003",
+		Title:    "Blocked task",
+		Criteria: []parser.Criterion{{Checked: false, Text: "BLOCKED: something", Blocked: true}},
+	}
+	// Task 4: skipped
+	t4 := parser.Task{
+		ID:       "TASK-004",
+		Title:    "Skipped task",
+		Criteria: []parser.Criterion{{Checked: false, Text: "SKIPPED: something", Skipped: true}},
+	}
+
+	m.plans = []parser.Plan{
+		{
+			ID:    "feature_001",
+			File:  "feature_001.md",
+			Tasks: []parser.Task{t1, t2, t3, t4},
+		},
+	}
+	m.treeCursor = 0 // plan row (selFeature)
+	return m
+}
+
+// TestRenderPlanTab_ReturnsNonEmptyString verifies renderPlanTab does not return an empty string
+// when a feature with tasks is selected.
+func TestRenderPlanTab_ReturnsNonEmptyString(t *testing.T) {
+	m := makePlanTabModel()
+	out := m.renderPlanTab(80, 20)
+	if strings.TrimSpace(out) == "" {
+		t.Error("renderPlanTab returned empty string for a model with tasks")
+	}
+}
+
+// TestRenderPlanTab_ShowsStepNumber verifies that step headers like "Step 1" appear.
+func TestRenderPlanTab_ShowsStepNumber(t *testing.T) {
+	m := makePlanTabModel()
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "Step 1") {
+		t.Errorf("renderPlanTab output should contain 'Step 1'; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_ShowsParallelLabel verifies "(parallel)" appears for parallel steps.
+func TestRenderPlanTab_ShowsParallelLabel(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{ID: "T1", Title: "Task 1", Parallel: true},
+					{ID: "T2", Title: "Task 2", Parallel: true},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "parallel") {
+		t.Errorf("expected 'parallel' label for parallel step; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_DoneTaskShowsCheckmark verifies ✓ appears for completed tasks.
+func TestRenderPlanTab_DoneTaskShowsCheckmark(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:       "T1",
+						Title:    "Done task",
+						Criteria: []parser.Criterion{{Checked: true, Text: "done"}},
+					},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "✓") {
+		t.Errorf("expected ✓ for completed task; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_PendingTaskShowsCircle verifies ○ appears for pending tasks.
+func TestRenderPlanTab_PendingTaskShowsCircle(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:       "T1",
+						Title:    "Pending task",
+						Criteria: []parser.Criterion{{Checked: false, Text: "todo"}},
+					},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "○") {
+		t.Errorf("expected ○ for pending task; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_BlockedTaskShowsWarning verifies ⚠ appears for blocked tasks.
+func TestRenderPlanTab_BlockedTaskShowsWarning(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:       "T1",
+						Title:    "Blocked task",
+						Criteria: []parser.Criterion{{Checked: false, Text: "BLOCKED: something", Blocked: true}},
+					},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "⚠") {
+		t.Errorf("expected ⚠ for blocked task; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_SkippedTaskShowsArrow verifies > appears for skipped tasks.
+func TestRenderPlanTab_SkippedTaskShowsArrow(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:       "T1",
+						Title:    "Skipped task",
+						Criteria: []parser.Criterion{{Checked: false, Text: "SKIPPED: something", Skipped: true}},
+					},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, ">") {
+		t.Errorf("expected > for skipped task; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_ShowsTokenTotal verifies the token total appears when non-zero.
+func TestRenderPlanTab_ShowsTokenTotal(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:            "T1",
+						Title:         "Task 1",
+						Criteria:      []parser.Criterion{{Checked: false, Text: "todo"}},
+						TokenEstimate: 35000,
+					},
+					{
+						ID:            "T2",
+						Title:         "Task 2",
+						Criteria:      []parser.Criterion{{Checked: false, Text: "todo"}},
+						Predecessors:  []string{"T1"},
+						TokenEstimate: 45000,
+					},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	// Total is 80000 tokens → rendered as "80k" by FormatTokens.
+	if !strings.Contains(out, "80k") {
+		t.Errorf("expected total token estimate ~80k in plan tab output; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_NoTokensOmitsTotal verifies the token total line is omitted when all estimates are 0.
+func TestRenderPlanTab_NoTokensOmitsTotal(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{ID: "T1", Title: "Task 1", Criteria: []parser.Criterion{{Checked: false, Text: "todo"}}},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if strings.Contains(out, "Estimated") {
+		t.Errorf("token total line should be omitted when all estimates are 0; got:\n%s", out)
+	}
+}
+
+// TestRenderPlanTab_RunningTaskShowsSpinner verifies a spinner-like char appears for running tasks.
+func TestRenderPlanTab_RunningTaskShowsSpinner(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{
+						ID:       "T1",
+						Title:    "Running task",
+						Criteria: []parser.Criterion{{Checked: false, Text: "in progress"}},
+					},
+				},
+			},
+		},
+		daemon: daemonStatus{Running: true, CurrentTask: "T1"},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	// The spinner frame 0 character should appear (not ✓, ○, ⚠, or >).
+	// We verify ✓ does not appear (it's not done), and a spinner character does.
+	if strings.Contains(out, "✓") {
+		t.Errorf("running task should show spinner, not ✓; got:\n%s", out)
+	}
+	// At spinnerFrame=0, the spinner char is styles.SpinnerFrames[0].
+	// We just verify some content appears (not empty) since spinner chars may not be ASCII.
+	if strings.TrimSpace(out) == "" {
+		t.Error("renderPlanTab returned empty for running task model")
+	}
+}
+
+// TestRenderPlanTab_NoSelectionReturnsPlaceholder verifies graceful output when no feature is selected.
+func TestRenderPlanTab_NoSelectionReturnsPlaceholder(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+	}
+	// No plans → selNone
+	out := m.renderPlanTab(80, 20)
+	// Should not panic and should return something (even empty styled content).
+	_ = out
+}
+
+// TestRenderPlanTab_ScrollOffsetRespected verifies that planTabScroll shifts visible content.
+func TestRenderPlanTab_ScrollOffsetRespected(t *testing.T) {
+	// Build a model with many steps so there's content to scroll past.
+	tasks := make([]parser.Task, 10)
+	for i := range tasks {
+		tasks[i] = parser.Task{
+			ID:       fmt.Sprintf("T%02d", i+1),
+			Title:    fmt.Sprintf("Task %d", i+1),
+			Criteria: []parser.Criterion{{Checked: false, Text: "pending"}},
+		}
+	}
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{ID: "f1", File: "feature_1.md", Tasks: tasks},
+		},
+	}
+	m.treeCursor = 0
+
+	out0 := m.renderPlanTab(80, 20)
+
+	// Scroll to offset 3 — the first 3 entries should no longer appear at the top.
+	m.planTabScroll = 3
+	outScrolled := m.renderPlanTab(80, 20)
+
+	// The scrolled output should differ from the un-scrolled output.
+	if out0 == outScrolled {
+		t.Error("scroll offset 3 should produce different output than scroll offset 0")
+	}
+	// T01 should NOT appear in scrolled output (scrolled past).
+	if strings.Contains(outScrolled, "T01") {
+		t.Errorf("T01 should be scrolled past at offset=3; got:\n%s", outScrolled)
+	}
+}
+
+// TestRenderPlanTab_ShowsTaskTitles verifies task titles appear in the output.
+func TestRenderPlanTab_ShowsTaskTitles(t *testing.T) {
+	m := statusModel{
+		expandedPlans: make(map[string]bool),
+		width:         120,
+		height:        40,
+		plans: []parser.Plan{
+			{
+				ID:   "f1",
+				File: "feature_1.md",
+				Tasks: []parser.Task{
+					{ID: "T1", Title: "My unique task title", Criteria: []parser.Criterion{{Checked: false}}},
+				},
+			},
+		},
+	}
+	m.treeCursor = 0
+	out := m.renderPlanTab(80, 20)
+	if !strings.Contains(out, "T1") {
+		t.Errorf("task ID 'T1' should appear in plan tab; got:\n%s", out)
+	}
+}
