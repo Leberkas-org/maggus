@@ -1721,9 +1721,9 @@ func TestMigrateApprovalKeys_PreventsStalePrune(t *testing.T) {
 	}
 }
 
-func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
-	// In opt-out mode, plan with no approval entry is approved by default.
-	// Pressing 'a' must write explicit true, NOT false (additive-only toggle).
+func TestHandleApproveToggle_OptIn_NoEntry_WritesTrue(t *testing.T) {
+	// In opt-in mode, plan with no approval entry is unapproved by default.
+	// Pressing 'a' must write explicit true (additive-only toggle).
 	dir := setupApproveDir(t)
 	// UUID must use hex characters only ([0-9a-f-]) so ParseMaggusID can parse it.
 	const uuid = "00000001-0000-4000-8000-000000000001"
@@ -1738,7 +1738,7 @@ func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
 		dir:              dir,
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{}, // no entry
-		approvalRequired: false,                // opt-out mode
+		approvalRequired: true,                 // opt-in mode
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -1755,6 +1755,42 @@ func TestHandleApproveToggle_NoEntry_OptOut_WritesTrue(t *testing.T) {
 	}
 	if newM.statusNote != "feature approved" {
 		t.Errorf("expected 'feature approved' note, got: %q", newM.statusNote)
+	}
+}
+
+func TestHandleApproveToggle_OptOutMode_IsNoop(t *testing.T) {
+	// In opt-out mode, pressing 'a' should be a no-op: sets statusNote and does not write.
+	dir := setupApproveDir(t)
+	const uuid = "00000099-0000-4000-8000-000000000099"
+	writeApproveFeature(t, dir, "feature_001.md", uuid)
+
+	plan := parser.Plan{
+		ID:       "feature_001",
+		MaggusID: uuid,
+		File:     filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+	}
+	m := statusModel{
+		dir:              dir,
+		plans:            []parser.Plan{plan},
+		approvals:        approval.Approvals{},
+		approvalRequired: false, // opt-out mode
+		featureStore:     stores.NewFileFeatureStore(dir),
+		bugStore:         stores.NewFileBugStore(dir),
+	}
+
+	result, _ := m.handleApproveToggle()
+	newM := result.(statusModel)
+
+	// No write should have happened.
+	a, err := approval.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a) != 0 {
+		t.Errorf("expected no writes in opt-out mode, got approvals: %v", a)
+	}
+	if newM.statusNote != "approval not required (opt-out mode)" {
+		t.Errorf("expected opt-out note, got: %q", newM.statusNote)
 	}
 }
 
@@ -1776,7 +1812,7 @@ func TestHandleApproveToggle_ExplicitTrue_RemovesEntry(t *testing.T) {
 		dir:              dir,
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{uuid: true},
-		approvalRequired: false,
+		approvalRequired: true, // opt-in mode
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -1814,7 +1850,7 @@ func TestHandleApproveToggle_ExplicitFalse_ReapprovesWithTrue(t *testing.T) {
 		dir:              dir,
 		plans:            []parser.Plan{plan},
 		approvals:        approval.Approvals{uuid: false},
-		approvalRequired: false,
+		approvalRequired: true, // opt-in mode
 		featureStore:     stores.NewFileFeatureStore(dir),
 		bugStore:         stores.NewFileBugStore(dir),
 	}
@@ -2033,6 +2069,82 @@ func TestIsTaskRunning(t *testing.T) {
 		}
 		if m.isTaskRunning("TASK-002") {
 			t.Error("isTaskRunning should be false for completed dispatched worker")
+		}
+	})
+
+	t.Run("snapshot with matching task and non-terminal status returns true", func(t *testing.T) {
+		m := statusModel{
+			daemon: daemonStatus{Running: true, CurrentTask: "TASK-999"}, // JSONL says different task
+			snapshot: &runlog.StateSnapshot{
+				TaskID: "TASK-001",
+				Status: "Running",
+			},
+		}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be true when snapshot task matches and status is non-terminal")
+		}
+		// JSONL says TASK-999 is running, but snapshot overrides
+		if m.isTaskRunning("TASK-999") {
+			t.Error("isTaskRunning should be false for JSONL task when snapshot points elsewhere")
+		}
+	})
+
+	t.Run("snapshot with terminal status returns false", func(t *testing.T) {
+		for _, status := range []string{"Done", "Failed", "Interrupted"} {
+			m := statusModel{
+				daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"},
+				snapshot: &runlog.StateSnapshot{
+					TaskID: "TASK-001",
+					Status: status,
+				},
+			}
+			if m.isTaskRunning("TASK-001") {
+				t.Errorf("isTaskRunning should be false when snapshot status is %q (terminal)", status)
+			}
+		}
+	})
+
+	t.Run("snapshot with empty task_id returns false (no false positives)", func(t *testing.T) {
+		m := statusModel{
+			daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"},
+			snapshot: &runlog.StateSnapshot{
+				TaskID: "",
+				Status: "Running",
+			},
+		}
+		if m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be false when snapshot has empty task_id")
+		}
+	})
+
+	t.Run("no snapshot falls back to JSONL daemon state", func(t *testing.T) {
+		m := statusModel{
+			daemon:   daemonStatus{Running: true, CurrentTask: "TASK-001"},
+			snapshot: nil,
+		}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should fall back to daemon.CurrentTask when no snapshot")
+		}
+		if m.isTaskRunning("TASK-002") {
+			t.Error("isTaskRunning should be false for non-matching JSONL task when no snapshot")
+		}
+	})
+
+	t.Run("worker index takes precedence over snapshot for parallel mode", func(t *testing.T) {
+		// When a workerIndex entry says "working", it should return true even if
+		// the main snapshot points to a different task (parallel mode).
+		m := statusModel{
+			daemon: daemonStatus{Running: true},
+			snapshot: &runlog.StateSnapshot{
+				TaskID: "TASK-002",
+				Status: "Running",
+			},
+			workerIndex: []runlog.WorkerIndexEntry{
+				{TaskID: "TASK-001", Status: "working"},
+			},
+		}
+		if !m.isTaskRunning("TASK-001") {
+			t.Error("isTaskRunning should be true for working worker even when snapshot points elsewhere")
 		}
 	})
 }
@@ -2668,5 +2780,66 @@ func TestStatusSplitFooter_DetailView_AltRHint_DaemonNotRunning(t *testing.T) {
 	}
 	if strings.Contains(footer, "alt+r: dispatch") {
 		t.Errorf("expected no 'alt+r: dispatch' when daemon not running, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_HidesApproveHintWhenOptOut(t *testing.T) {
+	// In opt-out mode, "a: approve" hint must not appear in the footer.
+	plan := parser.Plan{ID: "feature_001", Completed: false}
+	m := statusModel{
+		plans:            []parser.Plan{plan},
+		approvalRequired: false, // opt-out mode
+	}
+	footer := m.statusSplitFooter()
+	if strings.Contains(footer, "a: approve") {
+		t.Errorf("expected 'a: approve' hint to be hidden in opt-out mode, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_ShowsApproveHintWhenOptIn(t *testing.T) {
+	// In opt-in mode, "a: approve" hint must appear in the footer.
+	plan := parser.Plan{ID: "feature_001", Completed: false}
+	m := statusModel{
+		plans:            []parser.Plan{plan},
+		approvalRequired: true, // opt-in mode
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "a: approve") {
+		t.Errorf("expected 'a: approve' hint in opt-in mode, got: %q", footer)
+	}
+}
+
+func TestRenderLeftPane_BadgeOptOut_NeverShowsUnapprovedBadge(t *testing.T) {
+	// In opt-out mode, even an explicitly-unapproved plan shows ✓ (not ○) for its approval badge.
+	// The plan row must be visible — use enough height to show header + daemon + separator + plan rows.
+	plan := parser.Plan{
+		ID:    "feature_001",
+		File:  "feature_001.md",
+		Tasks: []parser.Task{{ID: "T1"}},
+	}
+	m := statusModel{
+		plans:            []parser.Plan{plan},
+		approvals:        approval.Approvals{"feature_001": false}, // explicitly unapproved
+		approvalRequired: false,                                    // opt-out mode
+	}
+	out := m.renderLeftPane(40, 10)
+	lines := strings.Split(out, "\n")
+
+	// Find the line that renders the feature plan (contains "feature_001").
+	var planLine string
+	for _, l := range lines {
+		if strings.Contains(l, "feature_001") {
+			planLine = l
+			break
+		}
+	}
+	if planLine == "" {
+		t.Fatalf("plan line for feature_001 not found in left pane output:\n%q", out)
+	}
+	if !strings.Contains(planLine, "✓") {
+		t.Errorf("expected ✓ badge on plan line in opt-out mode, got: %q", planLine)
+	}
+	if strings.Contains(planLine, "○") {
+		t.Errorf("expected no ○ badge on plan line in opt-out mode, got: %q", planLine)
 	}
 }

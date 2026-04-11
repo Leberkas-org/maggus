@@ -265,10 +265,6 @@ func (m statusModel) selectionCtx() selectionContext {
 // isTaskRunning returns true when the given task ID is actively being worked on,
 // either by the sequential daemon, a parallel orchestrator worker, or a dispatched worker.
 func (m statusModel) isTaskRunning(taskID string) bool {
-	// Sequential mode: daemon is running and its current task matches.
-	if m.daemon.Running && m.daemon.CurrentTask == taskID {
-		return true
-	}
 	// Parallel orchestrator or dispatched workers: check the worker index for an
 	// active "working" entry. This works even when the daemon itself is not running.
 	for _, w := range m.workerIndex {
@@ -276,7 +272,20 @@ func (m statusModel) isTaskRunning(taskID string) bool {
 			return true
 		}
 	}
-	return false
+
+	// Sequential mode: use the snapshot as the primary source of truth when available.
+	// This ensures the spinner and Output tab always agree on whether a task is running.
+	if m.snapshot != nil {
+		if m.snapshot.TaskID == "" {
+			// Snapshot exists but has no task ID — no active task, avoid false positives.
+			return false
+		}
+		isTerminal := m.snapshot.Status == "Done" || m.snapshot.Status == "Failed" || m.snapshot.Status == "Interrupted"
+		return m.snapshot.TaskID == taskID && !isTerminal
+	}
+
+	// Fallback: no snapshot available — use the JSONL-derived daemon state.
+	return m.daemon.Running && m.daemon.CurrentTask == taskID
 }
 
 // availableTabs returns the ordered list of tab definitions for the current
