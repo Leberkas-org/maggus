@@ -118,8 +118,10 @@ func TestResolve_UnconfiguredGitRepo_AddNo(t *testing.T) {
 	if savedCfg.HasRepository(repoPath) {
 		t.Fatal("expected repo NOT to be added")
 	}
-	if savedCfg.LastOpened != repoPath {
-		t.Fatalf("expected last_opened=%s, got %q", repoPath, savedCfg.LastOpened)
+	// last_opened is not updated for unregistered repos (SetLastOpened only
+	// persists registered paths to prevent transient/worktree paths from being saved).
+	if savedCfg.LastOpened != "" {
+		t.Fatalf("expected last_opened to remain empty for unregistered repo, got %q", savedCfg.LastOpened)
 	}
 }
 
