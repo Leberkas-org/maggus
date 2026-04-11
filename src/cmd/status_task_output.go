@@ -151,18 +151,24 @@ func (m statusModel) renderScrollableToolList(sb *strings.Builder, toolLines []s
 
 // snapshotForSelectedTask returns the live StateSnapshot for the currently
 // selected running task. Per-worker snapshots (from parallel orchestrator or
-// dispatched workers) take precedence; falls back to the main daemon snapshot.
+// dispatched workers) take precedence; falls back to the main daemon snapshot
+// only when its TaskID matches the selected task.
 func (m statusModel) snapshotForSelectedTask() *runlog.StateSnapshot {
 	task := m.selectedTask()
 	if task == nil {
-		return m.snapshot
+		return nil
 	}
 	// Per-worker snapshot takes precedence (parallel orchestrator or dispatched workers).
 	if snap, ok := m.workerSnapshots[task.ID]; ok {
 		return snap
 	}
-	// Sequential daemon mode: use main snapshot.
-	return m.snapshot
+	// Sequential daemon mode: only return the main snapshot when its TaskID
+	// matches the selected task. A mismatched TaskID means the snapshot belongs
+	// to a different task (e.g. stale data from a previous run) and must not be shown.
+	if m.snapshot != nil && m.snapshot.TaskID == task.ID {
+		return m.snapshot
+	}
+	return nil
 }
 
 // spinnerFrameForTask returns the spinner frame index for the given task ID.
