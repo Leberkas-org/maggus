@@ -32,12 +32,24 @@ var errStopAfterTask = errors.New("stop-after-task")
 func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 	dir := wc.dir
 
-	// Write daemon PID so 'maggus stop' can find this process.
-	if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
-		cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
+	// Dispatched workers don't write a PID file — the main daemon owns it.
+	if dispatchRepoFlag == "" {
+		if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
+			cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
+		}
+		defer removeDaemonPID(dir)
 	}
-	defer removeDaemonPID(dir)
 	defer removeDaemonStopFile(dir)
+
+	// Register in the workers index if this is a dispatched worker.
+	if dispatchRepoFlag != "" && taskFlag != "" {
+		_ = runlog.UpsertWorkerEntry(dispatchRepoFlag, runlog.WorkerIndexEntry{
+			TaskID:    taskFlag,
+			TaskTitle: taskFlag,
+			Status:    "working",
+			StartedAt: time.Now().UTC().Format(time.RFC3339),
+		})
+	}
 
 	// Signal handling — shared across all cycles.
 	sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -278,9 +290,11 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
-		snapshotDir:   dir,
-		snapshotRunID: runID,
-		runStartedAt:  setup.startTime,
+		snapshotDir:     dir,
+		snapshotRunID:   runID,
+		runStartedAt:    setup.startTime,
+		dispatchRepoDir: dispatchRepoFlag,
+		dispatchTaskID:  taskFlag,
 	}
 	dm.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
 		runLogger.ToolUse(taskID, toolType, params)

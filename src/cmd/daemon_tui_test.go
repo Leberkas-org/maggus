@@ -166,6 +166,113 @@ func TestNullTUIModel_StartTimeSet(t *testing.T) {
 	}
 }
 
+func TestNullTUIModel_DispatchMode_WritesPerWorkerSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	runID := "dispatch-run-001"
+	taskID := "TASK-045-001"
+
+	dm := nullTUIModel{
+		snapshotDir:     dir, // local dir (unused in dispatch mode)
+		snapshotRunID:   runID,
+		dispatchRepoDir: dir,
+		dispatchTaskID:  taskID,
+		runStartedAt:    time.Now(),
+	}
+
+	// Start iteration.
+	updated, _ := dm.Update(IterationStartMsg{
+		TaskID:    taskID,
+		TaskTitle: "Dispatch test task",
+	})
+	dm = updated.(nullTUIModel)
+
+	// Send a tool use event.
+	updated, _ = dm.Update(agent.ToolMsg{
+		Type:        "Read",
+		Description: "Read: test.go",
+		Timestamp:   time.Now(),
+	})
+	dm = updated.(nullTUIModel)
+
+	// Verify per-worker snapshot was written (not main state.json).
+	workerSnap, err := runlog.ReadWorkerSnapshot(dir, taskID)
+	if err != nil {
+		t.Fatalf("per-worker snapshot not found: %v", err)
+	}
+	if workerSnap.TaskID != taskID {
+		t.Errorf("worker snapshot TaskID = %q, want %q", workerSnap.TaskID, taskID)
+	}
+	if len(workerSnap.ToolEntries) != 1 {
+		t.Errorf("worker snapshot ToolEntries len = %d, want 1", len(workerSnap.ToolEntries))
+	}
+
+	// Verify main state.json was NOT written.
+	mainSnap := filepath.Join(dir, ".maggus", "runs", "state.json")
+	if _, err := os.Stat(mainSnap); err == nil {
+		t.Error("main state.json should not have been written in dispatch mode")
+	}
+}
+
+func TestNullTUIModel_DispatchMode_FinalizeWorkerDone(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-002"
+
+	// Write initial workers index.
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	dm := nullTUIModel{
+		snapshotRunID:   "dispatch-run-002",
+		dispatchRepoDir: dir,
+		dispatchTaskID:  taskID,
+		runStartedAt:    time.Now(),
+		commits:         []string{"feat: task completed"},
+	}
+
+	// Trigger QuitMsg which calls finalizeDispatchWorker.
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	// Verify worker status was updated to "done".
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "done" {
+		t.Errorf("worker status = %q, want %q", workers[0].Status, "done")
+	}
+}
+
+func TestNullTUIModel_DispatchMode_FinalizeWorkerFailed(t *testing.T) {
+	dir := t.TempDir()
+	taskID := "TASK-045-003"
+
+	// Write initial workers index.
+	_ = runlog.WriteWorkersIndex(dir, []runlog.WorkerIndexEntry{
+		{TaskID: taskID, Status: "working"},
+	})
+
+	dm := nullTUIModel{
+		snapshotRunID:   "dispatch-run-003",
+		dispatchRepoDir: dir,
+		dispatchTaskID:  taskID,
+		runStartedAt:    time.Now(),
+		// No commits — worker should be marked as failed.
+	}
+
+	updated, _ := dm.Update(QuitMsg{})
+	_ = updated
+
+	workers := runlog.ReadWorkersIndex(dir)
+	if len(workers) != 1 {
+		t.Fatalf("expected 1 worker, got %d", len(workers))
+	}
+	if workers[0].Status != "failed" {
+		t.Errorf("worker status = %q, want %q (no commits = failed)", workers[0].Status, "failed")
+	}
+}
+
 func TestNullTUIModel_SnapshotContainsTimestamps(t *testing.T) {
 	dir := t.TempDir()
 	runID := "test-snap-ts"
