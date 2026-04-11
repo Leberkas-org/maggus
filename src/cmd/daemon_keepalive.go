@@ -280,10 +280,10 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	var planBranch string
 
 	if wc.parallel {
-		// Parallel mode: set up a plan-level branch (feature/maggus-NNN).
+		// Parallel mode: set up a plan-level branch (feature/feat-NNN).
 		var planBranchMsg string
 		var pbErr error
-		planBranch, planBranchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID)
+		planBranch, planBranchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
 		if pbErr != nil {
 			return false, fmt.Errorf("setup plan branch: %w", pbErr)
 		}
