@@ -145,12 +145,19 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // writeSnapshot writes the current state to state.json (normal daemon) or
 // per-worker snapshot state-<taskID>.json (dispatched worker).
 func (m *nullTUIModel) writeSnapshot() {
+	status := m.status
+	if m.taskID == "" && m.dispatchTaskID == "" {
+		// No active task in either sequential or dispatch mode: override status to
+		// "Idle" so readers can detect the absent task explicitly rather than
+		// encountering a silently empty task_id field.
+		status = "Idle"
+	}
 	snap := runlog.StateSnapshot{
 		RunID:          m.snapshotRunID,
 		TaskID:         m.taskID,
 		TaskTitle:      m.taskTitle,
 		ItemTitle:      m.itemTitle,
-		Status:         m.status,
+		Status:         status,
 		ToolEntries:    m.toolEntries,
 		TokenInput:     m.iterInput,
 		TokenOutput:    m.iterOutput,
