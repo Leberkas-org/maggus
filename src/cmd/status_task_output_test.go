@@ -233,6 +233,48 @@ func TestSnapshotForSelectedTask_Parallel(t *testing.T) {
 	}
 }
 
+func TestSnapshotForSelectedTask_StaleSnapshot_ReturnsNil(t *testing.T) {
+	// Main snapshot has a TaskID that does NOT match the selected task.
+	// snapshotForSelectedTask must return nil instead of the stale snapshot.
+	staleSnap := &runlog.StateSnapshot{TaskID: "TASK-OTHER", Status: "Done"}
+	m := statusModel{
+		snapshot:      staleSnap,
+		expandedPlans: make(map[string]bool),
+		plans: []parser.Plan{
+			{ID: "f1", Tasks: []parser.Task{{ID: "TASK-001", Title: "T1"}}},
+		},
+		daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"},
+	}
+	m.expandedPlans["f1"] = true
+	m.treeCursor = 1 // task row
+
+	got := m.snapshotForSelectedTask()
+	if got != nil {
+		t.Errorf("expected nil for stale snapshot (TaskID %q != TASK-001), got TaskID=%q", staleSnap.TaskID, got.TaskID)
+	}
+}
+
+func TestSnapshotForSelectedTask_EmptySnapshotTaskID_ReturnsNil(t *testing.T) {
+	// Main snapshot has TaskID "" (written before IterationStartMsg set the task ID).
+	// snapshotForSelectedTask must return nil so no stale data is displayed.
+	emptySnap := &runlog.StateSnapshot{TaskID: "", Status: "Running"}
+	m := statusModel{
+		snapshot:      emptySnap,
+		expandedPlans: make(map[string]bool),
+		plans: []parser.Plan{
+			{ID: "f1", Tasks: []parser.Task{{ID: "TASK-001", Title: "T1"}}},
+		},
+		daemon: daemonStatus{Running: true, CurrentTask: "TASK-001"},
+	}
+	m.expandedPlans["f1"] = true
+	m.treeCursor = 1 // task row
+
+	got := m.snapshotForSelectedTask()
+	if got != nil {
+		t.Errorf("expected nil for snapshot with empty TaskID, got TaskID=%q", got.TaskID)
+	}
+}
+
 func TestSnapshotForSelectedTask_DispatchedWorker(t *testing.T) {
 	// Dispatched worker: daemon is NOT running, but there is a per-worker snapshot.
 	workerSnap := &runlog.StateSnapshot{TaskID: "TASK-001", Status: "Working"}
