@@ -162,6 +162,258 @@ func TestFindNextIncomplete(t *testing.T) {
 	}
 }
 
+func TestParseFile_TokenEstimate(t *testing.T) {
+	const content = `# Feature 001: Token Estimate Test
+
+## User Stories
+
+### TASK-001: First task
+**Description:** A task with token estimate.
+
+**Token Estimate:** ~35k tokens
+**Predecessors:** none
+**Parallel:** no
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+
+### TASK-002: Second task
+
+**Token Estimate:** ~20k tokens
+
+**Acceptance Criteria:**
+- [ ] Criterion B
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+	if tasks[0].TokenEstimate != 35000 {
+		t.Errorf("task 0 TokenEstimate = %d, want 35000", tasks[0].TokenEstimate)
+	}
+	if tasks[1].TokenEstimate != 20000 {
+		t.Errorf("task 1 TokenEstimate = %d, want 20000", tasks[1].TokenEstimate)
+	}
+}
+
+func TestParseTokenEstimateK(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"~35k tokens", 35000},
+		{"~45k tokens", 45000},
+		{"~100k", 100000},
+		{"~2k tokens", 2000},
+		{"35000", 35000},
+		{"~0k", 0},
+		{"", 0},
+		{"none", 0},
+		{"~10k tokens extra words", 10000},
+	}
+	for _, tt := range tests {
+		got := parseTokenEstimateK(tt.input)
+		if got != tt.want {
+			t.Errorf("parseTokenEstimateK(%q) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestParseFile_TokenEstimate_MissingField(t *testing.T) {
+	const content = `# Feature 001
+
+### TASK-001: No estimate
+**Description:** Task without token estimate.
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].TokenEstimate != 0 {
+		t.Errorf("task without Token Estimate should have TokenEstimate=0, got %d", tasks[0].TokenEstimate)
+	}
+}
+
+func TestParseFile_TokenEstimate_NoKSuffix(t *testing.T) {
+	const content = `# Feature 001
+
+### TASK-001: Plain number estimate
+**Token Estimate:** 50000
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].TokenEstimate != 50000 {
+		t.Errorf("task TokenEstimate = %d, want 50000", tasks[0].TokenEstimate)
+	}
+}
+
+func TestParseFile_TokenEstimate_ZeroK(t *testing.T) {
+	const content = `# Feature 001
+
+### TASK-001: Zero estimate
+**Token Estimate:** ~0k tokens
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].TokenEstimate != 0 {
+		t.Errorf("expected 0, got %d", tasks[0].TokenEstimate)
+	}
+}
+
+func TestParseFile_Predecessors_AndParallel(t *testing.T) {
+	const content = `# Feature 001
+
+### TASK-001: First task
+**Parallel:** yes — can run alongside others
+
+**Predecessors:** TASK-000-001, TASK-000-002
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+
+### TASK-002: Second task
+**Parallel:** no
+
+**Predecessors:** none
+
+**Acceptance Criteria:**
+- [ ] Criterion B
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(tasks))
+	}
+	if !tasks[0].Parallel {
+		t.Error("task 0: expected Parallel=true")
+	}
+	if len(tasks[0].Predecessors) != 2 {
+		t.Errorf("task 0: expected 2 predecessors, got %d: %v", len(tasks[0].Predecessors), tasks[0].Predecessors)
+	}
+	if tasks[1].Parallel {
+		t.Error("task 1: expected Parallel=false")
+	}
+	if len(tasks[1].Predecessors) != 0 {
+		t.Errorf("task 1: expected 0 predecessors, got %d: %v", len(tasks[1].Predecessors), tasks[1].Predecessors)
+	}
+}
+
+func TestParseFile_Successors_IgnoredField(t *testing.T) {
+	// **Successors:** is not a task-level field stored in Task — verify it doesn't break parsing.
+	const content = `# Feature 001
+
+### TASK-001: Task with successors field
+**Token Estimate:** ~10k tokens
+**Successors:** TASK-002
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].TokenEstimate != 10000 {
+		t.Errorf("TokenEstimate = %d, want 10000", tasks[0].TokenEstimate)
+	}
+}
+
+func TestParseFile_AllMetadata(t *testing.T) {
+	// Verify all metadata fields are parsed correctly from a realistic task block.
+	const content = `# Feature 001
+
+### TASK-001: Full metadata task
+**Description:** As a user, I want everything.
+
+**Token Estimate:** ~50k tokens
+**Predecessors:** TASK-000-001
+**Parallel:** yes
+**Model:** opus
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	t0 := tasks[0]
+	if t0.TokenEstimate != 50000 {
+		t.Errorf("TokenEstimate = %d, want 50000", t0.TokenEstimate)
+	}
+	if len(t0.Predecessors) != 1 || t0.Predecessors[0] != "TASK-000-001" {
+		t.Errorf("Predecessors = %v, want [TASK-000-001]", t0.Predecessors)
+	}
+	if !t0.Parallel {
+		t.Error("expected Parallel=true")
+	}
+	if t0.Model != "opus" {
+		t.Errorf("Model = %q, want 'opus'", t0.Model)
+	}
+}
+
+func TestParseFile_TokenEstimate_NilStringInput(t *testing.T) {
+	// Regression: parseTokenEstimateK with completely non-numeric input returns 0.
+	got := parseTokenEstimateK("not-a-number")
+	if got != 0 {
+		t.Errorf("parseTokenEstimateK(\"not-a-number\") = %d, want 0", got)
+	}
+}
+
 func TestFindNextIncomplete_AllDone(t *testing.T) {
 	tasks := []Task{
 		{ID: "TASK-001", Criteria: []Criterion{{Checked: true}}},

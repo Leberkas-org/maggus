@@ -106,6 +106,9 @@ type statusModel struct {
 	// Live log panel scroll state
 	logScroll     int
 	logAutoScroll bool
+
+	// Plan tab scroll offset (number of rendered lines scrolled past the top)
+	planTabScroll int
 	daemon        daemonStatus
 
 	// Rich live view from state.json

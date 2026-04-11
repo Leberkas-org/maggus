@@ -88,14 +88,48 @@ type Criterion struct {
 }
 
 type Task struct {
-	ID           string
-	Title        string
-	Description  string
-	Model        string
-	Parallel     bool     // true when "Parallel: yes" is set in the task metadata
-	Predecessors []string // task IDs from "Predecessors:" line (e.g. ["TASK-038-001", "TASK-038-004"])
-	Criteria     []Criterion
-	SourceFile   string
+	ID             string
+	Title          string
+	Description    string
+	Model          string
+	Parallel       bool     // true when "Parallel: yes" is set in the task metadata
+	Predecessors   []string // task IDs from "Predecessors:" line (e.g. ["TASK-038-001", "TASK-038-004"])
+	Criteria       []Criterion
+	SourceFile     string
+	TokenEstimate  int // parsed from "**Token Estimate:** ~NNk tokens"; 0 when absent
+}
+
+// parseTokenEstimateK parses a token estimate string like "~35k tokens" or "~45k"
+// and returns the integer value (35000, 45000, etc.). Returns 0 on any parse failure
+// or when the input is empty or non-numeric. Supports:
+//   - "~NNk tokens" or "~NNk" → NN * 1000
+//   - plain integer strings → parsed directly
+func parseTokenEstimateK(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	// Strip a leading tilde.
+	s = strings.TrimPrefix(s, "~")
+	// Take only the first whitespace-separated token.
+	if fields := strings.Fields(s); len(fields) > 0 {
+		s = fields[0]
+	}
+	// Check for a "k" suffix (case-insensitive).
+	if strings.HasSuffix(strings.ToLower(s), "k") {
+		numStr := s[:len(s)-1]
+		n, err := strconv.Atoi(numStr)
+		if err != nil {
+			return 0
+		}
+		return n * 1000
+	}
+	// Try plain integer.
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 type Feature struct {
@@ -244,6 +278,20 @@ func ParseFile(path string) ([]Task, error) {
 					}
 				}
 			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Token Estimate:**") {
+			inDescription = false
+			value := strings.TrimPrefix(line, "**Token Estimate:**")
+			value = strings.TrimSpace(value)
+			current.TokenEstimate = parseTokenEstimateK(value)
+			continue
+		}
+
+		if strings.HasPrefix(line, "**Successors:**") {
+			// Successors are not stored on the Task; skip without ending description.
+			inDescription = false
 			continue
 		}
 

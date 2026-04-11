@@ -29,14 +29,14 @@ Add a "Plan" tab to the status view that appears when a feature is selected in t
 **Parallel:** yes — can run alongside nothing (single foundation task)
 
 **Acceptance Criteria:**
-- [ ] A new function `buildExecutionPlan(tasks []parser.Task) []executionStep` is created (in a new file `cmd/status_execution.go` or similar)
-- [ ] Each `executionStep` contains: step number, list of task IDs in this step, whether the step is parallel
-- [ ] Tasks with `Predecessors: none` are grouped into the first step(s) — parallel tasks together, sequential tasks as individual steps
-- [ ] Tasks whose predecessors are all in earlier steps are placed in the earliest possible step
-- [ ] Tasks with unresolvable predecessors (ID not found) are placed in a final "unresolved" group
-- [ ] The function handles: no tasks, single task, all parallel, all sequential, diamond dependencies, completed tasks
-- [ ] Unit tests cover each of the above cases
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] A new function `buildExecutionPlan(tasks []parser.Task) []executionStep` is created (in a new file `cmd/status_execution.go` or similar)
+- [x] Each `executionStep` contains: step number, list of task IDs in this step, whether the step is parallel
+- [x] Tasks with `Predecessors: none` are grouped into the first step(s) — parallel tasks together, sequential tasks as individual steps
+- [x] Tasks whose predecessors are all in earlier steps are placed in the earliest possible step
+- [x] Tasks with unresolvable predecessors (ID not found) are placed in a final "unresolved" group
+- [x] The function handles: no tasks, single task, all parallel, all sequential, diamond dependencies, completed tasks
+- [x] Unit tests cover each of the above cases
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-044-002: Render the Plan tab with execution order visualization
 **Description:** As a user viewing a feature in the status TUI, I want a Plan tab that shows the execution order so I can understand how tasks will be processed.
@@ -47,8 +47,8 @@ Add a "Plan" tab to the status view that appears when a feature is selected in t
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] A new `renderPlanTab(width, height int) string` method is added to `statusModel`
-- [ ] The Plan tab renders execution steps as a vertical list, e.g.:
+- [x] A new `renderPlanTab(width, height int) string` method is added to `statusModel`
+- [x] The Plan tab renders execution steps as a vertical list, e.g.:
   ```
   Step 1 (parallel)
     ✓ TASK-044-001  Compute execution order
@@ -57,12 +57,12 @@ Add a "Plan" tab to the status view that appears when a feature is selected in t
   Step 2
     ○ TASK-044-003  Wire up Plan tab
   ```
-- [ ] Each task row shows a status icon: `✓` done, spinner if running, `○` pending, `⚠` blocked, `>` skipped
-- [ ] Parallel steps are labeled "(parallel)" and show all tasks in the batch
-- [ ] Sequential steps show a single task
-- [ ] The total estimated tokens for the feature is shown at the bottom (sum of token estimates from plan file)
-- [ ] The view is scrollable if the plan is longer than the available height
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Each task row shows a status icon: `✓` done, spinner if running, `○` pending, `⚠` blocked, `>` skipped
+- [x] Parallel steps are labeled "(parallel)" and show all tasks in the batch
+- [x] Sequential steps show a single task
+- [x] The total estimated tokens for the feature is shown at the bottom (sum of token estimates from plan file)
+- [x] The view is scrollable if the plan is longer than the available height
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-044-003: Wire up Plan tab in the context-sensitive tab system
 **Description:** As a user, I want the Plan tab to appear when I select a feature in the left pane so I can access it alongside Summary, Details, and Metrics.
