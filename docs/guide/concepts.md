@@ -52,12 +52,19 @@ If no agent is configured, Maggus defaults to `claude` (Claude Code) for backwar
 
 ## Git Branch Behavior
 
-Maggus automatically manages branches to keep your main branch clean:
+Maggus automatically manages branches to keep your main branch clean.
 
-- If you're on a **protected branch** (`main`, `master`, or `dev`), Maggus creates a new branch before starting work. Feature tasks land on `feature/maggus-NNN/task-MMM` (e.g., `feature/maggus-042/task-003`); bug tasks land on `bugfix/maggus-bug-NNN/task-MMM` (e.g., `bugfix/maggus-bug-001/task-001`).
-- If you're already on a **non-protected branch**, Maggus works directly on it without creating a new one.
+**Protected branches** (`main`, `master`, `dev`): When the daemon starts on a protected branch, Maggus creates a plan branch for the feature or bug being worked on:
+- Feature plans: `feature/feat-NNN` (e.g., `feature/feat-042`)
+- Bug plans: `fix/bug-NNN` (e.g., `fix/bug-001`)
 
-This means you can either let Maggus manage branches automatically, or check out a specific branch beforehand to control where changes land.
+Each task within the plan then runs on its own task branch off the plan branch:
+- Feature tasks: `feature/maggus-NNN/task-MMM` (e.g., `feature/maggus-042/task-003`)
+- Bug tasks: `bugfix/maggus-bug-NNN/task-MMM` (e.g., `bugfix/maggus-bug-001/task-001`)
+
+**Non-protected branches**: If you are already on a non-protected branch, Maggus does **not** create a plan branch. It works directly on your current branch, branching task branches off it as needed.
+
+This means you can either let Maggus manage branches automatically from a protected base, or check out a specific branch beforehand to control where changes land.
 
 ## Stopping the Daemon
 

@@ -67,10 +67,10 @@ Also renames plan branch prefixes: `feature/feat-NNN` for features and `fix/bug-
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `docs/guide/concepts.md` Git Branch Behavior section updated: mentions `feature/feat-NNN` and `fix/bug-NNN` naming; explains that no plan branch is created on non-protected branches
-- [ ] `CLAUDE.md` gitbranch package description updated
-- [ ] `ARCHITECTURE.md` branch naming references updated if present
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `docs/guide/concepts.md` Git Branch Behavior section updated: mentions `feature/feat-NNN` and `fix/bug-NNN` naming; explains that no plan branch is created on non-protected branches
+- [x] `CLAUDE.md` gitbranch package description updated
+- [x] `ARCHITECTURE.md` branch naming references updated if present
+- [x] `go vet ./...` and `go test ./...` pass
 
 ## Task Dependency Graph
 

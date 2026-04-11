@@ -97,8 +97,9 @@ find next workable task
   ├── none found → done / blocked → exit
   │
   ▼
-create feature branch if on protected branch
-  (feature/maggus-NNN/task-MMM or bugfix/maggus-bug-NNN/task-MMM)
+create plan branch if on protected branch
+  (feature/feat-NNN for features, fix/bug-NNN for bugs)
+  no branch created when already on a non-protected branch
   │
   ▼
 build prompt
