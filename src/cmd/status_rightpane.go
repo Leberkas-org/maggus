@@ -393,6 +393,9 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 			} else if t.IsBlocked() {
 				icon = "⚠"
 				style = statusRedStyle
+			} else if t.IsSkipped() {
+				icon = ">"
+				style = lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
 			} else if t.ID == m.nextTaskID && t.SourceFile == m.nextTaskFile {
 				icon = "→"
 				style = statusCyanStyle

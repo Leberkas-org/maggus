@@ -15,6 +15,7 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 	totalTasks := 0
 	totalDone := 0
 	totalBlocked := 0
+	totalSkipped := 0
 	activeFeatures := 0
 	totalBugs := 0
 	activeBugs := 0
@@ -22,6 +23,7 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 		totalTasks += len(p.Tasks)
 		totalDone += p.DoneCount()
 		totalBlocked += p.BlockedCount()
+		totalSkipped += p.SkippedCount()
 		if p.IsBug {
 			totalBugs++
 			if !p.Completed {
@@ -33,7 +35,7 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 			}
 		}
 	}
-	totalPending := totalTasks - totalDone - totalBlocked
+	totalPending := totalTasks - totalDone - totalBlocked - totalSkipped
 	featureCount := len(plans) - totalBugs
 
 	headerParts := fmt.Sprintf("%d features (%d active)", featureCount, activeFeatures)
@@ -41,7 +43,11 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 		headerParts += fmt.Sprintf(", %d bugs (%d active)", totalBugs, activeBugs)
 	}
 	fmt.Fprintf(w, "Maggus Status — %s, %d tasks total\n\n", headerParts, totalTasks)
-	fmt.Fprintf(w, " Summary: %d/%d tasks complete · %d pending · %d blocked\n", totalDone, totalTasks, totalPending, totalBlocked)
+	summaryLine := fmt.Sprintf(" Summary: %d/%d tasks complete · %d pending · %d blocked", totalDone, totalTasks, totalPending, totalBlocked)
+	if totalSkipped > 0 {
+		summaryLine += fmt.Sprintf(" · %d skipped", totalSkipped)
+	}
+	fmt.Fprintln(w, summaryLine)
 	fmt.Fprintf(w, " Agent: %s\n", agentName)
 
 	for _, p := range plans {
@@ -68,6 +74,9 @@ func renderStatusPlain(w *strings.Builder, plans []parser.Plan, showAll bool, ne
 				prefix = "  "
 			} else if t.IsBlocked() {
 				icon = "[!]"
+				prefix = "  "
+			} else if t.IsSkipped() {
+				icon = "[>]"
 				prefix = "  "
 			} else if t.ID == nextTaskID && t.SourceFile == nextTaskFile {
 				icon = "o"

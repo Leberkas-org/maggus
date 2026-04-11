@@ -2411,11 +2411,27 @@ func TestStatusSplitFooter_ShowsStatusNote(t *testing.T) {
 }
 
 func TestStatusSplitFooter_ContainsSkipHint(t *testing.T) {
+	// Skip hint should appear when a task row is selected.
+	task := parser.Task{ID: "TASK-001-001", Title: "Test task",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
 	m := statusModel{
-		plans: []parser.Plan{{ID: "feature_001", File: "feature_001.md"}},
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row (0 = plan row, 1 = first task)
 	}
 	footer := m.statusSplitFooter()
 	if !strings.Contains(footer, "x: skip") {
-		t.Errorf("expected footer to contain 'x: skip/unskip' hint, got: %q", footer)
+		t.Errorf("expected footer to contain 'x: skip/unskip' hint when task selected, got: %q", footer)
+	}
+
+	// Skip hint should NOT appear when a plan row is selected.
+	mPlan := statusModel{
+		plans:      []parser.Plan{plan},
+		treeCursor: 0, // plan row
+	}
+	footerPlan := mPlan.statusSplitFooter()
+	if strings.Contains(footerPlan, "x: skip") {
+		t.Errorf("expected footer to NOT contain 'x: skip/unskip' hint when plan row selected, got: %q", footerPlan)
 	}
 }

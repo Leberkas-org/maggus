@@ -63,8 +63,9 @@ func (m statusModel) renderFeatureSummary(width, height int) string {
 	// ── Task breakdown ──
 	pending := 0
 	blocked := plan.BlockedCount()
+	skipped := plan.SkippedCount()
 	for _, t := range plan.Tasks {
-		if !t.IsComplete() && !t.IsBlocked() {
+		if !t.IsComplete() && !t.IsBlocked() && !t.IsSkipped() {
 			pending++
 		}
 	}
@@ -72,6 +73,7 @@ func (m statusModel) renderFeatureSummary(width, height int) string {
 	sb.WriteString(summaryRow(labelStyle, valueStyle, "  Done", fmt.Sprintf("%d", done)))
 	sb.WriteString(summaryRow(labelStyle, valueStyle, "  Pending", fmt.Sprintf("%d", pending)))
 	sb.WriteString(summaryRow(labelStyle, valueStyle, "  Blocked", fmt.Sprintf("%d", blocked)))
+	sb.WriteString(summaryRow(labelStyle, valueStyle, "  Skipped", fmt.Sprintf("%d", skipped)))
 
 	// ── Active daemon state (running on this feature) ──
 	activeTaskID, elapsed, spinnerStr := m.featureDaemonState(plan)
@@ -244,6 +246,9 @@ func taskStatusDisplay(task *parser.Task) (string, lipgloss.Style) {
 	}
 	if task.IsBlocked() {
 		return "⚠ Blocked", statusRedStyle
+	}
+	if task.IsSkipped() {
+		return "> Skipped", lipgloss.NewStyle().Foreground(styles.Muted)
 	}
 	return "○ Pending", lipgloss.NewStyle().Foreground(styles.Muted)
 }

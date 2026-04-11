@@ -264,6 +264,8 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else if task.IsComplete() {
 				spinStr = addBg(greenStyle).Render("✓")
+			} else if task.IsSkipped() {
+				spinStr = addBg(mutedStyle).Render(">")
 			} else {
 				spinStr = bgStr(" ")
 			}
@@ -291,6 +293,10 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			if isSelected {
 				taskIDRendered = addBg(whiteStyle).Render(taskIDStr)
 				taskTitleRendered = addBg(whiteStyle).Render(taskTitleStr)
+			} else if task.IsSkipped() {
+				skippedStyle := lipgloss.NewStyle().Foreground(styles.Muted).Faint(true)
+				taskIDRendered = skippedStyle.Render(taskIDStr)
+				taskTitleRendered = skippedStyle.Render(taskTitleStr)
 			} else {
 				taskIDRendered = mutedStyle.Render(taskIDStr)
 				taskTitleRendered = mutedStyle.Render(taskTitleStr)

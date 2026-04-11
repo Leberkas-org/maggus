@@ -126,12 +126,12 @@ For task skipping, users currently have no way to say "don't work on this task" 
 **Parallel:** no — needs skip functionality working first
 
 **Acceptance Criteria:**
-- [ ] Left pane tree: skipped tasks show `>` icon with a distinct style (e.g., dimmed or muted color, similar to how `~` shows for ignored)
-- [ ] Right pane task list (Details tab): skipped tasks show `[>]` marker
-- [ ] Status summary counts: skipped tasks are counted separately (e.g., "3 done, 2 pending, 1 blocked, 1 skipped")
-- [ ] Plain mode output (`--plain`): skipped tasks show `[>]` marker
-- [ ] Footer hints include `x: skip` when a task is selected in the left pane
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] Left pane tree: skipped tasks show `>` icon with a distinct style (e.g., dimmed or muted color, similar to how `~` shows for ignored)
+- [x] Right pane task list (Details tab): skipped tasks show `[>]` marker
+- [x] Status summary counts: skipped tasks are counted separately (e.g., "3 done, 2 pending, 1 blocked, 1 skipped")
+- [x] Plain mode output (`--plain`): skipped tasks show `[>]` marker
+- [x] Footer hints include `x: skip` when a task is selected in the left pane
+- [x] `go vet ./...` and `go test ./...` pass
 
 ### TASK-043-007: Update docs for new branch naming and skip status
 **Description:** As a user reading the docs, I want the documentation to reflect the new branch naming format and the skip feature.

@@ -170,6 +170,9 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 	} else if t.IsBlocked() {
 		statusText = "Blocked"
 		statusStyle = warningStyle
+	} else if t.IsSkipped() {
+		statusText = "Skipped"
+		statusStyle = mutedStyle
 	} else {
 		statusText = "Pending"
 		statusStyle = mutedStyle
@@ -211,6 +214,8 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 				checkbox = successStyle.Render("✓")
 			} else if c.Blocked {
 				checkbox = warningStyle.Render("⊘")
+			} else if c.Skipped {
+				checkbox = mutedStyle.Render(">")
 			} else {
 				checkbox = mutedStyle.Render("○")
 			}

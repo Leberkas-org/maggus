@@ -49,6 +49,17 @@ func (p *Plan) BlockedCount() int {
 	return n
 }
 
+// SkippedCount returns the count of incomplete tasks that are skipped.
+func (p *Plan) SkippedCount() int {
+	n := 0
+	for _, t := range p.Tasks {
+		if !t.IsComplete() && t.IsSkipped() {
+			n++
+		}
+	}
+	return n
+}
+
 // planIDFromPath extracts the Plan ID from a file path: the base filename with
 // both the ".md" extension and the "_completed" suffix stripped.
 // For example: ".maggus/features/feature_003_completed.md" → "feature_003"
