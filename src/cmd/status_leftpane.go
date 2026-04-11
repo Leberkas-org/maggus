@@ -191,7 +191,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			var badge string
 			if plan.Completed {
 				badge = addBg(mutedStyle).Render("✓")
-			} else if isPlanApproved(plan, m.approvals, m.approvalRequired) {
+			} else if !m.approvalRequired || isPlanApproved(plan, m.approvals, m.approvalRequired) {
 				badge = addBg(greenStyle).Render("✓")
 			} else {
 				badge = addBg(orangeStyle).Render("○")
@@ -260,7 +260,7 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 
 			// Spinner column (1 char, always reserved).
 			var spinStr string
-			if m.daemon.Running && !runIsTerminal && m.daemon.CurrentTask == task.ID {
+			if m.isTaskRunning(task.ID) {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
 			} else if task.IsComplete() {
 				spinStr = addBg(greenStyle).Render("✓")
