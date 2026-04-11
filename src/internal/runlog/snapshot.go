@@ -212,6 +212,41 @@ func RemoveWorkerSnapshot(dir, taskID string) {
 	os.Remove(target + ".tmp")
 }
 
+// PruneStaleWorkerEntries removes entries with terminal status (done/failed/blocked)
+// whose StartedAt timestamp is older than maxAge, or whose StartedAt is empty.
+// This prevents ghost workers from accumulating in the index across daemon restarts.
+// It is a no-op when the index file does not exist or contains no stale entries.
+func PruneStaleWorkerEntries(dir string, maxAge time.Duration) error {
+	existing := ReadWorkersIndex(dir)
+	if len(existing) == 0 {
+		return nil
+	}
+	cutoff := time.Now().Add(-maxAge)
+	var retained []WorkerIndexEntry
+	for _, w := range existing {
+		if isTerminalWorkerStatus(w.Status) {
+			if w.StartedAt == "" {
+				continue // no timestamp → treat as maximally stale
+			}
+			t, err := time.Parse(time.RFC3339, w.StartedAt)
+			if err != nil || t.Before(cutoff) {
+				continue // unparseable or older than maxAge → prune
+			}
+		}
+		retained = append(retained, w)
+	}
+	if len(retained) == len(existing) {
+		return nil // nothing changed
+	}
+	return WriteWorkersIndex(dir, retained)
+}
+
+// isTerminalWorkerStatus reports whether a worker status string represents a
+// completed state (done, failed, or blocked) that can be pruned when stale.
+func isTerminalWorkerStatus(status string) bool {
+	return status == "done" || status == "failed" || status == "blocked"
+}
+
 // UpsertWorkerEntry reads the workers index, adds or updates the entry for
 // taskID, and writes the result back. This is safe for use by external
 // processes (dispatched workers) that need to register alongside the daemon's

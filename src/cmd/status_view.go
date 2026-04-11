@@ -216,7 +216,9 @@ func (m statusModel) statusSplitFooter() string {
 	}
 	parts = append(parts, "pgup/pgdn: prev/next feature")
 	parts = append(parts, "enter: details")
-	parts = append(parts, "a: approve")
+	if m.approvalRequired {
+		parts = append(parts, "a: approve")
+	}
 	if m.selectedTask() != nil {
 		parts = append(parts, "x: skip/unskip")
 		if m.daemon.Running {

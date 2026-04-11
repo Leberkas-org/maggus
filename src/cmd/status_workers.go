@@ -10,6 +10,8 @@ import (
 // Sets m.workerIndex to nil when no workers are active (parallel orchestrator
 // or dispatched workers). Does not require the daemon to be running — dispatched
 // workers write to the same index independently of the daemon.
+// Entries whose per-worker snapshot file does not exist are skipped so ghost
+// workers from previous runs never appear in the TUI.
 func (m *statusModel) refreshWorkerSnapshots() {
 	idx := runlog.ReadWorkersIndex(m.dir)
 	if len(idx) == 0 {
@@ -18,23 +20,34 @@ func (m *statusModel) refreshWorkerSnapshots() {
 		m.workerSpinners = nil
 		return
 	}
-	m.workerIndex = idx
 	if m.workerSnapshots == nil {
 		m.workerSnapshots = make(map[string]*runlog.StateSnapshot)
 	}
 	if m.workerSpinners == nil {
 		m.workerSpinners = make(map[string]int)
 	}
+	// Only include entries whose per-worker snapshot file exists.
+	// This prevents ghost workers (stale index entries with no snapshot) from
+	// showing up in the TUI after a daemon restart or interrupted parallel run.
+	var activeIdx []runlog.WorkerIndexEntry
 	for _, w := range idx {
 		snap, err := runlog.ReadWorkerSnapshot(m.dir, w.TaskID)
-		if err == nil {
-			m.workerSnapshots[w.TaskID] = snap
+		if err != nil {
+			// Snapshot file missing — skip this entry.
+			continue
 		}
+		activeIdx = append(activeIdx, w)
+		m.workerSnapshots[w.TaskID] = snap
 		// Initialize spinner frame for new workers.
 		if _, ok := m.workerSpinners[w.TaskID]; !ok {
 			m.workerSpinners[w.TaskID] = 0
 		}
 	}
+	if len(activeIdx) == 0 {
+		m.workerIndex = nil
+		return
+	}
+	m.workerIndex = activeIdx
 }
 
 // isParallelMode returns true when there are active workers (parallel

@@ -231,6 +231,13 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 		planDir = dir
 	}
 
+	// Prune stale worker entries (done/failed/blocked older than 5 min) at the
+	// start of each cycle. Only the main daemon prunes; dispatched workers must
+	// not modify the shared index beyond their own entry.
+	if dispatchRepoFlag == "" {
+		_ = runlog.PruneStaleWorkerEntries(planDir, 5*time.Minute)
+	}
+
 	// Hot-reload parallel setting from config so changes take effect without daemon restart.
 	if freshCfg, err := loadConfigFn(planDir); err == nil {
 		wc.parallel = freshCfg.IsParallelEnabled() || parallelFlag

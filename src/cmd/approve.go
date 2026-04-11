@@ -8,11 +8,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/stores"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 	"github.com/spf13/cobra"
 )
+
+// checkOptOut reports whether approval_mode is opt-out for the given directory.
+// When it is, it prints "approval not required (opt-out mode)" to cmd's output and returns true.
+// The caller should return nil immediately when true.
+func checkOptOut(cmd *cobra.Command, dir string) bool {
+	cfg, _ := config.Load(dir)
+	if !cfg.IsApprovalRequired() {
+		cmd.Println("approval not required (opt-out mode)")
+		return true
+	}
+	return false
+}
 
 // loadAllPlans loads all plans from both stores (bugs first, then features).
 func loadAllPlans(featureStore stores.FeatureStore, bugStore stores.BugStore) ([]parser.Plan, error) {
@@ -52,6 +65,9 @@ var approveCmd = &cobra.Command{
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
+		}
+		if checkOptOut(cmd, dir) {
+			return nil
 		}
 		featureStore := stores.NewFileFeatureStore(dir)
 		bugStore := stores.NewFileBugStore(dir)
@@ -140,6 +156,9 @@ var unapproveCmd = &cobra.Command{
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
+		}
+		if checkOptOut(cmd, dir) {
+			return nil
 		}
 		featureStore := stores.NewFileFeatureStore(dir)
 		bugStore := stores.NewFileBugStore(dir)
