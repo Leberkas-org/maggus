@@ -289,13 +289,24 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		branchTask = setup.next
 	}
 
-	repoDir := dir
-	workDir := dir
-
+	var repoDir, workDir string
 	var branchMsg string
 	var planBranch string
+	var existingWorktreePath string
 
-	if wc.parallel {
+	if dispatchRepoFlag != "" {
+		// Dispatch mode: the current process is a dispatched worker running in a
+		// pre-existing worktree (dir). The main repo is at dispatchRepoFlag. The
+		// task branch and worktree were already created by dispatchTask(); the
+		// unified worker merges the task branch back into dispatchBaseBranchFlag
+		// in the main repo and cleans up when done.
+		repoDir = dispatchRepoFlag
+		workDir = dir
+		planBranch = dispatchBaseBranchFlag
+		existingWorktreePath = dir
+	} else if wc.parallel {
+		repoDir = dir
+		workDir = dir
 		// Parallel mode: set up a plan-level branch (feature/feat-NNN).
 		var planBranchMsg string
 		var pbErr error
@@ -305,6 +316,8 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		}
 		branchMsg = planBranchMsg
 	} else {
+		repoDir = dir
+		workDir = dir
 		// Sequential mode: determine the plan branch for per-task branching via
 		// the unified worker. When auto-branch is enabled, EnsurePlanBranch
 		// creates (or switches to) the plan-level integration branch on protected
@@ -325,11 +338,10 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
-		snapshotDir:        dir,
-		runStartedAt:       setup.startTime,
-		dispatchRepoDir:    dispatchRepoFlag,
-		dispatchTaskID:     taskFlag,
-		dispatchBaseBranch: dispatchBaseBranchFlag,
+		snapshotDir:     dir,
+		runStartedAt:    setup.startTime,
+		dispatchRepoDir: dispatchRepoFlag,
+		dispatchTaskID:  taskFlag,
 	}
 	dm.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
 		runLogger.ToolUse(taskID, toolType, params)
@@ -416,20 +428,21 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}()
 
 	tc := taskContext{
-		workCtx:            workCtx,
-		p:                  p,
-		activeAgent:        wc.activeAgent,
-		resolvedModel:      wc.resolvedModel,
-		sessionPersistence: wc.sessionPersistence,
-		notifier:           wc.notifier,
-		validIncludes:      wc.validIncludes,
-		repoDir:            repoDir,
-		workDir:            workDir,
-		onComplete:         wc.cfg.OnComplete,
-		hooks:              wc.cfg.Hooks,
-		logger:             runLogger,
-		featureStore:       featureStore,
-		bugStore:           bugStore,
+		workCtx:              workCtx,
+		p:                    p,
+		activeAgent:          wc.activeAgent,
+		resolvedModel:        wc.resolvedModel,
+		sessionPersistence:   wc.sessionPersistence,
+		notifier:             wc.notifier,
+		validIncludes:        wc.validIncludes,
+		repoDir:              repoDir,
+		workDir:              workDir,
+		onComplete:           wc.cfg.OnComplete,
+		hooks:                wc.cfg.Hooks,
+		logger:               runLogger,
+		featureStore:         featureStore,
+		bugStore:             bugStore,
+		existingWorktreePath: existingWorktreePath,
 	}
 
 	loopParams := runLoopParams{

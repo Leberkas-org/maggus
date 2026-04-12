@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -96,32 +95,6 @@ func TestCheckCriterionInFile(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCriteriaComplete(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "feature.md")
-	content := "### TASK-001: First\n- [ ] Criterion A\n- [ ] Criterion B\n- [ ] BLOCKED: Something\n\n### TASK-002: Second\n- [ ] Other criterion\n"
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	orch := &parallelOrchestrator{mu: sync.Mutex{}}
-	orch.markTaskCriteriaComplete(path, "TASK-001")
-
-	data, _ := os.ReadFile(path)
-	got := string(data)
-	if !strings.Contains(got, "- [x] Criterion A") {
-		t.Error("Criterion A should be checked")
-	}
-	if !strings.Contains(got, "- [x] Criterion B") {
-		t.Error("Criterion B should be checked")
-	}
-	if !strings.Contains(got, "- [ ] BLOCKED: Something") {
-		t.Error("BLOCKED criterion should remain unchecked")
-	}
-	if !strings.Contains(got, "- [ ] Other criterion") {
-		t.Error("TASK-002 criterion should remain unchecked")
-	}
-}
 
 func taskIDs(tasks []parser.Task) []string {
 	var result []string

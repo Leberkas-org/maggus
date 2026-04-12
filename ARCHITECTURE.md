@@ -33,6 +33,7 @@ no HTTP server.
 |---|---|---|
 | **Screen Router** | `cmd/` (`appModel`) | Single Bubble Tea program; routes between sub-models via `navigateToMsg`/`navigateBackMsg`; eliminates alt-screen flicker |
 | **Work Loop** | `cmd/run.go` | Orchestrates the full parse → prompt → invoke → commit → repeat cycle |
+| **Unified Task Worker** | `cmd/worker.go` | Single `RunTaskWorker` function that owns the complete per-task lifecycle for all execution modes (sequential, parallel, dispatched): branch creation → worktree → prompt → agent → commit → merge-back → cleanup |
 | **Parser** | `internal/parser` | Reads `.maggus/features/feature_*.md` and `.maggus/bugs/bug_*.md`; extracts tasks, checkboxes, blocked criteria, UUIDs |
 | **Prompt Builder** | `internal/prompt` | Assembles per-task prompts: bootstrap context files + run metadata + task details + behavioral instructions |
 | **Agent Interface** | `internal/agent` | Pluggable agent backend abstraction: `Run()` (streaming + TUI), `RunOnce()` (text), `Validate()` |
@@ -123,6 +124,43 @@ rename completed plans (feature_N.md → feature_N_completed.md)
   ▼
 loop back to "parse all active plans"
 ```
+
+## Unified Task Worker
+
+All three execution modes — sequential, parallel, and dispatched — share a single
+`RunTaskWorker` function in `cmd/worker.go`. This eliminates duplicated
+branch/commit/merge logic that previously lived in three separate code paths.
+
+```
+RunTaskWorker(WorkerConfig)
+  │
+  ├── ExistingWorktreePath set?
+  │     yes → skip branch creation, run agent in provided directory
+  │     no  → UseWorktree?
+  │             yes → create task branch + git worktree (parallel mode)
+  │             no  → create task branch in-place (sequential mode)
+  │
+  ├── build prompt
+  ├── invoke agent subprocess
+  ├── run pre-commit operations (mark completed, fire hooks)
+  ├── git commit from COMMIT.md
+  ├── merge task branch → plan branch (if applicable)
+  └── remove worktree + delete task branch
+```
+
+### WorkerConfig fields that drive mode selection
+
+| Field | Sequential | Parallel | Dispatched |
+|---|---|---|---|
+| `UseWorktree` | `false` | `true` | `false` |
+| `ExistingWorktreePath` | `""` | `""` | worktree path |
+| `RepoDir` | main repo | main repo | main repo (from `--dispatch-repo`) |
+| `MergeMu` | `nil` | `&o.mu` | `nil` |
+
+In **dispatch mode** the worker process runs inside a pre-created git worktree.
+`ExistingWorktreePath` tells the worker to skip branch/worktree creation and run
+the agent directly in that directory. `RepoDir` is set to the main repository so
+merge and cleanup git operations target the correct git object store.
 
 ## Agent Abstraction
 

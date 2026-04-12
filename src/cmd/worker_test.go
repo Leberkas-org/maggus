@@ -431,25 +431,34 @@ func TestWorkerConfig_UsableFromParallelCallSite(t *testing.T) {
 
 func TestWorkerConfig_UsableFromDispatchCallSite(t *testing.T) {
 	// Verify the WorkerConfig struct can be populated for dispatch mode.
+	// In dispatch mode: RepoDir = main repo, ExistingWorktreePath = pre-existing
+	// worktree dir (created by dispatchTask), PlanBranch = base branch to merge into.
 	cfg := WorkerConfig{
-		Ctx:            context.Background(),
-		Task:           parser.Task{ID: "TASK-022", Title: "Dispatch test"},
-		PlanFile:       "/path/to/feature_022.md",
-		MaggusID:       "uuid-022",
-		Agent:          &workerFakeAgent{},
-		Model:          "claude-sonnet-4-6",
-		RepoDir:        "/repo",
-		PlanBranch:     "feature/maggus-022",
-		UseWorktree:    false, // dispatch runs in its own process, not worktree
-		MergeMu:        nil,   // single worker, no serialization needed
-		AgentSender:    &msgCollector{},
-		EventSender:    &msgCollector{},
+		Ctx:                  context.Background(),
+		Task:                 parser.Task{ID: "TASK-022", Title: "Dispatch test"},
+		PlanFile:             "/repo/.maggus/features/feature_022.md",
+		MaggusID:             "uuid-022",
+		Agent:                &workerFakeAgent{},
+		Model:                "claude-sonnet-4-6",
+		RepoDir:              "/repo",        // main repo for git operations
+		PlanBranch:           "feature/feat-022-plan", // base branch for merge-back
+		UseWorktree:          false,          // no new worktree creation; use ExistingWorktreePath
+		ExistingWorktreePath: "/repo/.maggus/worktrees/TASK-022-001", // pre-existing worktree
+		MergeMu:              nil,            // single worker, no serialization needed
+		AgentSender:          &msgCollector{},
+		EventSender:          &msgCollector{},
 	}
 	if cfg.UseWorktree {
-		t.Error("UseWorktree should be false for dispatch mode")
+		t.Error("UseWorktree should be false for dispatch mode (worktree already exists)")
 	}
 	if cfg.PlanBranch == "" {
 		t.Error("PlanBranch should be set for dispatch mode (for merge-back)")
+	}
+	if cfg.ExistingWorktreePath == "" {
+		t.Error("ExistingWorktreePath should be set for dispatch mode")
+	}
+	if cfg.RepoDir == cfg.ExistingWorktreePath {
+		t.Error("RepoDir (main repo) and ExistingWorktreePath (worktree) should differ")
 	}
 }
 
@@ -482,41 +491,39 @@ func TestWorkerCleanupWorktree_EmptyPath(t *testing.T) {
 	workerCleanupWorktree(cfg, "") // should not panic
 }
 
-// --- Integration: verify worker matches parallel orchestrator behavior ---
+// --- Integration: verify workerMarkCriteria handles all criterion states ---
 
-func TestWorkerMarkCriteria_MatchesOrchestratorBehavior(t *testing.T) {
-	// Both workerMarkCriteria and parallelOrchestrator.markTaskCriteriaComplete
-	// should produce the same result for the same input.
+func TestWorkerMarkCriteria_AllCriterionStates(t *testing.T) {
 	dir := t.TempDir()
 
 	content := "### TASK-001: First\n- [ ] A\n- [ ] B\n- [ ] BLOCKED: X\n- [x] C\n\n### TASK-002: Second\n- [ ] D\n"
 
-	// Test worker version.
-	workerPath := filepath.Join(dir, "worker_feature.md")
-	if err := os.WriteFile(workerPath, []byte(content), 0o644); err != nil {
+	path := filepath.Join(dir, "feature.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg := WorkerConfig{
 		Task:     parser.Task{ID: "TASK-001"},
-		PlanFile: workerPath,
+		PlanFile: path,
 	}
 	workerMarkCriteria(cfg)
 
-	// Test orchestrator version.
-	orchPath := filepath.Join(dir, "orch_feature.md")
-	if err := os.WriteFile(orchPath, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
+	data, _ := os.ReadFile(path)
+	got := string(data)
+	if !strings.Contains(got, "- [x] A") {
+		t.Error("A should be checked")
 	}
-	orch := &parallelOrchestrator{mu: sync.Mutex{}}
-	orch.markTaskCriteriaComplete(orchPath, "TASK-001")
-
-	// Both should produce identical output.
-	workerData, _ := os.ReadFile(workerPath)
-	orchData, _ := os.ReadFile(orchPath)
-
-	if string(workerData) != string(orchData) {
-		t.Errorf("workerMarkCriteria and markTaskCriteriaComplete produced different results:\nworker:\n%s\norch:\n%s",
-			string(workerData), string(orchData))
+	if !strings.Contains(got, "- [x] B") {
+		t.Error("B should be checked")
+	}
+	if !strings.Contains(got, "- [ ] BLOCKED: X") {
+		t.Error("BLOCKED criterion should remain unchecked")
+	}
+	if !strings.Contains(got, "- [x] C") {
+		t.Error("already-checked C should remain checked")
+	}
+	if !strings.Contains(got, "- [ ] D") {
+		t.Error("TASK-002 criterion should remain unchecked")
 	}
 }
 

@@ -11,8 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
-	"github.com/leberkas-org/maggus/internal/gitmerge"
-	"github.com/leberkas-org/maggus/internal/globalconfig"
+"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -406,47 +405,6 @@ func (o *parallelOrchestrator) markWorkerBlocked(taskID string, wsw *workerSnaps
 	o.mu.Unlock()
 }
 
-// failTask records a failed task and returns the result.
-func (o *parallelOrchestrator) failTask(result *parallelWorkResult, logger *runlog.Logger, task parser.Task, reason string) parallelWorkResult {
-	logger.TaskFailed(task.ID, reason)
-	o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s: %s", task.ID, reason)})
-	result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
-	return *result
-}
-
-// handleMergeErr handles merge errors (conflicts vs other failures).
-func (o *parallelOrchestrator) handleMergeErr(result *parallelWorkResult, logger *runlog.Logger, task parser.Task, err error) parallelWorkResult {
-	if _, ok := err.(*gitmerge.MergeConflictError); ok {
-		o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: merge conflict — task blocked, worktree preserved", task.ID)})
-		result.warnings = append(result.warnings, fmt.Sprintf("%s: merge conflict", task.ID))
-	} else {
-		reason := fmt.Sprintf("merge: %v", err)
-		logger.TaskFailed(task.ID, reason)
-		o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s: %s", task.ID, reason)})
-		result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
-	}
-	return *result
-}
-
-// markTaskCriteriaComplete checks off all unchecked, non-blocked acceptance criteria.
-// Must be called with o.mu held.
-func (o *parallelOrchestrator) markTaskCriteriaComplete(planFile, taskID string) {
-	tasks, err := parser.ParseFile(planFile)
-	if err != nil {
-		return
-	}
-	for _, t := range tasks {
-		if t.ID != taskID {
-			continue
-		}
-		for _, c := range t.Criteria {
-			if !c.Checked && !c.Blocked {
-				_ = checkCriterionInFile(planFile, c.Text)
-			}
-		}
-		return
-	}
-}
 
 func checkCriterionInFile(filePath, criterionText string) error {
 	data, err := os.ReadFile(filePath)
