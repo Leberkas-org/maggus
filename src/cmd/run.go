@@ -23,8 +23,7 @@ var (
 	parallelFlag bool
 
 	// Daemon-mode flags (hidden; set by 'maggus start', not users directly).
-	daemonRunFlag   bool
-	daemonRunIDFlag string
+	daemonRunFlag bool
 
 	// Dispatch-mode flags (hidden; set by dispatchTask, not users directly).
 	// When non-empty, this process is a dispatched worker and should write
@@ -43,7 +42,6 @@ func resetRunFlags() {
 	taskFlag = ""
 	parallelFlag = false
 	daemonRunFlag = false
-	daemonRunIDFlag = ""
 	dispatchRepoFlag = ""
 	dispatchBaseBranchFlag = ""
 }
@@ -89,11 +87,9 @@ func init() {
 
 	// Hidden flags used internally by 'maggus start' to launch the daemon work loop.
 	runCmd.Flags().BoolVar(&daemonRunFlag, "daemon-run", false, "run the work loop as a daemon (no TUI)")
-	runCmd.Flags().StringVar(&daemonRunIDFlag, "daemon-run-id", "", "run ID to use in daemon mode")
 	runCmd.Flags().StringVar(&dispatchRepoFlag, "dispatch-repo", "", "main repo dir for dispatched worker state files")
 	runCmd.Flags().StringVar(&dispatchBaseBranchFlag, "dispatch-base-branch", "", "base branch to merge back into after dispatch completes")
 	_ = runCmd.Flags().MarkHidden("daemon-run")
-	_ = runCmd.Flags().MarkHidden("daemon-run-id")
 	_ = runCmd.Flags().MarkHidden("dispatch-repo")
 	_ = runCmd.Flags().MarkHidden("dispatch-base-branch")
 

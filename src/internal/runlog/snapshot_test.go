@@ -15,7 +15,7 @@ func TestWriteSnapshot_CreatesValidJSON(t *testing.T) {
 	dir := t.TempDir()
 
 	snap := StateSnapshot{
-		RunID:     "test-run-001",
+		MaggusID:  "test-maggus-id-001",
 		TaskID:    "TASK-001",
 		TaskTitle: "Test task",
 		ItemTitle: "feature_001.md",

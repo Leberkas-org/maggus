@@ -199,30 +199,36 @@ func (m *statusModel) ensureCompletedTaskOutput() {
 	m.logScroll = 0
 	m.logAutoScroll = true
 	m.cachedTaskOutputID = task.ID
-	m.cachedTaskOutput = loadCompletedTaskOutput(m.dir, task.ID)
+	m.cachedTaskOutput = loadCompletedTaskOutput(m.dir, m.maggusIDForSelectedTask(), task.ID)
 }
 
-// loadCompletedTaskOutput scans run log JSONL files in .maggus/runs/ for entries
-// matching taskID and builds a synthetic StateSnapshot. Returns nil when no
-// matching entries are found.
-func loadCompletedTaskOutput(dir, taskID string) *runlog.StateSnapshot {
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
-	if err != nil {
-		return nil
-	}
-
+// loadCompletedTaskOutput scans run log JSONL files in .maggus/logs/<maggusID>/ for
+// entries matching taskID and builds a synthetic StateSnapshot. If maggusID is empty
+// it falls back to scanning all subdirectories under .maggus/logs/. Returns nil when
+// no matching entries are found.
+func loadCompletedTaskOutput(dir, maggusID, taskID string) *runlog.StateSnapshot {
 	var logFiles []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".log") && e.Name() != "daemon.log" {
-			logFiles = append(logFiles, e.Name())
+
+	if maggusID != "" {
+		// Targeted lookup: only scan the feature's own log directory.
+		logFiles = findLogsForMaggusID(dir, maggusID)
+	} else {
+		// Fallback: scan all feature subdirectories under .maggus/logs/.
+		logsBase := filepath.Join(dir, ".maggus", "logs")
+		subdirs, err := os.ReadDir(logsBase)
+		if err == nil {
+			for _, sub := range subdirs {
+				if sub.IsDir() {
+					logFiles = append(logFiles, findLogsForMaggusID(dir, sub.Name())...)
+				}
+			}
 		}
 	}
+
 	// Sort descending (most recent first) to find the latest matching entries.
 	sort.Sort(sort.Reverse(sort.StringSlice(logFiles)))
 
-	for _, name := range logFiles {
-		logPath := filepath.Join(runsDir, name)
+	for _, logPath := range logFiles {
 		snap := scanLogForTask(logPath, taskID)
 		if snap != nil {
 			return snap

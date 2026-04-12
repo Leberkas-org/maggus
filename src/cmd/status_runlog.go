@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -37,54 +36,28 @@ type daemonStatus struct {
 	PID               int
 	Running           bool
 	StoppingAfterTask bool
-	RunID             string
-	LogPath           string
 	CurrentFeature    string
 	CurrentTask       string
 }
 
-// findLatestRunLog returns the run ID (from the fixed-path state.json snapshot)
-// and the path to the latest flat .log file under .maggus/runs/.
-// Each is found independently; either may be empty if none exists.
-func findLatestRunLog(dir string) (runID, logPath string) {
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
+// findLogsForMaggusID returns the sorted list of .log file paths in
+// .maggus/logs/<maggusID>/. Returns nil when the directory is missing or empty.
+func findLogsForMaggusID(dir, maggusID string) []string {
+	if maggusID == "" {
+		return nil
+	}
+	logDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	entries, err := os.ReadDir(logDir)
 	if err != nil {
-		return "", ""
+		return nil
 	}
-
-	// Collect flat .log files (excluding daemon.log) for logPath.
-	var logFiles []string
+	var files []string
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".log") && e.Name() != "daemon.log" {
-			logFiles = append(logFiles, e.Name())
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".log") {
+			files = append(files, filepath.Join(logDir, e.Name()))
 		}
 	}
-
-	// Latest log file (lexicographic sort — timestamp prefix ensures correct order).
-	if len(logFiles) > 0 {
-		sort.Strings(logFiles)
-		logPath = filepath.Join(runsDir, logFiles[len(logFiles)-1])
-	}
-
-	// Check the fixed-path state.json directly instead of scanning subdirectories.
-	statePath := filepath.Join(runsDir, "state.json")
-	if _, err := os.Stat(statePath); err == nil {
-		// Extract RunID from the snapshot struct for log-file lookup.
-		if snap, err := runlog.ReadSnapshot(dir); err == nil && snap.RunID != "" {
-			runID = snap.RunID
-			// Find the log file belonging to this runID by prefix match (<runID>_<ts>.log).
-			prefix := runID + "_"
-			for _, name := range logFiles {
-				if strings.HasPrefix(name, prefix) {
-					logPath = filepath.Join(runsDir, name)
-					break
-				}
-			}
-		}
-	}
-
-	return runID, logPath
+	return files
 }
 
 // readLastNLogLines returns the last n lines of the file at path.

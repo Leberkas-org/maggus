@@ -306,6 +306,88 @@ func TestCleanNothingToCleanWithWorkingWorker(t *testing.T) {
 	}
 }
 
+func TestCleanRemovesLogDirForCompletedFeature(t *testing.T) {
+	dir := setupCleanDir(t)
+
+	// Write a completed feature with a maggus-id.
+	const maggusID = "aaaaaaaa-0000-0000-0000-000000000001"
+	content := "<!-- maggus-id: " + maggusID + " -->\n# Feature 001: Test Feature\n"
+	writeFeatureFile(t, dir, "feature_001_completed.md", content)
+
+	// Create a fake log directory for this feature.
+	logDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	logFile := filepath.Join(logDir, "12345.log")
+	if err := os.WriteFile(logFile, []byte(`{"event":"task_start"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runCleanCmd(t, dir)
+
+	// Log directory should be removed.
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Error("log directory should have been removed after feature cleanup")
+	}
+}
+
+func TestCleanRemovesLogDirForCompletedBug(t *testing.T) {
+	dir := setupCleanDir(t)
+
+	// Write a completed bug with a maggus-id.
+	const maggusID = "bbbbbbbb-0000-0000-0000-000000000002"
+	content := "<!-- maggus-id: " + maggusID + " -->\n# Bug 001: Test Bug\n"
+	writeBugFile(t, dir, "bug_001_completed.md", content)
+
+	// Create a fake log directory.
+	logDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runCleanCmd(t, dir)
+
+	// Log directory should be removed.
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Error("log directory should have been removed after bug cleanup")
+	}
+}
+
+func TestCleanDryRunDoesNotRemoveLogDir(t *testing.T) {
+	dir := setupCleanDir(t)
+
+	const maggusID = "cccccccc-0000-0000-0000-000000000003"
+	content := "<!-- maggus-id: " + maggusID + " -->\n# Feature 002: Test Feature\n"
+	writeFeatureFile(t, dir, "feature_002_completed.md", content)
+
+	logDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runCleanCmd(t, dir, "--dry-run")
+
+	// Log directory should still exist after a dry run.
+	if _, err := os.Stat(logDir); err != nil {
+		t.Error("log directory should still exist after dry-run")
+	}
+}
+
+func TestCleanNoLogDirForFeatureWithoutMaggusID(t *testing.T) {
+	dir := setupCleanDir(t)
+
+	// Feature file without a maggus-id comment.
+	writeFeatureFile(t, dir, "feature_003_completed.md", "# Feature 003: No ID\n")
+
+	// Should not panic or error even if no log dir exists.
+	out := runCleanCmd(t, dir)
+
+	if !strings.Contains(out, "1 completed feature file(s) and 0 completed bug file(s)") {
+		t.Errorf("unexpected output: %s", out)
+	}
+}
+
 // writeWorkersIndex writes a fake workers index JSON for testing.
 func writeWorkersIndex(t *testing.T, dir string, workers []map[string]string) {
 	t.Helper()

@@ -87,8 +87,6 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 		}
 	}()
 
-	runID := daemonRunIDFlag
-
 	// Open structured run log (shared across cycles).
 	runLogger, logErr := runlog.Open(dir, wc.cfg.LogMaxFiles())
 	if logErr != nil {
@@ -116,7 +114,7 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 		default:
 		}
 
-		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runID, runLogger, workCtx)
+		hadWork, err := runOneDaemonCycle(cmd, wc, dir, runLogger, workCtx)
 		if errors.Is(err, errStopAfterTask) {
 			return nil
 		}
@@ -223,7 +221,7 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
-func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
+func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
 	// Use planDir for loading plans/config/approvals (main repo root).
 	// For normal daemon mode, planDir == dir. For dispatched workers, planDir
 	// points to the main repo while dir is the worktree.
@@ -317,7 +315,6 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
 		snapshotDir:        dir,
-		snapshotRunID:      runID,
 		runStartedAt:       setup.startTime,
 		dispatchRepoDir:    dispatchRepoFlag,
 		dispatchTaskID:     taskFlag,
@@ -332,7 +329,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 	repoURL := gitutil.RepoURL(dir)
 	dm.SetOnTaskUsage(func(tu TaskUsage) {
 		_ = usage.Append([]usage.Record{{
-			RunID:                    runID,
+			RunID:                    "",
 			Repository:               repoURL,
 			ItemID:                   tu.ItemID,
 			ItemShort:                tu.ItemShort,
@@ -417,7 +414,6 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 		validIncludes:      wc.validIncludes,
 		repoDir:            repoDir,
 		workDir:            workDir,
-		runID:              runID,
 		onComplete:         wc.cfg.OnComplete,
 		hooks:              wc.cfg.Hooks,
 		logger:             runLogger,
@@ -431,7 +427,6 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 		featureGroups: featureGroups,
 		count:         0,
 		autoContinue:  wc.cfg.IsAutoContinueEnabled(),
-		runID:         runID,
 		startTime:     setup.startTime,
 		p:             p,
 		stopFlag:      stopFlagAtomic,

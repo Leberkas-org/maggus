@@ -86,8 +86,7 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 		return fmt.Errorf("create runs dir: %w", err)
 	}
 
-	// Generate run ID and open daemon.log.
-	runID := generateDaemonRunID()
+	// Open daemon.log.
 	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -102,7 +101,7 @@ func startCurrentDaemon(cmd *cobra.Command) error {
 	}
 
 	// Build the daemon work command arguments.
-	daemonArgs := []string{"run", "--daemon-run", "--daemon-run-id=" + runID}
+	daemonArgs := []string{"run", "--daemon-run"}
 	if startModelFlag != "" {
 		daemonArgs = append(daemonArgs, "--model="+startModelFlag)
 	}
@@ -208,8 +207,7 @@ func startDaemon(dir string) error {
 		return fmt.Errorf("create runs dir: %w", err)
 	}
 
-	// Generate run ID and open daemon.log.
-	runID := generateDaemonRunID()
+	// Open daemon.log.
 	daemonLogPath := daemonLogPath(dir)
 	logFile, err := os.OpenFile(daemonLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -224,7 +222,7 @@ func startDaemon(dir string) error {
 	}
 
 	// Build daemon args — no model/agent flags (use config defaults).
-	daemonArgs := []string{"run", "--daemon-run", "--daemon-run-id=" + runID}
+	daemonArgs := []string{"run", "--daemon-run"}
 
 	// Launch the daemon process (platform-specific detach).
 	pid, err := launchDaemon(exe, daemonArgs, logFile, dir)

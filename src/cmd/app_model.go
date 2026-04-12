@@ -438,18 +438,12 @@ func buildStatusModel() (*statusModel, error) {
 		sm.daemonStoppingAfterTask = cached.StoppingAfterTask
 	}
 
-	// Seed log-derived fields immediately so the output panel is populated on re-entry.
-	runID, logPath := findLatestRunLog(dir)
-	sm.daemon.RunID = runID
-	sm.daemon.LogPath = logPath
-	if logPath != "" {
-		lines := readLastNLogLines(logPath, 200)
-		sm.daemon.CurrentFeature, sm.daemon.CurrentTask = parseLogForCurrentState(lines)
-	}
-	if sm.daemon.Running && sm.daemon.RunID != "" {
-		snap, err := runlog.ReadSnapshot(dir)
-		if err == nil {
+	// Seed live daemon state immediately so the output panel is populated on re-entry.
+	if sm.daemon.Running {
+		if snap, err := runlog.ReadSnapshot(dir); err == nil {
 			sm.snapshot = snap
+			sm.daemon.CurrentTask = snap.TaskID
+			sm.daemon.CurrentFeature = sm.planIDForMaggusID(snap.MaggusID)
 		}
 	}
 

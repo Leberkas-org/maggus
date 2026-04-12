@@ -9,6 +9,7 @@ import (
 
 var requiredEntries = []string{
 	".maggus/runs",
+	".maggus/logs/",
 	".maggus/MEMORY.md",
 	".maggus/RELEASE_NOTES.md",
 	".maggus/usage*.csv",

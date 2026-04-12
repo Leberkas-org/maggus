@@ -107,12 +107,21 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case logFileUpdateMsg:
 		prevFeature := m.daemon.CurrentFeature
-		runID, logPath := findLatestRunLog(m.dir)
-		m.daemon.RunID = runID
-		m.daemon.LogPath = logPath
-		if logPath != "" {
-			lines := readLastNLogLines(logPath, 200)
-			m.daemon.CurrentFeature, m.daemon.CurrentTask = parseLogForCurrentState(lines)
+		prevSnapStatus := ""
+		if m.snapshot != nil {
+			prevSnapStatus = m.snapshot.Status
+		}
+		if m.daemon.Running {
+			snap, err := runlog.ReadSnapshot(m.dir)
+			if err == nil {
+				m.snapshot = snap
+				// Derive CurrentTask and CurrentFeature from the snapshot.
+				m.daemon.CurrentTask = snap.TaskID
+				m.daemon.CurrentFeature = m.planIDForMaggusID(snap.MaggusID)
+			}
+			// else: keep previous snapshot
+		} else {
+			m.snapshot = nil
 		}
 		// Auto-expand the active plan when CurrentFeature changes so the task row is visible.
 		if m.daemon.Running && m.daemon.CurrentFeature != "" && m.daemon.CurrentFeature != prevFeature {
@@ -120,19 +129,6 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.expandedPlans = make(map[string]bool)
 			}
 			m.expandedPlans[m.daemon.CurrentFeature] = true
-		}
-		prevSnapStatus := ""
-		if m.snapshot != nil {
-			prevSnapStatus = m.snapshot.Status
-		}
-		if m.daemon.Running && m.daemon.RunID != "" {
-			snap, err := runlog.ReadSnapshot(m.dir)
-			if err == nil {
-				m.snapshot = snap
-			}
-			// else: keep previous snapshot or nil
-		} else if !m.daemon.Running {
-			m.snapshot = nil
 		}
 
 		// Read parallel worker state (nil when not in parallel mode).

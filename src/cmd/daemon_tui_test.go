@@ -170,12 +170,10 @@ func TestNullTUIModel_StartTimeSet(t *testing.T) {
 
 func TestNullTUIModel_DispatchMode_WritesPerWorkerSnapshot(t *testing.T) {
 	dir := t.TempDir()
-	runID := "dispatch-run-001"
 	taskID := "TASK-045-001"
 
 	dm := nullTUIModel{
 		snapshotDir:     dir, // local dir (unused in dispatch mode)
-		snapshotRunID:   runID,
 		dispatchRepoDir: dir,
 		dispatchTaskID:  taskID,
 		runStartedAt:    time.Now(),
@@ -225,7 +223,6 @@ func TestNullTUIModel_DispatchMode_FinalizeWorkerDone(t *testing.T) {
 	})
 
 	dm := nullTUIModel{
-		snapshotRunID:   "dispatch-run-002",
 		dispatchRepoDir: dir,
 		dispatchTaskID:  taskID,
 		runStartedAt:    time.Now(),
@@ -256,7 +253,6 @@ func TestNullTUIModel_DispatchMode_FinalizeWorkerFailed(t *testing.T) {
 	})
 
 	dm := nullTUIModel{
-		snapshotRunID:   "dispatch-run-003",
 		dispatchRepoDir: dir,
 		dispatchTaskID:  taskID,
 		runStartedAt:    time.Now(),
@@ -297,7 +293,6 @@ func TestNullTUIModel_DispatchMode_MergeBackSuccess(t *testing.T) {
 	}
 
 	dm := nullTUIModel{
-		snapshotRunID:      "dispatch-merge-ok",
 		dispatchRepoDir:    dir,
 		dispatchTaskID:     taskID,
 		dispatchBaseBranch: "feature/maggus-045",
@@ -346,7 +341,6 @@ func TestNullTUIModel_DispatchMode_MergeBackConflict(t *testing.T) {
 	}
 
 	dm := nullTUIModel{
-		snapshotRunID:      "dispatch-merge-conflict",
 		dispatchRepoDir:    dir,
 		dispatchTaskID:     taskID,
 		dispatchBaseBranch: "feature/maggus-045",
@@ -395,7 +389,6 @@ func TestNullTUIModel_DispatchMode_NoBaseBranch_SkipsMerge(t *testing.T) {
 	}
 
 	dm := nullTUIModel{
-		snapshotRunID:   "dispatch-no-base",
 		dispatchRepoDir: dir,
 		dispatchTaskID:  taskID,
 		// No dispatchBaseBranch — merge should be skipped gracefully.
@@ -438,7 +431,6 @@ func TestNullTUIModel_DispatchMode_NoCommits_SkipsMerge(t *testing.T) {
 	}
 
 	dm := nullTUIModel{
-		snapshotRunID:      "dispatch-no-commits",
 		dispatchRepoDir:    dir,
 		dispatchTaskID:     taskID,
 		dispatchBaseBranch: "feature/maggus-045",
@@ -472,7 +464,6 @@ func TestNullTUIModel_IterationStartMsg_SetsTaskIDBeforeSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	dm := nullTUIModel{
 		snapshotDir:   dir,
-		snapshotRunID: "run-039-003",
 		runStartedAt:  time.Now(),
 	}
 
@@ -505,7 +496,6 @@ func TestNullTUIModel_WriteSnapshot_EmptyTaskID_StatusIsIdle(t *testing.T) {
 	dir := t.TempDir()
 	dm := nullTUIModel{
 		snapshotDir:   dir,
-		snapshotRunID: "run-idle",
 		runStartedAt:  time.Now(),
 		status:        "Starting", // status set but no taskID
 		// taskID intentionally left empty
@@ -541,13 +531,11 @@ func TestMergeDispatchedTaskBackImpl_EmptyRepoDir(t *testing.T) {
 
 func TestNullTUIModel_SnapshotContainsTimestamps(t *testing.T) {
 	dir := t.TempDir()
-	runID := "test-snap-ts"
 	runStart := time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
 
 	dm := nullTUIModel{
-		snapshotDir:   dir,
-		snapshotRunID: runID,
-		runStartedAt:  runStart,
+		snapshotDir:  dir,
+		runStartedAt: runStart,
 	}
 
 	// Start an iteration — sets startTime (task start).

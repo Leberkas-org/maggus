@@ -229,6 +229,30 @@ func (m statusModel) selectedTask() *parser.Task {
 	return items[m.treeCursor].task
 }
 
+// maggusIDForSelectedTask returns the MaggusID of the plan that contains the
+// currently selected task, or "" when no task is selected or the plan has no ID.
+func (m statusModel) maggusIDForSelectedTask() string {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return ""
+	}
+	return items[m.treeCursor].plan.MaggusID
+}
+
+// planIDForMaggusID finds the plan.ID whose MaggusID matches maggusID.
+// Returns "" when maggusID is empty or no matching plan is found.
+func (m statusModel) planIDForMaggusID(maggusID string) string {
+	if maggusID == "" {
+		return ""
+	}
+	for _, p := range m.plans {
+		if p.MaggusID == maggusID {
+			return p.ID
+		}
+	}
+	return ""
+}
+
 // selectionCtx returns the selection context for the item at treeCursor.
 // It examines the tree item kind and, for task items, checks whether the
 // daemon is currently working on that task (directly or via a parallel worker).

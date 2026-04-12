@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 // logFileUpdateMsg is sent when the active log file has new content or a new
-// log file has been created in the runs directory.
+// log file has been created in the logs directory.
 type logFileUpdateMsg struct{}
 
 // listenForLogFileUpdate returns a Cmd that blocks until the log watcher channel
@@ -27,19 +28,19 @@ func listenForLogFileUpdate(ch <-chan logFileUpdateMsg) tea.Cmd {
 	}
 }
 
-// LogFileWatcher watches the runs directory for new log files and the active
-// log file for writes, delivering logFileUpdateMsg via its channel.
+// LogFileWatcher watches .maggus/logs/ for new log files and writes,
+// and .maggus/runs/state.json for daemon state changes.
+// It delivers logFileUpdateMsg via its channel.
 type LogFileWatcher struct {
 	watcher       *fsnotify.Watcher
 	dir           string
-	activePath    string
 	stateJsonPath string
 	ch            chan logFileUpdateMsg
 	done          chan struct{}
 }
 
 // NewLogFileWatcher creates and starts a LogFileWatcher that watches
-// .maggus/runs/ for Create events and the current active log file for Write events.
+// .maggus/logs/ for new .log files and writes, and state.json for daemon state.
 // Returns (nil, err) if fsnotify cannot be initialized.
 func NewLogFileWatcher(dir string) (*LogFileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
@@ -47,11 +48,14 @@ func NewLogFileWatcher(dir string) (*LogFileWatcher, error) {
 		return nil, err
 	}
 
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	// Watch runs directory for Create events (new log files).
-	// Ignore error if the directory doesn't exist yet.
-	_ = watcher.Add(runsDir)
+	// Watch .maggus/logs/ for Create events (new subdirectories and log files).
+	logsDir := filepath.Join(dir, ".maggus", "logs")
+	_ = watcher.Add(logsDir)
 
+	// Also watch any existing feature subdirectories.
+	addExistingLogSubdirs(watcher, logsDir)
+
+	runsDir := filepath.Join(dir, ".maggus", "runs")
 	stateJsonPath := filepath.Join(runsDir, "state.json")
 
 	lfw := &LogFileWatcher{
@@ -62,18 +66,25 @@ func NewLogFileWatcher(dir string) (*LogFileWatcher, error) {
 		done:          make(chan struct{}),
 	}
 
-	// Watch state.json for Write events. Ignore error if it doesn't exist yet.
+	// Watch state.json for Write events.
 	_ = watcher.Add(stateJsonPath)
-
-	// Start watching the current latest log file if one exists.
-	_, logPath := findLatestRunLog(dir)
-	if logPath != "" {
-		lfw.activePath = filepath.Clean(logPath)
-		_ = watcher.Add(lfw.activePath)
-	}
 
 	go lfw.run()
 	return lfw, nil
+}
+
+// addExistingLogSubdirs adds all subdirectories of logsDir to the watcher so
+// that writes to existing log files are detected on startup.
+func addExistingLogSubdirs(w *fsnotify.Watcher, logsDir string) {
+	entries, err := os.ReadDir(logsDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			_ = w.Add(filepath.Join(logsDir, e.Name()))
+		}
+	}
 }
 
 // Chan returns the receive-only channel that delivers logFileUpdateMsg.
@@ -108,53 +119,37 @@ func (lfw *LogFileWatcher) run() {
 func (lfw *LogFileWatcher) handleEvent(event fsnotify.Event) {
 	name := filepath.Clean(event.Name)
 
-	// Write on the active log file → signal new content.
-	if event.Has(fsnotify.Write) && name == lfw.activePath {
-		select {
-		case lfw.ch <- logFileUpdateMsg{}:
-		default: // drop if update already pending
-		}
-		return
-	}
-
 	// Write on state.json → signal update (daemon started a new run).
 	if event.Has(fsnotify.Write) && name == lfw.stateJsonPath {
-		select {
-		case lfw.ch <- logFileUpdateMsg{}:
-		default:
-		}
+		lfw.signal()
 		return
 	}
 
-	if event.Has(fsnotify.Create) {
-		// Create of state.json → add it to the watcher (wasn't present at init).
-		if name == lfw.stateJsonPath {
-			_ = lfw.watcher.Add(lfw.stateJsonPath)
-			select {
-			case lfw.ch <- logFileUpdateMsg{}:
-			default:
-			}
-			return
-		}
+	// Create of state.json → add it to the watcher (wasn't present at init).
+	if event.Has(fsnotify.Create) && name == lfw.stateJsonPath {
+		_ = lfw.watcher.Add(lfw.stateJsonPath)
+		lfw.signal()
+		return
+	}
 
-		// Create of a .log file in runs dir → check if active path changed.
-		if strings.HasSuffix(name, ".log") && !strings.HasSuffix(name, "daemon.log") {
-			_, newPath := findLatestRunLog(lfw.dir)
-			if newPath == "" {
-				return
-			}
-			newPath = filepath.Clean(newPath)
-			if newPath != lfw.activePath {
-				if lfw.activePath != "" {
-					_ = lfw.watcher.Remove(lfw.activePath)
-				}
-				lfw.activePath = newPath
-				_ = lfw.watcher.Add(newPath)
-				select {
-				case lfw.ch <- logFileUpdateMsg{}:
-				default:
-				}
-			}
-		}
+	// Create of a new directory under .maggus/logs/ → add it to the watcher.
+	if event.Has(fsnotify.Create) {
+		// Add the new path to the watcher so we receive events from inside it.
+		_ = lfw.watcher.Add(name)
+		lfw.signal()
+		return
+	}
+
+	// Write on any .log file → signal new content.
+	if event.Has(fsnotify.Write) && strings.HasSuffix(name, ".log") {
+		lfw.signal()
+		return
+	}
+}
+
+func (lfw *LogFileWatcher) signal() {
+	select {
+	case lfw.ch <- logFileUpdateMsg{}:
+	default: // drop if update already pending
 	}
 }

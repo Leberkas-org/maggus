@@ -83,7 +83,6 @@ func TestDispatchTask_WritesInitialSnapshot(t *testing.T) {
 
 	// Simulate the initial snapshot write that dispatchTask does.
 	snap := runlog.StateSnapshot{
-		RunID:     "test-run",
 		TaskID:    taskID,
 		TaskTitle: taskID,
 		Status:    "Working",

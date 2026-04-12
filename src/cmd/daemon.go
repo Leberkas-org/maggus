@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // daemonPIDPath returns the path to the daemon PID file.
@@ -75,7 +74,3 @@ func removeStopAfterTaskFile(dir string) {
 	_ = os.Remove(daemonStopAfterTaskFilePath(dir))
 }
 
-// generateDaemonRunID returns a timestamp-based run ID for the daemon session.
-func generateDaemonRunID() string {
-	return time.Now().Format("20060102-150405")
-}

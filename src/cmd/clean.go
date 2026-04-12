@@ -9,6 +9,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/gitworktree"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/spf13/cobra"
 )
@@ -65,9 +66,11 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		if dryRun {
 			fmt.Fprintf(out, "  feature: %s\n", filepath.ToSlash(rel))
 		} else {
+			maggusID := parser.ParseMaggusID(p)
 			if err := os.Remove(p); err != nil {
 				return fmt.Errorf("remove feature %s: %w", rel, err)
 			}
+			removeLogDir(dir, maggusID)
 		}
 	}
 
@@ -79,9 +82,11 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		if dryRun {
 			fmt.Fprintf(out, "  bug: %s\n", filepath.ToSlash(rel))
 		} else {
+			maggusID := parser.ParseMaggusID(p)
 			if err := os.Remove(p); err != nil {
 				return fmt.Errorf("remove bug %s: %w", rel, err)
 			}
+			removeLogDir(dir, maggusID)
 		}
 	}
 
@@ -180,6 +185,16 @@ func cleanFinishedDispatchWorkers(out io.Writer, dir string, workers []runlog.Wo
 	}
 
 	return nil
+}
+
+// removeLogDir removes the per-feature log directory .maggus/logs/<maggusID>/ when
+// maggusID is non-empty. Errors are silently ignored (best-effort cleanup).
+func removeLogDir(dir, maggusID string) {
+	if maggusID == "" {
+		return
+	}
+	logDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	_ = os.RemoveAll(logDir)
 }
 
 // findCompletedFeatures returns paths to all _completed.md feature files in .maggus/features/.

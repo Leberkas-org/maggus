@@ -22,7 +22,7 @@ type SnapshotToolEntry struct {
 // StateSnapshot is the live state written to state.json by the daemon work loop.
 // The status view reads this file to render a rich TUI without IPC.
 type StateSnapshot struct {
-	RunID          string                       `json:"run_id"`
+	MaggusID       string                       `json:"maggus_id,omitempty"`
 	TaskID         string                       `json:"task_id"`
 	TaskTitle      string                       `json:"task_title"`
 	ItemTitle      string                       `json:"item_title"`
