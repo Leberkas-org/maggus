@@ -224,8 +224,8 @@ func TestTaskIDFromBranch(t *testing.T) {
 		{"feature/other", ""},
 	}
 	for _, tt := range tests {
-		if got := taskIDFromBranch(tt.branch); got != tt.want {
-			t.Errorf("taskIDFromBranch(%q) = %q, want %q", tt.branch, got, tt.want)
+		if got := TaskIDFromBranch(tt.branch); got != tt.want {
+			t.Errorf("TaskIDFromBranch(%q) = %q, want %q", tt.branch, got, tt.want)
 		}
 	}
 }

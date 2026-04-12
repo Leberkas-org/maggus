@@ -87,11 +87,11 @@ var featureTaskBranchRe = regexp.MustCompile(`^feature/maggus-([^/]+)/task-(.+)$
 // bugfix/maggus-bug-<plan>/task-<task>
 var bugTaskBranchRe = regexp.MustCompile(`^bugfix/maggus-bug-([^/]+)/task-(.+)$`)
 
-// taskIDFromBranch derives the task ID from a task branch name.
+// TaskIDFromBranch derives the task ID from a task branch name.
 //
 //	feature/maggus-038/task-003      ->  TASK-038-003
 //	bugfix/maggus-bug-001/task-003   ->  BUG-001-003
-func taskIDFromBranch(branch string) string {
+func TaskIDFromBranch(branch string) string {
 	if m := featureTaskBranchRe.FindStringSubmatch(branch); m != nil {
 		return "TASK-" + strings.ToUpper(m[1]) + "-" + strings.ToUpper(m[2])
 	}
@@ -123,7 +123,7 @@ func planFileFromTaskID(repoRoot, taskID string) string {
 }
 
 func injectBlockedCriterion(repoRoot, featureBranch, taskBranch string) error {
-	taskID := taskIDFromBranch(taskBranch)
+	taskID := TaskIDFromBranch(taskBranch)
 	if taskID == "" {
 		return fmt.Errorf("cannot derive task ID from branch %s", taskBranch)
 	}

@@ -11,6 +11,12 @@ import (
 // taskSegRe matches TASK-<plan>[−<task>] and captures plan and optional task segments.
 var taskSegRe = regexp.MustCompile(`^TASK-([^-]+)(?:-(.+))?$`)
 
+// featureTaskBranchRe matches feature task branches: feature/maggus-NNN/task-NNN
+var featureTaskBranchRe = regexp.MustCompile(`^(feature/maggus-[^/]+)/task-(.+)$`)
+
+// bugTaskBranchRe matches bug task branches: bugfix/maggus-bug-NNN/task-NNN
+var bugTaskBranchRe = regexp.MustCompile(`^(bugfix/maggus-bug-[^/]+)/task-(.+)$`)
+
 // bugSegRe matches BUG-<plan>[−<task>] and captures plan number and optional task segment.
 var bugSegRe = regexp.MustCompile(`^BUG-(\d+)(?:-(.+))?$`)
 
@@ -57,6 +63,26 @@ func FeatureBranchName(taskID string) string {
 		taskSeg = strings.ToLower(taskSeg)
 	}
 	return fmt.Sprintf("feature/maggus-%s/task-%s", planNum, taskSeg)
+}
+
+// IsTaskBranch returns true if branch is a task branch in either the
+// feature/maggus-NNN/task-NNN or bugfix/maggus-bug-NNN/task-NNN format.
+func IsTaskBranch(branch string) bool {
+	return featureTaskBranchRe.MatchString(branch) || bugTaskBranchRe.MatchString(branch)
+}
+
+// TaskPrefixFromBranch extracts the feature prefix from a task branch name.
+// For "feature/maggus-004/task-007" it returns "feature/maggus-004".
+// For "bugfix/maggus-bug-001/task-003" it returns "bugfix/maggus-bug-001".
+// Returns "" for non-task branches.
+func TaskPrefixFromBranch(branch string) string {
+	if m := featureTaskBranchRe.FindStringSubmatch(branch); m != nil {
+		return m[1]
+	}
+	if m := bugTaskBranchRe.FindStringSubmatch(branch); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // EnsureFeatureBranch checks the current branch and creates a feature branch if on a protected branch.
