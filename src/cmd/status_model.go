@@ -114,7 +114,6 @@ type statusModel struct {
 	// Rich live view from state.json
 	snapshot          *runlog.StateSnapshot // nil when no snapshot available
 	spinnerFrame      int
-	spinnerTicking    bool   // true while the 80ms tick loop is live
 	frozenRunElapsed  string // frozen run elapsed when snap reaches a terminal state
 	frozenTaskElapsed string // frozen task elapsed when snap reaches a terminal state
 
@@ -168,7 +167,6 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		bugStore:         bugStore,
 		logAutoScroll: true,
 		activeTab:     0,
-		spinnerTicking:   true,
 	}
 	// Query actual terminal dimensions before the first render so View() always
 	// has a non-zero size and the split-pane is visible on the first frame

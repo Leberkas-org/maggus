@@ -62,6 +62,14 @@ type WorkerConfig struct {
 	AgentSender agent.MessageSender // receives agent output (status, tool, usage, output msgs)
 	EventSender agent.MessageSender // receives lifecycle events (InfoMsg, CommitMsg)
 	Notifier    *notify.Notifier
+
+	// PreCommit is called after the agent completes successfully but before the
+	// commit. Callers use this to perform pre-commit operations such as marking
+	// completed feature files (renaming/deleting them) and firing lifecycle
+	// hooks. The workDir argument is the directory where the agent ran (may
+	// differ from RepoDir when UseWorktree is true). Leave nil for no
+	// pre-commit operations.
+	PreCommit func(workDir string)
 }
 
 // WorkerResult holds the outcome of a task worker execution.
@@ -148,6 +156,11 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 		result.Failed = &failedTask{ID: cfg.Task.ID, Title: cfg.Task.Title, Reason: reason}
 		workerCleanupWorktree(cfg, worktreePath)
 		return result
+	}
+
+	// --- Pre-commit operations (optional callback) ---
+	if cfg.PreCommit != nil {
+		cfg.PreCommit(workDir)
 	}
 
 	// --- Step 3: Commit ---

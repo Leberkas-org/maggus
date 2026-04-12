@@ -55,13 +55,8 @@ func consolidateBranches(repoDir string, cfg config.Config) ([]string, error) {
 		logs = append(logs, fmt.Sprintf("created integration branch %s", mergeTarget))
 	}
 
-	// Check out the merge target.
-	if err := checkoutRef(repoDir, mergeTarget); err != nil {
-		return logs, fmt.Errorf("consolidateBranches: checkout %s: %w", mergeTarget, err)
-	}
-
-	// Merge the task branch.
-	if err := mergeNoFF(repoDir, mergeTarget, current); err != nil {
+	// Rebase the task branch onto the merge target and fast-forward.
+	if err := rebaseAndMergeFF(repoDir, mergeTarget, current); err != nil {
 		return logs, err
 	}
 	logs = append(logs, fmt.Sprintf("merged %s into %s", current, mergeTarget))
@@ -185,30 +180,47 @@ func deleteAncestorSiblings(repoDir, prefix string) []string {
 	return logs
 }
 
-// mergeNoFF runs git merge --no-ff --no-edit sourceBranch in repoDir.
-// On conflict the merge is aborted and an error is returned. The repo is
-// guaranteed to not be in a mid-merge state when an error is returned.
-func mergeNoFF(repoDir, targetBranch, sourceBranch string) error {
-	cmd := gitutil.Command("merge", "--no-ff", "--no-edit", sourceBranch)
-	cmd.Dir = repoDir
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		return nil
+// rebaseAndMergeFF rebases sourceBranch onto targetBranch, then fast-forwards
+// targetBranch to the rebased tip. On conflict the rebase is aborted and an
+// error is returned. The repo is guaranteed to not be in a mid-rebase state
+// when an error is returned.
+func rebaseAndMergeFF(repoDir, targetBranch, sourceBranch string) error {
+	// Step 1: Rebase source onto target.
+	if err := checkoutRef(repoDir, sourceBranch); err != nil {
+		return fmt.Errorf("checkout %s for rebase: %w", sourceBranch, err)
 	}
 
-	// Check whether a real merge conflict is in progress (MERGE_HEAD exists).
-	checkCmd := gitutil.Command("rev-parse", "-q", "--verify", "MERGE_HEAD")
-	checkCmd.Dir = repoDir
-	if checkCmd.Run() == nil {
-		// Conflict — abort to leave the repo in a clean state.
-		abortCmd := gitutil.Command("merge", "--abort")
-		abortCmd.Dir = repoDir
-		_ = abortCmd.Run()
-		return fmt.Errorf("merge conflict merging %s into %s: resolve manually", sourceBranch, targetBranch)
+	rebaseCmd := gitutil.Command("rebase", targetBranch)
+	rebaseCmd.Dir = repoDir
+	out, err := rebaseCmd.CombinedOutput()
+	if err != nil {
+		// Check whether a rebase conflict is in progress (REBASE_HEAD exists).
+		checkCmd := gitutil.Command("rev-parse", "-q", "--verify", "REBASE_HEAD")
+		checkCmd.Dir = repoDir
+		if checkCmd.Run() == nil {
+			abortCmd := gitutil.Command("rebase", "--abort")
+			abortCmd.Dir = repoDir
+			_ = abortCmd.Run()
+			_ = checkoutRef(repoDir, targetBranch)
+			return fmt.Errorf("rebase conflict rebasing %s onto %s: resolve manually", sourceBranch, targetBranch)
+		}
+		// Non-conflict failure (e.g. branch not found).
+		return fmt.Errorf("rebase %s onto %s: %w: %s", sourceBranch, targetBranch, err, strings.TrimSpace(string(out)))
 	}
 
-	// Non-conflict failure (e.g. branch not found).
-	return fmt.Errorf("merge %s into %s: %w: %s", sourceBranch, targetBranch, err, strings.TrimSpace(string(out)))
+	// Step 2: Fast-forward target to the rebased source.
+	if err := checkoutRef(repoDir, targetBranch); err != nil {
+		return err
+	}
+
+	ffCmd := gitutil.Command("merge", "--ff-only", sourceBranch)
+	ffCmd.Dir = repoDir
+	if ffOut, ffErr := ffCmd.CombinedOutput(); ffErr != nil {
+		return fmt.Errorf("fast-forward %s to %s: %w: %s",
+			targetBranch, sourceBranch, ffErr, strings.TrimSpace(string(ffOut)))
+	}
+
+	return nil
 }
 
 // currentGitBranch returns the abbreviated ref name of HEAD (the current branch).

@@ -21,25 +21,38 @@ func (e *MergeConflictError) Error() string {
 	return fmt.Sprintf("merge conflict merging %s into %s", e.TaskBranch, e.FeatureBranch)
 }
 
-// MergeTaskBranch merges taskBranch into featureBranch in the repository at repoRoot
-// using a standard merge commit (no rebase, no fast-forward squash).
+// MergeTaskBranch integrates taskBranch into featureBranch using rebase +
+// fast-forward, producing a linear commit history with no merge commits.
 //
 // On success nil is returned. Branch deletion and worktree removal are the
 // responsibility of the caller; use gitbranch.DeleteBranch and
 // gitworktree.RemoveWorktree for best-effort cleanup.
-// On conflict the merge is aborted, a BLOCKED criterion is injected into the
+// On conflict the rebase is aborted, a BLOCKED criterion is injected into the
 // task's plan file, and a *MergeConflictError is returned. The worktree is
 // preserved so the developer can inspect the changes.
 func MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error {
+	// Step 1: Rebase task branch onto feature branch.
+	if err := checkout(repoRoot, taskBranch); err != nil {
+		return err
+	}
+
+	rebaseCmd := gitutil.Command("rebase", featureBranch)
+	rebaseCmd.Dir = repoRoot
+	out, err := rebaseCmd.CombinedOutput()
+	if err != nil {
+		return handleRebaseFailure(repoRoot, featureBranch, taskBranch, out, err)
+	}
+
+	// Step 2: Fast-forward feature branch to the rebased task branch tip.
 	if err := checkout(repoRoot, featureBranch); err != nil {
 		return err
 	}
 
-	cmd := gitutil.Command("merge", "--no-ff", "--no-edit", taskBranch)
-	cmd.Dir = repoRoot
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return handleMergeFailure(repoRoot, featureBranch, taskBranch, out, err)
+	ffCmd := gitutil.Command("merge", "--ff-only", taskBranch)
+	ffCmd.Dir = repoRoot
+	if ffOut, ffErr := ffCmd.CombinedOutput(); ffErr != nil {
+		return fmt.Errorf("fast-forward %s to %s: %w: %s",
+			featureBranch, taskBranch, ffErr, strings.TrimSpace(string(ffOut)))
 	}
 
 	return nil
@@ -54,20 +67,23 @@ func checkout(repoRoot, branch string) error {
 	return nil
 }
 
-func handleMergeFailure(repoRoot, featureBranch, taskBranch string, mergeOutput []byte, mergeErr error) error {
-	// Check whether a merge is actually in progress (MERGE_HEAD exists).
+func handleRebaseFailure(repoRoot, featureBranch, taskBranch string, rebaseOutput []byte, rebaseErr error) error {
+	// Check whether a rebase conflict is in progress (REBASE_HEAD exists).
 	// If not, this was a non-conflict failure (e.g. branch not found).
-	checkCmd := gitutil.Command("rev-parse", "-q", "--verify", "MERGE_HEAD")
+	checkCmd := gitutil.Command("rev-parse", "-q", "--verify", "REBASE_HEAD")
 	checkCmd.Dir = repoRoot
 	if checkCmd.Run() != nil {
-		return fmt.Errorf("merge %s into %s: %w: %s",
-			taskBranch, featureBranch, mergeErr, strings.TrimSpace(string(mergeOutput)))
+		return fmt.Errorf("rebase %s onto %s: %w: %s",
+			taskBranch, featureBranch, rebaseErr, strings.TrimSpace(string(rebaseOutput)))
 	}
 
-	// Conflict — abort the merge.
-	abortCmd := gitutil.Command("merge", "--abort")
+	// Conflict — abort the rebase.
+	abortCmd := gitutil.Command("rebase", "--abort")
 	abortCmd.Dir = repoRoot
 	_ = abortCmd.Run()
+
+	// Switch back to the feature branch so the repo is in the expected state.
+	_ = checkout(repoRoot, featureBranch)
 
 	// Best-effort: inject a BLOCKED criterion into the task's plan file.
 	_ = injectBlockedCriterion(repoRoot, featureBranch, taskBranch)

@@ -12,14 +12,12 @@ import (
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitsync"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/hooks"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/stores"
 )
@@ -65,6 +63,12 @@ type taskContext struct {
 	// Discord Rich Presence (nil when disabled).
 	presence *discord.Presence
 
+	// Branch context: plan branch for per-task branching (empty = no branching).
+	// Set by the work goroutine from runLoopParams.planBranch. When non-empty,
+	// the unified worker creates a task branch from this, merges back after
+	// commit, and deletes the task branch.
+	planBranch string
+
 	// Feature-centric context (set per-group by runWorkGoroutine).
 	currentPlan       *parser.Plan // current plan being worked on (set per-group)
 	featureSourceFile string       // scope parsedTasks to this source file for progress calculation
@@ -72,12 +76,14 @@ type taskContext struct {
 	featureTotal      int          // total features being processed (for TUI display)
 }
 
-// runTask executes a single task iteration: finds the next task, builds the
-// prompt, runs the agent, re-parses features, marks completed features, stages
-// renames, commits, and handles the result.
+// runTask executes a single task iteration via the unified RunTaskWorker:
+// finds the next workable task, signals the TUI, invokes the worker (which
+// handles branch creation → agent → pre-commit ops → commit → merge-back →
+// branch cleanup), re-parses the task list, fires post-commit hooks, updates
+// progress, and performs between-task sync checks.
 //
-// The caller's loop index (i) and total count are needed for progress tracking
-// and prompt metadata. The tasks slice is the current parsed task list.
+// The caller's loop index (i) and total count are needed for progress tracking.
+// The tasks slice is the current parsed task list.
 // maxCount is the user-requested task limit (0 = unlimited; used to cap progress total).
 func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskResult {
 	if tc.workCtx.Err() != nil {
@@ -107,28 +113,55 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 		})
 	}
 
-	// Build and run the prompt.
-	opts := prompt.Options{
-		Include:   tc.validIncludes,
-		Iteration: i + 1,
+	// Resolve plan metadata from the current group context.
+	var planFile, maggusID, planTitle string
+	if tc.currentPlan != nil {
+		planFile = tc.currentPlan.File
+		maggusID = tc.currentPlan.MaggusID
+		planTitle = tc.currentPlan.Title
 	}
 
-	tc.logger.TaskStart(next.ID, next.Title)
-	builtPrompt := prompt.Build(next, opts)
-	model := resolveTaskModel(next.Model, tc.resolvedModel)
-	if err := tc.activeAgent.Run(tc.workCtx, builtPrompt, model, tc.sessionPersistence, tc.p); err != nil {
-		if tc.workCtx.Err() != nil {
-			return taskResult{action: taskBreak, stopReason: StopReasonInterrupted}
-		}
-		tc.notifier.PlayError()
-		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{AgentErrors: 1})
-		reason := err.Error()
-		tc.logger.TaskFailed(next.ID, reason)
-		tc.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s — skipping to next task", next.ID, reason)})
+	// Run the unified task worker. The worker owns the complete lifecycle:
+	// branch creation → agent → pre-commit callback → commit → merge-back → cleanup.
+	wr := RunTaskWorker(WorkerConfig{
+		Ctx:            tc.workCtx,
+		Task:           *next,
+		PlanFile:       planFile,
+		MaggusID:       maggusID,
+		PlanTitle:      planTitle,
+		Agent:          tc.activeAgent,
+		Model:          tc.resolvedModel,
+		SessionPersist: tc.sessionPersistence,
+		ValidIncludes:  tc.validIncludes,
+		Iteration:      i + 1,
+		RepoDir:        tc.repoDir,
+		PlanBranch:     tc.planBranch,
+		UseWorktree:    false,
+		Logger:         tc.logger,
+		AgentSender:    tc.p,
+		EventSender:    tc.p,
+		Notifier:       tc.notifier,
+		PreCommit:      buildPreCommitFn(tc),
+	})
+
+	// Handle interruption.
+	if wr.StopReason != 0 {
+		return taskResult{action: taskBreak, stopReason: wr.StopReason}
+	}
+	// Handle agent / commit / branch failures.
+	if wr.Failed != nil {
 		return taskResult{
 			action: taskSkipToNext,
 			taskID: next.ID,
-			failed: &failedTask{ID: next.ID, Title: next.Title, Reason: reason},
+			failed: wr.Failed,
+		}
+	}
+	// Handle merge conflict (task marked blocked, loop skips to next).
+	if wr.Blocked {
+		return taskResult{
+			action:  taskSkipToNext,
+			taskID:  next.ID,
+			warning: wr.Warning,
 		}
 	}
 
@@ -143,115 +176,48 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 		}
 	}
 
-	// Rename or delete fully completed feature and bug files before committing.
-	// When hooks are configured, snapshot file metadata before the mark operation
-	// since the files may be renamed or deleted.
-	featureAction := tc.onComplete.FeatureAction()
-	bugAction := tc.onComplete.BugAction()
-	var featureSnapshots, bugSnapshots []completionSnapshot
-	if len(tc.hooks.OnFeatureComplete) > 0 {
-		featureSnapshots = snapshotForHooks(tc.featureStore)
-	}
-	if len(tc.hooks.OnBugComplete) > 0 {
-		bugSnapshots = snapshotForHooks(tc.bugStore)
-	}
-
-	completedFeatures, _ := tc.featureStore.MarkCompleted(featureAction)
-	completedBugs, _ := tc.bugStore.MarkCompleted(bugAction)
-	if len(completedFeatures) > 0 || len(completedBugs) > 0 {
-		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{
-			FeaturesCompleted: int64(len(completedFeatures)),
-			BugsCompleted:     int64(len(completedBugs)),
-		})
-	}
-
-	// Fire lifecycle hooks for completed features/bugs (after file action, before git add).
-	fireCompletionHooks(tc, completedFeatures, featureSnapshots, featureAction, "feature_complete", tc.hooks.OnFeatureComplete)
-	fireCompletionHooks(tc, completedBugs, bugSnapshots, bugAction, "bug_complete", tc.hooks.OnBugComplete)
-
-	// Stage any feature renames so they are included in the commit.
-	stageFeatures := gitutil.Command("add", "--", ".maggus/")
-	stageFeatures.Dir = tc.workDir
-	_, _ = stageFeatures.CombinedOutput()
-
-	// Scope parsedTasks to the current feature source file when in feature mode.
-	// This ensures progress calculation and result.tasks reflect only this feature's tasks.
+	// Scope parsed tasks to the current feature source file.
 	scopedTasks := parsedTasks
 	if tc.featureSourceFile != "" {
 		scopedTasks = filterTasksBySourceFile(parsedTasks, tc.featureSourceFile)
 	}
 
-	// Commit, update progress, and check sync.
-	result := completeTask(tc, next, scopedTasks, i, count, maxCount)
-	result.taskID = next.ID
-	return result
-}
-
-// completeTask encapsulates post-agent-execution logic: committing via COMMIT.md,
-// sending progress updates, and running between-task sync checks.
-// It returns a taskResult indicating whether the loop should continue, break, or skip.
-// maxCount is the user-requested task limit; when >0 the computed progress total is capped at it.
-func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, i, count, maxCount int) taskResult {
-	// Commit using COMMIT.md.
-	commitResult, commitErr := gitcommit.CommitIteration(tc.workDir, task.ID+": "+task.Title)
-	if commitErr != nil {
-		reason := commitErr.Error()
-		tc.logger.TaskFailed(task.ID, reason)
-		tc.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s — skipping to next task", task.ID, reason)})
-		return taskResult{
-			action: taskSkipToNext,
-			tasks:  parsedTasks,
-			failed: &failedTask{ID: task.ID, Title: task.Title, Reason: reason},
-		}
-	}
-
 	result := taskResult{
-		action: taskContinue,
-		tasks:  parsedTasks,
+		action:    taskContinue,
+		tasks:     scopedTasks,
+		taskID:    next.ID,
+		committed: wr.Completed,
+		warning:   wr.Warning,
 	}
 
-	if commitResult.Committed {
-		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{GitCommits: 1})
-		commitHash := captureShortHash(tc.workDir)
-		tc.logger.TaskComplete(task.ID, commitHash)
-		tc.p.Send(CommitMsg{Message: commitResult.Message})
-		tc.notifier.PlayTaskComplete()
-		result.committed = true
-
+	if wr.Completed {
 		// Update Discord presence with incremented progress (task now counts as done).
 		if tc.presence != nil {
-			completed, total := computeTaskProgress(parsedTasks, task.SourceFile)
+			completed, total := computeTaskProgress(parsedTasks, next.SourceFile)
 			tc.presence.Update(discord.PresenceState{
-				TaskID:          task.ID,
-				TaskTitle:       task.Title,
-				FeatureTitle:    parser.ParseFileTitle(task.SourceFile),
+				TaskID:          next.ID,
+				TaskTitle:       next.Title,
+				FeatureTitle:    parser.ParseFileTitle(next.SourceFile),
 				StartTime:       time.Now(),
-				Verb:            verbForTask(task.SourceFile),
+				Verb:            verbForTask(next.SourceFile),
 				ProgressCurrent: completed,
 				ProgressTotal:   total,
 			})
 		}
 
-		// Fire task completion hooks (zero overhead when unconfigured).
+		// Fire task_complete hook (zero overhead when unconfigured).
 		if len(tc.hooks.OnTaskComplete) > 0 {
 			event := hooks.Event{
 				Type:      "task_complete",
-				File:      filepath.Base(task.SourceFile),
-				MaggusID:  parser.ParseMaggusID(task.SourceFile),
-				Title:     task.Title,
+				File:      filepath.Base(next.SourceFile),
+				MaggusID:  parser.ParseMaggusID(next.SourceFile),
+				Title:     next.Title,
 				Action:    "",
-				Tasks:     []hooks.TaskInfo{{ID: task.ID, Title: task.Title}},
+				Tasks:     []hooks.TaskInfo{{ID: next.ID, Title: next.Title}},
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 			}
 			hooks.Run(tc.hooks.OnTaskComplete, event, tc.workDir, log.Default())
 		}
-	} else {
-		msg := commitResult.Message
-		if msg == "" {
-			msg = "commit skipped (unknown reason)"
-		}
-		result.warning = fmt.Sprintf("%s: %s", task.ID, msg)
-		tc.p.Send(InfoMsg{Text: "⚠ " + result.warning})
 	}
 
 	// Update progress to reflect completed iteration.
@@ -273,6 +239,45 @@ func completeTask(tc taskContext, task *parser.Task, parsedTasks []parser.Task, 
 	}
 
 	return result
+}
+
+// buildPreCommitFn creates the pre-commit callback injected into RunTaskWorker
+// for sequential task execution. It marks completed feature/bug files (renaming
+// or deleting them per config), fires feature/bug lifecycle hooks, and stages
+// the .maggus/ directory so file renames are included in the commit.
+func buildPreCommitFn(tc taskContext) func(workDir string) {
+	return func(workDir string) {
+		featureAction := tc.onComplete.FeatureAction()
+		bugAction := tc.onComplete.BugAction()
+
+		// Snapshot metadata before MarkCompleted renames/deletes files so hook
+		// payloads can be built after the file action.
+		var featureSnapshots, bugSnapshots []completionSnapshot
+		if len(tc.hooks.OnFeatureComplete) > 0 {
+			featureSnapshots = snapshotForHooks(tc.featureStore)
+		}
+		if len(tc.hooks.OnBugComplete) > 0 {
+			bugSnapshots = snapshotForHooks(tc.bugStore)
+		}
+
+		completedFeatures, _ := tc.featureStore.MarkCompleted(featureAction)
+		completedBugs, _ := tc.bugStore.MarkCompleted(bugAction)
+		if len(completedFeatures) > 0 || len(completedBugs) > 0 {
+			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{
+				FeaturesCompleted: int64(len(completedFeatures)),
+				BugsCompleted:     int64(len(completedBugs)),
+			})
+		}
+
+		// Fire lifecycle hooks for completed features/bugs (after file action, before commit).
+		fireCompletionHooks(tc, completedFeatures, featureSnapshots, featureAction, "feature_complete", tc.hooks.OnFeatureComplete)
+		fireCompletionHooks(tc, completedBugs, bugSnapshots, bugAction, "bug_complete", tc.hooks.OnBugComplete)
+
+		// Stage .maggus/ so file renames/deletions are included in the commit.
+		stageFeatures := gitutil.Command("add", "--", ".maggus/")
+		stageFeatures.Dir = workDir
+		_, _ = stageFeatures.CombinedOutput()
+	}
 }
 
 // findNextWorkableTask returns the next task to work on, respecting --task flag, worktree

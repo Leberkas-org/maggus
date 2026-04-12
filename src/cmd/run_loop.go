@@ -244,6 +244,10 @@ type runLoopParams struct {
 	dir           string
 	featureStore  stores.FeatureStore
 	bugStore      stores.BugStore
+	// planBranch is the integration branch for per-task branching in sequential
+	// mode. The unified worker creates task branches from this branch and merges
+	// back after each task. Empty when auto-branch is disabled.
+	planBranch string
 }
 
 // runWorkGoroutine runs the feature-centric work loop in a goroutine, sending TUI events.
@@ -332,6 +336,7 @@ func runWorkGoroutine(params runLoopParams) {
 			tc.featureSourceFile = group.File
 			tc.featureCurrent = fi + 1
 			tc.featureTotal = featureTotal
+			tc.planBranch = params.planBranch // for per-task branching via unified worker
 
 			// Run all tasks in this feature group.
 			grResult := runGroupTasks(tc, params, group)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -12,14 +11,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
-	"github.com/leberkas-org/maggus/internal/gitbranch"
-	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitmerge"
-	"github.com/leberkas-org/maggus/internal/gitworktree"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/prompt"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/stores"
 	"golang.org/x/sync/errgroup"
@@ -259,11 +254,11 @@ func (o *parallelOrchestrator) runParallelBatch(group parser.Plan, tasks []parse
 	return result
 }
 
-// runSingleTask runs one task. When useWorktree is true, the task runs in its own
-// worktree on its own branch (parallel mode). When false, it runs in the main worktree.
+// runSingleTask runs one task via the unified worker. When useWorktree is true,
+// the task runs in its own worktree on its own branch (parallel mode). When false,
+// it runs in the main worktree sequentially.
 func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task, useWorktree bool) parallelWorkResult {
 	var result parallelWorkResult
-	taskBranch := gitbranch.BranchName(task.ID)
 
 	o.mu.Lock()
 	o.iteration++
@@ -285,27 +280,9 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	var wsw *workerSnapshotWriter
 	if useWorktree {
 		wsw = newWorkerSnapshotWriter(o.repoDir, group.MaggusID, task.ID, task.Title, group.Title, o.runStartedAt)
-	}
-
-	worktreePath := filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)
-	workDir := o.repoDir
-	if useWorktree {
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting in worktree", task.ID)})
-
-		if err := gitbranch.CreateBranchFrom(o.repoDir, taskBranch, o.planBranch); err != nil {
-			o.markWorkerFailed(task.ID, wsw)
-			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create branch: %v", err))
-		}
-		if err := gitworktree.CreateWorktree(o.repoDir, worktreePath, taskBranch); err != nil {
-			o.markWorkerFailed(task.ID, wsw)
-			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create worktree: %v", err))
-		}
-		workDir = worktreePath
 	} else {
 		o.p.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting sequentially (Parallel: no)", task.ID)})
-		if _, _, err := gitbranch.EnsureTaskBranchFromBase(o.repoDir, task.ID, o.planBranch); err != nil {
-			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create task branch: %v", err))
-		}
 		// Notify the main snapshot (state.json) of the active task so the TUI
 		// can show the spinner on the task row for sequential tasks in parallel mode.
 		o.p.Send(IterationStartMsg{
@@ -317,103 +294,77 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		})
 	}
 
-	workerLogger.TaskStart(task.ID, task.Title)
-
-	// Run agent — parallel workers use per-worker snapshot writer, sequential use main program.
-	opts := prompt.Options{Include: o.validIncludes, Iteration: iter}
-	builtPrompt := prompt.Build(&task, opts)
-	model := resolveTaskModel(task.Model, o.resolvedModel)
-
+	// Parallel workers write to their own snapshot; sequential tasks use the main program.
 	var agentSender agent.MessageSender = o.p
 	if wsw != nil {
 		agentSender = wsw
 	}
-	if err := o.activeAgent.Run(o.ctx, builtPrompt, model, o.sessionPersist, agentSender); err != nil {
-		if o.ctx.Err() != nil {
-			result.stopReason = StopReasonInterrupted
-			return result
-		}
-		o.notifier.PlayError()
-		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{AgentErrors: 1})
-		reason := err.Error()
-		workerLogger.TaskFailed(task.ID, reason)
-		o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s", task.ID, reason)})
-		result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
-		o.markWorkerFailed(task.ID, wsw)
-		if useWorktree {
-			_ = gitworktree.RemoveWorktree(o.repoDir, filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID))
-		}
-		return result
-	}
 
-	// Commit.
-	commitResult, commitErr := gitcommit.CommitIteration(workDir, task.ID+": "+task.Title)
-	if commitErr != nil {
-		reason := commitErr.Error()
-		workerLogger.TaskFailed(task.ID, reason)
-		o.p.Send(InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s", task.ID, reason)})
-		result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: reason})
-		o.markWorkerFailed(task.ID, wsw)
-		if useWorktree {
-			_ = gitworktree.RemoveWorktree(o.repoDir, filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID))
-		}
-		return result
-	}
-
-	if !commitResult.Committed {
-		msg := commitResult.Message
-		if msg == "" {
-			msg = "commit skipped (unknown reason)"
-		}
-		result.warnings = append(result.warnings, fmt.Sprintf("%s: %s", task.ID, msg))
-		o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: %s", task.ID, msg)})
-	} else {
-		workerLogger.TaskComplete(task.ID, captureShortHash(workDir))
-		o.p.Send(CommitMsg{Message: commitResult.Message})
-		o.notifier.PlayTaskComplete()
-		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{GitCommits: 1})
-	}
-
-	// Merge task branch into plan branch (serialized for worktree tasks).
+	// Serialize merges for parallel (worktree) tasks only.
+	var mergeMu *sync.Mutex
 	if useWorktree {
-		o.mu.Lock()
-		mergeErr := gitmerge.MergeTaskBranch(o.repoDir, o.planBranch, taskBranch)
-		o.mu.Unlock()
-		if mergeErr != nil {
-			o.markWorkerBlocked(task.ID, wsw, mergeErr)
-			return o.handleMergeErr(&result, workerLogger, task, mergeErr)
-		}
-		// Best-effort cleanup: remove worktree then delete branch.
-		// Order matters: worktree must be removed before branch can be deleted.
-		if err := gitworktree.RemoveWorktree(o.repoDir, worktreePath); err != nil {
-			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", task.ID, err)})
-		}
-		if err := gitbranch.DeleteBranch(o.repoDir, taskBranch); err != nil {
-			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: branch cleanup failed: %v", task.ID, err)})
-		}
-	} else {
-		if mergeErr := gitmerge.MergeTaskBranch(o.repoDir, o.planBranch, taskBranch); mergeErr != nil {
-			return o.handleMergeErr(&result, workerLogger, task, mergeErr)
-		}
-		// Best-effort cleanup: delete task branch (no worktree for sequential tasks).
-		if err := gitbranch.DeleteBranch(o.repoDir, taskBranch); err != nil {
-			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: branch cleanup failed: %v", task.ID, err)})
-		}
+		mergeMu = &o.mu
 	}
 
-	// Mark task complete in the plan file (serialized).
+	cfg := WorkerConfig{
+		Ctx:            o.ctx,
+		Task:           task,
+		PlanFile:       group.File,
+		MaggusID:       group.MaggusID,
+		PlanTitle:      group.Title,
+		Agent:          o.activeAgent,
+		Model:          o.resolvedModel,
+		SessionPersist: o.sessionPersist,
+		ValidIncludes:  o.validIncludes,
+		Iteration:      iter,
+		RepoDir:        o.repoDir,
+		PlanBranch:     o.planBranch,
+		UseWorktree:    useWorktree,
+		MergeMu:        mergeMu,
+		Logger:         workerLogger,
+		AgentSender:    agentSender,
+		EventSender:    o.p,
+		Notifier:       o.notifier,
+	}
+
+	wr := RunTaskWorker(cfg)
+
+	// Handle interruption.
+	if wr.StopReason == StopReasonInterrupted {
+		o.markWorkerFailed(task.ID, wsw)
+		result.stopReason = StopReasonInterrupted
+		return result
+	}
+
+	// Handle task failure (agent error, commit error, branch error).
+	if wr.Failed != nil {
+		result.failed = append(result.failed, *wr.Failed)
+		o.markWorkerFailed(task.ID, wsw)
+		return result
+	}
+
+	// Handle merge conflict (task blocked).
+	if wr.Blocked {
+		result.warnings = append(result.warnings, wr.Warning)
+		o.markWorkerBlocked(task.ID, wsw, nil)
+		return result
+	}
+
+	// Propagate any commit warning (e.g. commit skipped).
+	if wr.Warning != "" {
+		result.warnings = append(result.warnings, wr.Warning)
+	}
+
+	// Mark task as completed in orchestrator state.
 	o.mu.Lock()
-	o.markTaskCriteriaComplete(group.File, task.ID)
 	o.completedIDs[task.ID] = true
 	o.mu.Unlock()
 
-	// Update worker snapshot and index with done status.
 	o.markWorkerDone(task.ID, wsw)
-
 	o.p.Send(InfoMsg{Text: fmt.Sprintf("✓ %s: Completed and merged into %s", task.ID, o.planBranch)})
 	_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
 
-	if commitResult.Committed {
+	if wr.Completed {
 		result.completed = 1
 	}
 	return result

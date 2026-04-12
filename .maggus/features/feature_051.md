@@ -86,14 +86,14 @@ Replace the sequential work loop in `run_loop.go` / `run_task.go` with calls to 
 This resolves bug_041 as a side effect — the worker always merges back and cleans up.
 
 **Acceptance Criteria:**
-- [ ] Sequential daemon loop calls the unified worker per task
-- [ ] Task branches are created, merged, and deleted per task (not once per cycle)
-- [ ] `setupBranch()` in `daemon_keepalive.go` is no longer called for sequential mode — the worker handles it
-- [ ] Bug_041 behavior verified: after each task, the task branch is merged and deleted
-- [ ] Daemon returns to plan branch between tasks
-- [ ] No behavioral change from user's perspective
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] Sequential daemon loop calls the unified worker per task
+- [x] Task branches are created, merged, and deleted per task (not once per cycle)
+- [x] `setupBranch()` in `daemon_keepalive.go` is no longer called for sequential mode — the worker handles it
+- [x] Bug_041 behavior verified: after each task, the task branch is merged and deleted
+- [x] Daemon returns to plan branch between tasks
+- [x] No behavioral change from user's perspective
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ### TASK-051-003: Rewire parallel orchestrator to use unified worker
 **Description:** As a developer, I want the parallel orchestrator to use the unified worker so that task execution logic is not duplicated.
@@ -111,13 +111,13 @@ Replace `run_parallel.go` `runSingleTask` with calls to the unified worker:
 4. Merge serialization (the `o.mu.Lock()` around merge) stays in the orchestrator — the worker's merge step uses a callback or mutex provided by the caller
 
 **Acceptance Criteria:**
-- [ ] `runSingleTask` replaced with calls to the unified worker
-- [ ] Parallel concurrency and worktree management remain in the orchestrator
-- [ ] Merge serialization preserved (no concurrent merges to the plan branch)
-- [ ] Worker snapshot writing works correctly per worker
-- [ ] No behavioral change from user's perspective
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] `runSingleTask` replaced with calls to the unified worker
+- [x] Parallel concurrency and worktree management remain in the orchestrator
+- [x] Merge serialization preserved (no concurrent merges to the plan branch)
+- [x] Worker snapshot writing works correctly per worker
+- [x] No behavioral change from user's perspective
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ### TASK-051-004: Rewire dispatched worker and remove dead code
 **Description:** As a developer, I want dispatched workers to use the unified worker and all dead code from the old three-path implementation removed.

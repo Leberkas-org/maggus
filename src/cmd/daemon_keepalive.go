@@ -305,10 +305,21 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		}
 		branchMsg = planBranchMsg
 	} else {
-		var brErr error
-		branchMsg, brErr = setupBranch(repoDir, branchTask, wc.cfg.Git)
-		if brErr != nil {
-			return false, fmt.Errorf("setup branch: %w", brErr)
+		// Sequential mode: determine the plan branch for per-task branching via
+		// the unified worker. When auto-branch is enabled, EnsurePlanBranch
+		// creates (or switches to) the plan-level integration branch on protected
+		// branches, or returns the current branch on non-protected branches. The
+		// worker then creates per-task branches from planBranch, commits, merges
+		// back, and cleans up after each task — resolving bug_041.
+		if wc.cfg.Git.IsAutoBranchEnabled() {
+			var pbErr error
+			planBranch, branchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
+			if pbErr != nil {
+				return false, fmt.Errorf("setup plan branch: %w", pbErr)
+			}
+		} else {
+			branchMsg = "Auto-branch disabled, staying on current branch"
+			// planBranch stays "": worker runs without per-task branching.
 		}
 	}
 
@@ -438,6 +449,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		dir:           dir,
 		featureStore:  featureStore,
 		bugStore:      bugStore,
+		planBranch:    planBranch,
 	}
 
 	if wc.parallel {

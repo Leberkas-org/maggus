@@ -70,29 +70,14 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd
 
 	case spinnerTickMsg:
-		if m.daemon.Running && m.snapshot != nil {
-			isTerminal := m.snapshot.Status == "Done" || m.snapshot.Status == "Failed" || m.snapshot.Status == "Interrupted"
-			if isTerminal && !m.isParallelMode() {
-				// Stop the tick loop; it will be restarted when a new run begins.
-				m.spinnerTicking = false
-				return m, nil
-			}
-			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
-			// Advance per-worker spinners in parallel mode.
-			if m.isParallelMode() {
-				m.advanceWorkerSpinners()
-			}
-			return m, spinnerTick()
-		}
-		// Advance worker spinners when active workers exist (parallel orchestrator or
-		// dispatched workers). Dispatched workers may run without a daemon, so we
-		// check isParallelMode() rather than requiring m.daemon.Running.
+		m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
 		if m.isParallelMode() {
 			m.advanceWorkerSpinners()
-			m.spinnerFrame = (m.spinnerFrame + 1) % len(styles.SpinnerFrames)
-			return m, spinnerTick()
 		}
-		// Keep ticking even when idle so the spinner starts immediately when daemon resumes.
+		// Always keep the tick loop alive so the spinner starts animating
+		// immediately when a new task begins. Rendering code substitutes
+		// static icons (✓/✗/⊘) for terminal statuses, so advancing the
+		// frame during idle/terminal states is harmless.
 		return m, spinnerTick()
 
 	case daemonCacheUpdateMsg:
@@ -161,15 +146,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.frozenTaskElapsed = formatHumanDuration(time.Since(t))
 			}
 		}
-		// Clear frozen elapsed and restart the tick loop when a new run begins.
-		if newSnapStatus != "" && !isTerminalStatus(newSnapStatus) && !m.spinnerTicking {
+		// Clear frozen elapsed when a new run begins (terminal → non-terminal transition).
+		if newSnapStatus != "" && !isTerminalStatus(newSnapStatus) && isTerminalStatus(prevSnapStatus) {
 			m.frozenRunElapsed = ""
 			m.frozenTaskElapsed = ""
-			m.spinnerTicking = true
-			if m.logWatcherCh != nil {
-				return m, tea.Batch(listenForLogFileUpdate(m.logWatcherCh), spinnerTick())
-			}
-			return m, tea.Batch(logPollTick(), spinnerTick())
 		}
 
 		if m.logWatcherCh != nil {
