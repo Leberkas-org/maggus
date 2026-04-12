@@ -11,10 +11,7 @@ import (
 
 func TestTaskUsage(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("20260101-100000", dir, 50)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskUsage(runlog.TaskUsageData{
@@ -33,7 +30,7 @@ func TestTaskUsage(t *testing.T) {
 		},
 	})
 
-	logPath := findLogFile(t, dir)
+	logPath := findLogFile(t, dir, testMaggusID)
 	f, err := os.Open(logPath)
 	if err != nil {
 		t.Fatalf("open log: %v", err)

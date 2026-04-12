@@ -90,7 +90,7 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 	runID := daemonRunIDFlag
 
 	// Open structured run log (shared across cycles).
-	runLogger, logErr := runlog.Open(runID, dir, wc.cfg.LogMaxFiles())
+	runLogger, logErr := runlog.Open(dir, wc.cfg.LogMaxFiles())
 	if logErr != nil {
 		cmd.Printf("Warning: could not open run log: %v\n", logErr)
 	}

@@ -73,10 +73,13 @@ func findLatestRunLog(dir string) (runID, logPath string) {
 		// Extract RunID from the snapshot struct for log-file lookup.
 		if snap, err := runlog.ReadSnapshot(dir); err == nil && snap.RunID != "" {
 			runID = snap.RunID
-			// If the run-specific log file exists, prefer it over the latest scanned log.
-			candidate := filepath.Join(runsDir, runID+".log")
-			if _, err := os.Stat(candidate); err == nil {
-				logPath = candidate
+			// Find the log file belonging to this runID by prefix match (<runID>_<ts>.log).
+			prefix := runID + "_"
+			for _, name := range logFiles {
+				if strings.HasPrefix(name, prefix) {
+					logPath = filepath.Join(runsDir, name)
+					break
+				}
 			}
 		}
 	}
