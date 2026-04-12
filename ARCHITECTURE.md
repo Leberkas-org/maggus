@@ -39,7 +39,7 @@ no HTTP server.
 | **Claude Agent** | `internal/agent/claude` | Implements agent interface for Claude Code: invokes `claude --output-format stream-json`, parses streaming events, feeds TUI messages |
 | **Config** | `internal/config` | Parses `.maggus/config.yml`; resolves model aliases; validates include paths |
 | **Approval** | `internal/approval` | Manages `.maggus/feature_approvals.yml`; opt-in / opt-out modes; UUID-keyed state |
-| **Run Tracker** | `internal/runtracker` | Creates `.maggus/runs/<RUN_ID>/`; writes `state.json` snapshots and iteration logs for live status rendering |
+| **Run Logger** | `internal/runlog` | Writes JSONL events to `.maggus/logs/<maggus_id>/<pid>.log`, organized by feature GUID; manages daemon state snapshots in `.maggus/runs/`; prunes old log files per feature directory |
 | **Git Layer** | `internal/git*` | Branch creation, commit from `COMMIT.md`, `.gitignore` enforcement, remote sync check |
 | **Global Config** | `internal/globalconfig` | `~/.config/maggus/settings.json`; tracks registered repos, startup metrics, Discord toggle |
 | **File Watcher** | `internal/filewatcher` | Monitors `.maggus/features/` and `.maggus/bugs/` for changes; notifies status view to refresh |
@@ -59,8 +59,9 @@ All runtime state is stored in the `.maggus/` directory. No database.
 | `.maggus/features/feature_*_completed.md` | Completed feature plans (renamed on completion) |
 | `.maggus/bugs/bug_*.md` | Bug plan files |
 | `.maggus/feature_approvals.yml` | Approval state, keyed by stable UUID |
-| `.maggus/runs/<RUN_ID>/state.json` | State snapshots per run iteration (for live TUI status) |
-| `.maggus/runs/<RUN_ID>/<iter>.log` | Raw streaming JSON events per iteration |
+| `.maggus/runs/state.json` | Live daemon state snapshot (active feature, task, token counts) for TUI display |
+| `.maggus/runs/state-<worker>.json` | Per-worker state snapshots for parallel task execution |
+| `.maggus/logs/<maggus_id>/<pid>.log` | JSONL streaming events per feature/bug GUID; `<maggus_id>` is the feature UUID, `<pid>` is the writer's OS process ID |
 | `.maggus/MEMORY.md` | Cross-task architectural learnings; included in every prompt bootstrap (gitignored) |
 | `.maggus/daemon.pid` | PID of the running daemon process |
 | `.maggus/daemon.stop` | Sentinel: immediate daemon stop |
@@ -173,7 +174,8 @@ The TUI and daemon share state via the file system only — no sockets, no pipes
 | Mechanism | Direction | Purpose |
 |---|---|---|
 | `.maggus/daemon.pid` | Daemon → TUI | TUI watches for start/stop events |
-| `.maggus/runs/<RUN_ID>/state.json` | Daemon → TUI | Live task status, tool activity, token counts |
+| `.maggus/runs/state.json` | Daemon → TUI | Live task status, tool activity, token counts |
+| `.maggus/logs/<maggus_id>/` | Daemon → TUI | JSONL event log files; TUI reads by feature GUID from snapshot's `maggus_id` field |
 | `.maggus/daemon.stop` | TUI → Daemon | Immediate stop signal |
 | `.maggus/daemon.stop-after-task` | TUI → Daemon | Graceful stop-after-task signal |
 | **File watcher** | FS → TUI | Auto-refresh status when plan files change externally |
@@ -184,7 +186,7 @@ Each agent invocation receives a minimal, task-scoped prompt:
 
 1. **Bootstrap context** — CLAUDE.md, AGENTS.md, PROJECT_CONTEXT.md, TOOLING.md,
    `.maggus/MEMORY.md`, + files listed in `config.yml include`
-2. **Run metadata** — `RUN_ID`, `ITERATION` number
+2. **Run metadata** — `ITERATION` number
 3. **Task details** — ID, title, description, acceptance criteria
 4. **Behavioral instructions** — "Complete only this task. Update checkboxes.
    Stage files. Write COMMIT.md. Optionally update MEMORY.md and RELEASE_NOTES.md."

@@ -162,13 +162,13 @@ Update all TUI code that reads log files:
 5. **Update usage tests**: Stop asserting specific RunID values in new records. Keep migration tests that read old records with RunID intact.
 
 **Acceptance Criteria:**
-- [ ] `usage.Record.RunID` field retained in struct for backwards compat
-- [ ] New usage records write empty string for `RunID`
-- [ ] `runID` removed from `taskContext` struct
-- [ ] No code path generates or threads a `runID` value
-- [ ] Migration tests for old usage records still pass
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./internal/usage/...` passes
+- [x] `usage.Record.RunID` field retained in struct for backwards compat
+- [x] New usage records write empty string for `RunID`
+- [x] `runID` removed from `taskContext` struct
+- [x] No code path generates or threads a `runID` value
+- [x] Migration tests for old usage records still pass
+- [x] `go build ./...` succeeds
+- [x] `go test ./internal/usage/...` passes
 
 ### TASK-050-005: Add .maggus/logs/ to gitignore and update pruning
 **Description:** As a developer, I want the new logs directory properly gitignored and old feature log directories cleaned up when features are completed or deleted.
@@ -215,12 +215,12 @@ Update all TUI code that reads log files:
 4. **Update ARCHITECTURE.md**: Document the new log directory structure and the removal of `run_id`.
 
 **Acceptance Criteria:**
-- [ ] No dead functions, types, or variables related to the old logging system remain
-- [ ] `go vet ./...` reports no new warnings from this refactor
-- [ ] CLAUDE.md architecture table updated for `runlog` package
-- [ ] ARCHITECTURE.md updated with new log structure
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] No dead functions, types, or variables related to the old logging system remain
+- [x] `go vet ./...` reports no new warnings from this refactor
+- [x] CLAUDE.md architecture table updated for `runlog` package
+- [x] ARCHITECTURE.md updated with new log structure
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 
