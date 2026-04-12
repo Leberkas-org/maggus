@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/filewatcher"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/gitrecover"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -89,7 +90,7 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 	runID := daemonRunIDFlag
 
 	// Open structured run log (shared across cycles).
-	runLogger, logErr := runlog.Open("", dir, wc.cfg.LogMaxFiles())
+	runLogger, logErr := runlog.Open(runID, dir, wc.cfg.LogMaxFiles())
 	if logErr != nil {
 		cmd.Printf("Warning: could not open run log: %v\n", logErr)
 	}
@@ -245,6 +246,16 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir, runID string, runLog
 
 	featureStore := stores.NewFileFeatureStore(planDir)
 	bugStore := stores.NewFileBugStore(planDir)
+
+	// Recovery: detect and fix any dirty state left by a previous interrupted run.
+	// Errors are warnings only — the normal work cycle is attempted regardless.
+	recoveryLogs, recoveryErr := gitrecover.RecoverDirtyState(dir, wc.cfg, featureStore, bugStore)
+	for _, msg := range recoveryLogs {
+		cmd.Println(msg)
+	}
+	if recoveryErr != nil {
+		cmd.Printf("Warning: recovery error: %v\n", recoveryErr)
+	}
 
 	// Parse tasks and check for work.
 	setup, err := initIteration(cmd, planDir, wc.modelDisplay, 0, featureStore, bugStore)

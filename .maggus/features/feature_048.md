@@ -114,13 +114,13 @@ This feature adds a `RecoverDirtyState` pre-flight function that runs at the top
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] Public function `gitrecover.RecoverDirtyState(repoDir string, cfg config.Config, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]string, error)` that calls `commitPending`, `consolidateBranches`, and `cleanOrphanedWorktrees` in order
-- [ ] Each step is independent: if step 1 succeeds but step 2 fails, the error is returned but step 1's commit is preserved
-- [ ] Integrated into `daemon_keepalive.go` `runOneDaemonCycle`, before `initIteration`
-- [ ] Recovery messages sent via `cmd.Println` (same pattern as other daemon info messages)
-- [ ] Recovery errors are logged as warnings but do not abort the daemon cycle — the normal flow is attempted regardless
-- [ ] On a clean repo: function completes in under 100ms (just a few git status checks)
-- [ ] Unit test: orchestration calls all three steps, early failure in step 2 does not prevent step 3
+- [x] Public function `gitrecover.RecoverDirtyState(repoDir string, cfg config.Config, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]string, error)` that calls `commitPending`, `consolidateBranches`, and `cleanOrphanedWorktrees` in order
+- [x] Each step is independent: if step 1 succeeds but step 2 fails, the error is returned but step 1's commit is preserved
+- [x] Integrated into `daemon_keepalive.go` `runOneDaemonCycle`, before `initIteration`
+- [x] Recovery messages sent via `cmd.Println` (same pattern as other daemon info messages)
+- [x] Recovery errors are logged as warnings but do not abort the daemon cycle — the normal flow is attempted regardless
+- [x] On a clean repo: function completes in under 100ms (just a few git status checks)
+- [x] Unit test: orchestration calls all three steps, early failure in step 2 does not prevent step 3
 
 ---
 

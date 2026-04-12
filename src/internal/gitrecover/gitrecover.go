@@ -6,12 +6,46 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitmerge"
 	"github.com/leberkas-org/maggus/internal/gitutil"
 	"github.com/leberkas-org/maggus/internal/gitworktree"
 	"github.com/leberkas-org/maggus/internal/runlog"
+	"github.com/leberkas-org/maggus/internal/stores"
 )
+
+// RecoverDirtyState orchestrates recovery of any dirty state left by an interrupted
+// daemon run. It calls commitPending, consolidateBranches, and cleanOrphanedWorktrees
+// in order. Each step is independent: if one step fails the others still run.
+// Returns all log messages from all steps and the first error encountered.
+func RecoverDirtyState(repoDir string, cfg config.Config, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]string, error) {
+	var allLogs []string
+	var firstErr error
+
+	// Step 1: commit any pending agent work left by an interrupted run.
+	logs1, err1 := commitPending(repoDir, featureStore, bugStore)
+	allLogs = append(allLogs, logs1...)
+	if err1 != nil {
+		firstErr = err1
+	}
+
+	// Step 2: merge the current task branch into its integration branch.
+	logs2, err2 := consolidateBranches(repoDir, cfg)
+	allLogs = append(allLogs, logs2...)
+	if err2 != nil && firstErr == nil {
+		firstErr = err2
+	}
+
+	// Step 3: remove orphaned worktrees left from previous parallel runs.
+	logs3, err3 := cleanOrphanedWorktrees(repoDir)
+	allLogs = append(allLogs, logs3...)
+	if err3 != nil && firstErr == nil {
+		firstErr = err3
+	}
+
+	return allLogs, firstErr
+}
 
 // cleanOrphanedWorktrees removes leftover worktrees from .maggus/worktrees/ and
 // safely deletes their branches when fully merged. Worktrees whose task IDs have
