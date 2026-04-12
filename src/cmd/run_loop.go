@@ -316,6 +316,17 @@ func runWorkGoroutine(params runLoopParams) {
 				break
 			}
 
+			// Re-check approval before each feature so mid-run revocations take effect.
+			if featuresDone > 0 {
+				if freshCfg, cfgErr := loadConfigFn(params.dir); cfgErr == nil {
+					if approvals, aErr := approval.Load(params.dir); aErr == nil {
+						if !isPlanApproved(group, approvals, freshCfg.IsApprovalRequired()) {
+							continue
+						}
+					}
+				}
+			}
+
 			// Set feature context in task context for TUI progress display.
 			tc := params.tc
 			tc.featureSourceFile = group.File
