@@ -11,7 +11,7 @@ import (
 
 func TestTaskUsage(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("run1", dir, 50)
+	l, err := runlog.Open("20260101-100000", dir, 50)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
