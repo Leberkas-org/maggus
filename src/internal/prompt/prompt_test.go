@@ -23,7 +23,6 @@ func newTestTask() *parser.Task {
 
 func newTestOpts() Options {
 	return Options{
-		RunID:     "20260309-120000",
 		Iteration: 3,
 	}
 }
@@ -43,7 +42,6 @@ func TestBuild_ContainsAllSections(t *testing.T) {
 
 		// Run metadata
 		"# Run Metadata",
-		"RUN_ID:** 20260309-120000",
 		"ITERATION:** 3",
 
 		// Task

@@ -22,7 +22,6 @@ type iterationSetup struct {
 	tasks     []parser.Task
 	next      *parser.Task
 	count     int
-	runID     string
 	startTime time.Time
 	workDir   string
 }
@@ -73,13 +72,11 @@ func initIteration(cmd interface{ Println(...interface{}) }, dir, modelDisplay s
 	count = capCount(tasks, count)
 
 	now := time.Now()
-	runID := now.Format("20060102-150405")
 
 	return &iterationSetup{
 		tasks:     tasks,
 		next:      next,
 		count:     count,
-		runID:     runID,
 		startTime: now,
 		workDir:   dir,
 	}, nil
@@ -234,7 +231,6 @@ type runLoopParams struct {
 	featureGroups []parser.Plan // ordered approved plans to work (bugs first, then features)
 	count         int           // number of features to work (0 = determined by autoContinue)
 	autoContinue  bool          // from config: continue to next feature after completing one
-	runID         string
 	startTime     time.Time
 	p             *tea.Program
 	stopFlag      *atomic.Bool
@@ -493,7 +489,6 @@ func buildSummaryData(params runLoopParams, completed int, failedTasks []failedT
 	}
 
 	return SummaryData{
-		RunID:          params.runID,
 		Branch:         currentBranch,
 		Model:          params.modelDisplay,
 		StartTime:      params.startTime,

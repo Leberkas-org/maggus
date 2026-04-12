@@ -40,11 +40,10 @@ func extractSkillUsage(dir, model, agentName, kind string, info *SessionInfo) {
 		return
 	}
 
-	runID := info.StartTime.Format("20060102-150405")
 	repoURL := gitutil.RepoURL(dir)
 
 	rec := usage.Record{
-		RunID:                    runID,
+		RunID:                    "",
 		Repository:               repoURL,
 		Kind:                     kind,
 		Model:                    model,

@@ -65,7 +65,6 @@ type IterationStartMsg struct {
 type BannerInfo struct {
 	Iterations    int
 	Branch        string
-	RunID         string
 	Worktree      string // empty if not using worktree
 	Agent         string // agent name (e.g. "claude", "opencode")
 	TwoXExpiresIn string // e.g. "17h 54m 44s"; empty when not in 2x mode
@@ -86,7 +85,6 @@ const (
 
 // SummaryData holds information displayed on the post-completion summary screen.
 type SummaryData struct {
-	RunID          string
 	Branch         string
 	Model          string
 	StartTime      time.Time
