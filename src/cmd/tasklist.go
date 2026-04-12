@@ -185,7 +185,7 @@ func (c *taskListComponent) Update(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
 
 // updateListNav handles common list navigation keys (up/down/home/end/enter).
 func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "alt+r":
 		if len(c.Tasks) > 0 {
 			c.RunTaskID = c.Tasks[c.Cursor].ID
@@ -240,7 +240,7 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 		return c.updateCriteriaMode(msg)
 	}
 
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "alt+r":
 		if len(c.Tasks) > 0 {
 			c.RunTaskID = c.Tasks[c.Cursor].ID
@@ -299,7 +299,7 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 }
 
 func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "up", "k":
 		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor-1, len(c.Detail.blockedIndices))
 		c.refreshDetailViewport()
@@ -321,7 +321,7 @@ func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskLis
 }
 
 func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "up", "k":
 		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor-1, len(criteriaActions))
 		c.refreshDetailViewport()
@@ -354,8 +354,8 @@ func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskLis
 // Returns taskListDeleted if the task was successfully deleted from disk.
 // The parent is responsible for any additional cleanup (e.g. reloading plans).
 func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch msg.String() {
-	case "y", "Y", "enter":
+	switch normalizeKey(msg) {
+	case "y", "enter":
 		t := c.Tasks[c.Cursor]
 		if err := c.storeForFile(t.SourceFile).DeleteTask(t.SourceFile, t.ID); err != nil {
 			c.DeleteErr = err.Error()
@@ -373,7 +373,7 @@ func (c *taskListComponent) updateConfirmDelete(msg tea.KeyMsg) (tea.Cmd, taskLi
 			return nil, taskListQuit
 		}
 		return nil, taskListDeleted
-	case "n", "N", "esc":
+	case "n", "esc":
 		c.ConfirmDelete = false
 		return nil, taskListNone
 	}

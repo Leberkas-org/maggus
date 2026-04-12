@@ -362,8 +362,8 @@ func (m *statusModel) logVisibleLines() int {
 }
 
 func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "Y", "enter":
+	switch normalizeKey(msg) {
+	case "y", "enter":
 		t := m.Tasks[m.Cursor]
 		if err := m.storeForFile(t.SourceFile).DeleteTask(t.SourceFile, t.ID); err != nil {
 			m.DeleteErr = err.Error()
@@ -380,7 +380,7 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
-	case "n", "N", "esc":
+	case "n", "esc":
 		m.ConfirmDelete = false
 		return m, nil
 	}
@@ -388,8 +388,8 @@ func (m statusModel) updateStatusConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.C
 }
 
 func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "Y", "enter":
+	switch normalizeKey(msg) {
+	case "y", "enter":
 		visible := m.visiblePlans()
 		if m.planCursor >= len(visible) {
 			m.confirmDeleteFeature = false
@@ -417,7 +417,7 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 			return m, func() tea.Msg { return navigateBackMsg{} }
 		}
 		return m, nil
-	case "n", "N", "esc":
+	case "n", "esc":
 		m.confirmDeleteFeature = false
 		return m, nil
 	}
@@ -425,8 +425,8 @@ func (m statusModel) updateStatusConfirmDeleteFeature(msg tea.KeyMsg) (tea.Model
 }
 
 func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "s", "S":
+	switch normalizeKey(msg) {
+	case "s":
 		// Stop after current task — send the stop-after-task signal, stay in status view.
 		m.daemonStopOverlay = false
 		m.daemonStoppingAfterTask = true
@@ -435,7 +435,7 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 			_ = sendStopAfterTaskSignal(dir)
 			return nil
 		}
-	case "k", "K", "ctrl+c", "ctrl+C":
+	case "k", "ctrl+c":
 		// Immediate kill.
 		m.daemonStopOverlay = false
 		dir := m.dir
@@ -453,18 +453,18 @@ func (m statusModel) updateStatusDaemonStopOverlay(msg tea.KeyMsg) (tea.Model, t
 }
 
 func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "d", "D":
+	switch normalizeKey(msg) {
+	case "d":
 		return m, func() tea.Msg { return navigateBackMsg{} }
-	case "s", "S":
+	case "s":
 		// Stop after current task, then exit. Daemon finishes in background.
 		_ = sendStopAfterTaskSignal(m.dir)
 		return m, func() tea.Msg { return navigateBackMsg{} }
-	case "k", "K", "ctrl+c", "ctrl+C":
+	case "k", "ctrl+c":
 		_ = forceKill(m.daemon.PID)
 		removeDaemonPID(m.dir)
 		return m, func() tea.Msg { return navigateBackMsg{} }
-	case "esc", "q", "Q":
+	case "esc", "q":
 		m.exitDaemonOverlay = false
 		return m, nil
 	}
@@ -633,7 +633,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Feature tree navigation — always active.
-	switch key {
+	switch normalizeKey(msg) {
 	case "up", "k":
 		items := m.buildTreeItems()
 		if len(items) > 0 {
