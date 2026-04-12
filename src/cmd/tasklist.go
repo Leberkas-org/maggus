@@ -115,6 +115,9 @@ func (c *taskListComponent) ensureCursorVisible() {
 
 // refreshDetailViewport re-renders the detail content for the current task.
 func (c *taskListComponent) refreshDetailViewport() {
+	if len(c.Tasks) == 0 || c.Cursor >= len(c.Tasks) {
+		return
+	}
 	content := renderDetailContent(c.Tasks[c.Cursor], &c.Detail)
 	if c.DetailSuffix != "" {
 		content += c.DetailSuffix
@@ -124,6 +127,9 @@ func (c *taskListComponent) refreshDetailViewport() {
 
 // openDetail opens the detail view for the current task.
 func (c *taskListComponent) openDetail() {
+	if len(c.Tasks) == 0 || c.Cursor >= len(c.Tasks) {
+		return
+	}
 	c.ShowDetail = true
 	c.Detail = detailState{}
 	content := renderDetailContent(c.Tasks[c.Cursor], &c.Detail)

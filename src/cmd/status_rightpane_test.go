@@ -654,12 +654,12 @@ func TestRenderPlanTab_ReturnsNonEmptyString(t *testing.T) {
 	}
 }
 
-// TestRenderPlanTab_ShowsStepNumber verifies that step headers like "Step 1" appear.
+// TestRenderPlanTab_ShowsStepNumber verifies that phase headers like "Phase 1" appear.
 func TestRenderPlanTab_ShowsStepNumber(t *testing.T) {
 	m := makePlanTabModel()
 	out := m.renderPlanTab(80, 20)
-	if !strings.Contains(out, "Step 1") {
-		t.Errorf("renderPlanTab output should contain 'Step 1'; got:\n%s", out)
+	if !strings.Contains(out, "Phase 1") {
+		t.Errorf("renderPlanTab output should contain 'Phase 1'; got:\n%s", out)
 	}
 }
 

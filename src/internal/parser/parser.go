@@ -314,6 +314,20 @@ func ParseFile(path string) ([]Task, error) {
 			})
 			continue
 		}
+		if strings.HasPrefix(trimmed, "- [~] ") {
+			// [~] marks a criterion that is truly blocked (impossible to complete).
+			// Counted as checked so IsComplete() returns true for tasks that did
+			// everything they could; also marked Blocked so IsBlocked() returns true
+			// and the UI can surface the unmet criterion to the user.
+			inDescription = false
+			current.Criteria = append(current.Criteria, Criterion{
+				Text:    strings.TrimPrefix(trimmed, "- [~] "),
+				Checked: true,
+				Blocked: true,
+				Skipped: false,
+			})
+			continue
+		}
 		if strings.HasPrefix(trimmed, "- [>] ") {
 
 			inDescription = false

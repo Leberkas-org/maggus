@@ -396,7 +396,10 @@ func (m statusModel) renderTab2TaskList(width, height int, plan parser.Plan) str
 			t := tasks[i]
 			var icon string
 			var style lipgloss.Style
-			if t.IsComplete() {
+			if t.IsComplete() && t.IsBlocked() {
+				icon = "⊘"
+				style = lipgloss.NewStyle().Foreground(styles.Warning)
+			} else if t.IsComplete() {
 				icon = "✓"
 				style = statusGreenStyle
 			} else if t.IsBlocked() {

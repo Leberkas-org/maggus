@@ -307,6 +307,15 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		if _, _, err := gitbranch.EnsureTaskBranchFromBase(o.repoDir, task.ID, o.planBranch); err != nil {
 			return o.failTask(&result, workerLogger, task, fmt.Sprintf("create task branch: %v", err))
 		}
+		// Notify the main snapshot (state.json) of the active task so the TUI
+		// can show the spinner on the task row for sequential tasks in parallel mode.
+		o.p.Send(IterationStartMsg{
+			TaskID:    task.ID,
+			TaskTitle: task.Title,
+			ItemID:    group.MaggusID,
+			ItemShort: group.ID,
+			ItemTitle: group.Title,
+		})
 	}
 
 	workerLogger.TaskStart(task.ID, task.Title)

@@ -22,13 +22,11 @@ type executionStep struct {
 //  2. The remaining tasks are sorted into topological waves: wave 0 contains
 //     tasks with no predecessors; wave k contains tasks whose all predecessors
 //     are in waves 0..k-1.
-//  3. Each wave is converted to one or more steps:
-//     - Parallel tasks (Parallel==true) in the same wave are grouped into a
-//       single parallel step.
-//     - Sequential tasks (Parallel==false) in the same wave each get their own
-//       individual step.
-//     - Within a wave, the parallel batch (if any) is emitted first, followed
-//       by sequential tasks in their original order.
+//  3. Each wave becomes exactly one step containing all tasks in that wave.
+//     A step is marked Parallel=true only when it contains 2 or more tasks
+//     that all have Parallel==true, meaning they will genuinely run concurrently
+//     in separate worktrees. A single Parallel==true task still gets
+//     Parallel=false on the step because it runs alone with no concurrency.
 //  4. Step numbers are 1-based and contiguous across all waves.
 //  5. The unresolved group (if non-empty) is appended as the final step.
 func buildExecutionPlan(tasks []parser.Task) []executionStep {
@@ -72,41 +70,26 @@ func buildExecutionPlan(tasks []parser.Task) []executionStep {
 		waveGroups[w] = append(waveGroups[w], t)
 	}
 
-	// Convert wave groups into execution steps.
+	// Convert wave groups into execution steps — one step per wave.
 	var steps []executionStep
 	stepNum := 1
 
 	for _, group := range waveGroups {
-		var parallelIDs []string
-		var sequentialTasks []parser.Task
-
+		taskIDs := make([]string, 0, len(group))
+		parallelCount := 0
 		for _, t := range group {
+			taskIDs = append(taskIDs, t.ID)
 			if t.Parallel {
-				parallelIDs = append(parallelIDs, t.ID)
-			} else {
-				sequentialTasks = append(sequentialTasks, t)
+				parallelCount++
 			}
 		}
-
-		// Parallel tasks in this wave share a single step.
-		if len(parallelIDs) > 0 {
-			steps = append(steps, executionStep{
-				StepNumber: stepNum,
-				TaskIDs:    parallelIDs,
-				Parallel:   true,
-			})
-			stepNum++
-		}
-
-		// Sequential tasks each get their own step.
-		for _, t := range sequentialTasks {
-			steps = append(steps, executionStep{
-				StepNumber: stepNum,
-				TaskIDs:    []string{t.ID},
-				Parallel:   false,
-			})
-			stepNum++
-		}
+		// Mark as parallel only when 2+ tasks will genuinely run concurrently.
+		steps = append(steps, executionStep{
+			StepNumber: stepNum,
+			TaskIDs:    taskIDs,
+			Parallel:   parallelCount >= 2,
+		})
+		stepNum++
 	}
 
 	// Append the unresolved group as a final step if there are any.

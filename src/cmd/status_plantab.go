@@ -45,7 +45,7 @@ func (m statusModel) renderPlanTab(width, height int) string {
 	// Build all renderable lines up-front so we can apply scroll.
 	var lines []string
 	for _, step := range steps {
-		label := fmt.Sprintf("Step %d", step.StepNumber)
+		label := fmt.Sprintf("Phase %d", step.StepNumber)
 		if step.Parallel {
 			label += " (parallel)"
 		}
@@ -63,7 +63,11 @@ func (m statusModel) renderPlanTab(width, height int) string {
 				maxTitleW = 10
 			}
 			title := styles.Truncate(t.Title, maxTitleW)
-			row := fmt.Sprintf("   %s  %s  %s", icon, taskID, statusDimStyle.Render(title))
+			wtBadge := ""
+			if t.Parallel {
+				wtBadge = " 🌲🪓"
+			}
+			row := fmt.Sprintf("   %s  %s  %s%s", icon, taskID, statusDimStyle.Render(title), wtBadge)
 			lines = append(lines, row)
 		}
 
@@ -116,6 +120,9 @@ func (m statusModel) renderPlanTab(width, height int) string {
 
 // planTabTaskIcon returns the styled status icon for a task row in the Plan tab.
 func (m statusModel) planTabTaskIcon(t parser.Task) string {
+	if t.IsComplete() && t.IsBlocked() {
+		return lipgloss.NewStyle().Foreground(styles.Warning).Render("⊘")
+	}
 	if t.IsComplete() {
 		return statusGreenStyle.Render("✓")
 	}

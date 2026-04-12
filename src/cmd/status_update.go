@@ -742,14 +742,18 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.treeCursor >= 0 && m.treeCursor < len(items) {
 			item := items[m.treeCursor]
 			if item.kind == treeItemKindTask && item.task != nil {
+				found := false
 				for i, t := range m.taskListComponent.Tasks {
 					if t.ID == item.task.ID {
 						m.taskListComponent.Cursor = i
+						found = true
 						break
 					}
 				}
-				m.taskListComponent.openDetail()
-				m.resizeTab2DetailViewport()
+				if found {
+					m.taskListComponent.openDetail()
+					m.resizeTab2DetailViewport()
+				}
 			} else if item.kind == treeItemKindPlan {
 				// Switch to Details tab if available in current context.
 				for i, td := range m.availableTabs() {

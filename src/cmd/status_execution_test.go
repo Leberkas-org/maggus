@@ -84,7 +84,7 @@ func TestBuildExecutionPlan_AllParallel(t *testing.T) {
 }
 
 func TestBuildExecutionPlan_AllSequential(t *testing.T) {
-	// All tasks sequential, no predecessors — each gets its own step.
+	// All tasks sequential, no predecessors — same wave, so one step containing all three.
 	tasks := []parser.Task{
 		makeTask("T1", false),
 		makeTask("T2", false),
@@ -92,19 +92,18 @@ func TestBuildExecutionPlan_AllSequential(t *testing.T) {
 	}
 	steps := buildExecutionPlan(tasks)
 
-	if len(steps) != 3 {
-		t.Fatalf("expected 3 steps for all-sequential tasks, got %d", len(steps))
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step (all in same wave), got %d", len(steps))
 	}
-	for i, s := range steps {
-		if s.StepNumber != i+1 {
-			t.Errorf("step[%d]: expected StepNumber=%d, got %d", i, i+1, s.StepNumber)
-		}
-		if s.Parallel {
-			t.Errorf("step[%d]: expected Parallel=false", i)
-		}
-		if len(s.TaskIDs) != 1 {
-			t.Errorf("step[%d]: expected 1 task ID, got %d: %v", i, len(s.TaskIDs), s.TaskIDs)
-		}
+	s := steps[0]
+	if s.StepNumber != 1 {
+		t.Errorf("expected StepNumber=1, got %d", s.StepNumber)
+	}
+	if s.Parallel {
+		t.Error("expected Parallel=false (no parallel tasks)")
+	}
+	if len(s.TaskIDs) != 3 {
+		t.Errorf("expected 3 task IDs, got %d: %v", len(s.TaskIDs), s.TaskIDs)
 	}
 }
 
@@ -242,7 +241,7 @@ func TestBuildExecutionPlan_CompletedTasksIncluded(t *testing.T) {
 
 func TestBuildExecutionPlan_MixedParallelAndSequential(t *testing.T) {
 	// P1 (parallel), P2 (parallel), S1 (sequential) — all no predecessors.
-	// Expected: Step 1 [P1, P2] (parallel), Step 2 [S1] (sequential).
+	// All are in the same wave → one step. Step is Parallel=true because 2+ parallel tasks.
 	tasks := []parser.Task{
 		makeTask("P1", true),
 		makeTask("P2", true),
@@ -250,29 +249,58 @@ func TestBuildExecutionPlan_MixedParallelAndSequential(t *testing.T) {
 	}
 	steps := buildExecutionPlan(tasks)
 
+	if len(steps) != 1 {
+		t.Fatalf("expected 1 step (all same wave), got %d: %v", len(steps), stepsDebug(steps))
+	}
+
+	s := steps[0]
+	if s.StepNumber != 1 {
+		t.Errorf("expected StepNumber=1, got %d", s.StepNumber)
+	}
+	if !s.Parallel {
+		t.Error("expected Parallel=true (2 parallel tasks)")
+	}
+	if len(s.TaskIDs) != 3 {
+		t.Errorf("expected 3 task IDs, got %v", s.TaskIDs)
+	}
+	ids := map[string]bool{}
+	for _, id := range s.TaskIDs {
+		ids[id] = true
+	}
+	if !ids["P1"] || !ids["P2"] || !ids["S1"] {
+		t.Errorf("expected P1, P2, S1 in step, got %v", s.TaskIDs)
+	}
+}
+
+func TestBuildExecutionPlan_MixedSingleParallelAndSequential(t *testing.T) {
+	// T0 (seq) → P1 (parallel), S1 (sequential).
+	// P1 and S1 are in the same wave. Step is NOT parallel because only 1 parallel task.
+	tasks := []parser.Task{
+		makeTask("T0", false),
+		makeTask("P1", true, "T0"),
+		makeTask("S1", false, "T0"),
+	}
+	steps := buildExecutionPlan(tasks)
+
 	if len(steps) != 2 {
 		t.Fatalf("expected 2 steps, got %d: %v", len(steps), stepsDebug(steps))
 	}
-
-	// Step 1: parallel group
-	if !steps[0].Parallel {
-		t.Error("step[0]: expected Parallel=true")
+	if steps[0].TaskIDs[0] != "T0" {
+		t.Errorf("step[0]: expected T0, got %v", steps[0].TaskIDs)
 	}
-	if len(steps[0].TaskIDs) != 2 {
-		t.Errorf("step[0]: expected 2 tasks, got %v", steps[0].TaskIDs)
+	s := steps[1]
+	if len(s.TaskIDs) != 2 {
+		t.Errorf("step[1]: expected 2 tasks (P1+S1), got %v", s.TaskIDs)
 	}
-
-	// Step 2: sequential
-	if steps[1].Parallel {
-		t.Error("step[1]: expected Parallel=false")
-	}
-	if len(steps[1].TaskIDs) != 1 || steps[1].TaskIDs[0] != "S1" {
-		t.Errorf("step[1]: expected [S1], got %v", steps[1].TaskIDs)
+	if s.Parallel {
+		t.Error("step[1]: expected Parallel=false (only 1 parallel task, no true concurrency)")
 	}
 }
 
 func TestBuildExecutionPlan_StepNumbers(t *testing.T) {
 	// Verify step numbers are contiguous and start at 1.
+	// T1, T2, T3 have no predecessors → same wave → Step 1.
+	// T4 depends on T1 → wave 1 → Step 2.
 	tasks := []parser.Task{
 		makeTask("T1", false),
 		makeTask("T2", true),
@@ -281,10 +309,24 @@ func TestBuildExecutionPlan_StepNumbers(t *testing.T) {
 	}
 	steps := buildExecutionPlan(tasks)
 
+	if len(steps) != 2 {
+		t.Fatalf("expected 2 steps, got %d: %v", len(steps), stepsDebug(steps))
+	}
 	for i, s := range steps {
 		if s.StepNumber != i+1 {
 			t.Errorf("steps[%d].StepNumber = %d, want %d", i, s.StepNumber, i+1)
 		}
+	}
+	// Step 1 contains T1, T2, T3 (Parallel=true: 2+ parallel tasks T2, T3).
+	if !steps[0].Parallel {
+		t.Error("steps[0]: expected Parallel=true (T2 and T3 are parallel)")
+	}
+	if len(steps[0].TaskIDs) != 3 {
+		t.Errorf("steps[0]: expected 3 task IDs, got %v", steps[0].TaskIDs)
+	}
+	// Step 2 contains only T4.
+	if len(steps[1].TaskIDs) != 1 || steps[1].TaskIDs[0] != "T4" {
+		t.Errorf("steps[1]: expected [T4], got %v", steps[1].TaskIDs)
 	}
 }
 

@@ -164,7 +164,10 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 	// Status
 	var statusText string
 	var statusStyle lipgloss.Style
-	if t.IsComplete() {
+	if t.IsComplete() && t.IsBlocked() {
+		statusText = "Complete (blocked)"
+		statusStyle = warningStyle
+	} else if t.IsComplete() {
 		statusText = "Complete"
 		statusStyle = successStyle
 	} else if t.IsBlocked() {
@@ -210,10 +213,12 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 		sb.WriteString("\n")
 		for i, c := range t.Criteria {
 			var checkbox string
-			if c.Checked {
-				checkbox = successStyle.Render("✓")
-			} else if c.Blocked {
+			if c.Blocked {
+				// Blocked takes priority over Checked — [~] criteria are both
+				// Checked=true and Blocked=true, but should display as blocked.
 				checkbox = warningStyle.Render("⊘")
+			} else if c.Checked {
+				checkbox = successStyle.Render("✓")
 			} else if c.Skipped {
 				checkbox = mutedStyle.Render(">")
 			} else {

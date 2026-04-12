@@ -262,8 +262,12 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 			var spinStr string
 			if m.isTaskRunning(task.ID) {
 				spinStr = addBg(primaryStyle).Render(spinnerChar)
+			} else if task.IsComplete() && task.IsBlocked() {
+				spinStr = addBg(orangeStyle).Render("⊘")
 			} else if task.IsComplete() {
 				spinStr = addBg(greenStyle).Render("✓")
+			} else if task.IsBlocked() {
+				spinStr = addBg(orangeStyle).Render("⚠")
 			} else if task.IsSkipped() {
 				spinStr = addBg(mutedStyle).Render(">")
 			} else {
