@@ -60,11 +60,11 @@ type Entry struct {
 	ModelUsage               map[string]ModelTokensEntry `json:"model_usage,omitempty"`
 }
 
-// Open creates a log file at .maggus/runs/<timestamp>_<maggusID>.log, or
-// .maggus/runs/<timestamp>.log when maggusID is empty. The runs directory is
+// Open creates a log file at .maggus/runs/<runID>_<ts>.log, or
+// .maggus/runs/<ts>.log when runID is empty. The runs directory is
 // created if it does not exist. After opening, older log files are pruned so
 // that at most maxFiles log files are retained (daemon.log is never pruned).
-func Open(maggusID, dir string, maxFiles int) (*Logger, error) {
+func Open(runID, dir string, maxFiles int) (*Logger, error) {
 	runsDir := filepath.Join(dir, ".maggus", "runs")
 	if err := os.MkdirAll(runsDir, 0755); err != nil {
 		return nil, fmt.Errorf("create runs dir: %w", err)
@@ -72,10 +72,10 @@ func Open(maggusID, dir string, maxFiles int) (*Logger, error) {
 
 	ts := time.Now().Format("20060102-150405")
 	var name string
-	if maggusID == "" {
+	if runID == "" {
 		name = ts + ".log"
 	} else {
-		name = ts + "_" + maggusID + ".log"
+		name = runID + "_" + ts + ".log"
 	}
 
 	logPath := filepath.Join(runsDir, name)
@@ -133,8 +133,8 @@ func pruneLogFiles(runsDir string, maxFiles int) {
 		}
 	}
 
-	// ReadDir returns entries sorted by name; timestamp-prefixed names sort
-	// chronologically, so logFiles[0] is the oldest.
+	// Filenames are <runID>_<ts>.log or <ts>.log — both start with a
+	// timestamp, so lexicographic sort gives chronological order.
 	sort.Strings(logFiles)
 	for len(logFiles) > maxFiles {
 		_ = os.Remove(filepath.Join(runsDir, logFiles[0]))

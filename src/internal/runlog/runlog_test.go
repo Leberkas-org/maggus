@@ -37,7 +37,7 @@ func findLogFile(t *testing.T, dir string) string {
 
 func TestOpen_CreatesLogFile(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("abc-uuid", dir, 50)
+	l, err := runlog.Open("20260101-100000", dir, 50)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -58,9 +58,9 @@ func TestOpen_CreatesLogFile(t *testing.T) {
 	if len(logFiles) == 0 {
 		t.Fatal("no .log file created in .maggus/runs/")
 	}
-	// Filename must contain the maggusID
-	if !strings.Contains(logFiles[0], "abc-uuid") {
-		t.Errorf("log filename %q does not contain maggusID %q", logFiles[0], "abc-uuid")
+	// Filename must contain the runID
+	if !strings.Contains(logFiles[0], "20260101-100000") {
+		t.Errorf("log filename %q does not contain runID %q", logFiles[0], "20260101-100000")
 	}
 	// No subdirectory should have been created
 	for _, e := range entries {
@@ -72,7 +72,7 @@ func TestOpen_CreatesLogFile(t *testing.T) {
 
 func TestOpen_FlatPath_NoSubdirectory(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("someid", dir, 50)
+	l, err := runlog.Open("20260101-100000", dir, 50)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestOpen_EmptyMaggusID_TimestampOnlyName(t *testing.T) {
 }
 
 func TestOpen_ReturnsErrorOnBadDir(t *testing.T) {
-	l, err := runlog.Open("test", filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"), 10)
+	l, err := runlog.Open("20260101-100000", filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"), 10)
 	// MkdirAll creates all intermediate directories, so Open should succeed.
 	if err != nil {
 		// If the OS refuses, that's acceptable; just log it.
@@ -171,7 +171,7 @@ func assertEntryTimestamp(t *testing.T, e runlog.Entry) {
 
 func TestFeatureStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
@@ -195,7 +195,7 @@ func TestFeatureStart(t *testing.T) {
 
 func TestFeatureComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.FeatureComplete("feature_001")
@@ -214,7 +214,7 @@ func TestFeatureComplete(t *testing.T) {
 
 func TestTaskStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")
@@ -237,7 +237,7 @@ func TestTaskStart(t *testing.T) {
 
 func TestTaskComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskComplete("TASK-001-001", "abc1234")
@@ -257,7 +257,7 @@ func TestTaskComplete(t *testing.T) {
 
 func TestTaskFailed(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskFailed("TASK-001-001", "agent error")
@@ -280,7 +280,7 @@ func TestTaskFailed(t *testing.T) {
 
 func TestToolUse(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.ToolUse("TASK-001-001", "Read", map[string]string{"file": "src/main.go"})
@@ -306,7 +306,7 @@ func TestToolUse(t *testing.T) {
 
 func TestInfo_WritesTaskIDWhenTaskActive(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-002-001", "Some task")
@@ -327,7 +327,7 @@ func TestInfo_WritesTaskIDWhenTaskActive(t *testing.T) {
 
 func TestInfo_NoTaskIDWhenNoTaskActive(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.Info("daemon started")
@@ -343,7 +343,7 @@ func TestInfo_NoTaskIDWhenNoTaskActive(t *testing.T) {
 
 func TestInfo_TaskIDClearedAfterTaskComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-003-001", "A task")
@@ -365,7 +365,7 @@ func TestInfo_TaskIDClearedAfterTaskComplete(t *testing.T) {
 
 func TestMultipleEventsOrdered(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
@@ -395,7 +395,7 @@ func TestMultipleEventsOrdered(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.Output("TASK-003-001", "Hello from the agent")
@@ -422,7 +422,7 @@ func TestOutput(t *testing.T) {
 
 func TestOutput_LongText(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	longText := strings.Repeat("x", 10000)
@@ -439,7 +439,7 @@ func TestOutput_LongText(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.Info("something happened")
@@ -476,7 +476,7 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 
 func TestClose_Idempotent(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	if err := l.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
 	}
@@ -524,7 +524,7 @@ func TestOpenWorker_CreatesNamespacedLogFile(t *testing.T) {
 
 func TestJSONLFormat(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("run1", dir, 50)
+	l, _ := runlog.Open("20260101-100000", dir, 50)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")

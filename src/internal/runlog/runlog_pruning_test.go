@@ -16,20 +16,20 @@ func TestPruning_RemovesOldestFiles(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	// Pre-create 5 old log files with ascending timestamps.
+	// Pre-create 5 old log files with ascending timestamps (<runID>_<ts> format).
 	oldFiles := []string{
-		"20260101-100000_uuid1.log",
-		"20260101-110000_uuid2.log",
-		"20260101-120000_uuid3.log",
-		"20260101-130000_uuid4.log",
-		"20260101-140000_uuid5.log",
+		"20260101-100000_20260101-100001.log",
+		"20260101-110000_20260101-110001.log",
+		"20260101-120000_20260101-120001.log",
+		"20260101-130000_20260101-130001.log",
+		"20260101-140000_20260101-140001.log",
 	}
 	for _, name := range oldFiles {
 		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
 	}
 
 	// Open with maxFiles=5: opening creates a 6th file, so oldest is pruned.
-	l, err := runlog.Open("new-uuid", dir, 5)
+	l, err := runlog.Open("20260101-150000", dir, 5)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -67,12 +67,12 @@ func TestPruning_DaemonLogNeverPruned(t *testing.T) {
 	// Create daemon.log and enough old files to trigger pruning.
 	os.WriteFile(filepath.Join(runsDir, "daemon.log"), []byte("daemon"), 0644)
 	for i := 0; i < 5; i++ {
-		name := strings.Replace("20260101-1X0000_uuid.log", "X", string(rune('0'+i)), 1)
+		name := strings.Replace("20260101-1X0000_20260101-1X0001.log", "X", string(rune('0'+i)), -1)
 		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
 	}
 
 	// Open with maxFiles=3 — will prune task logs but never daemon.log.
-	l, err := runlog.Open("new-uuid", dir, 3)
+	l, err := runlog.Open("20260101-150000", dir, 3)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -92,12 +92,12 @@ func TestPruning_NoPruneWhenUnderLimit(t *testing.T) {
 	}
 
 	// Pre-create 2 old log files.
-	for _, name := range []string{"20260101-100000_a.log", "20260101-110000_b.log"} {
+	for _, name := range []string{"20260101-100000_20260101-100001.log", "20260101-110000_20260101-110001.log"} {
 		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
 	}
 
 	// Open with maxFiles=10: 3 total files, well under limit — nothing pruned.
-	l, err := runlog.Open("new", dir, 10)
+	l, err := runlog.Open("20260101-150000", dir, 10)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
