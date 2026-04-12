@@ -215,11 +215,10 @@ func TestSessionInfo_UsageExtractionWiring(t *testing.T) {
 		EndTime:        endTime,
 	}
 
-	runID := info.StartTime.Format("20060102-150405")
 	usagePath := filepath.Join(tmpDir, "usage_test.jsonl")
 
 	rec := usage.Record{
-		RunID:                    runID,
+		RunID:                    "",
 		Model:                    "claude-sonnet-4-6",
 		Agent:                    "claude",
 		InputTokens:              summary.InputTokens,
@@ -278,12 +277,11 @@ func TestExtractSkillUsage_Success(t *testing.T) {
 
 	startTime := time.Now().Add(-3 * time.Minute)
 	endTime := time.Now()
-	runID := startTime.Format("20060102-150405")
 
 	usagePath := filepath.Join(tmpDir, "sessions.jsonl")
 
 	rec := usage.Record{
-		RunID:                    runID,
+		RunID:                    "",
 		Repository:               "https://github.com/test/repo.git",
 		Kind:                     "plan",
 		Model:                    "claude-sonnet-4-6",
@@ -312,9 +310,6 @@ func TestExtractSkillUsage_Success(t *testing.T) {
 		t.Fatalf("unmarshal usage record: %v", err)
 	}
 
-	if written.RunID != runID {
-		t.Errorf("RunID = %q, want %q", written.RunID, runID)
-	}
 	if written.Repository != "https://github.com/test/repo.git" {
 		t.Errorf("Repository = %q, want %q", written.Repository, "https://github.com/test/repo.git")
 	}

@@ -36,7 +36,6 @@ type parallelOrchestrator struct {
 	validIncludes  []string
 	repoDir        string
 	planBranch     string
-	runID          string
 	onComplete     config.OnCompleteConfig
 	hooks          config.HooksConfig
 	parentLogger   *runlog.Logger
@@ -98,7 +97,7 @@ func runParallelWorkGoroutine(params runLoopParams, planBranch string) {
 			activeAgent: params.tc.activeAgent, resolvedModel: params.tc.resolvedModel,
 			sessionPersist: params.tc.sessionPersistence, notifier: params.tc.notifier,
 			validIncludes: params.tc.validIncludes, repoDir: params.tc.repoDir,
-			planBranch: planBranch, runID: params.runID,
+			planBranch: planBranch,
 			onComplete: params.tc.onComplete, hooks: params.tc.hooks,
 			parentLogger: params.tc.logger,
 			featureStore: params.featureStore, bugStore: params.bugStore,
@@ -321,7 +320,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	workerLogger.TaskStart(task.ID, task.Title)
 
 	// Run agent — parallel workers use per-worker snapshot writer, sequential use main program.
-	opts := prompt.Options{Include: o.validIncludes, RunID: o.runID, Iteration: iter}
+	opts := prompt.Options{Include: o.validIncludes, Iteration: iter}
 	builtPrompt := prompt.Build(&task, opts)
 	model := resolveTaskModel(task.Model, o.resolvedModel)
 

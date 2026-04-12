@@ -17,7 +17,6 @@ type Options struct {
 	Include []string
 
 	// Run metadata
-	RunID     string
 	Iteration int
 }
 
@@ -62,7 +61,6 @@ func writeBootstrap(b *strings.Builder, includes []string) {
 
 func writeRunMetadata(b *strings.Builder, opts Options) {
 	b.WriteString("# Run Metadata\n\n")
-	fmt.Fprintf(b, "- **RUN_ID:** %s\n", opts.RunID)
 	fmt.Fprintf(b, "- **ITERATION:** %d\n", opts.Iteration)
 	b.WriteString("\n")
 }

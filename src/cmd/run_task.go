@@ -56,7 +56,6 @@ type taskContext struct {
 	validIncludes      []string
 	repoDir            string
 	workDir            string
-	runID              string
 	onComplete         config.OnCompleteConfig
 	hooks              config.HooksConfig
 	logger             *runlog.Logger // structured run log; nil-safe
@@ -111,7 +110,6 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	// Build and run the prompt.
 	opts := prompt.Options{
 		Include:   tc.validIncludes,
-		RunID:     tc.runID,
 		Iteration: i + 1,
 	}
 
