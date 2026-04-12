@@ -99,7 +99,7 @@ func (m promptPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd
 
 	case tea.KeyMsg:
-		key := msg.String()
+		key := normalizeKey(msg)
 
 		switch key {
 		case "q", "esc":

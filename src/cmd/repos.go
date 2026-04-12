@@ -218,7 +218,7 @@ func (m reposModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m reposModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "q":
 		return m, func() tea.Msg { return navigateBackMsg{} }
 	case "up", "k":
@@ -356,7 +356,7 @@ func (m reposModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m reposModel) updateConfirmInit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "y":
 		// Initialize .maggus directory
 		maggusDir := filepath.Join(m.pendingDir, ".maggus")

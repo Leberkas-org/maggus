@@ -261,7 +261,7 @@ func (m pickerModel) Init() tea.Cmd {
 func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
+		switch normalizeKey(msg) {
 		case "up", "k":
 			m.cursor = styles.ClampCursor(m.cursor-1, len(m.items))
 		case "down", "j":

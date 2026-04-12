@@ -342,7 +342,7 @@ func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rows := m.activeRows()
 		itemCount := len(*rows)
 
-		switch msg.String() {
+		switch normalizeKey(msg) {
 		case "ctrl+s":
 			if m.activeTab == 0 {
 				return m, m.executeAction(configActionSaveProject)

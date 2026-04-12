@@ -218,7 +218,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m menuModel) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "q":
 		if m.daemon.Running {
 			if m.daemon.StoppingAfterTask {
@@ -306,7 +306,7 @@ func (m menuModel) activateItem(item menuItem) (tea.Model, tea.Cmd) {
 func (m menuModel) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	itemCount := len(m.activeSubDef.options) + 1 // options + Run
 
-	switch msg.String() {
+	switch normalizeKey(msg) {
 	case "q":
 		m.inSubMenu = false
 		m.activeSubDef = nil
