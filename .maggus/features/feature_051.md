@@ -60,13 +60,13 @@ The worker returns a result struct with: success/failure, commit hash, error, st
 The parallel `runSingleTask` is the best starting point since it already does the full lifecycle (branch, work, commit, merge, cleanup). Extract and generalize it.
 
 **Acceptance Criteria:**
-- [ ] A single `Worker` function/struct handles the full task lifecycle
-- [ ] Branch creation, merge-back, and cleanup are part of the worker — not the caller's responsibility
-- [ ] Worker handles merge conflicts by marking the task as blocked (same as current parallel behavior)
-- [ ] Worker handles worktree mode (work dir != repo dir) when applicable
-- [ ] Worker is usable from sequential, parallel, and dispatch call sites
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] A single `Worker` function/struct handles the full task lifecycle
+- [x] Branch creation, merge-back, and cleanup are part of the worker — not the caller's responsibility
+- [x] Worker handles merge conflicts by marking the task as blocked (same as current parallel behavior)
+- [x] Worker handles worktree mode (work dir != repo dir) when applicable
+- [x] Worker is usable from sequential, parallel, and dispatch call sites
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-051-002: Rewire sequential daemon to use unified worker
 **Description:** As a developer, I want the sequential daemon loop to use the unified worker so that it gets merge-back and branch cleanup for free.
