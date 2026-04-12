@@ -3,6 +3,7 @@ package runlog_test
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,22 +13,36 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
-// findLogFile finds the single non-daemon .log file in .maggus/runs/ (for testing).
-func findLogFile(t *testing.T, dir string) string {
+const testMaggusID = "test-guid-0001"
+
+// openWithID is a test helper that calls Open then SetCurrentMaggusID so that
+// the logger has an active file to write to.
+func openWithID(t *testing.T, dir string, maxFiles int, maggusID string) *runlog.Logger {
 	t.Helper()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
+	l, err := runlog.Open(dir, maxFiles)
 	if err != nil {
-		t.Fatalf("read runs dir: %v", err)
+		t.Fatalf("Open: %v", err)
+	}
+	l.SetCurrentMaggusID(maggusID)
+	return l
+}
+
+// findLogFile finds a .log file under .maggus/logs/<maggusID>/ (for testing).
+func findLogFile(t *testing.T, dir, maggusID string) string {
+	t.Helper()
+	featureDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	entries, err := os.ReadDir(featureDir)
+	if err != nil {
+		t.Fatalf("read feature log dir: %v", err)
 	}
 	var logs []string
 	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" && e.Name() != "daemon.log" {
-			logs = append(logs, filepath.Join(runsDir, e.Name()))
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logs = append(logs, filepath.Join(featureDir, e.Name()))
 		}
 	}
 	if len(logs) == 0 {
-		t.Fatal("no log file found in runs dir")
+		t.Fatal("no log file found in feature log dir")
 	}
 	if len(logs) > 1 {
 		t.Fatalf("expected 1 log file, got %d: %v", len(logs), logs)
@@ -35,99 +50,123 @@ func findLogFile(t *testing.T, dir string) string {
 	return logs[0]
 }
 
-func TestOpen_CreatesLogFile(t *testing.T) {
+func TestOpen_CreatesLogsBaseDir(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("20260101-100000", dir, 50)
+	l, err := runlog.Open(dir, 50)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	defer l.Close()
 
-	// The log file should exist at a flat path inside .maggus/runs/
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
+	logsDir := filepath.Join(dir, ".maggus", "logs")
+	info, err := os.Stat(logsDir)
 	if err != nil {
-		t.Fatalf("read runs dir: %v", err)
+		t.Fatalf(".maggus/logs/ not created: %v", err)
 	}
-	var logFiles []string
-	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
-			logFiles = append(logFiles, e.Name())
-		}
+	if !info.IsDir() {
+		t.Fatal(".maggus/logs/ is not a directory")
 	}
-	if len(logFiles) == 0 {
-		t.Fatal("no .log file created in .maggus/runs/")
+}
+
+func TestOpen_NoFileUntilSetMaggusID(t *testing.T) {
+	dir := t.TempDir()
+	l, err := runlog.Open(dir, 50)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
 	}
-	// Filename must contain the runID
-	if !strings.Contains(logFiles[0], "20260101-100000") {
-		t.Errorf("log filename %q does not contain runID %q", logFiles[0], "20260101-100000")
+	defer l.Close()
+
+	// No feature directory should exist yet.
+	logsDir := filepath.Join(dir, ".maggus", "logs")
+	entries, err := os.ReadDir(logsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
 	}
-	// No subdirectory should have been created
 	for _, e := range entries {
 		if e.IsDir() {
-			t.Errorf("unexpected subdirectory %q created under runs/", e.Name())
+			t.Errorf("unexpected subdirectory %q before SetCurrentMaggusID", e.Name())
 		}
 	}
 }
 
-func TestOpen_FlatPath_NoSubdirectory(t *testing.T) {
+func TestSetCurrentMaggusID_CreatesFeatureDir(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("20260101-100000", dir, 50)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
+	featureDir := filepath.Join(dir, ".maggus", "logs", testMaggusID)
+	info, err := os.Stat(featureDir)
 	if err != nil {
-		t.Fatalf("read runs dir: %v", err)
+		t.Fatalf("feature dir not created: %v", err)
 	}
-	for _, e := range entries {
-		if e.IsDir() {
-			t.Errorf("unexpected subdirectory %q created under runs/", e.Name())
-		}
+	if !info.IsDir() {
+		t.Fatal("feature dir is not a directory")
 	}
 }
 
-func TestOpen_EmptyMaggusID_TimestampOnlyName(t *testing.T) {
+func TestSetCurrentMaggusID_CreatesLogFile(t *testing.T) {
 	dir := t.TempDir()
-	l, err := runlog.Open("", dir, 50)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, err := os.ReadDir(runsDir)
-	if err != nil {
-		t.Fatalf("read runs dir: %v", err)
+	pid := fmt.Sprintf("%d", os.Getpid())
+	logPath := filepath.Join(dir, ".maggus", "logs", testMaggusID, pid+".log")
+	if _, err := os.Stat(logPath); err != nil {
+		t.Fatalf("log file not created at expected path %q: %v", logPath, err)
 	}
-	var logFiles []string
-	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
-			logFiles = append(logFiles, e.Name())
-		}
+}
+
+func TestSetCurrentMaggusID_SwitchesFile(t *testing.T) {
+	dir := t.TempDir()
+	l := openWithID(t, dir, 50, "guid-aaa")
+	defer l.Close()
+
+	l.Info("first feature")
+	l.SetCurrentMaggusID("guid-bbb")
+	l.Info("second feature")
+
+	// Both directories should exist with log files.
+	entriesA := readLogEntries(t, findLogFile(t, dir, "guid-aaa"))
+	if len(entriesA) != 1 || entriesA[0].Text != "first feature" {
+		t.Errorf("guid-aaa entries = %+v, want 1 entry with 'first feature'", entriesA)
 	}
-	if len(logFiles) == 0 {
-		t.Fatal("no .log file created")
+
+	entriesB := readLogEntries(t, findLogFile(t, dir, "guid-bbb"))
+	if len(entriesB) != 1 || entriesB[0].Text != "second feature" {
+		t.Errorf("guid-bbb entries = %+v, want 1 entry with 'second feature'", entriesB)
 	}
-	name := logFiles[0]
-	// Name should be <timestamp>.log with no underscore separator
-	if strings.Count(name, "_") != 0 {
-		t.Errorf("expected timestamp-only name (no underscore), got %q", name)
+}
+
+func TestSetCurrentMaggusID_EmptyDropsEntries(t *testing.T) {
+	dir := t.TempDir()
+	l := openWithID(t, dir, 50, testMaggusID)
+	defer l.Close()
+
+	l.Info("before clear")
+	l.SetCurrentMaggusID("")
+	l.Info("should be dropped")
+	l.SetCurrentMaggusID(testMaggusID)
+	l.Info("after restore")
+
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries (dropped middle one), got %d", len(entries))
+	}
+	if entries[0].Text != "before clear" {
+		t.Errorf("entries[0].Text = %q, want 'before clear'", entries[0].Text)
+	}
+	if entries[1].Text != "after restore" {
+		t.Errorf("entries[1].Text = %q, want 'after restore'", entries[1].Text)
 	}
 }
 
 func TestOpen_ReturnsErrorOnBadDir(t *testing.T) {
-	l, err := runlog.Open("20260101-100000", filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"), 10)
-	// MkdirAll creates all intermediate directories, so Open should succeed.
+	// On most OS implementations MkdirAll succeeds for nested paths.
+	l, err := runlog.Open(filepath.Join(t.TempDir(), "nonexistent", "deeply", "nested"), 10)
 	if err != nil {
-		// If the OS refuses, that's acceptable; just log it.
 		t.Logf("Open returned error (acceptable): %v", err)
 		return
 	}
-	// Close the logger so the temp dir can be cleaned up.
 	if closeErr := l.Close(); closeErr != nil {
 		t.Logf("Close returned error: %v", closeErr)
 	}
@@ -171,12 +210,12 @@ func assertEntryTimestamp(t *testing.T, e runlog.Entry) {
 
 func TestFeatureStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -195,12 +234,12 @@ func TestFeatureStart(t *testing.T) {
 
 func TestFeatureComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.FeatureComplete("feature_001")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -214,12 +253,12 @@ func TestFeatureComplete(t *testing.T) {
 
 func TestTaskStart(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -237,12 +276,12 @@ func TestTaskStart(t *testing.T) {
 
 func TestTaskComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskComplete("TASK-001-001", "abc1234")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -257,12 +296,12 @@ func TestTaskComplete(t *testing.T) {
 
 func TestTaskFailed(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskFailed("TASK-001-001", "agent error")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -280,12 +319,12 @@ func TestTaskFailed(t *testing.T) {
 
 func TestToolUse(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.ToolUse("TASK-001-001", "Read", map[string]string{"file": "src/main.go"})
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -306,13 +345,13 @@ func TestToolUse(t *testing.T) {
 
 func TestInfo_WritesTaskIDWhenTaskActive(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskStart("TASK-002-001", "Some task")
 	l.Info("something happened during the task")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 entries, got %d", len(entries))
 	}
@@ -327,12 +366,12 @@ func TestInfo_WritesTaskIDWhenTaskActive(t *testing.T) {
 
 func TestInfo_NoTaskIDWhenNoTaskActive(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.Info("daemon started")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -343,14 +382,14 @@ func TestInfo_NoTaskIDWhenNoTaskActive(t *testing.T) {
 
 func TestInfo_TaskIDClearedAfterTaskComplete(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskStart("TASK-003-001", "A task")
 	l.TaskComplete("TASK-003-001", "abc123")
 	l.Info("post-task info")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(entries))
 	}
@@ -365,7 +404,7 @@ func TestInfo_TaskIDClearedAfterTaskComplete(t *testing.T) {
 
 func TestMultipleEventsOrdered(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.FeatureStart("feature_001")
@@ -374,7 +413,7 @@ func TestMultipleEventsOrdered(t *testing.T) {
 	l.TaskComplete("TASK-001-001", "deadbeef")
 	l.FeatureComplete("feature_001")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 5 {
 		t.Fatalf("expected 5 entries, got %d", len(entries))
 	}
@@ -395,12 +434,12 @@ func TestMultipleEventsOrdered(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.Output("TASK-003-001", "Hello from the agent")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -422,13 +461,13 @@ func TestOutput(t *testing.T) {
 
 func TestOutput_LongText(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	longText := strings.Repeat("x", 10000)
 	l.Output("TASK-001-001", longText)
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -439,12 +478,12 @@ func TestOutput_LongText(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.Info("something happened")
 
-	entries := readLogEntries(t, findLogFile(t, dir))
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -471,65 +510,27 @@ func TestNilLoggerMethodsAreNoOp(t *testing.T) {
 	l.ToolUse("x", "Read", map[string]string{"file": "file"})
 	l.Output("x", "text")
 	l.Info("msg")
+	l.SetCurrentMaggusID("some-id")
 	_ = l.Close()
 }
 
 func TestClose_Idempotent(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	if err := l.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
 	}
 	// Second close should not panic but may return an error (file already closed).
 }
 
-func TestOpenWorker_CreatesNamespacedLogFile(t *testing.T) {
-	dir := t.TempDir()
-	l, err := runlog.OpenWorker(3, "TASK-038-002", dir)
-	if err != nil {
-		t.Fatalf("OpenWorker: %v", err)
-	}
-	defer l.Close()
-
-	l.TaskStart("TASK-038-002", "Some task")
-
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	entries, readErr := os.ReadDir(runsDir)
-	if readErr != nil {
-		t.Fatalf("read runs dir: %v", readErr)
-	}
-	var logFiles []string
-	for _, e := range entries {
-		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
-			logFiles = append(logFiles, e.Name())
-		}
-	}
-	if len(logFiles) != 1 {
-		t.Fatalf("expected 1 log file, got %d: %v", len(logFiles), logFiles)
-	}
-	want := "3-TASK-038-002.log"
-	if logFiles[0] != want {
-		t.Errorf("log filename = %q, want %q", logFiles[0], want)
-	}
-
-	// Verify the log entry was written.
-	logEntries := readLogEntries(t, filepath.Join(runsDir, logFiles[0]))
-	if len(logEntries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(logEntries))
-	}
-	if logEntries[0].Event != "task_start" {
-		t.Errorf("event = %q, want task_start", logEntries[0].Event)
-	}
-}
-
 func TestJSONLFormat(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := runlog.Open("20260101-100000", dir, 50)
+	l := openWithID(t, dir, 50, testMaggusID)
 	defer l.Close()
 
 	l.TaskStart("TASK-001-001", "Do something")
 
-	logPath := findLogFile(t, dir)
+	logPath := findLogFile(t, dir, testMaggusID)
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("read log file: %v", err)
@@ -539,12 +540,42 @@ func TestJSONLFormat(t *testing.T) {
 		t.Fatalf("line is not valid JSON: %s", line)
 	}
 
-	// Verify omitempty works — fields not set should be absent
+	// Verify omitempty works — fields not set should be absent.
 	var raw map[string]any
 	json.Unmarshal([]byte(line), &raw)
 	for _, absent := range []string{"feature_id", "commit", "tool", "description", "text", "reason"} {
 		if _, ok := raw[absent]; ok {
 			t.Errorf("field %q should be omitted but is present", absent)
 		}
+	}
+}
+
+func TestLogFileNameIsPID(t *testing.T) {
+	dir := t.TempDir()
+	l := openWithID(t, dir, 50, testMaggusID)
+	defer l.Close()
+
+	l.Info("check path")
+
+	logPath := findLogFile(t, dir, testMaggusID)
+	wantName := fmt.Sprintf("%d.log", os.Getpid())
+	if filepath.Base(logPath) != wantName {
+		t.Errorf("log filename = %q, want %q", filepath.Base(logPath), wantName)
+	}
+}
+
+func TestMaggusID_InjectedIntoEntries(t *testing.T) {
+	dir := t.TempDir()
+	l := openWithID(t, dir, 50, testMaggusID)
+	defer l.Close()
+
+	l.Info("test entry")
+
+	entries := readLogEntries(t, findLogFile(t, dir, testMaggusID))
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].MaggusID != testMaggusID {
+		t.Errorf("maggus_id = %q, want %q", entries[0].MaggusID, testMaggusID)
 	}
 }

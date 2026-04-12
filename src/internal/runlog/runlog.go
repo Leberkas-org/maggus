@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
-// Logger writes structured run events to a flat log file in .maggus/runs/.
-// All methods are safe to call on a nil Logger (no-op).
+// Logger writes structured run events to per-feature log files in
+// .maggus/logs/<maggus_id>/<pid>.log. The active file is switched by
+// SetCurrentMaggusID. All methods are safe to call on a nil Logger (no-op).
 type Logger struct {
 	w               *os.File
-	dir             string
+	logsDir         string
+	pid             string
+	maxFiles        int
 	currentMaggusID string
 	currentTaskID   string
 }
@@ -60,61 +63,30 @@ type Entry struct {
 	ModelUsage               map[string]ModelTokensEntry `json:"model_usage,omitempty"`
 }
 
-// Open creates a log file at .maggus/runs/<runID>_<ts>.log, or
-// .maggus/runs/<ts>.log when runID is empty. The runs directory is
-// created if it does not exist. After opening, older log files are pruned so
-// that at most maxFiles log files are retained (daemon.log is never pruned).
-func Open(runID, dir string, maxFiles int) (*Logger, error) {
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	if err := os.MkdirAll(runsDir, 0755); err != nil {
-		return nil, fmt.Errorf("create runs dir: %w", err)
+// Open creates a Logger that writes to .maggus/logs/<maggus_id>/<pid>.log.
+// No file is opened until SetCurrentMaggusID is called with a non-empty ID.
+// The logs base directory is created if it does not exist.
+func Open(dir string, maxFiles int) (*Logger, error) {
+	logsDir := filepath.Join(dir, ".maggus", "logs")
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return nil, fmt.Errorf("create logs dir: %w", err)
 	}
 
-	ts := time.Now().Format("20060102-150405")
-	var name string
-	if runID == "" {
-		name = ts + ".log"
-	} else {
-		name = runID + "_" + ts + ".log"
-	}
-
-	logPath := filepath.Join(runsDir, name)
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("open log file: %w", err)
-	}
-
-	pruneLogFiles(runsDir, maxFiles)
-
-	return &Logger{w: f, dir: dir}, nil
+	return &Logger{
+		logsDir:  logsDir,
+		pid:      fmt.Sprintf("%d", os.Getpid()),
+		maxFiles: maxFiles,
+	}, nil
 }
 
-// OpenWorker creates a per-worker log file at .maggus/runs/<iteration>-<taskID>.log.
-// This is used in parallel mode to give each concurrent worker its own log file,
-// namespaced by task ID to avoid collisions.
-func OpenWorker(iteration int, taskID, dir string) (*Logger, error) {
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	if err := os.MkdirAll(runsDir, 0755); err != nil {
-		return nil, fmt.Errorf("create runs dir: %w", err)
-	}
-
-	name := fmt.Sprintf("%d-%s.log", iteration, taskID)
-	logPath := filepath.Join(runsDir, name)
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("open worker log file: %w", err)
-	}
-
-	return &Logger{w: f, dir: dir}, nil
-}
-
-// pruneLogFiles removes the oldest .log files in runsDir when the count
-// exceeds maxFiles. daemon.log is always excluded from pruning.
-func pruneLogFiles(runsDir string, maxFiles int) {
+// pruneLogFiles removes the oldest .log files in dir when the count
+// exceeds maxFiles. The file named exclude is never pruned (used to
+// protect the currently active log file).
+func pruneLogFiles(dir string, maxFiles int, exclude string) {
 	if maxFiles <= 0 {
 		return
 	}
-	entries, err := os.ReadDir(runsDir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
@@ -125,7 +97,7 @@ func pruneLogFiles(runsDir string, maxFiles int) {
 			continue
 		}
 		name := e.Name()
-		if name == "daemon.log" {
+		if name == exclude {
 			continue
 		}
 		if filepath.Ext(name) == ".log" {
@@ -133,11 +105,12 @@ func pruneLogFiles(runsDir string, maxFiles int) {
 		}
 	}
 
-	// Filenames are <runID>_<ts>.log or <ts>.log — both start with a
-	// timestamp, so lexicographic sort gives chronological order.
+	// maxFiles includes the excluded file, so the budget for pruneable files
+	// is maxFiles-1.
+	limit := maxFiles - 1
 	sort.Strings(logFiles)
-	for len(logFiles) > maxFiles {
-		_ = os.Remove(filepath.Join(runsDir, logFiles[0]))
+	for len(logFiles) > limit {
+		_ = os.Remove(filepath.Join(dir, logFiles[0]))
 		logFiles = logFiles[1:]
 	}
 }
@@ -150,14 +123,41 @@ func (l *Logger) Close() error {
 	return l.w.Close()
 }
 
-// SetCurrentMaggusID sets the maggus ID that will be injected into all subsequent log entries.
-// Pass an empty string to clear the current ID (entries outside any active plan).
+// SetCurrentMaggusID switches the active log file to .maggus/logs/<maggusID>/<pid>.log.
+// If maggusID is empty, the current file is closed and subsequent entries are
+// silently dropped until a non-empty ID is set.
 // Safe to call on a nil Logger (no-op).
 func (l *Logger) SetCurrentMaggusID(maggusID string) {
 	if l == nil {
 		return
 	}
+
+	// Close the current file handle if open.
+	if l.w != nil {
+		l.w.Close()
+		l.w = nil
+	}
+
 	l.currentMaggusID = maggusID
+
+	if maggusID == "" {
+		return
+	}
+
+	// Create the per-feature directory and open the log file.
+	featureDir := filepath.Join(l.logsDir, maggusID)
+	if err := os.MkdirAll(featureDir, 0755); err != nil {
+		return
+	}
+
+	logPath := filepath.Join(featureDir, l.pid+".log")
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	l.w = f
+
+	pruneLogFiles(featureDir, l.maxFiles, l.pid+".log")
 }
 
 // emit writes a single JSONL entry to the log file.

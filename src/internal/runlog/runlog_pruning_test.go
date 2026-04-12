@@ -1,41 +1,37 @@
 package runlog_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
-func TestPruning_RemovesOldestFiles(t *testing.T) {
+func TestPruning_RemovesOldestFilesInFeatureDir(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	if err := os.MkdirAll(runsDir, 0755); err != nil {
+	maggusID := "prune-guid-001"
+	featureDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	if err := os.MkdirAll(featureDir, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	// Pre-create 5 old log files with ascending timestamps (<runID>_<ts> format).
-	oldFiles := []string{
-		"20260101-100000_20260101-100001.log",
-		"20260101-110000_20260101-110001.log",
-		"20260101-120000_20260101-120001.log",
-		"20260101-130000_20260101-130001.log",
-		"20260101-140000_20260101-140001.log",
-	}
-	for _, name := range oldFiles {
-		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
+	// Pre-create 5 old log files in the feature directory.
+	for i := 0; i < 5; i++ {
+		name := fmt.Sprintf("%d.log", 1000+i)
+		os.WriteFile(filepath.Join(featureDir, name), []byte("{}"), 0644)
 	}
 
-	// Open with maxFiles=5: opening creates a 6th file, so oldest is pruned.
-	l, err := runlog.Open("20260101-150000", dir, 5)
+	// Open and SetCurrentMaggusID with maxFiles=3 triggers pruning.
+	l, err := runlog.Open(dir, 3)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+	l.SetCurrentMaggusID(maggusID)
 	defer l.Close()
 
-	entries, err := os.ReadDir(runsDir)
+	entries, err := os.ReadDir(featureDir)
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}
@@ -46,64 +42,41 @@ func TestPruning_RemovesOldestFiles(t *testing.T) {
 		}
 	}
 
-	if len(logs) != 5 {
-		t.Errorf("expected 5 log files after pruning, got %d: %v", len(logs), logs)
+	// 5 old + 1 new = 6, pruned to 3.
+	if len(logs) != 3 {
+		t.Errorf("expected 3 log files after pruning, got %d: %v", len(logs), logs)
 	}
-	// The oldest file should have been removed.
+	// The oldest files (1000.log, 1001.log, 1002.log) should be removed.
 	for _, name := range logs {
-		if name == oldFiles[0] {
-			t.Errorf("oldest file %q should have been pruned but still exists", oldFiles[0])
+		if name == "1000.log" || name == "1001.log" || name == "1002.log" {
+			t.Errorf("old file %q should have been pruned but still exists", name)
 		}
-	}
-}
-
-func TestPruning_DaemonLogNeverPruned(t *testing.T) {
-	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	if err := os.MkdirAll(runsDir, 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-
-	// Create daemon.log and enough old files to trigger pruning.
-	os.WriteFile(filepath.Join(runsDir, "daemon.log"), []byte("daemon"), 0644)
-	for i := 0; i < 5; i++ {
-		name := strings.Replace("20260101-1X0000_20260101-1X0001.log", "X", string(rune('0'+i)), -1)
-		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
-	}
-
-	// Open with maxFiles=3 — will prune task logs but never daemon.log.
-	l, err := runlog.Open("20260101-150000", dir, 3)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer l.Close()
-
-	// daemon.log must still exist.
-	if _, err := os.Stat(filepath.Join(runsDir, "daemon.log")); err != nil {
-		t.Errorf("daemon.log was pruned: %v", err)
 	}
 }
 
 func TestPruning_NoPruneWhenUnderLimit(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	if err := os.MkdirAll(runsDir, 0755); err != nil {
+	maggusID := "prune-guid-002"
+	featureDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	if err := os.MkdirAll(featureDir, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
 	// Pre-create 2 old log files.
-	for _, name := range []string{"20260101-100000_20260101-100001.log", "20260101-110000_20260101-110001.log"} {
-		os.WriteFile(filepath.Join(runsDir, name), []byte("{}"), 0644)
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("%d.log", 2000+i)
+		os.WriteFile(filepath.Join(featureDir, name), []byte("{}"), 0644)
 	}
 
-	// Open with maxFiles=10: 3 total files, well under limit — nothing pruned.
-	l, err := runlog.Open("20260101-150000", dir, 10)
+	// Open with maxFiles=10: 3 total (2 old + 1 new), well under limit.
+	l, err := runlog.Open(dir, 10)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+	l.SetCurrentMaggusID(maggusID)
 	defer l.Close()
 
-	entries, _ := os.ReadDir(runsDir)
+	entries, _ := os.ReadDir(featureDir)
 	var logs []string
 	for _, e := range entries {
 		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
@@ -112,5 +85,82 @@ func TestPruning_NoPruneWhenUnderLimit(t *testing.T) {
 	}
 	if len(logs) != 3 {
 		t.Errorf("expected 3 log files (no pruning), got %d", len(logs))
+	}
+}
+
+func TestPruning_OnlyAffectsCurrentFeatureDir(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create two feature directories with log files.
+	for _, guid := range []string{"guid-aaa", "guid-bbb"} {
+		fdir := filepath.Join(dir, ".maggus", "logs", guid)
+		os.MkdirAll(fdir, 0755)
+		for i := 0; i < 5; i++ {
+			name := fmt.Sprintf("%d.log", 3000+i)
+			os.WriteFile(filepath.Join(fdir, name), []byte("{}"), 0644)
+		}
+	}
+
+	// Open with maxFiles=2 and set to guid-aaa.
+	l, err := runlog.Open(dir, 2)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	l.SetCurrentMaggusID("guid-aaa")
+	defer l.Close()
+
+	// guid-aaa should be pruned to 2 files.
+	entriesA, _ := os.ReadDir(filepath.Join(dir, ".maggus", "logs", "guid-aaa"))
+	var logsA int
+	for _, e := range entriesA {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logsA++
+		}
+	}
+	if logsA != 2 {
+		t.Errorf("guid-aaa: expected 2 log files after pruning, got %d", logsA)
+	}
+
+	// guid-bbb should be untouched (5 files).
+	entriesB, _ := os.ReadDir(filepath.Join(dir, ".maggus", "logs", "guid-bbb"))
+	var logsB int
+	for _, e := range entriesB {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logsB++
+		}
+	}
+	if logsB != 5 {
+		t.Errorf("guid-bbb: expected 5 log files (untouched), got %d", logsB)
+	}
+}
+
+func TestPruning_DisabledWhenMaxFilesZero(t *testing.T) {
+	dir := t.TempDir()
+	maggusID := "prune-guid-003"
+	featureDir := filepath.Join(dir, ".maggus", "logs", maggusID)
+	os.MkdirAll(featureDir, 0755)
+
+	for i := 0; i < 10; i++ {
+		name := fmt.Sprintf("%d.log", 4000+i)
+		os.WriteFile(filepath.Join(featureDir, name), []byte("{}"), 0644)
+	}
+
+	l, err := runlog.Open(dir, 0)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	l.SetCurrentMaggusID(maggusID)
+	defer l.Close()
+
+	entries, _ := os.ReadDir(featureDir)
+	var logs int
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".log" {
+			logs++
+		}
+	}
+	// 10 old + 1 new = 11, none pruned.
+	if logs != 11 {
+		t.Errorf("expected 11 log files (no pruning with maxFiles=0), got %d", logs)
 	}
 }

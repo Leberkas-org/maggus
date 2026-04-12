@@ -271,7 +271,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	iter := o.iteration
 	o.mu.Unlock()
 
-	workerLogger, logErr := runlog.OpenWorker(iter, task.ID, o.repoDir)
+	workerLogger, logErr := runlog.Open(o.repoDir, 0)
 	if logErr != nil {
 		workerLogger = o.parentLogger
 	}
