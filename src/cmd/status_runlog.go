@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +8,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
 // logPollTick returns a tea.Cmd that fires logFileUpdateMsg after 200ms.
@@ -58,47 +55,6 @@ func findLogsForMaggusID(dir, maggusID string) []string {
 		}
 	}
 	return files
-}
-
-// readLastNLogLines returns the last n lines of the file at path.
-// Returns nil on error or if the file is empty.
-func readLastNLogLines(path string, n int) []string {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-	return lines
-}
-
-// parseLogForCurrentState scans log lines from newest to oldest to find the most
-// recently started feature and task. Parses JSONL entries; non-JSON lines are silently skipped.
-func parseLogForCurrentState(lines []string) (feature, task string) {
-	for i := len(lines) - 1; i >= 0; i-- {
-		var entry runlog.Entry
-		if err := json.Unmarshal([]byte(lines[i]), &entry); err != nil {
-			continue // skip non-JSON lines gracefully
-		}
-		if feature == "" && entry.Event == "feature_start" && entry.FeatureID != "" {
-			feature = entry.FeatureID
-		}
-		if task == "" && entry.Event == "task_start" && entry.TaskID != "" {
-			task = entry.TaskID
-		}
-		if feature != "" && task != "" {
-			break
-		}
-	}
-	return feature, task
 }
 
 // formatHumanDuration formats a duration as human-friendly text (e.g. "5m 32s", "1h 12m 5s").

@@ -55,7 +55,7 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 | **config** | Parses `.maggus/config.yml`. Resolves model aliases (sonnet→claude-sonnet-4-6, opus→claude-opus-4-6, haiku→claude-haiku-4-5-20251001), validates include file paths, and holds notification settings. |
 | **globalconfig** | Manages global Maggus settings in `~/.maggus/`: repository list, user preferences, lifetime metrics, and binary update state. |
 | **approval** | Manages feature approval state in `.maggus/feature_approvals.yml`. Supports opt-in (explicit approval required) and opt-out (approved by default) modes. |
-| **runlog** | Writes structured run events to `.maggus/runs/` log files. Tracks per-task token usage and cost; prunes old log files automatically. |
+| **runlog** | Writes structured JSONL events to `.maggus/logs/<maggus_id>/<pid>.log`, organized by feature/bug GUID. Tracks per-task token usage and cost; prunes old log files per feature directory. Manages daemon state snapshots in `.maggus/runs/` (`state.json`, `state-*.json`). |
 | **stores** | File-backed and in-memory repository implementations for features and bugs. Wraps parser operations for consistent use by the work loop and TUI. |
 | **gitbranch** | Creates hierarchical branches when starting work on a protected branch (main/master/dev). On protected branches, creates a plan branch (`feature/feat-NNN` for features, `fix/bug-NNN` for bugs); on non-protected branches, stays on the current branch. Task branches: `feature/maggus-NNN/task-MMM` (features), `bugfix/maggus-bug-NNN/task-MMM` (bugs). |
 | **gitcommit** | Reads COMMIT.md written by the agent, strips Co-Authored-By lines, and runs `git commit -F`. |
