@@ -11,19 +11,31 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 )
 
+// testMaggusID is the fixed UUID used when writing test log files.
+const testMaggusID = "aaaabbbb-cccc-dddd-eeee-111122223333"
+
+// makeLogDir creates .maggus/logs/<testMaggusID>/ in dir and returns its path.
+func makeLogDir(t *testing.T, dir string) string {
+	t.Helper()
+	logDir := filepath.Join(dir, ".maggus", "logs", testMaggusID)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatalf("makeLogDir: %v", err)
+	}
+	return logDir
+}
+
 func TestLoadCompletedTaskOutput_ReturnsNilForMissingTask(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	// Write a log file with entries for a different task.
 	entries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-OTHER", Title: "Other"},
 		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-OTHER", Commit: "abc123"},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
 
-	snap := loadCompletedTaskOutput(dir, "TASK-001")
+	snap := loadCompletedTaskOutput(dir, testMaggusID, "TASK-001")
 	if snap != nil {
 		t.Errorf("expected nil for missing task, got %+v", snap)
 	}
@@ -31,8 +43,7 @@ func TestLoadCompletedTaskOutput_ReturnsNilForMissingTask(t *testing.T) {
 
 func TestLoadCompletedTaskOutput_LoadsToolEntries(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	entries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "Do the thing"},
@@ -42,9 +53,9 @@ func TestLoadCompletedTaskOutput_LoadsToolEntries(t *testing.T) {
 		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001", Commit: "abc1234"},
 		{Ts: "2025-01-01T00:01:01Z", Event: "task_usage", InputTokens: 5000, OutputTokens: 2000, CostUSD: 0.05},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
 
-	snap := loadCompletedTaskOutput(dir, "TASK-001")
+	snap := loadCompletedTaskOutput(dir, testMaggusID, "TASK-001")
 	if snap == nil {
 		t.Fatal("expected snapshot, got nil")
 	}
@@ -76,17 +87,16 @@ func TestLoadCompletedTaskOutput_LoadsToolEntries(t *testing.T) {
 
 func TestLoadCompletedTaskOutput_FailedTask(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	entries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-002", Title: "Will fail"},
 		{Ts: "2025-01-01T00:00:10Z", Event: "tool_use", TaskID: "TASK-002", Tool: "Bash", Input: map[string]string{"command": "make build"}},
 		{Ts: "2025-01-01T00:01:00Z", Event: "task_failed", TaskID: "TASK-002", Reason: "build error"},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
 
-	snap := loadCompletedTaskOutput(dir, "TASK-002")
+	snap := loadCompletedTaskOutput(dir, testMaggusID, "TASK-002")
 	if snap == nil {
 		t.Fatal("expected snapshot, got nil")
 	}
@@ -102,8 +112,7 @@ func TestLoadCompletedTaskOutput_TaskUsageWithTaskID(t *testing.T) {
 	// Verifies that scanLogForTask correctly handles task_usage entries that
 	// carry a task_id field (the fixed behaviour after BUG-035).
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	entries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "Fixed task"},
@@ -112,9 +121,9 @@ func TestLoadCompletedTaskOutput_TaskUsageWithTaskID(t *testing.T) {
 		// task_usage now carries task_id — matches the entry and enters the switch.
 		{Ts: "2025-01-01T00:01:01Z", Event: "task_usage", TaskID: "TASK-001", InputTokens: 7000, OutputTokens: 3000, CostUSD: 0.07},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
 
-	snap := loadCompletedTaskOutput(dir, "TASK-001")
+	snap := loadCompletedTaskOutput(dir, testMaggusID, "TASK-001")
 	if snap == nil {
 		t.Fatal("expected snapshot, got nil")
 	}
@@ -134,15 +143,14 @@ func TestLoadCompletedTaskOutput_TaskUsageWithTaskID(t *testing.T) {
 
 func TestLoadCompletedTaskOutput_ScansNewestLogFirst(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	// Older log with the task (fewer tools).
 	oldEntries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "Old run"},
 		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001"},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", oldEntries)
+	writeLogFile(t, logDir, "20250101-000000.log", oldEntries)
 
 	// Newer log with the same task (more tools).
 	newEntries := []runlog.Entry{
@@ -151,9 +159,9 @@ func TestLoadCompletedTaskOutput_ScansNewestLogFirst(t *testing.T) {
 		{Ts: "2025-02-01T00:00:20Z", Event: "tool_use", TaskID: "TASK-001", Tool: "Edit", Input: map[string]string{"file_path": "/b.go"}},
 		{Ts: "2025-02-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001", Commit: "def5678"},
 	}
-	writeLogFile(t, runsDir, "20250201-000000.log", newEntries)
+	writeLogFile(t, logDir, "20250201-000000.log", newEntries)
 
-	snap := loadCompletedTaskOutput(dir, "TASK-001")
+	snap := loadCompletedTaskOutput(dir, testMaggusID, "TASK-001")
 	if snap == nil {
 		t.Fatal("expected snapshot, got nil")
 	}
@@ -166,11 +174,35 @@ func TestLoadCompletedTaskOutput_ScansNewestLogFirst(t *testing.T) {
 	}
 }
 
+func TestLoadCompletedTaskOutput_FallbackScansAllDirs(t *testing.T) {
+	// When maggusID is empty, loadCompletedTaskOutput scans all subdirectories.
+	dir := t.TempDir()
+	otherID := "ffffeeee-dddd-cccc-bbbb-000011112222"
+	logDir := filepath.Join(dir, ".maggus", "logs", otherID)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	entries := []runlog.Entry{
+		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "Fallback task"},
+		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001"},
+	}
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
+
+	snap := loadCompletedTaskOutput(dir, "", "TASK-001")
+	if snap == nil {
+		t.Fatal("expected snapshot via fallback scan, got nil")
+	}
+	if snap.TaskTitle != "Fallback task" {
+		t.Errorf("TaskTitle = %q, want 'Fallback task'", snap.TaskTitle)
+	}
+}
+
 func TestFormatToolDescription(t *testing.T) {
 	tests := []struct {
-		tool     string
-		input    map[string]string
-		wantHas  string
+		tool    string
+		input   map[string]string
+		wantHas string
 	}{
 		{"Read", map[string]string{"file_path": "/home/user/project/main.go"}, "main.go"},
 		{"Edit", map[string]string{"file_path": "/foo/bar.go"}, "bar.go"},
@@ -298,14 +330,13 @@ func TestSnapshotForSelectedTask_DispatchedWorker(t *testing.T) {
 
 func TestEnsureCompletedTaskOutput_CachesAndInvalidates(t *testing.T) {
 	dir := t.TempDir()
-	runsDir := filepath.Join(dir, ".maggus", "runs")
-	os.MkdirAll(runsDir, 0755)
+	logDir := makeLogDir(t, dir)
 
 	entries := []runlog.Entry{
 		{Ts: "2025-01-01T00:00:00Z", Event: "task_start", TaskID: "TASK-001", Title: "T1"},
 		{Ts: "2025-01-01T00:01:00Z", Event: "task_complete", TaskID: "TASK-001"},
 	}
-	writeLogFile(t, runsDir, "20250101-000000.log", entries)
+	writeLogFile(t, logDir, "20250101-000000.log", entries)
 
 	task := parser.Task{
 		ID:       "TASK-001",
@@ -316,7 +347,7 @@ func TestEnsureCompletedTaskOutput_CachesAndInvalidates(t *testing.T) {
 		dir:           dir,
 		expandedPlans: make(map[string]bool),
 		plans: []parser.Plan{
-			{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{task}},
+			{ID: "f1", MaggusID: testMaggusID, File: "feature_1.md", Tasks: []parser.Task{task}},
 		},
 	}
 	m.expandedPlans["f1"] = true
@@ -355,9 +386,9 @@ func TestRenderCompletedTaskOutput_ShowsTaskInfo(t *testing.T) {
 			{Type: "Read", Icon: "📖", Description: "main.go", Timestamp: "2025-01-01T00:00:10Z"},
 			{Type: "Edit", Icon: "✏️", Description: "main.go", Timestamp: "2025-01-01T00:00:20Z"},
 		},
-		TokenInput:   5000,
-		TokenOutput:  2000,
-		TokenCost:    0.05,
+		TokenInput:    5000,
+		TokenOutput:   2000,
+		TokenCost:     0.05,
 		TaskStartedAt: "2025-01-01T00:00:00Z",
 		UpdatedAt:     "2025-01-01T00:01:00Z",
 	}
@@ -576,8 +607,8 @@ func TestRenderCompletedTaskOutput_LineCountMatchesHeight(t *testing.T) {
 // invocations recorded" message is shown when there are no tool entries.
 func TestRenderCompletedTaskOutput_ZeroToolsMessage(t *testing.T) {
 	snap := &runlog.StateSnapshot{
-		TaskID:  "TASK-001",
-		Status:  "Done",
+		TaskID:        "TASK-001",
+		Status:        "Done",
 		TaskStartedAt: "2025-01-01T00:00:00Z",
 		UpdatedAt:     "2025-01-01T00:01:00Z",
 	}
@@ -639,10 +670,10 @@ func TestTruncateToWidth(t *testing.T) {
 	}
 }
 
-// writeLogFile writes JSONL entries to a log file in the runs directory.
-func writeLogFile(t *testing.T, runsDir, name string, entries []runlog.Entry) {
+// writeLogFile writes JSONL entries to a log file in the given directory.
+func writeLogFile(t *testing.T, logDir, name string, entries []runlog.Entry) {
 	t.Helper()
-	path := filepath.Join(runsDir, name)
+	path := filepath.Join(logDir, name)
 	f, err := os.Create(path)
 	if err != nil {
 		t.Fatalf("create log file: %v", err)

@@ -17,7 +17,7 @@ import (
 type workerSnapshotWriter struct {
 	mu          sync.Mutex
 	dir         string
-	runID       string
+	maggusID    string
 	taskID      string
 	taskTitle   string
 	itemTitle   string
@@ -32,10 +32,10 @@ type workerSnapshotWriter struct {
 	taskStarted time.Time
 }
 
-func newWorkerSnapshotWriter(dir, runID, taskID, taskTitle, itemTitle string, runStarted time.Time) *workerSnapshotWriter {
+func newWorkerSnapshotWriter(dir, maggusID, taskID, taskTitle, itemTitle string, runStarted time.Time) *workerSnapshotWriter {
 	w := &workerSnapshotWriter{
 		dir:         dir,
-		runID:       runID,
+		maggusID:    maggusID,
 		taskID:      taskID,
 		taskTitle:   taskTitle,
 		itemTitle:   itemTitle,
@@ -102,7 +102,7 @@ func (w *workerSnapshotWriter) SetStatus(status string) {
 
 func (w *workerSnapshotWriter) writeSnapshot() {
 	snap := runlog.StateSnapshot{
-		RunID:          w.runID,
+		MaggusID:       w.maggusID,
 		TaskID:         w.taskID,
 		TaskTitle:      w.taskTitle,
 		ItemTitle:      w.itemTitle,
@@ -201,5 +201,5 @@ func (o *parallelOrchestrator) registerWorker(taskID, taskTitle string) {
 func (o *parallelOrchestrator) workerSnapshotWriterFor(task parser.Task) *workerSnapshotWriter {
 	o.registerWorker(task.ID, task.Title)
 	o.updateWorkersIndex(o.buildWorkerEntries())
-	return newWorkerSnapshotWriter(o.repoDir, o.runID, task.ID, task.Title, "", o.runStartedAt)
+	return newWorkerSnapshotWriter(o.repoDir, "", task.ID, task.Title, "", o.runStartedAt)
 }

@@ -97,16 +97,16 @@ Update all callers of the old `runlog.Open` / `runlog.OpenWorker`:
 8. **Update `daemon_keepalive.go` `runOneDaemonCycle`**: Remove `runID` parameter. Remove all places where `runID` is threaded through.
 
 **Acceptance Criteria:**
-- [ ] `daemon_keepalive.go` calls `runlog.Open(dir, maxFiles)` without run ID
-- [ ] `run_parallel.go` uses `runlog.Open` + `SetCurrentMaggusID` instead of `OpenWorker`
-- [ ] Dispatched workers write JSONL to `<dispatch-repo>/.maggus/logs/<maggus_id>/`
-- [ ] `--daemon-run-id` flag removed from `run.go`
-- [ ] `generateDaemonRunID()` deleted from `daemon.go`
-- [ ] `daemonRunIDFlag` variable removed
-- [ ] `daemon_start.go` and `dispatch.go` no longer pass `--daemon-run-id` to subprocesses
-- [ ] `nullTUIModel.snapshotRunID` removed
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] `daemon_keepalive.go` calls `runlog.Open(dir, maxFiles)` without run ID
+- [x] `run_parallel.go` uses `runlog.Open` + `SetCurrentMaggusID` instead of `OpenWorker`
+- [x] Dispatched workers write JSONL to `<dispatch-repo>/.maggus/logs/<maggus_id>/`
+- [x] `--daemon-run-id` flag removed from `run.go`
+- [x] `generateDaemonRunID()` deleted from `daemon.go`
+- [x] `daemonRunIDFlag` variable removed
+- [x] `daemon_start.go` and `dispatch.go` no longer pass `--daemon-run-id` to subprocesses
+- [x] `nullTUIModel.snapshotRunID` removed
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ### TASK-050-003: Update TUI log display to read from per-feature directories
 **Description:** As a user, I want the TUI status view to reliably show task output by reading from the correct per-feature log directory.
@@ -133,15 +133,15 @@ Update all TUI code that reads log files:
 7. **Update `parseLogForCurrentState()`**: Reads from per-feature directory. The "current feature" is now known from the snapshot's `MaggusID` field rather than parsed from log lines.
 
 **Acceptance Criteria:**
-- [ ] `findLatestRunLog` replaced with directory-based lookup using `maggus_id`
-- [ ] `loadCompletedTaskOutput` reads only from `.maggus/logs/<maggus_id>/` for the relevant feature
-- [ ] `StateSnapshot.RunID` field removed
-- [ ] `StateSnapshot.MaggusID` field added (or confirmed present)
-- [ ] `LogFileWatcher` watches `.maggus/logs/` for changes
-- [ ] Live task output displays correctly in the TUI during a running task
-- [ ] Completed task output displays correctly in the TUI for finished tasks
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] `findLatestRunLog` replaced with directory-based lookup using `maggus_id`
+- [x] `loadCompletedTaskOutput` reads only from `.maggus/logs/<maggus_id>/` for the relevant feature
+- [x] `StateSnapshot.RunID` field removed
+- [x] `StateSnapshot.MaggusID` field added (or confirmed present)
+- [x] `LogFileWatcher` watches `.maggus/logs/` for changes
+- [x] Live task output displays correctly in the TUI during a running task
+- [x] Completed task output displays correctly in the TUI for finished tasks
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ### TASK-050-004: Deprecate RunID in usage tracking
 **Description:** As a developer, I want RunID removed from active code paths while preserving backwards compatibility in persisted usage data.
@@ -185,11 +185,11 @@ Update all TUI code that reads log files:
 3. **Consider**: Should `.maggus/runs/` still be used for anything? After this feature, `state.json` and `state-*.json` snapshots still live there. `daemon.log` still lives there. But JSONL run logs move to `.maggus/logs/`. Document this split.
 
 **Acceptance Criteria:**
-- [ ] `.maggus/logs/` added to gitignore entries
-- [ ] `maggus clean` removes log directories for cleaned features
-- [ ] `.maggus/runs/` retains only snapshot files and `daemon.log`
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] `.maggus/logs/` added to gitignore entries
+- [x] `maggus clean` removes log directories for cleaned features
+- [x] `.maggus/runs/` retains only snapshot files and `daemon.log`
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-050-006: Remove dead code and update documentation
 **Description:** As a developer, I want all dead code from the old logging system removed and documentation updated to reflect the new structure.

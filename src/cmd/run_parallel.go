@@ -285,7 +285,7 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	// Create per-worker snapshot writer for TUI split view (parallel tasks only).
 	var wsw *workerSnapshotWriter
 	if useWorktree {
-		wsw = newWorkerSnapshotWriter(o.repoDir, o.runID, task.ID, task.Title, group.Title, o.runStartedAt)
+		wsw = newWorkerSnapshotWriter(o.repoDir, group.MaggusID, task.ID, task.Title, group.Title, o.runStartedAt)
 	}
 
 	worktreePath := filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)

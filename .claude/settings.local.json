@@ -21,7 +21,8 @@
       "Bash(find:*)",
       "Bash(head:*)",
       "Bash(python3:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git log:*)"
     ]
   }
 }

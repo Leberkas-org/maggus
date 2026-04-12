@@ -33,10 +33,9 @@ type nullTUIModel struct {
 	onTaskUsage  func(TaskUsage)
 
 	// Snapshot state — written to state.json on each event.
-	snapshotDir   string // project root directory
-	snapshotRunID string // run ID for the snapshot path
-	toolEntries   []runlog.SnapshotToolEntry
-	commits       []string
+	snapshotDir string // project root directory
+	toolEntries []runlog.SnapshotToolEntry
+	commits     []string
 
 	// Dispatch mode — when set, writes per-worker snapshots to the main repo
 	// instead of the daemon's state.json. Set by --dispatch-repo.
@@ -153,7 +152,7 @@ func (m *nullTUIModel) writeSnapshot() {
 		status = "Idle"
 	}
 	snap := runlog.StateSnapshot{
-		RunID:          m.snapshotRunID,
+		MaggusID:       m.itemID,
 		TaskID:         m.taskID,
 		TaskTitle:      m.taskTitle,
 		ItemTitle:      m.itemTitle,
@@ -175,7 +174,7 @@ func (m *nullTUIModel) writeSnapshot() {
 	}
 
 	// Normal daemon mode: write to state.json in the local dir.
-	if m.snapshotDir == "" || m.snapshotRunID == "" {
+	if m.snapshotDir == "" {
 		return
 	}
 	_ = runlog.WriteSnapshot(m.snapshotDir, snap)

@@ -72,11 +72,10 @@ func dispatchTask(dir, taskID, model, agentName string) error {
 
 	// Write initial per-worker snapshot so the status view has something to show.
 	initSnap := runlog.StateSnapshot{
-		RunID:        generateDaemonRunID(),
-		TaskID:       taskID,
-		TaskTitle:    taskID,
-		Status:       "Working",
-		RunStartedAt: time.Now().UTC().Format(time.RFC3339),
+		TaskID:        taskID,
+		TaskTitle:     taskID,
+		Status:        "Working",
+		RunStartedAt:  time.Now().UTC().Format(time.RFC3339),
 		TaskStartedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := runlog.WriteWorkerSnapshot(dir, taskID, initSnap); err != nil {
@@ -149,8 +148,7 @@ func launchDispatchedWorker(repoDir, worktreeDir, taskID, model, agentName, base
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	runID := generateDaemonRunID()
-	args := []string{"run", "--task", taskID, "--daemon-run", "--daemon-run-id=" + runID, "--dispatch-repo=" + repoDir}
+	args := []string{"run", "--task", taskID, "--daemon-run", "--dispatch-repo=" + repoDir}
 	if baseBranch != "" {
 		args = append(args, "--dispatch-base-branch="+baseBranch)
 	}
