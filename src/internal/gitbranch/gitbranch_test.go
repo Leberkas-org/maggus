@@ -6,6 +6,61 @@ import (
 	"testing"
 )
 
+func TestIsTaskBranch(t *testing.T) {
+	tests := []struct {
+		branch string
+		want   bool
+	}{
+		{"feature/maggus-004/task-007", true},
+		{"feature/maggus-038/task-003", true},
+		{"feature/maggus-001/task-001", true},
+		{"bugfix/maggus-bug-001/task-003", true},
+		{"bugfix/maggus-bug-123/task-456", true},
+		// plan branches — must return false
+		{"feature/feat-038-plan", false},
+		{"fix/bug-001-plan", false},
+		{"feature/maggus-038", false},
+		// protected branches — must return false
+		{"main", false},
+		{"master", false},
+		{"dev", false},
+		// arbitrary / empty — must return false
+		{"feature/other", false},
+		{"some-random-branch", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		got := IsTaskBranch(tt.branch)
+		if got != tt.want {
+			t.Errorf("IsTaskBranch(%q) = %v, want %v", tt.branch, got, tt.want)
+		}
+	}
+}
+
+func TestTaskPrefixFromBranch(t *testing.T) {
+	tests := []struct {
+		branch string
+		want   string
+	}{
+		{"feature/maggus-004/task-007", "feature/maggus-004"},
+		{"feature/maggus-038/task-003", "feature/maggus-038"},
+		{"feature/maggus-001/task-001", "feature/maggus-001"},
+		{"bugfix/maggus-bug-001/task-003", "bugfix/maggus-bug-001"},
+		{"bugfix/maggus-bug-123/task-456", "bugfix/maggus-bug-123"},
+		// non-task branches — must return ""
+		{"feature/feat-038-plan", ""},
+		{"main", ""},
+		{"feature/other", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := TaskPrefixFromBranch(tt.branch)
+		if got != tt.want {
+			t.Errorf("TaskPrefixFromBranch(%q) = %q, want %q", tt.branch, got, tt.want)
+		}
+	}
+}
+
 func TestIsProtected(t *testing.T) {
 	defaultList := []string{"main", "master", "dev"}
 	tests := []struct {

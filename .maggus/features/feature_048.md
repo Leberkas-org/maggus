@@ -37,11 +37,11 @@ This feature adds a `RecoverDirtyState` pre-flight function that runs at the top
 **Parallel:** yes — can run alongside nothing initially, but is a prerequisite for all other tasks
 
 **Acceptance Criteria:**
-- [ ] `gitmerge.TaskIDFromBranch` is exported (capital T) and existing callers updated
-- [ ] `gitbranch.IsTaskBranch(branch string) bool` correctly identifies both feature task branches (`feature/maggus-NNN/task-NNN`) and bug task branches (`bugfix/maggus-bug-NNN/task-NNN`)
-- [ ] `gitbranch.TaskPrefixFromBranch(branch string) string` returns the prefix portion (e.g. `feature/maggus-004` from `feature/maggus-004/task-007`), empty string for non-task branches
-- [ ] `gitbranch.IsTaskBranch` returns false for plan branches (`feature/feat-NNN-plan`), protected branches, and arbitrary branch names
-- [ ] Unit tests cover: feature task branch, bug task branch, plan branch, protected branch, arbitrary branch, empty string
+- [x] `gitmerge.TaskIDFromBranch` is exported (capital T) and existing callers updated
+- [x] `gitbranch.IsTaskBranch(branch string) bool` correctly identifies both feature task branches (`feature/maggus-NNN/task-NNN`) and bug task branches (`bugfix/maggus-bug-NNN/task-NNN`)
+- [x] `gitbranch.TaskPrefixFromBranch(branch string) string` returns the prefix portion (e.g. `feature/maggus-004` from `feature/maggus-004/task-007`), empty string for non-task branches
+- [x] `gitbranch.IsTaskBranch` returns false for plan branches (`feature/feat-NNN-plan`), protected branches, and arbitrary branch names
+- [x] Unit tests cover: feature task branch, bug task branch, plan branch, protected branch, arbitrary branch, empty string
 
 ---
 
@@ -54,13 +54,13 @@ This feature adds a `RecoverDirtyState` pre-flight function that runs at the top
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] New package `internal/gitrecover` with function `commitPending(repoDir string, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]string, error)`
-- [ ] When COMMIT.md exists: calls `gitcommit.CommitIteration(repoDir, "")`, returns log message with first line of commit
-- [ ] When COMMIT.md absent, dirty tree, on task branch, task ID differs from next workable task: runs safety-gate unstage of internal files, then `git add -A && git commit -m "maggus: recover uncommitted changes from <branch>"`
-- [ ] When COMMIT.md absent, dirty tree, on task branch, task ID matches next workable task: returns nil (skip — resume scenario)
-- [ ] When clean tree or not on task branch: returns nil (no-op)
-- [ ] "Next workable task" determined by parsing features/bugs via stores and calling `parser.FindNextIncomplete`
-- [ ] Unit tests with a temporary git repo: COMMIT.md present scenario, dirty+mismatched scenario, dirty+matched (resume) scenario, clean repo scenario
+- [x] New package `internal/gitrecover` with function `commitPending(repoDir string, featureStore stores.FeatureStore, bugStore stores.BugStore) ([]string, error)`
+- [x] When COMMIT.md exists: calls `gitcommit.CommitIteration(repoDir, "")`, returns log message with first line of commit
+- [x] When COMMIT.md absent, dirty tree, on task branch, task ID differs from next workable task: runs safety-gate unstage of internal files, then `git add -A && git commit -m "maggus: recover uncommitted changes from <branch>"`
+- [x] When COMMIT.md absent, dirty tree, on task branch, task ID matches next workable task: returns nil (skip — resume scenario)
+- [x] When clean tree or not on task branch: returns nil (no-op)
+- [x] "Next workable task" determined by parsing features/bugs via stores and calling `parser.FindNextIncomplete`
+- [x] Unit tests with a temporary git repo: COMMIT.md present scenario, dirty+mismatched scenario, dirty+matched (resume) scenario, clean repo scenario
 
 ---
 
@@ -73,15 +73,15 @@ This feature adds a `RecoverDirtyState` pre-flight function that runs at the top
 **Parallel:** yes — can run alongside TASK-048-002 (both depend only on TASK-048-001)
 
 **Acceptance Criteria:**
-- [ ] Function `consolidateBranches(repoDir string, cfg config.Config) ([]string, error)` in `internal/gitrecover`
-- [ ] If current branch is not a task branch or is protected: returns nil (skip)
-- [ ] Finds merge target: lists branches that are ancestors of HEAD (`git branch --merged HEAD`), filters out task branches and protected branches, picks the one closest to HEAD
-- [ ] If no merge target found: creates `feature/maggus` (for TASK- IDs) or `bug/maggus` (for BUG- IDs) off the first existing protected branch from config
-- [ ] Checks out the merge target, runs `git merge --no-ff <current-task-branch>`
-- [ ] Finds sibling task branches (same prefix, e.g. `feature/maggus-004/*`) and deletes those that are ancestors of HEAD via `gitbranch.DeleteBranch`
-- [ ] Returns log messages for each action taken (merge, branch deletions)
-- [ ] If merge has conflicts: returns descriptive error, does not leave repo in mid-merge state (aborts merge)
-- [ ] Unit tests with temporary git repo: basic merge scenario, no-ancestor scenario (creates integration branch), sibling branch cleanup, merge conflict scenario
+- [x] Function `consolidateBranches(repoDir string, cfg config.Config) ([]string, error)` in `internal/gitrecover`
+- [x] If current branch is not a task branch or is protected: returns nil (skip)
+- [x] Finds merge target: lists branches that are ancestors of HEAD (`git branch --merged HEAD`), filters out task branches and protected branches, picks the one closest to HEAD
+- [x] If no merge target found: creates `feature/maggus` (for TASK- IDs) or `bug/maggus` (for BUG- IDs) off the first existing protected branch from config
+- [x] Checks out the merge target, runs `git merge --no-ff <current-task-branch>`
+- [x] Finds sibling task branches (same prefix, e.g. `feature/maggus-004/*`) and deletes those that are ancestors of HEAD via `gitbranch.DeleteBranch`
+- [x] Returns log messages for each action taken (merge, branch deletions)
+- [x] If merge has conflicts: returns descriptive error, does not leave repo in mid-merge state (aborts merge)
+- [x] Unit tests with temporary git repo: basic merge scenario, no-ancestor scenario (creates integration branch), sibling branch cleanup, merge conflict scenario
 
 ---
 
@@ -94,14 +94,14 @@ This feature adds a `RecoverDirtyState` pre-flight function that runs at the top
 **Parallel:** yes — can run alongside TASK-048-002 and TASK-048-003
 
 **Acceptance Criteria:**
-- [ ] Function `cleanOrphanedWorktrees(repoDir string) ([]string, error)` in `internal/gitrecover`
-- [ ] Calls `gitworktree.ListWorktrees(repoDir)` and filters to entries under `.maggus/worktrees/`
-- [ ] Skips worktrees whose task ID has status `working` in the worker index (via `runlog` package)
-- [ ] For each orphaned worktree: calls `gitworktree.RemoveWorktree`, then if the worktree's branch is a task branch AND is an ancestor of HEAD, deletes it via `gitbranch.DeleteBranch`
-- [ ] If a worktree branch has divergent (unmerged) work: removes only the worktree directory, leaves the branch, logs a warning
-- [ ] Removes `.maggus/worktrees/` directory if empty after cleanup
-- [ ] Returns log messages for each worktree removed and each branch deleted
-- [ ] Unit tests: orphaned worktree removal, branch cleanup for merged branches, divergent branch preserved with warning
+- [x] Function `cleanOrphanedWorktrees(repoDir string) ([]string, error)` in `internal/gitrecover`
+- [x] Calls `gitworktree.ListWorktrees(repoDir)` and filters to entries under `.maggus/worktrees/`
+- [x] Skips worktrees whose task ID has status `working` in the worker index (via `runlog` package)
+- [x] For each orphaned worktree: calls `gitworktree.RemoveWorktree`, then if the worktree's branch is a task branch AND is an ancestor of HEAD, deletes it via `gitbranch.DeleteBranch`
+- [x] If a worktree branch has divergent (unmerged) work: removes only the worktree directory, leaves the branch, logs a warning
+- [x] Removes `.maggus/worktrees/` directory if empty after cleanup
+- [x] Returns log messages for each worktree removed and each branch deleted
+- [x] Unit tests: orphaned worktree removal, branch cleanup for merged branches, divergent branch preserved with warning
 
 ---
 
