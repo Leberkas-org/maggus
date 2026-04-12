@@ -69,6 +69,12 @@ type taskContext struct {
 	// commit, and deletes the task branch.
 	planBranch string
 
+	// existingWorktreePath is the path to a pre-existing worktree for dispatch
+	// mode. When non-empty, the worker skips branch/worktree creation and runs
+	// the agent in this directory. Set in runOneDaemonCycle when dispatchRepoFlag
+	// is active.
+	existingWorktreePath string
+
 	// Feature-centric context (set per-group by runWorkGoroutine).
 	currentPlan       *parser.Plan // current plan being worked on (set per-group)
 	featureSourceFile string       // scope parsedTasks to this source file for progress calculation
@@ -124,24 +130,25 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 	// Run the unified task worker. The worker owns the complete lifecycle:
 	// branch creation → agent → pre-commit callback → commit → merge-back → cleanup.
 	wr := RunTaskWorker(WorkerConfig{
-		Ctx:            tc.workCtx,
-		Task:           *next,
-		PlanFile:       planFile,
-		MaggusID:       maggusID,
-		PlanTitle:      planTitle,
-		Agent:          tc.activeAgent,
-		Model:          tc.resolvedModel,
-		SessionPersist: tc.sessionPersistence,
-		ValidIncludes:  tc.validIncludes,
-		Iteration:      i + 1,
-		RepoDir:        tc.repoDir,
-		PlanBranch:     tc.planBranch,
-		UseWorktree:    false,
-		Logger:         tc.logger,
-		AgentSender:    tc.p,
-		EventSender:    tc.p,
-		Notifier:       tc.notifier,
-		PreCommit:      buildPreCommitFn(tc),
+		Ctx:                  tc.workCtx,
+		Task:                 *next,
+		PlanFile:             planFile,
+		MaggusID:             maggusID,
+		PlanTitle:            planTitle,
+		Agent:                tc.activeAgent,
+		Model:                tc.resolvedModel,
+		SessionPersist:       tc.sessionPersistence,
+		ValidIncludes:        tc.validIncludes,
+		Iteration:            i + 1,
+		RepoDir:              tc.repoDir,
+		PlanBranch:           tc.planBranch,
+		UseWorktree:          false,
+		ExistingWorktreePath: tc.existingWorktreePath,
+		Logger:               tc.logger,
+		AgentSender:          tc.p,
+		EventSender:          tc.p,
+		Notifier:             tc.notifier,
+		PreCommit:            buildPreCommitFn(tc),
 	})
 
 	// Handle interruption.

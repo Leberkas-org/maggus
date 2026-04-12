@@ -142,14 +142,14 @@ Replace `run_parallel.go` `runSingleTask` with calls to the unified worker:
 4. **Update CLAUDE.md**: Update the architecture table to reflect the unified worker.
 
 **Acceptance Criteria:**
-- [ ] Dispatched workers use the unified worker for merge-back
-- [ ] `finalizeDispatchWorker` simplified or removed
-- [ ] No dead functions, types, or variables from the old three-path implementation remain
-- [ ] `go vet ./...` reports no new warnings
-- [ ] ARCHITECTURE.md updated with unified worker documentation
-- [ ] CLAUDE.md architecture table updated
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] Dispatched workers use the unified worker for merge-back
+- [x] `finalizeDispatchWorker` simplified or removed
+- [x] No dead functions, types, or variables from the old three-path implementation remain
+- [x] `go vet ./...` reports no new warnings
+- [x] ARCHITECTURE.md updated with unified worker documentation
+- [x] CLAUDE.md architecture table updated
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ## Task Dependency Graph
 

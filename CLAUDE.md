@@ -72,12 +72,17 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 1. Load config → validate includes → resolve model alias
 2. Ensure .gitignore entries
 3. Parse all active feature files → find next workable (incomplete + not blocked + approved) task
-4. Create feature branch if on protected branch
-5. Build prompt with bootstrap context + task details
-6. Run agent subprocess with streaming output
-7. Agent writes COMMIT.md → Maggus commits all changes
-8. Rename completed features (`feature_N.md` → `feature_N_completed.md`)
-9. Loop back to step 3
+4. Delegate to `RunTaskWorker` (`cmd/worker.go`) for the full per-task lifecycle:
+   - Create task branch (and worktree in parallel mode)
+   - Build prompt with bootstrap context + task details
+   - Run agent subprocess with streaming output
+   - Agent writes COMMIT.md → Maggus commits all changes
+   - Merge task branch → plan branch; remove worktree
+5. Rename completed features (`feature_N.md` → `feature_N_completed.md`)
+6. Loop back to step 3
+
+`RunTaskWorker` is shared by sequential, parallel, and dispatched execution modes.
+Dispatched workers pass `ExistingWorktreePath` to skip branch/worktree creation.
 
 ### Platform-Specific Code
 

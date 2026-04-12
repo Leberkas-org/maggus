@@ -8,11 +8,9 @@ import (
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
 	"github.com/leberkas-org/maggus/internal/fingerprint"
-	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitignore"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
-	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -156,16 +154,3 @@ func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 	}, nil
 }
 
-// setupBranch creates or ensures the feature branch for the current run.
-// Returns the branch message or empty string when auto-branch is disabled.
-func setupBranch(repoDir string, nextTask *parser.Task, gitCfg config.GitConfig) (string, error) {
-	if !gitCfg.IsAutoBranchEnabled() {
-		return "Auto-branch disabled, staying on current branch", nil
-	}
-
-	_, msg, err := gitbranch.EnsureFeatureBranch(repoDir, nextTask.ID, gitCfg.ProtectedBranchList())
-	if err != nil {
-		return "", fmt.Errorf("ensure feature branch: %w", err)
-	}
-	return msg, nil
-}

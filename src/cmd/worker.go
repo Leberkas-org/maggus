@@ -53,6 +53,16 @@ type WorkerConfig struct {
 	// .maggus/worktrees/<taskID> inside RepoDir.
 	UseWorktree bool
 
+	// ExistingWorktreePath is the path to a pre-existing worktree directory.
+	// When non-empty, the worker skips branch and worktree creation entirely
+	// and runs the agent in this directory instead of RepoDir. After the task
+	// completes, the worker still merges the task branch back into PlanBranch
+	// (in RepoDir), removes the worktree, and deletes the task branch.
+	//
+	// Used by dispatched workers where the worktree is created by dispatchTask()
+	// before the worker process starts. UseWorktree is ignored when this is set.
+	ExistingWorktreePath string
+
 	// MergeMu serializes merge and criteria-marking operations when multiple
 	// workers run concurrently. Leave nil for sequential (single-worker) mode.
 	MergeMu *sync.Mutex
@@ -118,7 +128,13 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 	var worktreePath string
 
 	// --- Step 1: Branch and worktree setup ---
-	if cfg.PlanBranch != "" {
+	if cfg.ExistingWorktreePath != "" {
+		// Dispatch mode: branch and worktree already created by the dispatcher
+		// (dispatchTask). Run the agent in the pre-existing worktree; merge and
+		// cleanup still happen in RepoDir after the task completes.
+		worktreePath = cfg.ExistingWorktreePath
+		workDir = cfg.ExistingWorktreePath
+	} else if cfg.PlanBranch != "" {
 		if cfg.UseWorktree {
 			worktreePath = filepath.Join(cfg.RepoDir, ".maggus", "worktrees", cfg.Task.ID)
 			if err := gitbranch.CreateBranchFrom(cfg.RepoDir, taskBranch, cfg.PlanBranch); err != nil {
