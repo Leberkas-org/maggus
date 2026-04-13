@@ -26,6 +26,9 @@ func TestIsRelevantEvent(t *testing.T) {
 		{"approval write", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Write}, true},
 		{"approval create", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Create}, true},
 		{"approval chmod", fsnotify.Event{Name: "/a/feature_approvals.yml", Op: fsnotify.Chmod}, false},
+		{"config write", fsnotify.Event{Name: "/a/config.yml", Op: fsnotify.Write}, true},
+		{"config create", fsnotify.Event{Name: "/a/config.yml", Op: fsnotify.Create}, true},
+		{"config chmod", fsnotify.Event{Name: "/a/config.yml", Op: fsnotify.Chmod}, false},
 		{"non-md file", fsnotify.Event{Name: "/a/feature_001.txt", Op: fsnotify.Write}, false},
 		{"random file", fsnotify.Event{Name: "/a/notes.md", Op: fsnotify.Write}, false},
 		{"chmod only", fsnotify.Event{Name: "/a/feature_001.md", Op: fsnotify.Chmod}, false},
@@ -486,9 +489,9 @@ func TestWatcherIgnoresIrrelevantInMaggusRoot(t *testing.T) {
 	}
 	defer w.Close()
 
-	// A random file in .maggus/ should NOT trigger.
-	file := filepath.Join(maggusDir, "config.yml")
-	if err := os.WriteFile(file, []byte("model: sonnet"), 0o644); err != nil {
+	// A random file in .maggus/ that is not config.yml should NOT trigger.
+	file := filepath.Join(maggusDir, "state.json")
+	if err := os.WriteFile(file, []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -496,6 +499,47 @@ func TestWatcherIgnoresIrrelevantInMaggusRoot(t *testing.T) {
 
 	if count.Load() != 0 {
 		t.Errorf("expected 0 UpdateMsg for irrelevant file in .maggus/, got %d", count.Load())
+	}
+}
+
+func TestWatcherConfigFileWakesDaemon(t *testing.T) {
+	baseDir := t.TempDir()
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Writing config.yml should trigger an UpdateMsg.
+	file := filepath.Join(maggusDir, "config.yml")
+	if err := os.WriteFile(file, []byte("model: sonnet\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg for config.yml, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if msg.Path == "" {
+			t.Error("expected UpdateMsg.Path to be non-empty")
+		}
+		if filepath.Base(msg.Path) != "config.yml" {
+			t.Errorf("expected Path to end with config.yml, got %q", msg.Path)
+		}
 	}
 }
 

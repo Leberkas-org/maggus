@@ -201,13 +201,13 @@ func (w *Watcher) loop() {
 }
 
 // isRelevantEvent returns true if the event is a file modification on a
-// feature_*.md or bug_*.md file.
+// feature_*.md, bug_*.md, feature_approvals.yml, or config.yml file.
 func isRelevantEvent(event fsnotify.Event) bool {
 	if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename) == 0 {
 		return false
 	}
 	name := filepath.Base(event.Name)
-	if name == "feature_approvals.yml" {
+	if name == "feature_approvals.yml" || name == "config.yml" {
 		return true
 	}
 	if strings.HasPrefix(name, "feature_") && strings.HasSuffix(name, ".md") {

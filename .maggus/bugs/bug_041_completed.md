@@ -71,7 +71,7 @@ The filewatcher in `src/internal/filewatcher/filewatcher.go` watches `.maggus/` 
 **Description:** As a user, I want saving `config.yml` to wake the idle daemon immediately (same as saving a feature file does) so the config change takes effect without waiting for the 30-second poll.
 
 **Acceptance Criteria:**
-- [ ] `isRelevantEvent` in `src/internal/filewatcher/filewatcher.go` returns true for `config.yml` write/create events
-- [ ] After saving `config.yml` while the daemon is idle, `waitForChanges` returns `wakeFileChange` and a new cycle starts
-- [ ] Existing behaviour for `feature_*.md`, `bug_*.md`, and `feature_approvals.yml` events is unchanged
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `isRelevantEvent` in `src/internal/filewatcher/filewatcher.go` returns true for `config.yml` write/create events
+- [x] After saving `config.yml` while the daemon is idle, `waitForChanges` returns `wakeFileChange` and a new cycle starts
+- [x] Existing behaviour for `feature_*.md`, `bug_*.md`, and `feature_approvals.yml` events is unchanged
+- [x] `go vet ./...` and `go test ./...` pass
