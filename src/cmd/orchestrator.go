@@ -276,13 +276,21 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	var result groupTasksResult
 	cfg := o.cfg
 
-	if o.countRunnable(group.Tasks) == 0 {
-		return result
+	// Build the set of all known task IDs in this group. Predecessor IDs that are
+	// absent from this set will never be satisfied at runtime, which would
+	// permanently deadlock their successors. We treat them as satisfied right away
+	// as a defensive fallback for externally-generated feature files with phantom
+	// predecessor references.
+	knownTaskIDs := make(map[string]bool, len(group.Tasks))
+	for _, t := range group.Tasks {
+		knownTaskIDs[t.ID] = true
 	}
 
-	// Initialize per-group parallel state. Pre-populate completedIDs with tasks
-	// that are already done and skippedOrBlockedIDs with tasks that are blocked
-	// or skipped so predecessor tracking works from the start.
+	// Initialize per-group parallel state before the early runnable check so that
+	// unknown predecessor IDs are already marked as satisfied when we count.
+	// Pre-populate completedIDs with already-done tasks and skippedOrBlockedIDs
+	// with blocked, skipped, and unknown-predecessor tasks so predecessor tracking
+	// works correctly from the very first classification pass.
 	o.mu.Lock()
 	o.completedIDs = make(map[string]bool)
 	o.failedIDs = make(map[string]bool)
@@ -299,8 +307,20 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		if t.IsBlocked() || t.IsSkipped() {
 			o.skippedOrBlockedIDs[t.ID] = true
 		}
+		// Any predecessor ID not present in this group will never enter
+		// completedIDs or skippedOrBlockedIDs through normal execution, so
+		// pre-add it now so PredecessorsSatisfied treats it as resolved.
+		for _, predID := range t.Predecessors {
+			if !knownTaskIDs[predID] {
+				o.skippedOrBlockedIDs[predID] = true
+			}
+		}
 	}
 	o.mu.Unlock()
+
+	if o.countRunnable(group.Tasks) == 0 {
+		return result
+	}
 
 	// Clean up worker snapshot files when this group finishes so stale entries
 	// from a previous group never appear in the TUI for the next one.

@@ -54,9 +54,9 @@ Neither ID exists in the task list. `predecessorsComplete` returns false on ever
 **Description:** As a user running maggus against externally-generated feature files, I want tasks with predecessor IDs that don't match any task in the file to run normally, so that a bad reference never permanently deadlocks a task.
 
 **Acceptance Criteria:**
-- [ ] A `knownTaskIDs` set is built from all task IDs in the group at the start of `runGroupTasks`
-- [ ] `IsRunnable` / `predecessorsComplete` treats a predecessor ID absent from `knownTaskIDs` as satisfied
-- [ ] A task with `**Predecessors:** NONEXISTENT-ID` runs as if it had no predecessors
-- [ ] A task with `**Predecessors:** TASK-A, NONEXISTENT-ID` runs as soon as TASK-A is complete
-- [ ] Tasks with valid-but-incomplete predecessors are still correctly held back
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] A `knownTaskIDs` set is built from all task IDs in the group at the start of `runGroupTasks`
+- [x] `IsRunnable` / `predecessorsComplete` treats a predecessor ID absent from `knownTaskIDs` as satisfied
+- [x] A task with `**Predecessors:** NONEXISTENT-ID` runs as if it had no predecessors
+- [x] A task with `**Predecessors:** TASK-A, NONEXISTENT-ID` runs as soon as TASK-A is complete
+- [x] Tasks with valid-but-incomplete predecessors are still correctly held back
+- [x] `go vet ./...` and `go test ./...` pass

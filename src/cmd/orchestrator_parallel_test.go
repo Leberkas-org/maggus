@@ -154,3 +154,63 @@ func TestOrchestratorClassifyWorkable_IncompletePredecessorStillHeld(t *testing.
 		t.Errorf("sequential workable = %v, want [TASK-001]", taskIDs(seq))
 	}
 }
+
+func TestOrchestratorClassifyWorkable_UnknownPredecessorTreatedAsSatisfied(t *testing.T) {
+	// NONEXISTENT-ID is not a real task in the group. runGroupTasks pre-adds it
+	// to skippedOrBlockedIDs so the task is not permanently blocked.
+	o := &Orchestrator{}
+	o.completedIDs = map[string]bool{}
+	o.failedIDs = map[string]bool{}
+	o.skippedOrBlockedIDs = map[string]bool{"NONEXISTENT-ID": true}
+
+	tasks := []parser.Task{
+		{ID: "TASK-001", Parallel: false, Predecessors: []string{"NONEXISTENT-ID"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	par, seq := o.classifyWorkable(tasks)
+	if len(par) != 0 {
+		t.Errorf("parallel workable = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-001" {
+		t.Errorf("sequential workable = %v, want [TASK-001]", taskIDs(seq))
+	}
+}
+
+func TestOrchestratorClassifyWorkable_MixedKnownUnknownPredecessors(t *testing.T) {
+	// TASK-A is a real predecessor that must complete first.
+	// NONEXISTENT-ID is unknown and pre-populated as satisfied by runGroupTasks.
+	// TASK-002 should be held back until TASK-A completes, then become runnable.
+	o := &Orchestrator{}
+	o.completedIDs = map[string]bool{}
+	o.failedIDs = map[string]bool{}
+	o.skippedOrBlockedIDs = map[string]bool{"NONEXISTENT-ID": true}
+
+	tasks := []parser.Task{
+		{ID: "TASK-A", Parallel: false, Criteria: []parser.Criterion{{Checked: false}}},
+		{ID: "TASK-002", Parallel: false, Predecessors: []string{"TASK-A", "NONEXISTENT-ID"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	// Before TASK-A completes: only TASK-A is runnable.
+	par, seq := o.classifyWorkable(tasks)
+	if len(par) != 0 {
+		t.Errorf("parallel workable = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-A" {
+		t.Errorf("sequential workable before TASK-A completes = %v, want [TASK-A]", taskIDs(seq))
+	}
+
+	// After TASK-A completes: update both completedIDs and the task struct
+	// (as the real orchestrator does by re-parsing the feature file after commit).
+	o.completedIDs["TASK-A"] = true
+	tasksAfterA := []parser.Task{
+		{ID: "TASK-A", Parallel: false, Criteria: []parser.Criterion{{Checked: true}}},
+		{ID: "TASK-002", Parallel: false, Predecessors: []string{"TASK-A", "NONEXISTENT-ID"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+	par, seq = o.classifyWorkable(tasksAfterA)
+	if len(par) != 0 {
+		t.Errorf("parallel workable after TASK-A completes = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-002" {
+		t.Errorf("sequential workable after TASK-A completes = %v, want [TASK-002]", taskIDs(seq))
+	}
+}
