@@ -41,10 +41,14 @@ func buildExecutionPlan(tasks []parser.Task) []executionStep {
 	}
 
 	// Separate tasks into "resolved" (all predecessors known) and "unresolved".
+	// A task is unresolved when at least one of its predecessor IDs does not
+	// appear in the set of known task IDs for this plan (treating all known
+	// tasks as satisfied). Uses PredecessorsSatisfied — the same logic as the
+	// runtime scheduler — instead of a separate hasUnknownPredecessor check.
 	var resolved []parser.Task
 	var unresolved []parser.Task
 	for _, t := range tasks {
-		if hasUnknownPredecessor(t, knownIDs) {
+		if !t.PredecessorsSatisfied(knownIDs, knownIDs) {
 			unresolved = append(unresolved, t)
 		} else {
 			resolved = append(resolved, t)
@@ -106,17 +110,6 @@ func buildExecutionPlan(tasks []parser.Task) []executionStep {
 	}
 
 	return steps
-}
-
-// hasUnknownPredecessor reports whether any of the task's predecessors are not
-// present in the knownIDs set.
-func hasUnknownPredecessor(t parser.Task, knownIDs map[string]bool) bool {
-	for _, pred := range t.Predecessors {
-		if !knownIDs[pred] {
-			return true
-		}
-	}
-	return false
 }
 
 // computeWaves assigns each resolved task to a topological wave (0-based).

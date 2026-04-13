@@ -261,7 +261,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	// Remove plans with no workable tasks.
 	var workableGroups []parser.Plan
 	for _, g := range featureGroups {
-		if countWorkable(g.Tasks) > 0 {
+		if countWorkable(g.Tasks, nil, nil) > 0 {
 			workableGroups = append(workableGroups, g)
 		}
 	}
@@ -272,7 +272,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}
 
 	// Work is available — run it.
-	branchTask := firstWorkableTask(featureGroups)
+	branchTask := firstWorkableTask(featureGroups, nil, nil)
 	if branchTask == nil {
 		branchTask = setup.next
 	}
@@ -296,7 +296,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	// feature/task the daemon is picking up immediately, before the work
 	// goroutine starts and sends the full IterationStartMsg.
 	if len(featureGroups) > 0 {
-		if ft := firstWorkableTask(featureGroups); ft != nil {
+		if ft := firstWorkableTask(featureGroups, nil, nil); ft != nil {
 			fg := featureGroups[0]
 			earlySnap := runlog.StateSnapshot{
 				MaggusID:      fg.MaggusID,

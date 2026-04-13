@@ -174,6 +174,27 @@ func (t *Task) IsWorkable() bool {
 	return !t.IsComplete() && !t.IsBlocked() && !t.IsSkipped()
 }
 
+// PredecessorsSatisfied reports whether all predecessor task IDs appear in
+// completedIDs or skippedOrBlockedIDs. Nil maps are treated as empty:
+// tasks with no predecessors always return true; tasks with any predecessors
+// return false when both maps are nil or do not contain the predecessor ID.
+func (t *Task) PredecessorsSatisfied(completedIDs, skippedOrBlockedIDs map[string]bool) bool {
+	for _, predID := range t.Predecessors {
+		if !completedIDs[predID] && !skippedOrBlockedIDs[predID] {
+			return false
+		}
+	}
+	return true
+}
+
+// IsRunnable is the canonical task-readiness check. It combines IsWorkable
+// (incomplete + not blocked + not skipped) with PredecessorsSatisfied.
+// Callers that do not yet have predecessor context should pass nil maps;
+// tasks with no predecessors degrade gracefully to IsWorkable() behaviour.
+func (t *Task) IsRunnable(completedIDs, skippedOrBlockedIDs map[string]bool) bool {
+	return t.IsWorkable() && t.PredecessorsSatisfied(completedIDs, skippedOrBlockedIDs)
+}
+
 // featureTitleRe matches the top-level heading in feature/bug files, e.g.
 // "# Feature 001: Discord Rich Presence Integration" or "# Bug 001: Title".
 var featureTitleRe = regexp.MustCompile(`^#\s+(?:Feature|Bug)\s+\d+:\s+(.+)$`)

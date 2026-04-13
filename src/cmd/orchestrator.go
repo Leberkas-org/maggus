@@ -276,7 +276,7 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	var result groupTasksResult
 	cfg := o.cfg
 
-	if countWorkable(group.Tasks) == 0 {
+	if o.countRunnable(group.Tasks) == 0 {
 		return result
 	}
 
@@ -377,7 +377,7 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		}
 
 		// -- Sequential task: run the first eligible task in the main repo --
-		workableRemaining := countWorkable(groupTasks)
+		workableRemaining := o.countRunnable(groupTasks)
 		displayCount := batchI + workableRemaining
 
 		next := &seq[0]
@@ -508,7 +508,7 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		}
 
 		// Update progress bar using refreshed task count.
-		progressTotal := (batchI + 1) + countWorkable(parsedTasks)
+		progressTotal := (batchI + 1) + o.countRunnable(parsedTasks)
 		cfg.Program.Send(ProgressMsg{Current: batchI + 1, Total: progressTotal})
 
 		// Between-task sync check: skip when this was the last workable task.

@@ -110,21 +110,18 @@ func (o *Orchestrator) runDispatchRequests() {
 
 // classifyWorkable splits the given tasks into parallel-workable and
 // sequential-workable lists using the same rules as the parallel orchestrator:
-//   - Complete, blocked, and previously-failed tasks are skipped.
-//   - Tasks whose predecessors have not yet completed are skipped.
+//   - Tasks that are not runnable (IsRunnable returns false) are skipped.
+//   - Previously-failed tasks are also skipped.
 //   - Tasks with Parallel=true go into the parallel list.
 //   - Tasks with Parallel=false go into the sequential list.
 func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequential []parser.Task) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range tasks {
-		if t.IsComplete() || t.IsBlocked() || t.IsSkipped() {
-			continue
-		}
 		if o.failedIDs[t.ID] {
 			continue
 		}
-		if !o.predecessorsComplete(t) {
+		if !t.IsRunnable(o.completedIDs, o.skippedOrBlockedIDs) {
 			continue
 		}
 		if t.Parallel {
@@ -136,15 +133,13 @@ func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequenti
 	return
 }
 
-// predecessorsComplete reports whether all of t's predecessor task IDs are
-// satisfied — either completed, blocked, or skipped. Caller must hold o.mu.
-func (o *Orchestrator) predecessorsComplete(t parser.Task) bool {
-	for _, predID := range t.Predecessors {
-		if !o.completedIDs[predID] && !o.skippedOrBlockedIDs[predID] {
-			return false
-		}
-	}
-	return true
+// countRunnable returns the number of currently runnable tasks in tasks,
+// taking predecessor state into account. It acquires o.mu to safely read
+// the predecessor maps alongside any concurrent dispatch goroutines.
+func (o *Orchestrator) countRunnable(tasks []parser.Task) int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return countWorkable(tasks, o.completedIDs, o.skippedOrBlockedIDs)
 }
 
 // runParallelBatch launches all tasks concurrently, each in its own isolated

@@ -143,18 +143,20 @@ func capCount(tasks []parser.Task, count int) int {
 	if taskFlag != "" {
 		return 1
 	}
-	workable := countWorkable(tasks)
+	workable := countWorkable(tasks, nil, nil)
 	if count <= 0 || workable < count {
 		return workable
 	}
 	return count
 }
 
-// countWorkable returns the number of workable (incomplete + not blocked) tasks.
-func countWorkable(tasks []parser.Task) int {
+// countWorkable returns the number of runnable tasks. completedIDs and
+// skippedOrBlockedIDs provide predecessor context; nil maps are safe and
+// degrade to IsWorkable() behaviour for tasks with no predecessors.
+func countWorkable(tasks []parser.Task, completedIDs, skippedOrBlockedIDs map[string]bool) int {
 	n := 0
 	for i := range tasks {
-		if tasks[i].IsWorkable() {
+		if tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
 			n++
 		}
 	}
@@ -210,11 +212,12 @@ func findGroupForTask(plans []parser.Plan, taskID string) *parser.Plan {
 	return nil
 }
 
-// firstWorkableTask returns the first workable task from the first plan that has one.
-func firstWorkableTask(plans []parser.Plan) *parser.Task {
+// firstWorkableTask returns the first runnable task from the first plan that has one.
+// completedIDs and skippedOrBlockedIDs provide predecessor context; nil maps are safe.
+func firstWorkableTask(plans []parser.Plan, completedIDs, skippedOrBlockedIDs map[string]bool) *parser.Task {
 	for _, p := range plans {
 		for i := range p.Tasks {
-			if p.Tasks[i].IsWorkable() {
+			if p.Tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
 				return &p.Tasks[i]
 			}
 		}

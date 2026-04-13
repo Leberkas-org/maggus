@@ -1720,3 +1720,118 @@ func TestIsSkipped_And_IsBlocked_Interaction(t *testing.T) {
 		t.Error("task should not be complete")
 	}
 }
+
+// ─── PredecessorsSatisfied and IsRunnable ─────────────────────────────────────
+
+func TestPredecessorsSatisfied_NoPredecessors(t *testing.T) {
+	task := Task{ID: "T1"}
+	// A task with no predecessors is always satisfied, even with nil maps.
+	if !task.PredecessorsSatisfied(nil, nil) {
+		t.Error("expected true for task with no predecessors")
+	}
+	if !task.PredecessorsSatisfied(map[string]bool{}, map[string]bool{}) {
+		t.Error("expected true for task with no predecessors and empty maps")
+	}
+}
+
+func TestPredecessorsSatisfied_PredInCompleted(t *testing.T) {
+	task := Task{ID: "T2", Predecessors: []string{"T1"}}
+	if !task.PredecessorsSatisfied(map[string]bool{"T1": true}, nil) {
+		t.Error("expected true when predecessor is in completedIDs")
+	}
+}
+
+func TestPredecessorsSatisfied_PredInSkippedOrBlocked(t *testing.T) {
+	task := Task{ID: "T2", Predecessors: []string{"T1"}}
+	if !task.PredecessorsSatisfied(nil, map[string]bool{"T1": true}) {
+		t.Error("expected true when predecessor is in skippedOrBlockedIDs")
+	}
+}
+
+func TestPredecessorsSatisfied_PredUnsatisfied(t *testing.T) {
+	task := Task{ID: "T2", Predecessors: []string{"T1"}}
+	if task.PredecessorsSatisfied(nil, nil) {
+		t.Error("expected false when predecessor is in neither map")
+	}
+	if task.PredecessorsSatisfied(map[string]bool{"T9": true}, map[string]bool{}) {
+		t.Error("expected false when predecessor is not the one in the map")
+	}
+}
+
+func TestPredecessorsSatisfied_MultiplePreds(t *testing.T) {
+	task := Task{ID: "T3", Predecessors: []string{"T1", "T2"}}
+	// Both satisfied via different maps.
+	if !task.PredecessorsSatisfied(map[string]bool{"T1": true}, map[string]bool{"T2": true}) {
+		t.Error("expected true when all predecessors are satisfied")
+	}
+	// Only one satisfied — must return false.
+	if task.PredecessorsSatisfied(map[string]bool{"T1": true}, nil) {
+		t.Error("expected false when only one of two predecessors is satisfied")
+	}
+}
+
+func TestIsRunnable_WorkableNoPredecessors(t *testing.T) {
+	task := Task{
+		ID:       "T1",
+		Criteria: []Criterion{{Text: "Do it", Checked: false}},
+	}
+	// No predecessors, workable — should be runnable with nil maps.
+	if !task.IsRunnable(nil, nil) {
+		t.Error("expected true for workable task with no predecessors")
+	}
+}
+
+func TestIsRunnable_NotWorkable(t *testing.T) {
+	// Complete task — not runnable regardless of predecessor maps.
+	task := Task{
+		ID:       "T1",
+		Criteria: []Criterion{{Text: "Done", Checked: true}},
+	}
+	if task.IsRunnable(nil, nil) {
+		t.Error("expected false for complete task")
+	}
+	if task.IsRunnable(map[string]bool{"T0": true}, map[string]bool{}) {
+		t.Error("expected false for complete task even with satisfied predecessors")
+	}
+}
+
+func TestIsRunnable_WorkableWithSatisfiedPredecessor(t *testing.T) {
+	task := Task{
+		ID:           "T2",
+		Predecessors: []string{"T1"},
+		Criteria:     []Criterion{{Text: "Do it", Checked: false}},
+	}
+	if !task.IsRunnable(map[string]bool{"T1": true}, nil) {
+		t.Error("expected true when workable and predecessor satisfied")
+	}
+}
+
+func TestIsRunnable_WorkableWithUnsatisfiedPredecessor(t *testing.T) {
+	task := Task{
+		ID:           "T2",
+		Predecessors: []string{"T1"},
+		Criteria:     []Criterion{{Text: "Do it", Checked: false}},
+	}
+	// T1 is not in either map.
+	if task.IsRunnable(nil, nil) {
+		t.Error("expected false when predecessor not satisfied")
+	}
+}
+
+func TestIsRunnable_DegradesToIsWorkableWhenNilMaps(t *testing.T) {
+	// A task with no predecessors should behave identically to IsWorkable() when
+	// nil maps are passed — this is the "graceful degradation" guarantee.
+	tasks := []Task{
+		{ID: "A", Criteria: []Criterion{{Checked: false}}},                    // workable
+		{ID: "B", Criteria: []Criterion{{Checked: true}}},                     // complete
+		{ID: "C", Criteria: []Criterion{{Blocked: true, Checked: false}}},     // blocked
+		{ID: "D", Criteria: []Criterion{{Skipped: true, Checked: false}}},     // skipped
+	}
+	for _, tc := range tasks {
+		want := tc.IsWorkable()
+		got := tc.IsRunnable(nil, nil)
+		if got != want {
+			t.Errorf("task %s: IsRunnable(nil,nil)=%v but IsWorkable()=%v", tc.ID, got, want)
+		}
+	}
+}
