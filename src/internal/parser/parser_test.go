@@ -1845,6 +1845,308 @@ func TestIsRunnable_NotWorkable(t *testing.T) {
 	}
 }
 
+// ─── Cross-feature predecessor parsing ────────────────────────────────────────
+
+func TestParseCrossFeatureToken_SingleFeature(t *testing.T) {
+	ref, ok := parseCrossFeatureToken("Feature 5")
+	if !ok {
+		t.Fatal("expected match for 'Feature 5'")
+	}
+	if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 5 {
+		t.Errorf("FeatureNums = %v, want [5]", ref.FeatureNums)
+	}
+	if ref.Label != "" {
+		t.Errorf("Label = %q, want empty", ref.Label)
+	}
+}
+
+func TestParseCrossFeatureToken_SingleFeatureWithLabel(t *testing.T) {
+	ref, ok := parseCrossFeatureToken("Feature 42 (controllers)")
+	if !ok {
+		t.Fatal("expected match for 'Feature 42 (controllers)'")
+	}
+	if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 42 {
+		t.Errorf("FeatureNums = %v, want [42]", ref.FeatureNums)
+	}
+	if ref.Label != "controllers" {
+		t.Errorf("Label = %q, want 'controllers'", ref.Label)
+	}
+}
+
+func TestParseCrossFeatureToken_SingleFeatureCaseInsensitive(t *testing.T) {
+	for _, token := range []string{"FEATURE 7", "feature 7", "fEaTuRe 7"} {
+		ref, ok := parseCrossFeatureToken(token)
+		if !ok {
+			t.Fatalf("expected match for %q", token)
+		}
+		if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 7 {
+			t.Errorf("%q: FeatureNums = %v, want [7]", token, ref.FeatureNums)
+		}
+	}
+}
+
+func TestParseCrossFeatureToken_RangeNoLabel(t *testing.T) {
+	ref, ok := parseCrossFeatureToken("Features 3-5")
+	if !ok {
+		t.Fatal("expected match for 'Features 3-5'")
+	}
+	if len(ref.FeatureNums) != 3 || ref.FeatureNums[0] != 3 || ref.FeatureNums[1] != 4 || ref.FeatureNums[2] != 5 {
+		t.Errorf("FeatureNums = %v, want [3 4 5]", ref.FeatureNums)
+	}
+	if ref.Label != "" {
+		t.Errorf("Label = %q, want empty", ref.Label)
+	}
+}
+
+func TestParseCrossFeatureToken_RangeWithLabel(t *testing.T) {
+	ref, ok := parseCrossFeatureToken("Features 10-12 (UI layer)")
+	if !ok {
+		t.Fatal("expected match for 'Features 10-12 (UI layer)'")
+	}
+	if len(ref.FeatureNums) != 3 || ref.FeatureNums[0] != 10 || ref.FeatureNums[2] != 12 {
+		t.Errorf("FeatureNums = %v, want [10 11 12]", ref.FeatureNums)
+	}
+	if ref.Label != "UI layer" {
+		t.Errorf("Label = %q, want 'UI layer'", ref.Label)
+	}
+}
+
+func TestParseCrossFeatureToken_SingleFeatureSameAsRange(t *testing.T) {
+	// "Features 5-5" is a single-element range — allowed by the range regex.
+	ref, ok := parseCrossFeatureToken("Features 5-5")
+	if !ok {
+		t.Fatal("expected match for 'Features 5-5'")
+	}
+	if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 5 {
+		t.Errorf("FeatureNums = %v, want [5]", ref.FeatureNums)
+	}
+}
+
+func TestParseCrossFeatureToken_NotACrossFeatureRef(t *testing.T) {
+	for _, token := range []string{"TASK-038-001", "BUG-002-001", "something-else", "", "TASK-001"} {
+		_, ok := parseCrossFeatureToken(token)
+		if ok {
+			t.Errorf("expected no match for %q", token)
+		}
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_SingleRef(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: A task
+**Predecessors:** Feature 5 (controllers)
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	task := tasks[0]
+	if len(task.Predecessors) != 0 {
+		t.Errorf("Predecessors = %v, want empty (cross-feature ref must not appear here)", task.Predecessors)
+	}
+	if len(task.CrossFeaturePredecessors) != 1 {
+		t.Fatalf("CrossFeaturePredecessors len = %d, want 1", len(task.CrossFeaturePredecessors))
+	}
+	ref := task.CrossFeaturePredecessors[0]
+	if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 5 {
+		t.Errorf("FeatureNums = %v, want [5]", ref.FeatureNums)
+	}
+	if ref.Label != "controllers" {
+		t.Errorf("Label = %q, want 'controllers'", ref.Label)
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_RangeRef(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: A task
+**Predecessors:** Features 3-5 (UI layer)
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := tasks[0]
+	if len(task.Predecessors) != 0 {
+		t.Errorf("Predecessors = %v, want empty", task.Predecessors)
+	}
+	if len(task.CrossFeaturePredecessors) != 1 {
+		t.Fatalf("CrossFeaturePredecessors len = %d, want 1", len(task.CrossFeaturePredecessors))
+	}
+	ref := task.CrossFeaturePredecessors[0]
+	if len(ref.FeatureNums) != 3 || ref.FeatureNums[0] != 3 || ref.FeatureNums[2] != 5 {
+		t.Errorf("FeatureNums = %v, want [3 4 5]", ref.FeatureNums)
+	}
+	if ref.Label != "UI layer" {
+		t.Errorf("Label = %q, want 'UI layer'", ref.Label)
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_MixedWithTaskID(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: A task
+**Predecessors:** TASK-054-001, Feature 42 (auth), TASK-054-003
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := tasks[0]
+	if len(task.Predecessors) != 2 {
+		t.Fatalf("Predecessors = %v, want [TASK-054-001, TASK-054-003]", task.Predecessors)
+	}
+	if task.Predecessors[0] != "TASK-054-001" || task.Predecessors[1] != "TASK-054-003" {
+		t.Errorf("Predecessors = %v", task.Predecessors)
+	}
+	if len(task.CrossFeaturePredecessors) != 1 {
+		t.Fatalf("CrossFeaturePredecessors len = %d, want 1", len(task.CrossFeaturePredecessors))
+	}
+	ref := task.CrossFeaturePredecessors[0]
+	if len(ref.FeatureNums) != 1 || ref.FeatureNums[0] != 42 {
+		t.Errorf("FeatureNums = %v, want [42]", ref.FeatureNums)
+	}
+	if ref.Label != "auth" {
+		t.Errorf("Label = %q, want 'auth'", ref.Label)
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_AtStartMiddleEnd(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: Cross-feature at start
+**Predecessors:** Feature 1, TASK-054-002, TASK-054-003
+
+**Acceptance Criteria:**
+- [ ] Do it
+
+### TASK-055-002: Cross-feature in middle
+**Predecessors:** TASK-054-001, Feature 2, TASK-054-003
+
+**Acceptance Criteria:**
+- [ ] Do it
+
+### TASK-055-003: Cross-feature at end
+**Predecessors:** TASK-054-001, TASK-054-002, Feature 3
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	// Task 0: Feature at start
+	t0 := tasks[0]
+	if len(t0.CrossFeaturePredecessors) != 1 || t0.CrossFeaturePredecessors[0].FeatureNums[0] != 1 {
+		t.Errorf("task 0: CrossFeaturePredecessors = %v", t0.CrossFeaturePredecessors)
+	}
+	if len(t0.Predecessors) != 2 || t0.Predecessors[0] != "TASK-054-002" || t0.Predecessors[1] != "TASK-054-003" {
+		t.Errorf("task 0: Predecessors = %v", t0.Predecessors)
+	}
+
+	// Task 1: Feature in middle
+	t1 := tasks[1]
+	if len(t1.CrossFeaturePredecessors) != 1 || t1.CrossFeaturePredecessors[0].FeatureNums[0] != 2 {
+		t.Errorf("task 1: CrossFeaturePredecessors = %v", t1.CrossFeaturePredecessors)
+	}
+	if len(t1.Predecessors) != 2 || t1.Predecessors[0] != "TASK-054-001" || t1.Predecessors[1] != "TASK-054-003" {
+		t.Errorf("task 1: Predecessors = %v", t1.Predecessors)
+	}
+
+	// Task 2: Feature at end
+	t2 := tasks[2]
+	if len(t2.CrossFeaturePredecessors) != 1 || t2.CrossFeaturePredecessors[0].FeatureNums[0] != 3 {
+		t.Errorf("task 2: CrossFeaturePredecessors = %v", t2.CrossFeaturePredecessors)
+	}
+	if len(t2.Predecessors) != 2 || t2.Predecessors[0] != "TASK-054-001" || t2.Predecessors[1] != "TASK-054-002" {
+		t.Errorf("task 2: Predecessors = %v", t2.Predecessors)
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_NoneUnaffected(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: None prefix
+**Predecessors:** none (Feature 005 provides this, but it's independent)
+
+**Acceptance Criteria:**
+- [ ] Do it
+
+### TASK-055-002: None plain
+**Predecessors:** none
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, task := range tasks {
+		if len(task.Predecessors) != 0 {
+			t.Errorf("task %d: Predecessors = %v, want empty", i, task.Predecessors)
+		}
+		if len(task.CrossFeaturePredecessors) != 0 {
+			t.Errorf("task %d: CrossFeaturePredecessors = %v, want empty", i, task.CrossFeaturePredecessors)
+		}
+	}
+}
+
+func TestParseFile_CrossFeaturePredecessors_NormalTaskIDsUnaffected(t *testing.T) {
+	const content = `# Feature 055: Test
+
+### TASK-055-001: Normal task IDs
+**Predecessors:** TASK-038-001, BUG-002-001, TASK-038-004
+
+**Acceptance Criteria:**
+- [ ] Do it
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_055.md", content)
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_055.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := tasks[0]
+	if len(task.CrossFeaturePredecessors) != 0 {
+		t.Errorf("CrossFeaturePredecessors = %v, want empty", task.CrossFeaturePredecessors)
+	}
+	if len(task.Predecessors) != 3 {
+		t.Fatalf("Predecessors = %v, want 3 entries", task.Predecessors)
+	}
+	if task.Predecessors[0] != "TASK-038-001" || task.Predecessors[1] != "BUG-002-001" || task.Predecessors[2] != "TASK-038-004" {
+		t.Errorf("Predecessors = %v", task.Predecessors)
+	}
+}
+
 func TestIsRunnable_WorkableWithSatisfiedPredecessor(t *testing.T) {
 	task := Task{
 		ID:           "T2",

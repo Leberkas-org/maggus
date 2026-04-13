@@ -39,21 +39,21 @@ This feature makes cross-feature predecessor references first-class: they are pa
 **Parallel:** yes — can run alongside TASK-055-002
 
 **Acceptance Criteria:**
-- [ ] New type `CrossFeatureRef` defined in `internal/parser/`:
+- [x] New type `CrossFeatureRef` defined in `internal/parser/`:
   ```go
   type CrossFeatureRef struct {
       FeatureNums []string // e.g. ["006"] for single, ["004","005",...,"013"] for range
       DisplayText string   // original token text, e.g. "Feature 006 (DTOs)" or "Features 004-013 (all RMC features)"
   }
   ```
-- [ ] `Task` struct has new field `CrossFeaturePredecessors []CrossFeatureRef`
-- [ ] Parser recognises `Feature NNN` and `Feature NNN (label)` tokens (singular, case-insensitive "Feature") and adds one `CrossFeatureRef` with a single `FeatureNum`
-- [ ] Parser recognises `Features NNN-MMM` and `Features NNN-MMM (label)` tokens (plural "Features" + dash range) and adds one `CrossFeatureRef` with all feature numbers from NNN to MMM inclusive
-- [ ] Cross-feature tokens are NOT added to `Predecessors []string` — they are extracted cleanly to `CrossFeaturePredecessors`
-- [ ] Non-matching tokens (genuine task IDs like `TASK-NNN-MMM`, or truly unknown IDs) continue to be handled exactly as before
-- [ ] `none` prefix handling is unaffected (still treated as no predecessors)
-- [ ] Tests cover: single feature ref, range ref, mixed line with task ID and cross-feature ref, range with no label, feature ref at start/middle/end of comma list
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `Task` struct has new field `CrossFeaturePredecessors []CrossFeatureRef`
+- [x] Parser recognises `Feature NNN` and `Feature NNN (label)` tokens (singular, case-insensitive "Feature") and adds one `CrossFeatureRef` with a single `FeatureNum`
+- [x] Parser recognises `Features NNN-MMM` and `Features NNN-MMM (label)` tokens (plural "Features" + dash range) and adds one `CrossFeatureRef` with all feature numbers from NNN to MMM inclusive
+- [x] Cross-feature tokens are NOT added to `Predecessors []string` — they are extracted cleanly to `CrossFeaturePredecessors`
+- [x] Non-matching tokens (genuine task IDs like `TASK-NNN-MMM`, or truly unknown IDs) continue to be handled exactly as before
+- [x] `none` prefix handling is unaffected (still treated as no predecessors)
+- [x] Tests cover: single feature ref, range ref, mixed line with task ID and cross-feature ref, range with no label, feature ref at start/middle/end of comma list
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 
@@ -67,20 +67,20 @@ This feature makes cross-feature predecessor references first-class: they are pa
 **Parallel:** yes — can run alongside TASK-055-001
 
 **Acceptance Criteria:**
-- [ ] New function `IsFeatureComplete(featureDir, featureNum string) bool` in `internal/parser/` (e.g. `feature_complete.go`):
+- [x] New function `IsFeatureComplete(featureDir, featureNum string) bool` in `internal/parser/` (e.g. `feature_complete.go`):
   - Returns `true` if `feature_NNN_completed.md` exists in `featureDir`
   - Falls back: returns `true` if `feature_NNN.md` exists and all tasks in it have all acceptance criteria checked
   - Returns `true` if neither file exists (missing feature = treat as complete, so dependent tasks are not permanently blocked)
   - Returns `false` only when `feature_NNN.md` exists and has at least one incomplete task
-- [ ] New method on `Task`: `CrossFeaturePredecessorsSatisfied(featureDir string) bool` — returns `true` if every `CrossFeatureRef` in `CrossFeaturePredecessors` has all its `FeatureNums` satisfied by `IsFeatureComplete`; returns `true` if `CrossFeaturePredecessors` is empty
-- [ ] Tests cover:
+- [x] New method on `Task`: `CrossFeaturePredecessorsSatisfied(featureDir string) bool` — returns `true` if every `CrossFeatureRef` in `CrossFeaturePredecessors` has all its `FeatureNums` satisfied by `IsFeatureComplete`; returns `true` if `CrossFeaturePredecessors` is empty
+- [x] Tests cover:
   - `_completed.md` present → true
   - `feature_NNN.md` present, all tasks complete → true
   - `feature_NNN.md` present, one task incomplete → false
   - Neither file exists → true
   - Range ref: all in range complete → true
   - Range ref: one in range incomplete → false
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 

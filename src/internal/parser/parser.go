@@ -88,15 +88,16 @@ type Criterion struct {
 }
 
 type Task struct {
-	ID             string
-	Title          string
-	Description    string
-	Model          string
-	Parallel       bool     // true when "Parallel: yes" is set in the task metadata
-	Predecessors   []string // task IDs from "Predecessors:" line (e.g. ["TASK-038-001", "TASK-038-004"])
-	Criteria       []Criterion
-	SourceFile     string
-	TokenEstimate  int // parsed from "**Token Estimate:** ~NNk tokens"; 0 when absent
+	ID                      string
+	Title                   string
+	Description             string
+	Model                   string
+	Parallel                bool              // true when "Parallel: yes" is set in the task metadata
+	Predecessors            []string          // same-feature task IDs from "Predecessors:" line (e.g. ["TASK-038-001", "TASK-038-004"])
+	CrossFeaturePredecessors []CrossFeatureRef // cross-feature references from "Predecessors:" (e.g. Feature NNN, Features NNN-MMM)
+	Criteria                []Criterion
+	SourceFile              string
+	TokenEstimate           int // parsed from "**Token Estimate:** ~NNk tokens"; 0 when absent
 }
 
 // parseTokenEstimateK parses a token estimate string like "~35k tokens" or "~45k"
@@ -298,7 +299,12 @@ func ParseFile(path string) ([]Task, error) {
 			if !strings.HasPrefix(strings.ToLower(value), "none") && value != "" {
 				for _, part := range strings.Split(value, ",") {
 					part = strings.TrimSpace(part)
-					if part != "" {
+					if part == "" {
+						continue
+					}
+					if ref, ok := parseCrossFeatureToken(part); ok {
+						current.CrossFeaturePredecessors = append(current.CrossFeaturePredecessors, ref)
+					} else {
 						current.Predecessors = append(current.Predecessors, part)
 					}
 				}
