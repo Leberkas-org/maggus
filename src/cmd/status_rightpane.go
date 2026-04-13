@@ -14,7 +14,7 @@ import (
 
 // renderRightPaneTabBar renders the tab bar at the top of the right pane.
 // It uses the dynamic availableTabs() list so only context-relevant tabs are shown.
-// Format: `[2] Output  [3] Task Details  [4] Metrics`
+// Format: `[2] Output  [3] Details  [4] Metrics`
 // The active tab has bold text and underline in primary color; inactive tabs are muted.
 // Number prefixes are always dimmed.
 func (m statusModel) renderRightPaneTabBar() string {
@@ -273,7 +273,7 @@ func (m *statusModel) loadCurrentTaskDetail() {
 	m.currentTaskViewport.SetContent(content)
 }
 
-// renderCurrentTaskTab renders the Task Details tab: detail view of the selected task,
+// renderCurrentTaskTab renders the Details tab: detail view of the selected task,
 // or the next workable task if no task is selected. Shows a placeholder when nothing applies.
 // Returns raw content without Width/Height wrapping — renderRightPane applies final sizing
 // with MaxHeight so that long lines (e.g. acceptance criteria) do not push the border off-screen.

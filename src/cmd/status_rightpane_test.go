@@ -68,13 +68,13 @@ func TestRenderRightPaneTabBar_RendersOnlyAvailableTabs(t *testing.T) {
 		wantTabNames []string
 		// tabCount is the expected number of [N] key labels in the bar.
 		// Used to guard against extra tabs without depending on substring collisions
-		// (e.g. "Details" is a substring of "Task Details").
+		// (e.g. tab names should be distinct).
 		tabCount int
 	}{
 		{ctx: selNone, wantTabNames: []string{"Metrics"}, tabCount: 1},
 		{ctx: selFeature, wantTabNames: []string{"Summary", "Plan", "Details", "Metrics"}, tabCount: 4},
-		{ctx: selRunningTask, wantTabNames: []string{"Output", "Task Details", "Metrics"}, tabCount: 3},
-		{ctx: selCompletedTask, wantTabNames: []string{"Summary", "Output", "Task Details", "Metrics"}, tabCount: 4},
+		{ctx: selRunningTask, wantTabNames: []string{"Output", "Details", "Metrics"}, tabCount: 3},
+		{ctx: selCompletedTask, wantTabNames: []string{"Summary", "Output", "Details", "Metrics"}, tabCount: 4},
 	}
 
 	for _, tt := range tests {
@@ -88,7 +88,7 @@ func TestRenderRightPaneTabBar_RendersOnlyAvailableTabs(t *testing.T) {
 				}
 			}
 			// Verify exact tab count via availableTabs() — this guards against extra tabs
-			// without relying on substring checks (which can collide, e.g. "Details" ⊂ "Task Details").
+			// beyond what is expected for the context.
 			got := len(m.availableTabs())
 			if got != tt.tabCount {
 				t.Errorf("availableTabs() len = %d, want %d", got, tt.tabCount)
@@ -379,7 +379,7 @@ func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 
 // ── TestRenderRightPane_TaskDetails_DoesNotOverflowHeight ────────────────────
 
-// TestRenderRightPane_TaskDetails_DoesNotOverflowHeight verifies that the Task Details
+// TestRenderRightPane_TaskDetails_DoesNotOverflowHeight verifies that the Details
 // tab never produces more lines than the specified height, even when the viewport
 // contains very long lines that lipgloss would word-wrap. This guards against
 // the outer border frame being pushed off-screen (BUG-033-001).
@@ -387,7 +387,7 @@ func TestRenderRightPane_TaskDetails_DoesNotOverflowHeight(t *testing.T) {
 	tests := []struct {
 		name   string
 		ctx    selectionContext
-		tabIdx int // index of "Task Details" tab for that context
+		tabIdx int // index of "Details" tab for that context
 	}{
 		{name: "selRunningTask Tab Details", ctx: selRunningTask, tabIdx: 1},
 		{name: "selCompletedTask Tab Details", ctx: selCompletedTask, tabIdx: 2},

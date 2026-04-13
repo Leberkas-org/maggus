@@ -277,7 +277,7 @@ func (m statusModel) selectionCtx() selectionContext {
 		// The feature plan still provides the best context for a pending task,
 		// but the spec maps only four contexts. A pending task that is not
 		// running shows the same tabs as a completed task (Summary, Output,
-		// Task Details, Metrics) so the user can inspect it.
+		// Details, Metrics) so the user can inspect it.
 		return selCompletedTask
 	default:
 		return selNone
@@ -315,8 +315,8 @@ func (m statusModel) isTaskRunning(taskID string) bool {
 //
 //	selNone          → [Metrics]
 //	selFeature       → [Summary, Details, Metrics]
-//	selRunningTask   → [Output, Task Details, Metrics]
-//	selCompletedTask → [Summary, Output, Task Details, Metrics]
+//	selRunningTask   → [Output, Details, Metrics]
+//	selCompletedTask → [Summary, Output, Details, Metrics]
 func (m statusModel) availableTabs() []tabDef {
 	switch m.selectionCtx() {
 	case selFeature:
@@ -329,14 +329,14 @@ func (m statusModel) availableTabs() []tabDef {
 	case selRunningTask:
 		return []tabDef{
 			{name: "Output", key: "output"},
-			{name: "Task Details", key: "taskdetails"},
+			{name: "Details", key: "taskdetails"},
 			{name: "Metrics", key: "metrics"},
 		}
 	case selCompletedTask:
 		return []tabDef{
 			{name: "Summary", key: "summary"},
 			{name: "Output", key: "output"},
-			{name: "Task Details", key: "taskdetails"},
+			{name: "Details", key: "taskdetails"},
 			{name: "Metrics", key: "metrics"},
 		}
 	default: // selNone

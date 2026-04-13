@@ -104,12 +104,12 @@ A cosmetic companion fix: the "Task Details" tab is renamed to "Details" for con
 4. Update test strings in `status_test.go` and `status_rightpane_test.go` that assert the tab name `"Task Details"` → `"Details"`.
 
 **Acceptance Criteria:**
-- [ ] `availableTabs()` returns `name: "Details"` for the taskdetails tab in both selRunningTask and selCompletedTask contexts
-- [ ] Tab key `"taskdetails"` is unchanged
-- [ ] All comments updated to say "Details" instead of "Task Details"
-- [ ] All test assertions updated to match new display name
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] `availableTabs()` returns `name: "Details"` for the taskdetails tab in both selRunningTask and selCompletedTask contexts
+- [x] Tab key `"taskdetails"` is unchanged
+- [x] All comments updated to say "Details" instead of "Task Details"
+- [x] All test assertions updated to match new display name
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ## Task Dependency Graph
 

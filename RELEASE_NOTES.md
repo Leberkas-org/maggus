@@ -1,5 +1,10 @@
 # Release Notes
 
+## TASK-053-002: Rename "Task Details" tab display name to "Details"
+
+- Task detail tab is now labeled "Details" matching the feature row's detail tab for consistent naming
+- Improved naming consistency across feature and task views
+
 ## TASK-005-001: Add right pane footer separator line
 
 - Right pane now displays a full-width separator line matching the left pane

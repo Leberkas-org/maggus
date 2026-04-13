@@ -1200,12 +1200,12 @@ func TestRenderCurrentTaskTab(t *testing.T) {
 }
 
 func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
-	t.Run("Task Details tab is wired into renderRightPane", func(t *testing.T) {
+	t.Run("Details tab is wired into renderRightPane", func(t *testing.T) {
 		// Set up a selFeature context so availableTabs = [Summary, Plan, Details, Metrics].
 		// Index 3 = Metrics (no "taskdetails" in this context).
-		// To test taskdetails, use a selRunningTask context: [Output, Task Details, Metrics].
+		// To test taskdetails, use a selRunningTask context: [Output, Details, Metrics].
 		// But we just want to verify taskdetails renders — use selCompletedTask:
-		// [Summary, Output, Task Details, Metrics] — index 2 = taskdetails.
+		// [Summary, Output, Details, Metrics] — index 2 = taskdetails.
 		completedTask := parser.Task{
 			ID:       "TASK-001",
 			Criteria: []parser.Criterion{{Checked: true}},
@@ -1227,11 +1227,11 @@ func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
 		}
 		content := m.renderRightPane(80, 20)
 		if strings.Contains(content, "coming soon") {
-			t.Error("Task Details tab should not show 'coming soon' placeholder")
+			t.Error("Details tab should not show 'coming soon' placeholder")
 		}
 		// A task is selected (treeCursor=1 → completed task), so "No task selected" should NOT appear.
 		if strings.Contains(content, "No task selected") {
-			t.Errorf("Task Details tab should not show 'No task selected' when a task is selected, got %q", content)
+			t.Errorf("Details tab should not show 'No task selected' when a task is selected, got %q", content)
 		}
 	})
 }
@@ -2191,7 +2191,7 @@ func TestAvailableTabs(t *testing.T) {
 		}
 	})
 
-	t.Run("selRunningTask returns Output, Task Details, Metrics", func(t *testing.T) {
+	t.Run("selRunningTask returns Output, Details, Metrics", func(t *testing.T) {
 		pendingTask := parser.Task{
 			ID:       "TASK-001",
 			Criteria: []parser.Criterion{{Checked: false}},
@@ -2212,7 +2212,7 @@ func TestAvailableTabs(t *testing.T) {
 		}
 		expected := []struct{ key, name string }{
 			{"output", "Output"},
-			{"taskdetails", "Task Details"},
+			{"taskdetails", "Details"},
 			{"metrics", "Metrics"},
 		}
 		for i, e := range expected {
@@ -2225,7 +2225,7 @@ func TestAvailableTabs(t *testing.T) {
 		}
 	})
 
-	t.Run("selCompletedTask returns Summary, Output, Task Details, Metrics", func(t *testing.T) {
+	t.Run("selCompletedTask returns Summary, Output, Details, Metrics", func(t *testing.T) {
 		completedTask := parser.Task{
 			ID:       "TASK-001",
 			Criteria: []parser.Criterion{{Checked: true}},
@@ -2247,7 +2247,7 @@ func TestAvailableTabs(t *testing.T) {
 		expected := []struct{ key, name string }{
 			{"summary", "Summary"},
 			{"output", "Output"},
-			{"taskdetails", "Task Details"},
+			{"taskdetails", "Details"},
 			{"metrics", "Metrics"},
 		}
 		for i, e := range expected {
@@ -2315,7 +2315,7 @@ func TestUpdateTabsForSelectionChange(t *testing.T) {
 			expandedPlans: map[string]bool{"plan_1": true},
 			treeCursor:    1, // task row → selCompletedTask
 			showAll:       true,
-			activeTabTask: 2, // task tracker at Task Details (index 2; valid in 4-tab selCompletedTask set)
+			activeTabTask: 2, // task tracker at Details (index 2; valid in 4-tab selCompletedTask set)
 		}
 		// Simulate moving from selFeature (prevCtx) to selCompletedTask (current)
 		m.updateTabsForSelectionChange(selFeature)
@@ -3053,7 +3053,7 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 			width:         120,
 			height:        40,
 		}
-		m.activeTabTask = 2 // task tab tracker at index 2 (Task Details)
+		m.activeTabTask = 2 // task tab tracker at index 2 (Details)
 
 		// Navigate down to TASK-002 (still selCompletedTask)
 		result := pressKey(m, "j")
