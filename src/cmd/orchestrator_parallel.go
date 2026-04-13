@@ -118,7 +118,7 @@ func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequenti
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range tasks {
-		if t.IsComplete() || t.IsBlocked() {
+		if t.IsComplete() || t.IsBlocked() || t.IsSkipped() {
 			continue
 		}
 		if o.failedIDs[t.ID] {
@@ -136,11 +136,11 @@ func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequenti
 	return
 }
 
-// predecessorsComplete reports whether all of t's predecessor task IDs are in
-// o.completedIDs. Caller must hold o.mu.
+// predecessorsComplete reports whether all of t's predecessor task IDs are
+// satisfied — either completed, blocked, or skipped. Caller must hold o.mu.
 func (o *Orchestrator) predecessorsComplete(t parser.Task) bool {
 	for _, predID := range t.Predecessors {
-		if !o.completedIDs[predID] {
+		if !o.completedIDs[predID] && !o.skippedOrBlockedIDs[predID] {
 			return false
 		}
 	}
@@ -312,6 +312,9 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		if wr.Warning != "" {
 			result.warnings = append(result.warnings, wr.Warning)
 		}
+		o.mu.Lock()
+		o.skippedOrBlockedIDs[task.ID] = true
+		o.mu.Unlock()
 		o.markWorkerBlocked(task.ID, wsw)
 		return result
 	}

@@ -88,3 +88,69 @@ func TestOrchestratorClassifyWorkable_MixedBatch(t *testing.T) {
 		t.Errorf("sequential workable = %v, want [TASK-002]", taskIDs(seq))
 	}
 }
+
+func TestOrchestratorClassifyWorkable_BlockedPredecessorSatisfied(t *testing.T) {
+	// Task 1 is blocked. Task 2 has Task 1 as predecessor.
+	// A blocked predecessor must be treated as satisfied so Task 2 can run.
+	o := &Orchestrator{}
+	o.completedIDs = map[string]bool{}
+	o.failedIDs = map[string]bool{}
+	o.skippedOrBlockedIDs = map[string]bool{"TASK-001": true}
+
+	tasks := []parser.Task{
+		{ID: "TASK-001", Criteria: []parser.Criterion{{Text: "BLOCKED: something", Blocked: true}}},
+		{ID: "TASK-002", Parallel: false, Predecessors: []string{"TASK-001"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	par, seq := o.classifyWorkable(tasks)
+	if len(par) != 0 {
+		t.Errorf("parallel workable = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-002" {
+		t.Errorf("sequential workable = %v, want [TASK-002]", taskIDs(seq))
+	}
+}
+
+func TestOrchestratorClassifyWorkable_SkippedPredecessorSatisfied(t *testing.T) {
+	// Task 1 is skipped. Task 2 has Task 1 as predecessor.
+	// A skipped predecessor must be treated as satisfied so Task 2 can run.
+	o := &Orchestrator{}
+	o.completedIDs = map[string]bool{}
+	o.failedIDs = map[string]bool{}
+	o.skippedOrBlockedIDs = map[string]bool{"TASK-001": true}
+
+	tasks := []parser.Task{
+		{ID: "TASK-001", Criteria: []parser.Criterion{{Skipped: true}}},
+		{ID: "TASK-002", Parallel: false, Predecessors: []string{"TASK-001"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	par, seq := o.classifyWorkable(tasks)
+	if len(par) != 0 {
+		t.Errorf("parallel workable = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-002" {
+		t.Errorf("sequential workable = %v, want [TASK-002]", taskIDs(seq))
+	}
+}
+
+func TestOrchestratorClassifyWorkable_IncompletePredecessorStillHeld(t *testing.T) {
+	// Task 1 is incomplete (not blocked, not skipped, not complete).
+	// Task 2 must still be held back — only truly unsatisfied predecessors block.
+	o := &Orchestrator{}
+	o.completedIDs = map[string]bool{}
+	o.failedIDs = map[string]bool{}
+	o.skippedOrBlockedIDs = map[string]bool{}
+
+	tasks := []parser.Task{
+		{ID: "TASK-001", Parallel: false, Criteria: []parser.Criterion{{Checked: false}}},
+		{ID: "TASK-002", Parallel: false, Predecessors: []string{"TASK-001"}, Criteria: []parser.Criterion{{Checked: false}}},
+	}
+
+	par, seq := o.classifyWorkable(tasks)
+	if len(par) != 0 {
+		t.Errorf("parallel workable = %v, want []", taskIDs(par))
+	}
+	if len(seq) != 1 || seq[0].ID != "TASK-001" {
+		t.Errorf("sequential workable = %v, want [TASK-001]", taskIDs(seq))
+	}
+}

@@ -113,10 +113,11 @@ type Orchestrator struct {
 
 	// Per-group parallel state — reset at the start of each runGroupTasks call.
 	// Guarded by mu; also used as MergeMu for parallel workers.
-	mu           sync.Mutex
-	completedIDs map[string]bool // task IDs that have successfully committed
-	failedIDs    map[string]bool // task IDs that failed (excluded from future batches)
-	iteration    int             // monotonically increasing per-worker counter
+	mu                  sync.Mutex
+	completedIDs        map[string]bool // task IDs that have successfully committed
+	failedIDs           map[string]bool // task IDs that failed (excluded from future batches)
+	skippedOrBlockedIDs map[string]bool // task IDs that are blocked or skipped (satisfy predecessors)
+	iteration           int             // monotonically increasing per-worker counter
 
 	// Per-group worker TUI state for split pane view — reset per group.
 	// Guarded by mu.
@@ -280,10 +281,12 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	}
 
 	// Initialize per-group parallel state. Pre-populate completedIDs with tasks
-	// that are already done so predecessor tracking works from the start.
+	// that are already done and skippedOrBlockedIDs with tasks that are blocked
+	// or skipped so predecessor tracking works from the start.
 	o.mu.Lock()
 	o.completedIDs = make(map[string]bool)
 	o.failedIDs = make(map[string]bool)
+	o.skippedOrBlockedIDs = make(map[string]bool)
 	o.iteration = 0
 	o.workerOrder = nil
 	o.workerStatuses = nil
@@ -292,6 +295,9 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	for _, t := range group.Tasks {
 		if t.IsComplete() {
 			o.completedIDs[t.ID] = true
+		}
+		if t.IsBlocked() || t.IsSkipped() {
+			o.skippedOrBlockedIDs[t.ID] = true
 		}
 	}
 	o.mu.Unlock()
@@ -440,6 +446,9 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 			if wr.Warning != "" {
 				result.warnings = append(result.warnings, wr.Warning)
 			}
+			o.mu.Lock()
+			o.skippedOrBlockedIDs[next.ID] = true
+			o.mu.Unlock()
 			if tasks, err := parseAllTasks(cfg.FeatureStore, cfg.BugStore); err == nil {
 				groupTasks = filterTasksBySourceFile(tasks, group.File)
 			}
