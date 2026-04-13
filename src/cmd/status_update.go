@@ -615,7 +615,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key {
 	case "shift+up":
 		switch m.activeTabKey() {
-		case "output":
+		case "output", "featureoutput":
 			if m.logScroll > 0 {
 				m.logScroll--
 				m.logAutoScroll = false
@@ -626,7 +626,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "shift+down":
 		switch m.activeTabKey() {
-		case "output":
+		case "output", "featureoutput":
 			maxS := m.maxLogScroll()
 			if m.logScroll < maxS {
 				m.logScroll++
@@ -653,6 +653,35 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logAutoScroll = true
 		case "taskdetails":
 			m.currentTaskViewport.GotoBottom()
+		}
+		return m, nil
+	case "tab":
+		// Cycle the right-pane tab forward (wrapping). Consumed here so it never
+		// reaches the feature-tree navigation or the taskListComponent.
+		tabs := m.availableTabs()
+		if len(tabs) > 0 {
+			idx := (m.activeTabIndex() + 1) % len(tabs)
+			m.setActiveTabIndex(idx)
+			if tabs[idx].key == "output" || tabs[idx].key == "featureoutput" {
+				m.logAutoScroll = true
+				m.logScroll = m.maxLogScroll()
+			}
+		}
+		return m, nil
+	case "shift+tab":
+		// Cycle the right-pane tab backward (wrapping). Consumed here so it never
+		// reaches the normalizeKey switch where it previously moved the left-pane cursor.
+		tabs := m.availableTabs()
+		if len(tabs) > 0 {
+			idx := m.activeTabIndex() - 1
+			if idx < 0 {
+				idx = len(tabs) - 1
+			}
+			m.setActiveTabIndex(idx)
+			if tabs[idx].key == "output" || tabs[idx].key == "featureoutput" {
+				m.logAutoScroll = true
+				m.logScroll = m.maxLogScroll()
+			}
 		}
 		return m, nil
 	}
@@ -739,20 +768,6 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			prevPlan := m.selectedPlan()
 			prevCtx := m.selectionCtx()
 			m.treeCursor = len(items) - 1
-			m.clampTreeScroll()
-			m.syncPlanCursorFromTreeCursor()
-			m.updateTabsForSelectionChange(prevCtx)
-			if m.selectedPlan().ID != prevPlan.ID {
-				m.rebuildRightPane()
-			}
-		}
-		return m, nil
-	case "shift+tab":
-		items := m.buildTreeItems()
-		if len(items) > 0 {
-			prevPlan := m.selectedPlan()
-			prevCtx := m.selectionCtx()
-			m.treeCursor = skipSeparatorUp(styles.CursorUp(m.treeCursor, len(items)), items)
 			m.clampTreeScroll()
 			m.syncPlanCursorFromTreeCursor()
 			m.updateTabsForSelectionChange(prevCtx)

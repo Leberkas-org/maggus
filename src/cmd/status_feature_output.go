@@ -17,6 +17,10 @@ import (
 // followed by its tool entries (indented 2 spaces). For the currently running task the
 // live snapshot is used instead of the cache; the latest tool entry shows the spinner.
 // Returns a placeholder when no tasks have any output and none is running.
+//
+// Each task is allocated a fixed line budget (linesPerTask = max(contentH/taskCount, 7));
+// only the last linesPerTask entries are rendered per task, but the full entry count is
+// always shown in the task header as "[N tools]".
 func (m statusModel) renderFeatureOutputTab(width, contentH int) string {
 	plan := m.selectedPlan()
 
@@ -39,6 +43,16 @@ func (m statusModel) renderFeatureOutputTab(width, contentH int) string {
 		return statusDimStyle.Render("  No output history")
 	}
 
+	// Per-task line budget: divide available height evenly, minimum 7 lines per task.
+	taskCount := len(plan.Tasks)
+	if taskCount < 1 {
+		taskCount = 1
+	}
+	linesPerTask := contentH / taskCount
+	if linesPerTask < 7 {
+		linesPerTask = 7
+	}
+
 	// Build the combined flat list: header + tool lines per task.
 	var allLines []string
 	for i, task := range plan.Tasks {
@@ -58,20 +72,34 @@ func (m statusModel) renderFeatureOutputTab(width, contentH int) string {
 			snap = m.cachedFeatureOutput[i]
 		}
 
-		// Separator header for this task.
-		allLines = append(allLines, buildFeatureTaskHeader(task, snap, isRunning, width))
+		// Retain the full entry count for the header regardless of display capping.
+		totalTools := 0
+		if snap != nil {
+			totalTools = len(snap.ToolEntries)
+		}
+
+		// Separator header for this task — always includes "[N tools]" when totalTools > 0.
+		allLines = append(allLines, buildFeatureTaskHeader(task, snap, isRunning, width, totalTools))
 
 		// Tool entries below the header (pending/blocked tasks with no data show header only).
 		if snap != nil && len(snap.ToolEntries) > 0 {
-			entries := make([]runlog.SnapshotToolEntry, len(snap.ToolEntries))
-			copy(entries, snap.ToolEntries)
+			entries := snap.ToolEntries
+			// Cap to last linesPerTask entries; retain full count in header via totalTools.
+			start := len(entries) - linesPerTask
+			if start < 0 {
+				start = 0
+			}
+			entries = entries[start:]
+
+			capped := make([]runlog.SnapshotToolEntry, len(entries))
+			copy(capped, entries)
 			// For the running task: latest tool entry gets the spinner character.
 			if isRunning {
-				last := len(entries) - 1
+				last := len(capped) - 1
 				spinChar := statusCyanStyle.Render(styles.SpinnerFrames[spinnerFrame%len(styles.SpinnerFrames)])
-				entries[last].Icon = spinChar
+				capped[last].Icon = spinChar
 			}
-			allLines = append(allLines, buildToolLines(entries, contentWidth)...)
+			allLines = append(allLines, buildToolLines(capped, contentWidth)...)
 		}
 	}
 
@@ -81,10 +109,11 @@ func (m statusModel) renderFeatureOutputTab(width, contentH int) string {
 }
 
 // buildFeatureTaskHeader builds the separator header line for one task in the feature
-// output tab. Format: ─── TASK-ID: Title <icon> [tokens/out] [$cost] [duration] ──────
+// output tab. Format: ─── TASK-ID: Title <icon> [tokens/out] [$cost] [duration] [N tools] ──
 // Icon: ✓ green for done, ▶ yellow for running, ○ dim for pending/blocked.
-// Token, cost, and duration fields are only shown when non-zero/available.
-func buildFeatureTaskHeader(task parser.Task, snap *runlog.StateSnapshot, isRunning bool, width int) string {
+// Token, cost, duration, and tool count fields are only shown when non-zero/available.
+// totalTools is the full entry count for the task — shown as "[N tools]" when > 0.
+func buildFeatureTaskHeader(task parser.Task, snap *runlog.StateSnapshot, isRunning bool, width, totalTools int) string {
 	dimStyle := lipgloss.NewStyle().Faint(true)
 	warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
 
@@ -98,7 +127,7 @@ func buildFeatureTaskHeader(task parser.Task, snap *runlog.StateSnapshot, isRunn
 		icon = dimStyle.Render("○")
 	}
 
-	// Metadata from the snapshot (tokens, cost, duration).
+	// Metadata from the snapshot (tokens, cost, duration, tool count).
 	var metaParts []string
 	if snap != nil {
 		if snap.TokenInput > 0 || snap.TokenOutput > 0 {
@@ -115,6 +144,9 @@ func buildFeatureTaskHeader(task parser.Task, snap *runlog.StateSnapshot, isRunn
 				metaParts = append(metaParts, fmt.Sprintf("[%s]", formatHumanDuration(t2.Sub(t1))))
 			}
 		}
+	}
+	if totalTools > 0 {
+		metaParts = append(metaParts, fmt.Sprintf("[%d tools]", totalTools))
 	}
 	meta := ""
 	if len(metaParts) > 0 {

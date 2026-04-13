@@ -204,9 +204,10 @@ func (m statusModel) statusSplitFooter() string {
 	}
 	var parts []string
 	parts = append(parts, tabRange)
+	parts = append(parts, "tab: switch tab")
 	parts = append(parts, "↑/↓: navigate")
 	activeKey := m.activeTabKey()
-	if activeKey == "output" || activeKey == "taskdetails" {
+	if activeKey == "output" || activeKey == "featureoutput" || activeKey == "taskdetails" {
 		parts = append(parts, "shift+↑/↓: scroll")
 		parts = append(parts, "g: top  G: bottom")
 	}

@@ -320,7 +320,7 @@ func (m statusModel) isTaskRunning(taskID string) bool {
 //	selNone          → [Metrics]
 //	selFeature       → [Summary, Details, Metrics]
 //	selRunningTask   → [Output, Details, Metrics]
-//	selCompletedTask → [Summary, Output, Details, Metrics]
+//	selCompletedTask → [Output, Summary, Details, Metrics]
 func (m statusModel) availableTabs() []tabDef {
 	switch m.selectionCtx() {
 	case selFeature:
@@ -339,8 +339,8 @@ func (m statusModel) availableTabs() []tabDef {
 		}
 	case selCompletedTask:
 		return []tabDef{
-			{name: "Summary", key: "summary"},
 			{name: "Output", key: "output"},
+			{name: "Summary", key: "summary"},
 			{name: "Details", key: "taskdetails"},
 			{name: "Metrics", key: "metrics"},
 		}

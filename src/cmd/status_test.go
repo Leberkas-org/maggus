@@ -1522,20 +1522,64 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 	})
 }
 
-func TestStatusModel_TabKeyIsNoOp(t *testing.T) {
+func TestStatusModel_TabKeyCyclesTabs(t *testing.T) {
 	plans := []parser.Plan{
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
 	}
 
-	t.Run("tab key does not change activeTabFeature", func(t *testing.T) {
+	t.Run("tab key advances activeTabFeature by 1", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
+		m.activeTabFeature = 0
+		tabs := m.availableTabs()
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		got := result.(statusModel)
-		if got.activeTabFeature != m.activeTabFeature {
-			t.Errorf("activeTabFeature changed from %d to %d after tab key", m.activeTabFeature, got.activeTabFeature)
+		want := 1 % len(tabs)
+		if got.activeTabFeature != want {
+			t.Errorf("after tab key: activeTabFeature = %d, want %d", got.activeTabFeature, want)
+		}
+	})
+
+	t.Run("tab key wraps from last tab to first", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		tabs := m.availableTabs()
+		m.activeTabFeature = len(tabs) - 1
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		got := result.(statusModel)
+		if got.activeTabFeature != 0 {
+			t.Errorf("after tab key from last tab: activeTabFeature = %d, want 0", got.activeTabFeature)
+		}
+	})
+
+	t.Run("shift+tab key moves activeTabFeature back by 1", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		m.activeTabFeature = 2
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+		got := result.(statusModel)
+		if got.activeTabFeature != 1 {
+			t.Errorf("after shift+tab key: activeTabFeature = %d, want 1", got.activeTabFeature)
+		}
+	})
+
+	t.Run("shift+tab key wraps from first tab to last", func(t *testing.T) {
+		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
+		m.width = 120
+		m.height = 40
+		tabs := m.availableTabs()
+		m.activeTabFeature = 0
+
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+		got := result.(statusModel)
+		if got.activeTabFeature != len(tabs)-1 {
+			t.Errorf("after shift+tab key from first tab: activeTabFeature = %d, want %d", got.activeTabFeature, len(tabs)-1)
 		}
 	})
 }
@@ -2246,8 +2290,8 @@ func TestAvailableTabs(t *testing.T) {
 			t.Fatalf("len(availableTabs) = %d, want 4", len(tabs))
 		}
 		expected := []struct{ key, name string }{
-			{"summary", "Summary"},
 			{"output", "Output"},
+			{"summary", "Summary"},
 			{"taskdetails", "Details"},
 			{"metrics", "Metrics"},
 		}
@@ -3099,7 +3143,7 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 			width:         120,
 			height:        40,
 		}
-		m.activeTabTask = 1 // task tracker at Output
+		m.activeTabTask = 1 // task tracker at Summary (index 1 in selCompletedTask: Output, Summary, Details, Metrics)
 
 		// Navigate up to the plan row → selFeature
 		result := pressKey(m, "k")
