@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -12,6 +13,100 @@ import (
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"golang.org/x/sync/errgroup"
 )
+
+// runDispatchRequests checks for pending dispatch sentinel files and runs each
+// requested task in an isolated git worktree. Sentinels are atomically consumed
+// (removed) before the corresponding task starts to prevent duplicate execution.
+//
+// Dispatched tasks run as background goroutines tracked via o.dispatchWG, so the
+// normal sequential/parallel queue continues without blocking. The caller (Run)
+// waits on dispatchWG before returning so dispatched tasks are never orphaned.
+//
+// Edge cases handled:
+//   - Sentinel with unknown/malformed task ID: removed, InfoMsg sent.
+//   - Task already complete or blocked: sentinel removed, InfoMsg sent.
+//   - Task already registered as a running worker: sentinel removed, InfoMsg sent.
+//   - Multiple sentinels for the same task: second os.Remove fails → goroutine not launched.
+func (o *Orchestrator) runDispatchRequests() {
+	sentinels := globDispatchSentinels(o.cfg.RepoDir)
+	if len(sentinels) == 0 {
+		return
+	}
+
+	// Load all plans (bugs + features) to locate each dispatched task and its group.
+	allPlans, err := loadAllPlans(o.cfg.FeatureStore, o.cfg.BugStore)
+	if err != nil {
+		return
+	}
+
+	for _, sentinel := range sentinels {
+		taskID := taskIDFromDispatchSentinel(sentinel)
+		if taskID == "" {
+			_ = os.Remove(sentinel)
+			continue
+		}
+
+		// Atomically consume the sentinel. If two goroutines race on the same
+		// file, only one Remove succeeds; the other sees an error and skips.
+		if err := os.Remove(sentinel); err != nil {
+			continue
+		}
+
+		// Find the task and its plan across all loaded plans.
+		var foundTask *parser.Task
+		var foundPlan *parser.Plan
+		for pi := range allPlans {
+			for ti := range allPlans[pi].Tasks {
+				if allPlans[pi].Tasks[ti].ID == taskID {
+					foundTask = &allPlans[pi].Tasks[ti]
+					foundPlan = &allPlans[pi]
+					break
+				}
+			}
+			if foundTask != nil {
+				break
+			}
+		}
+
+		if foundTask == nil {
+			o.cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⚠ Dispatch: task %s not found", taskID)})
+			continue
+		}
+		if foundTask.IsComplete() {
+			o.cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⊘ Dispatch: task %s already complete", taskID)})
+			continue
+		}
+		if foundTask.IsBlocked() {
+			o.cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⊘ Dispatch: task %s is blocked", taskID)})
+			continue
+		}
+
+		// Skip if already registered as a running dispatch worker.
+		o.mu.Lock()
+		alreadyRunning := o.hasWorkerMaps() && o.workerStatuses[taskID] == "working"
+		o.mu.Unlock()
+		if alreadyRunning {
+			o.cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⊘ Dispatch: task %s already running", taskID)})
+			continue
+		}
+
+		// Register the worker so the TUI can show its status immediately.
+		o.mu.Lock()
+		o.ensureWorkerMaps()
+		o.registerWorker(taskID, foundTask.Title)
+		o.updateWorkersIndex(o.buildWorkerEntries())
+		o.mu.Unlock()
+
+		// Launch the task in an isolated worktree as a background goroutine.
+		task := *foundTask
+		plan := *foundPlan
+		o.dispatchWG.Add(1)
+		go func() {
+			defer o.dispatchWG.Done()
+			o.runWorktreeTask(&plan, task)
+		}()
+	}
+}
 
 // classifyWorkable splits the given tasks into parallel-workable and
 // sequential-workable lists using the same rules as the parallel orchestrator:

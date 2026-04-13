@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2626,56 +2625,6 @@ func TestHandleAltRunDispatch_AlreadyRunningShowsNote(t *testing.T) {
 	}
 }
 
-func TestHandleAltRunDispatch_DaemonRunning_Dispatches(t *testing.T) {
-	origFn := dispatchTaskFn
-	defer func() { dispatchTaskFn = origFn }()
-
-	var capturedTaskID string
-	dispatchTaskFn = func(dir, taskID, model, agentName string) error {
-		capturedTaskID = taskID
-		return nil
-	}
-
-	task := &parser.Task{
-		ID:       "TASK-045-001",
-		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
-	}
-	m := statusModel{
-		daemon: daemonStatus{Running: true},
-	}
-	result, cmd := m.handleAltRunDispatch(task)
-	if capturedTaskID != "TASK-045-001" {
-		t.Errorf("expected dispatch called with TASK-045-001, got: %q", capturedTaskID)
-	}
-	if result.statusNote != "Dispatched TASK-045-001" {
-		t.Errorf("expected 'Dispatched TASK-045-001', got: %q", result.statusNote)
-	}
-	if cmd != nil {
-		t.Error("expected nil cmd after dispatch (background, fire-and-forget)")
-	}
-}
-
-func TestHandleAltRunDispatch_DaemonRunning_DispatchError(t *testing.T) {
-	origFn := dispatchTaskFn
-	defer func() { dispatchTaskFn = origFn }()
-
-	dispatchTaskFn = func(dir, taskID, model, agentName string) error {
-		return fmt.Errorf("worktree error")
-	}
-
-	task := &parser.Task{
-		ID:       "TASK-001",
-		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
-	}
-	m := statusModel{
-		daemon: daemonStatus{Running: true},
-	}
-	result, _ := m.handleAltRunDispatch(task)
-	if !strings.Contains(result.statusNote, "Dispatch failed") {
-		t.Errorf("expected 'Dispatch failed' in status note, got: %q", result.statusNote)
-	}
-}
-
 func TestHandleAltRunDispatch_DaemonNotRunning_ReturnsForegroundCmd(t *testing.T) {
 	task := &parser.Task{
 		ID:       "TASK-001",
@@ -2706,11 +2655,8 @@ func TestStatusSplitFooter_AltRHint_DaemonRunning(t *testing.T) {
 		daemon:        daemonStatus{Running: true},
 	}
 	footer := m.statusSplitFooter()
-	if !strings.Contains(footer, "alt+r: dispatch") {
-		t.Errorf("expected 'alt+r: dispatch' when daemon running, got: %q", footer)
-	}
-	if strings.Contains(footer, "alt+r: run") {
-		t.Errorf("expected no 'alt+r: run' when daemon running, got: %q", footer)
+	if !strings.Contains(footer, "alt+r: run") {
+		t.Errorf("expected 'alt+r: run' when daemon running, got: %q", footer)
 	}
 }
 
@@ -2757,8 +2703,8 @@ func TestStatusSplitFooter_DetailView_AltRHint_DaemonRunning(t *testing.T) {
 	m.taskListComponent.Tasks = []parser.Task{task}
 	m.taskListComponent.ShowDetail = true
 	footer := m.statusSplitFooter()
-	if !strings.Contains(footer, "alt+r: dispatch") {
-		t.Errorf("expected 'alt+r: dispatch' in detail footer when daemon running, got: %q", footer)
+	if !strings.Contains(footer, "alt+r: run") {
+		t.Errorf("expected 'alt+r: run' in detail footer when daemon running, got: %q", footer)
 	}
 }
 
@@ -2777,9 +2723,6 @@ func TestStatusSplitFooter_DetailView_AltRHint_DaemonNotRunning(t *testing.T) {
 	footer := m.statusSplitFooter()
 	if !strings.Contains(footer, "alt+r: run") {
 		t.Errorf("expected 'alt+r: run' in detail footer when daemon not running, got: %q", footer)
-	}
-	if strings.Contains(footer, "alt+r: dispatch") {
-		t.Errorf("expected no 'alt+r: dispatch' when daemon not running, got: %q", footer)
 	}
 }
 
@@ -2906,5 +2849,69 @@ func TestRefreshWorkerSnapshots_NilWhenEmptyIndex(t *testing.T) {
 
 	if m.workerIndex != nil {
 		t.Error("workerIndex should be nil when no index file exists")
+	}
+}
+
+// ── handleAltRunDispatch file-based dispatch tests ────────────────────────────
+
+func TestHandleAltRunDispatch_DaemonRunning_WritesDispatchSentinel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	task := &parser.Task{
+		ID:       "TASK-007",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		dir:    dir,
+		daemon: daemonStatus{Running: true},
+	}
+	result, cmd := m.handleAltRunDispatch(task)
+
+	if result.statusNote != "Dispatched TASK-007" {
+		t.Errorf("expected statusNote 'Dispatched TASK-007', got: %q", result.statusNote)
+	}
+	if cmd == nil {
+		t.Error("expected non-nil cmd for daemon dispatch")
+	}
+	// Execute the cmd to trigger the sentinel write.
+	msg := cmd()
+	if msg != nil {
+		t.Errorf("expected nil msg from dispatch cmd, got: %v", msg)
+	}
+
+	// Verify the sentinel file was written.
+	sentinelPath := dispatchSentinelPath(dir, "TASK-007")
+	if _, err := os.Stat(sentinelPath); err != nil {
+		t.Errorf("expected dispatch sentinel file to exist: %v", err)
+	}
+}
+
+func TestHandleAltRunDispatch_DaemonRunning_AlreadyRunning_NoSentinel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	task := &parser.Task{
+		ID:       "TASK-007",
+		Criteria: []parser.Criterion{{Text: "do something", Checked: false}},
+	}
+	m := statusModel{
+		dir:    dir,
+		daemon: daemonStatus{Running: true, CurrentTask: "TASK-007"},
+	}
+	result, cmd := m.handleAltRunDispatch(task)
+
+	if result.statusNote != "Task already running" {
+		t.Errorf("expected 'Task already running', got: %q", result.statusNote)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd when task already running")
+	}
+	// No sentinel should be written.
+	sentinelPath := dispatchSentinelPath(dir, "TASK-007")
+	if _, err := os.Stat(sentinelPath); !os.IsNotExist(err) {
+		t.Error("expected no sentinel file when task already running")
 	}
 }

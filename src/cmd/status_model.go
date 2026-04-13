@@ -285,10 +285,10 @@ func (m statusModel) selectionCtx() selectionContext {
 }
 
 // isTaskRunning returns true when the given task ID is actively being worked on,
-// either by the sequential daemon, a parallel orchestrator worker, or a dispatched worker.
+// either by the sequential daemon or a parallel orchestrator worker.
 func (m statusModel) isTaskRunning(taskID string) bool {
-	// Parallel orchestrator or dispatched workers: check the worker index for an
-	// active "working" entry. This works even when the daemon itself is not running.
+	// Parallel orchestrator workers: check the worker index for an active "working"
+	// entry. This works even when the daemon itself is not running.
 	for _, w := range m.workerIndex {
 		if w.TaskID == taskID && w.Status == "working" {
 			return true

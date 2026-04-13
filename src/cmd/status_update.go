@@ -492,8 +492,9 @@ func (m statusModel) buildRunTaskMsg() tea.Cmd {
 }
 
 // handleAltRunDispatch handles the Alt+R key press for the given task.
-// When the daemon is running, it dispatches the task as a background worker.
-// When the daemon is NOT running, it falls back to a foreground run.
+// When the daemon is running, writes a dispatch sentinel file so the orchestrator
+// picks up the task immediately ahead of the normal queue.
+// When the daemon is not running, falls back to foreground execution via tea.ExecProcess.
 // No-ops when: task is nil, complete, blocked, or already running in a worker.
 func (m statusModel) handleAltRunDispatch(task *parser.Task) (statusModel, tea.Cmd) {
 	if task == nil {
@@ -507,17 +508,21 @@ func (m statusModel) handleAltRunDispatch(task *parser.Task) (statusModel, tea.C
 		m.syncDetailSuffix()
 		return m, nil
 	}
+
+	// When the daemon is running, use file-based dispatch signaling.
+	// The orchestrator polls for sentinel files and runs the task in a worktree.
 	if m.daemon.Running {
-		err := dispatchTaskFn(m.dir, task.ID, "", m.agentName)
-		if err != nil {
-			m.statusNote = "Dispatch failed: " + err.Error()
-		} else {
-			m.statusNote = "Dispatched " + task.ID
-		}
+		taskID := task.ID
+		dir := m.dir
+		m.statusNote = "Dispatched " + taskID
 		m.syncDetailSuffix()
-		return m, nil
+		return m, func() tea.Msg {
+			_ = writeDispatchSentinel(dir, taskID)
+			return nil
+		}
 	}
-	// Daemon not running — run in the foreground via tea.ExecProcess.
+
+	// Daemon not running: fall back to foreground execution.
 	m.taskListComponent.RunTaskID = task.ID
 	return m, m.buildRunTaskMsg()
 }

@@ -133,3 +133,92 @@ func TestErrStopAfterTask_IsSentinel(t *testing.T) {
 		t.Fatal("errStopAfterTask must not match context.Canceled")
 	}
 }
+
+// ── Dispatch sentinel helpers ─────────────────────────────────────────────────
+
+func TestDispatchSentinelPath(t *testing.T) {
+	dir := "/some/repo"
+	got := dispatchSentinelPath(dir, "TASK-007")
+	want := filepath.Join(dir, ".maggus", "dispatch-TASK-007")
+	if got != want {
+		t.Errorf("dispatchSentinelPath = %q, want %q", got, want)
+	}
+}
+
+func TestTaskIDFromDispatchSentinel(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{filepath.Join("/repo", ".maggus", "dispatch-TASK-007"), "TASK-007"},
+		{filepath.Join("/repo", ".maggus", "dispatch-BUG-003-001"), "BUG-003-001"},
+		{filepath.Join("/repo", ".maggus", "daemon.stop"), ""},    // non-dispatch
+		{filepath.Join("/repo", ".maggus", "dispatch-"), ""},      // empty task ID
+	}
+	for _, tt := range tests {
+		got := taskIDFromDispatchSentinel(tt.input)
+		if got != tt.want {
+			t.Errorf("taskIDFromDispatchSentinel(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestWriteAndGlobDispatchSentinels(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// No sentinels initially.
+	if got := globDispatchSentinels(dir); len(got) != 0 {
+		t.Errorf("expected 0 sentinels, got %d", len(got))
+	}
+
+	// Write two sentinels.
+	if err := writeDispatchSentinel(dir, "TASK-001"); err != nil {
+		t.Fatalf("writeDispatchSentinel: %v", err)
+	}
+	if err := writeDispatchSentinel(dir, "TASK-002"); err != nil {
+		t.Fatalf("writeDispatchSentinel: %v", err)
+	}
+
+	sentinels := globDispatchSentinels(dir)
+	if len(sentinels) != 2 {
+		t.Errorf("expected 2 sentinels, got %d", len(sentinels))
+	}
+
+	// Verify task IDs can be extracted from the paths.
+	ids := make(map[string]bool)
+	for _, s := range sentinels {
+		ids[taskIDFromDispatchSentinel(s)] = true
+	}
+	if !ids["TASK-001"] || !ids["TASK-002"] {
+		t.Errorf("unexpected task IDs: %v", ids)
+	}
+}
+
+func TestWaitForChanges_DispatchSentinel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".maggus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+
+	start := time.Now()
+	// Write a dispatch sentinel after a short delay.
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = writeDispatchSentinel(dir, "TASK-007")
+	}()
+
+	reason, _ := waitForChanges(nil, ctx, dir) // nil filewatcher → polling only
+	elapsed := time.Since(start)
+
+	if reason != wakeDispatch {
+		t.Errorf("expected wakeDispatch, got %v", reason)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("took too long to detect dispatch sentinel: %v", elapsed)
+	}
+}

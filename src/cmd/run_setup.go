@@ -26,8 +26,7 @@ var (
 // runLoopConfig holds all resolved configuration needed by the work loop.
 type runLoopConfig struct {
 	count              int
-	dir                string // working directory (worktree for dispatched workers, repo root otherwise)
-	planDir            string // directory for plan/config/approval files (always the main repo root)
+	dir                string
 	cfg                config.Config
 	globalSettings     globalconfig.Settings
 	validIncludes      []string
@@ -64,15 +63,8 @@ func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 		return nil, fmt.Errorf("get working directory: %w", err)
 	}
 
-	// For dispatched workers, use the main repo dir for config/plan loading.
-	// The cwd (worktree) is only used for code changes and git operations.
-	planDir := dir
-	if dispatchRepoFlag != "" {
-		planDir = dispatchRepoFlag
-	}
-
 	// Load config
-	cfg, err := loadConfigFn(planDir)
+	cfg, err := loadConfigFn(dir)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -139,7 +131,6 @@ func runSetup(cmd *cobra.Command, args []string) (*runLoopConfig, error) {
 	return &runLoopConfig{
 		count:              count,
 		dir:                dir,
-		planDir:            planDir,
 		cfg:                cfg,
 		globalSettings:     globalSettings,
 		validIncludes:      validIncludes,

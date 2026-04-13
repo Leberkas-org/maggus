@@ -130,6 +130,8 @@ func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 		case wakeStopAfterTask:
 			removeStopAfterTaskFile(dir)
 			return nil
+		case wakeDispatch:
+			runLogger.Info("dispatch sentinel detected, restarting cycle")
 		case wakeFileChange:
 			runLogger.Info(fmt.Sprintf("file change detected: %s", wakePath))
 		}
@@ -143,6 +145,7 @@ const (
 	wakeSignal        wakeReason = iota // shutdown signal received
 	wakeFileChange                      // file change detected
 	wakeStopAfterTask                   // stop-after-task sentinel file detected
+	wakeDispatch                        // dispatch sentinel file detected
 )
 
 // daemonIdlePollInterval is the maximum time the daemon will wait idle before
@@ -158,7 +161,7 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 	defer stopAfterTaskTicker.Stop()
 
 	if fw == nil {
-		// No watcher available — block on context or stop-after-task only.
+		// No watcher available — block on context, stop-after-task, or dispatch only.
 		for {
 			select {
 			case <-ctx.Done():
@@ -166,6 +169,9 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 			case <-stopAfterTaskTicker.C:
 				if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
 					return wakeStopAfterTask, ""
+				}
+				if sentinels := globDispatchSentinels(dir); len(sentinels) > 0 {
+					return wakeDispatch, ""
 				}
 			}
 		}
@@ -199,6 +205,9 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 		case <-stopAfterTaskTicker.C:
 			if _, err := os.Stat(daemonStopAfterTaskFilePath(dir)); err == nil {
 				return wakeStopAfterTask, ""
+			}
+			if sentinels := globDispatchSentinels(dir); len(sentinels) > 0 {
+				return wakeDispatch, ""
 			}
 		case <-time.After(daemonIdlePollInterval):
 			return wakeFileChange, ""

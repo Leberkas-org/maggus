@@ -35,11 +35,6 @@ type nullTUIModel struct {
 	toolEntries []runlog.SnapshotToolEntry
 	commits     []string
 
-	// Dispatch mode — when set, writes per-worker snapshots to the main repo
-	// instead of the daemon's state.json. Set by --dispatch-repo.
-	dispatchRepoDir string // main repo dir for per-worker state files
-	dispatchTaskID  string // task ID for per-worker snapshot filename
-
 	// Token accumulation for current iteration.
 	iterInput         int
 	iterOutput        int
@@ -71,7 +66,6 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case QuitMsg:
 		_ = msg
 		m.flushUsage()
-		m.finalizeDispatchWorker()
 		return m, tea.Quit
 	case SyncCheckMsg:
 		// Auto-continue in daemon mode: skip the interactive sync screen.
@@ -138,14 +132,12 @@ func (m nullTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// writeSnapshot writes the current state to state.json (normal daemon) or
-// per-worker snapshot state-<taskID>.json (dispatched worker).
+// writeSnapshot writes the current state to state.json.
 func (m *nullTUIModel) writeSnapshot() {
 	status := m.status
-	if m.taskID == "" && m.dispatchTaskID == "" {
-		// No active task in either sequential or dispatch mode: override status to
-		// "Idle" so readers can detect the absent task explicitly rather than
-		// encountering a silently empty task_id field.
+	if m.taskID == "" {
+		// No active task: override status to "Idle" so readers can detect the
+		// absent task explicitly rather than encountering a silently empty task_id field.
 		status = "Idle"
 	}
 	snap := runlog.StateSnapshot{
@@ -164,13 +156,6 @@ func (m *nullTUIModel) writeSnapshot() {
 		TaskStartedAt:  m.startTime.UTC().Format(time.RFC3339),
 	}
 
-	// Dispatch mode: write per-worker snapshot to the main repo dir.
-	if m.dispatchRepoDir != "" && m.dispatchTaskID != "" {
-		_ = runlog.WriteWorkerSnapshot(m.dispatchRepoDir, m.dispatchTaskID, snap)
-		return
-	}
-
-	// Normal daemon mode: write to state.json in the local dir.
 	if m.snapshotDir == "" {
 		return
 	}
@@ -205,27 +190,6 @@ func (m *nullTUIModel) flushUsage() {
 	m.iterCacheRead = 0
 	m.iterCost = 0
 	m.iterModelUsage = nil
-}
-
-// finalizeDispatchWorker updates the worker status in the shared workers index
-// when a dispatched worker process exits. Merge-back is handled by the unified
-// RunTaskWorker before QuitMsg is sent, so this function only needs to record
-// the final status (done if commits were made, failed otherwise).
-func (m *nullTUIModel) finalizeDispatchWorker() {
-	if m.dispatchRepoDir == "" || m.dispatchTaskID == "" {
-		return
-	}
-
-	if len(m.commits) == 0 {
-		m.status = "Failed"
-		m.writeSnapshot()
-		_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, "failed")
-		return
-	}
-
-	m.status = "Done"
-	m.writeSnapshot()
-	_ = runlog.UpdateWorkerStatus(m.dispatchRepoDir, m.dispatchTaskID, "done")
 }
 
 func (m nullTUIModel) View() string { return "" }

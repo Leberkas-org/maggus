@@ -74,3 +74,40 @@ func removeStopAfterTaskFile(dir string) {
 	_ = os.Remove(daemonStopAfterTaskFilePath(dir))
 }
 
+// dispatchSentinelPath returns the path to the dispatch sentinel file for a task.
+// The TUI writes this file to signal the orchestrator to run the task immediately.
+func dispatchSentinelPath(dir, taskID string) string {
+	return filepath.Join(dir, ".maggus", "dispatch-"+taskID)
+}
+
+// writeDispatchSentinel writes an empty sentinel file signaling the orchestrator
+// to run the given task immediately ahead of the normal queue.
+// The orchestrator atomically consumes (removes) each sentinel before processing
+// the task to prevent duplicate execution.
+func writeDispatchSentinel(dir, taskID string) error {
+	path := dispatchSentinelPath(dir, taskID)
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o755); mkErr != nil {
+		return fmt.Errorf("create .maggus dir: %w", mkErr)
+	}
+	return os.WriteFile(path, []byte{}, 0o644)
+}
+
+// globDispatchSentinels returns paths to all pending dispatch sentinel files.
+// Returns nil when no sentinel files exist.
+func globDispatchSentinels(dir string) []string {
+	pattern := filepath.Join(dir, ".maggus", "dispatch-*")
+	files, _ := filepath.Glob(pattern)
+	return files
+}
+
+// taskIDFromDispatchSentinel extracts the task ID from a dispatch sentinel path.
+// Returns empty string if the path does not match the expected "dispatch-{id}" pattern.
+func taskIDFromDispatchSentinel(sentinelPath string) string {
+	base := filepath.Base(sentinelPath)
+	const prefix = "dispatch-"
+	if !strings.HasPrefix(base, prefix) {
+		return ""
+	}
+	return strings.TrimPrefix(base, prefix)
+}
+

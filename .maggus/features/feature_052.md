@@ -211,15 +211,15 @@ Delete all old code that is now unreachable after TASK-052-005:
 4. **Run `go vet ./...`** and check for unused exports, variables, types.
 
 **Acceptance Criteria:**
-- [ ] `runWorkGoroutine`, `runGroupTasks`, `runTask` deleted
-- [ ] `parallelOrchestrator`, `runParallelWorkGoroutine` deleted
-- [ ] `dispatch.go` deleted entirely
-- [ ] `--dispatch-repo` and `--dispatch-base-branch` flags removed
-- [ ] Dispatch-specific code removed from daemon_tui.go, clean.go, run_setup.go
-- [ ] No unused functions, types, or variables remain
-- [ ] `go vet ./...` reports no new warnings
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] `runWorkGoroutine`, `runGroupTasks`, `runTask` deleted
+- [x] `parallelOrchestrator`, `runParallelWorkGoroutine` deleted
+- [x] `dispatch.go` deleted entirely
+- [x] `--dispatch-repo` and `--dispatch-base-branch` flags removed
+- [x] Dispatch-specific code removed from daemon_tui.go, clean.go, run_setup.go
+- [x] No unused functions, types, or variables remain
+- [x] `go vet ./...` reports no new warnings
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-052-007: Implement file-based TUI dispatch
 **Description:** As a user, I want to dispatch a specific task from the status TUI so that I can run a task immediately without waiting for the orchestrator to pick it up naturally.
@@ -247,15 +247,15 @@ Replace the old subprocess dispatch (Alt+R in status TUI) with file-based signal
 4. **Validation** -- handle edge cases: task not found, task blocked, task already running, multiple dispatches for same task, stale sentinel files from interrupted runs.
 
 **Acceptance Criteria:**
-- [ ] Alt+R in status TUI writes `.maggus/dispatch-{taskID}` sentinel file
-- [ ] Orchestrator detects and processes dispatch requests
-- [ ] Dispatched task runs in a worktree with full worker lifecycle
-- [ ] TUI shows dispatched task status via per-worker snapshots
-- [ ] Fallback to foreground execution when daemon is not running
-- [ ] Sentinel file removed after task is picked up
-- [ ] Duplicate/stale dispatch requests handled gracefully
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] Alt+R in status TUI writes `.maggus/dispatch-{taskID}` sentinel file
+- [x] Orchestrator detects and processes dispatch requests
+- [x] Dispatched task runs in a worktree with full worker lifecycle
+- [x] TUI shows dispatched task status via per-worker snapshots
+- [x] Fallback to foreground execution when daemon is not running
+- [x] Sentinel file removed after task is picked up
+- [x] Duplicate/stale dispatch requests handled gracefully
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-052-008: Update documentation
 **Description:** As a developer, I want ARCHITECTURE.md and CLAUDE.md to reflect the new orchestrator+worker design so that the documentation matches the code.

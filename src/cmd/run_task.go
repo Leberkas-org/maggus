@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
@@ -22,28 +21,7 @@ import (
 	"github.com/leberkas-org/maggus/internal/stores"
 )
 
-// taskAction indicates what the work loop should do after a task iteration.
-type taskAction int
-
-const (
-	taskContinue   taskAction = iota // proceed to next iteration
-	taskBreak                        // stop the work loop
-	taskRetry                        // retry this iteration (decrement counter)
-	taskSkipToNext                   // skip to next task (agent or commit failed)
-)
-
-// taskResult holds the outcome of a single task iteration.
-type taskResult struct {
-	action     taskAction
-	stopReason StopReason    // only set when action == taskBreak
-	committed  bool          // true if a commit was made
-	warning    string        // non-empty if commit succeeded but with a caveat
-	failed     *failedTask   // non-nil if the task failed
-	tasks      []parser.Task // updated task list after re-parse (nil if unchanged)
-	taskID     string        // ID of the task that was worked on
-}
-
-// taskContext bundles the shared state needed by runTask.
+// taskContext bundles the shared state needed by buildPreCommitFn.
 type taskContext struct {
 	workCtx            context.Context
 	p                  *tea.Program
@@ -64,194 +42,15 @@ type taskContext struct {
 	presence *discord.Presence
 
 	// Branch context: plan branch for per-task branching (empty = no branching).
-	// Set by the work goroutine from runLoopParams.planBranch. When non-empty,
-	// the unified worker creates a task branch from this, merges back after
-	// commit, and deletes the task branch.
+	// When non-empty, the unified worker creates a task branch from this, merges
+	// back after commit, and deletes the task branch.
 	planBranch string
 
-	// existingWorktreePath is the path to a pre-existing worktree for dispatch
-	// mode. When non-empty, the worker skips branch/worktree creation and runs
-	// the agent in this directory. Set in runOneDaemonCycle when dispatchRepoFlag
-	// is active.
-	existingWorktreePath string
-
-	// Feature-centric context (set per-group by runWorkGoroutine).
+	// Feature-centric context (set per-group by the orchestrator).
 	currentPlan       *parser.Plan // current plan being worked on (set per-group)
 	featureSourceFile string       // scope parsedTasks to this source file for progress calculation
 	featureCurrent    int          // 1-based index of current feature (for TUI display)
 	featureTotal      int          // total features being processed (for TUI display)
-}
-
-// runTask executes a single task iteration via the unified RunTaskWorker:
-// finds the next workable task, signals the TUI, invokes the worker (which
-// handles branch creation → agent → pre-commit ops → commit → merge-back →
-// branch cleanup), re-parses the task list, fires post-commit hooks, updates
-// progress, and performs between-task sync checks.
-//
-// The caller's loop index (i) and total count are needed for progress tracking.
-// The tasks slice is the current parsed task list.
-// maxCount is the user-requested task limit (0 = unlimited; used to cap progress total).
-func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskResult {
-	if tc.workCtx.Err() != nil {
-		return taskResult{action: taskBreak, stopReason: StopReasonInterrupted}
-	}
-
-	// Find next workable task.
-	next := findNextWorkableTask(tasks)
-	if next == nil {
-		return taskResult{action: taskBreak}
-	}
-
-	// Signal iteration start to the TUI.
-	sendIterationStart(tc.p, next, tasks, i, count, tc.featureCurrent, tc.featureTotal, tc.currentPlan)
-
-	// Update Discord Rich Presence with current task info and progress.
-	if tc.presence != nil {
-		completed, total := computeTaskProgress(tasks, next.SourceFile)
-		tc.presence.Update(discord.PresenceState{
-			TaskID:          next.ID,
-			TaskTitle:       next.Title,
-			FeatureTitle:    parser.ParseFileTitle(next.SourceFile),
-			StartTime:       time.Now(),
-			Verb:            verbForTask(next.SourceFile),
-			ProgressCurrent: completed,
-			ProgressTotal:   total,
-		})
-	}
-
-	// Resolve plan metadata from the current group context.
-	var planFile, maggusID, planTitle string
-	if tc.currentPlan != nil {
-		planFile = tc.currentPlan.File
-		maggusID = tc.currentPlan.MaggusID
-		planTitle = tc.currentPlan.Title
-	}
-
-	// Determine the effective work directory: use an existing worktree path when
-	// set (dispatch mode), otherwise use the main repo directory.
-	workerWorkDir := tc.repoDir
-	if tc.existingWorktreePath != "" {
-		workerWorkDir = tc.existingWorktreePath
-	}
-
-	// Run the unified task worker. The worker owns the complete lifecycle:
-	// branch creation → agent → pre-commit callback → commit → merge-back → cleanup.
-	wr := RunTaskWorker(WorkerConfig{
-		Ctx:            tc.workCtx,
-		Task:           *next,
-		PlanFile:       planFile,
-		MaggusID:       maggusID,
-		PlanTitle:      planTitle,
-		Agent:          tc.activeAgent,
-		Model:          tc.resolvedModel,
-		SessionPersist: tc.sessionPersistence,
-		ValidIncludes:  tc.validIncludes,
-		Iteration:      i + 1,
-		RepoDir:        tc.repoDir,
-		WorkDir:        workerWorkDir,
-		PlanBranch:     tc.planBranch,
-		Logger:         tc.logger,
-		AgentSender:    tc.p,
-		EventSender:    tc.p,
-		Notifier:       tc.notifier,
-		PreCommit:      buildPreCommitFn(tc),
-	})
-
-	// Handle interruption.
-	if wr.StopReason != 0 {
-		return taskResult{action: taskBreak, stopReason: wr.StopReason}
-	}
-	// Handle agent / commit / branch failures.
-	if wr.Failed != nil {
-		return taskResult{
-			action: taskSkipToNext,
-			taskID: next.ID,
-			failed: wr.Failed,
-		}
-	}
-	// Handle merge conflict (task marked blocked, loop skips to next).
-	if wr.Blocked {
-		return taskResult{
-			action:  taskSkipToNext,
-			taskID:  next.ID,
-			warning: wr.Warning,
-		}
-	}
-
-	// Re-parse to pick up any changes the agent made (bugs + features).
-	parsedTasks, parseErr := parseAllTasks(tc.featureStore, tc.bugStore)
-	if parseErr != nil {
-		reason := fmt.Sprintf("re-parse tasks: %v", parseErr)
-		return taskResult{
-			action: taskSkipToNext,
-			taskID: next.ID,
-			failed: &failedTask{ID: next.ID, Title: next.Title, Reason: reason},
-		}
-	}
-
-	// Scope parsed tasks to the current feature source file.
-	scopedTasks := parsedTasks
-	if tc.featureSourceFile != "" {
-		scopedTasks = filterTasksBySourceFile(parsedTasks, tc.featureSourceFile)
-	}
-
-	result := taskResult{
-		action:    taskContinue,
-		tasks:     scopedTasks,
-		taskID:    next.ID,
-		committed: wr.Completed,
-		warning:   wr.Warning,
-	}
-
-	if wr.Completed {
-		// Update Discord presence with incremented progress (task now counts as done).
-		if tc.presence != nil {
-			completed, total := computeTaskProgress(parsedTasks, next.SourceFile)
-			tc.presence.Update(discord.PresenceState{
-				TaskID:          next.ID,
-				TaskTitle:       next.Title,
-				FeatureTitle:    parser.ParseFileTitle(next.SourceFile),
-				StartTime:       time.Now(),
-				Verb:            verbForTask(next.SourceFile),
-				ProgressCurrent: completed,
-				ProgressTotal:   total,
-			})
-		}
-
-		// Fire task_complete hook (zero overhead when unconfigured).
-		if len(tc.hooks.OnTaskComplete) > 0 {
-			event := hooks.Event{
-				Type:      "task_complete",
-				File:      filepath.Base(next.SourceFile),
-				MaggusID:  parser.ParseMaggusID(next.SourceFile),
-				Title:     next.Title,
-				Action:    "",
-				Tasks:     []hooks.TaskInfo{{ID: next.ID, Title: next.Title}},
-				Timestamp: time.Now().UTC().Format(time.RFC3339),
-			}
-			hooks.Run(tc.hooks.OnTaskComplete, event, tc.workDir, log.Default())
-		}
-	}
-
-	// Update progress to reflect completed iteration.
-	// Compute total from refreshed task list so the bar never shrinks when new files appear.
-	progressTotal := (i + 1) + countWorkable(parsedTasks)
-	if maxCount > 0 && progressTotal > maxCount {
-		progressTotal = maxCount
-	}
-	tc.p.Send(ProgressMsg{Current: i + 1, Total: progressTotal})
-
-	// Between-task sync check: detect if remote changed while working.
-	// Skip on the final iteration (push happens next anyway).
-	if i < count-1 {
-		if syncResult := betweenTaskSync(tc.workCtx, tc.workDir, tc.p); syncResult != nil {
-			result.action = taskBreak
-			result.stopReason = syncResult.stopReason
-			return result
-		}
-	}
-
-	return result
 }
 
 // buildPreCommitFn creates the pre-commit callback injected into RunTaskWorker
@@ -291,14 +90,6 @@ func buildPreCommitFn(tc taskContext) func(workDir string) {
 		stageFeatures.Dir = workDir
 		_, _ = stageFeatures.CombinedOutput()
 	}
-}
-
-// findNextWorkableTask returns the next task to work on, respecting --task flag, worktree
-func findNextWorkableTask(tasks []parser.Task) *parser.Task {
-	if taskFlag != "" {
-		return findTaskByID(tasks, taskFlag)
-	}
-	return parser.FindNextIncomplete(tasks)
 }
 
 // sendIterationStart sends the IterationStartMsg to the TUI with task details.

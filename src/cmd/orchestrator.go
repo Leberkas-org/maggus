@@ -124,6 +124,10 @@ type Orchestrator struct {
 	workerStatuses  map[string]string // taskID → "working"/"done"/"failed"/"blocked"
 	workerTitles    map[string]string // taskID → task title
 	workerStartedAt map[string]string // taskID → RFC3339 start time
+
+	// dispatchWG tracks goroutines launched for file-based dispatch requests.
+	// Run() waits on this before returning so dispatched tasks are not orphaned.
+	dispatchWG sync.WaitGroup
 }
 
 // NewOrchestrator creates an Orchestrator with the given configuration.
@@ -242,6 +246,9 @@ func (o *Orchestrator) Run() OrchestratorResult {
 		}
 	}
 
+	// Wait for any in-flight dispatch goroutines to complete before summarising.
+	o.dispatchWG.Wait()
+
 	summary := o.buildSummary(totalCompleted, failedTasks, stopReason, errorDetail, warnings)
 	cfg.Notifier.PlayRunComplete()
 	p.Send(SummaryMsg{Data: summary})
@@ -312,6 +319,11 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 			result.stopReason = StopReasonInterrupted
 			return result
 		}
+
+		// Check for file-based dispatch requests at the start of each iteration.
+		// Dispatched tasks run concurrently in isolated worktrees and do not block
+		// the normal sequential/parallel task queue.
+		o.runDispatchRequests()
 
 		// Between-batch stop flag check (after the first batch completes).
 		if batchI > 0 && cfg.StopFlag != nil && cfg.StopFlag.Load() {

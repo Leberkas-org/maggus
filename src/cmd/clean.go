@@ -2,15 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/leberkas-org/maggus/internal/gitbranch"
-	"github.com/leberkas-org/maggus/internal/gitutil"
-	"github.com/leberkas-org/maggus/internal/gitworktree"
 	"github.com/leberkas-org/maggus/internal/parser"
-	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/spf13/cobra"
 )
 
@@ -46,9 +41,7 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		return err
 	}
 
-	finishedWorkers := findFinishedDispatchWorkers(dir)
-
-	if len(completedFeatures) == 0 && len(completedBugs) == 0 && len(finishedWorkers) == 0 {
+	if len(completedFeatures) == 0 && len(completedBugs) == 0 {
 		fmt.Fprintln(out, "Nothing to clean.")
 		return nil
 	}
@@ -95,93 +88,6 @@ func runClean(cmd *cobra.Command, dir string, dryRun bool) error {
 		fmt.Fprintf(out, "Would remove %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
 	} else {
 		fmt.Fprintf(out, "Removed %d completed feature file(s) and %d completed bug file(s).\n", len(completedFeatures), len(completedBugs))
-	}
-
-	// Clean up finished dispatch worktrees (done/failed entries in the workers index).
-	if len(finishedWorkers) > 0 {
-		if err := cleanFinishedDispatchWorkers(out, dir, finishedWorkers, dryRun); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// findFinishedDispatchWorkers returns worker index entries that are done or failed.
-// These correspond to dispatched task workers whose worktrees can be cleaned up.
-func findFinishedDispatchWorkers(dir string) []runlog.WorkerIndexEntry {
-	all := runlog.ReadWorkersIndex(dir)
-	var finished []runlog.WorkerIndexEntry
-	for _, w := range all {
-		if w.Status == "done" || w.Status == "failed" {
-			finished = append(finished, w)
-		}
-	}
-	return finished
-}
-
-// cleanFinishedDispatchWorkers removes the worktree, per-worker snapshot, and
-// workers index entry for each finished dispatch worker.
-func cleanFinishedDispatchWorkers(out io.Writer, dir string, workers []runlog.WorkerIndexEntry, dryRun bool) error {
-	removed := 0
-	for _, w := range workers {
-		worktreePath := filepath.Join(dir, ".maggus", "worktrees", w.TaskID)
-		relWorktree, _ := filepath.Rel(dir, worktreePath)
-		if relWorktree == "" {
-			relWorktree = worktreePath
-		}
-
-		if dryRun {
-			fmt.Fprintf(out, "  dispatch worker: %s (%s)\n", w.TaskID, w.Status)
-			continue
-		}
-
-		// Remove the git worktree (try git first, then os.RemoveAll as fallback).
-		if _, statErr := os.Stat(worktreePath); statErr == nil {
-			if err := gitworktree.RemoveWorktree(dir, worktreePath); err != nil {
-				// Git worktree remove failed (e.g. stale metadata or not a git worktree).
-				// Fall back to plain directory removal.
-				_ = os.RemoveAll(worktreePath)
-			}
-		}
-
-		// Best-effort delete the task branch (may already be gone after a
-		// successful merge-back, but still exists after a failed merge).
-		taskBranch := gitbranch.BranchName(w.TaskID)
-		delCmd := gitutil.Command("branch", "-D", taskBranch)
-		delCmd.Dir = dir
-		_, _ = delCmd.CombinedOutput()
-
-		// Remove the per-worker snapshot file.
-		runlog.RemoveWorkerSnapshot(dir, w.TaskID)
-
-		removed++
-	}
-
-	if dryRun {
-		fmt.Fprintf(out, "\nWould remove %d dispatch worker worktree(s).\n", len(workers))
-		return nil
-	}
-
-	// Update the workers index: remove entries for cleaned-up workers.
-	if removed > 0 {
-		cleanedIDs := make(map[string]bool, len(workers))
-		for _, w := range workers {
-			cleanedIDs[w.TaskID] = true
-		}
-		remaining := runlog.ReadWorkersIndex(dir)
-		var kept []runlog.WorkerIndexEntry
-		for _, w := range remaining {
-			if !cleanedIDs[w.TaskID] {
-				kept = append(kept, w)
-			}
-		}
-		if len(kept) == 0 {
-			runlog.RemoveWorkersIndex(dir)
-		} else {
-			_ = runlog.WriteWorkersIndex(dir, kept)
-		}
-		fmt.Fprintf(out, "Removed %d dispatch worker worktree(s).\n", removed)
 	}
 
 	return nil

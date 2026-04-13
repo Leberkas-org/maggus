@@ -24,16 +24,10 @@ var (
 
 	// Daemon-mode flags (hidden; set by 'maggus start', not users directly).
 	daemonRunFlag bool
-
-	// Dispatch-mode flags (hidden; set by dispatchTask, not users directly).
-	// When non-empty, this process is a dispatched worker and should write
-	// per-worker state files to this directory (the main repo root).
-	dispatchRepoFlag       string
-	dispatchBaseBranchFlag string
 )
 
 // resetRunFlags resets all run command flags to their zero/default values.
-// This must be called before ParseFlags in menu-driven and dispatch contexts
+// This must be called before ParseFlags in menu-driven contexts
 // so that flags from a previous invocation do not leak into the next one.
 func resetRunFlags() {
 	countFlag = defaultTaskCount
@@ -42,8 +36,6 @@ func resetRunFlags() {
 	taskFlag = ""
 	parallelFlag = false
 	daemonRunFlag = false
-	dispatchRepoFlag = ""
-	dispatchBaseBranchFlag = ""
 }
 
 var runCmd = &cobra.Command{
@@ -87,11 +79,7 @@ func init() {
 
 	// Hidden flags used internally by 'maggus start' to launch the daemon work loop.
 	runCmd.Flags().BoolVar(&daemonRunFlag, "daemon-run", false, "run the work loop as a daemon (no TUI)")
-	runCmd.Flags().StringVar(&dispatchRepoFlag, "dispatch-repo", "", "main repo dir for dispatched worker state files")
-	runCmd.Flags().StringVar(&dispatchBaseBranchFlag, "dispatch-base-branch", "", "base branch to merge back into after dispatch completes")
 	_ = runCmd.Flags().MarkHidden("daemon-run")
-	_ = runCmd.Flags().MarkHidden("dispatch-repo")
-	_ = runCmd.Flags().MarkHidden("dispatch-base-branch")
 
 	rootCmd.AddCommand(runCmd)
 }
