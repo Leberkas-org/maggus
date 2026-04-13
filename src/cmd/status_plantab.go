@@ -20,7 +20,7 @@ import (
 //   - >  skipped
 //   - ○  pending
 //
-// Unresolvable tasks (unknown predecessors) appear in a final "(unresolved)" step.
+// Tasks with cross-feature predecessor references appear in a final "(cross-feature)" step.
 // The estimated token total (sum of all task TokenEstimate fields) is shown at the
 // bottom when non-zero. The content is scrollable via planTabScroll.
 func (m statusModel) renderPlanTab(width, height int) string {
@@ -49,8 +49,8 @@ func (m statusModel) renderPlanTab(width, height int) string {
 		if step.Parallel {
 			label += " (parallel)"
 		}
-		if step.Unresolved {
-			lines = append(lines, unresolvedHeaderStyle.Render(" "+label+" (unresolved)"))
+		if step.CrossFeature {
+			lines = append(lines, unresolvedHeaderStyle.Render(" "+label+" (cross-feature)"))
 		} else {
 			lines = append(lines, stepHeaderStyle.Render(" "+label))
 		}

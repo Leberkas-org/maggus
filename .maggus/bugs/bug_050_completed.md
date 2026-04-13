@@ -20,6 +20,6 @@ lines = append(lines, unresolvedHeaderStyle.Render(" "+label+" (unresolved)"))
 **Description:** As a user, I want tasks with cross-feature predecessor references to be labelled "(cross-feature)" in the plan tab so I understand why they appear separately.
 
 **Acceptance Criteria:**
-- [ ] `status_plantab.go:53` renders `" "+label+" (cross-feature)"` instead of `" "+label+" (unresolved)"`
-- [ ] The `Unresolved` field name on `executionStep` and all related comments are updated to reflect the new meaning (`CrossFeature` or similar)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `status_plantab.go:53` renders `" "+label+" (cross-feature)"` instead of `" "+label+" (unresolved)"`
+- [x] The `Unresolved` field name on `executionStep` and all related comments are updated to reflect the new meaning (`CrossFeature` or similar)
+- [x] `go vet ./...` and `go test ./...` pass

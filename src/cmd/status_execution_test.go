@@ -54,8 +54,8 @@ func TestBuildExecutionPlan_SingleTask(t *testing.T) {
 	if s.Parallel {
 		t.Error("expected Parallel=false for a single sequential task")
 	}
-	if s.Unresolved {
-		t.Error("expected Unresolved=false")
+	if s.CrossFeature {
+		t.Error("expected CrossFeature=false")
 	}
 }
 
@@ -188,14 +188,14 @@ func TestBuildExecutionPlan_UnresolvablePredecessors(t *testing.T) {
 	if len(steps[0].TaskIDs) != 1 || steps[0].TaskIDs[0] != "T2" {
 		t.Errorf("step[0]: expected [T2], got %v", steps[0].TaskIDs)
 	}
-	if steps[0].Unresolved {
-		t.Error("step[0]: should not be marked unresolved")
+	if steps[0].CrossFeature {
+		t.Error("step[0]: should not be marked cross-feature")
 	}
 
-	// Last step: unresolved
+	// Last step: cross-feature
 	last := steps[len(steps)-1]
-	if !last.Unresolved {
-		t.Error("last step: expected Unresolved=true")
+	if !last.CrossFeature {
+		t.Error("last step: expected CrossFeature=true")
 	}
 	if len(last.TaskIDs) != 1 || last.TaskIDs[0] != "T1" {
 		t.Errorf("last step: expected [T1] unresolved, got %v", last.TaskIDs)
@@ -212,8 +212,8 @@ func TestBuildExecutionPlan_AllUnresolved(t *testing.T) {
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 unresolved step, got %d", len(steps))
 	}
-	if !steps[0].Unresolved {
-		t.Error("expected Unresolved=true")
+	if !steps[0].CrossFeature {
+		t.Error("expected CrossFeature=true")
 	}
 	if len(steps[0].TaskIDs) != 2 {
 		t.Errorf("expected 2 unresolved tasks, got %d", len(steps[0].TaskIDs))
@@ -334,8 +334,8 @@ func TestBuildExecutionPlan_StepNumbers(t *testing.T) {
 func stepsDebug(steps []executionStep) string {
 	var s string
 	for _, step := range steps {
-		s += fmt.Sprintf("Step %d (parallel=%v, unresolved=%v): %v\n",
-			step.StepNumber, step.Parallel, step.Unresolved, step.TaskIDs)
+		s += fmt.Sprintf("Step %d (parallel=%v, cross-feature=%v): %v\n",
+			step.StepNumber, step.Parallel, step.CrossFeature, step.TaskIDs)
 	}
 	return s
 }

@@ -8,17 +8,17 @@ import (
 // A step is either a parallel batch (multiple tasks running simultaneously) or a
 // sequential step (a single task running alone).
 type executionStep struct {
-	StepNumber int      // 1-based step index
-	TaskIDs    []string // task IDs assigned to this step
-	Parallel   bool     // true if tasks in this step run in parallel
-	Unresolved bool     // true if this is the catch-all group for unresolvable predecessors
+	StepNumber   int      // 1-based step index
+	TaskIDs      []string // task IDs assigned to this step
+	Parallel     bool     // true if tasks in this step run in parallel
+	CrossFeature bool     // true if this is the catch-all group for tasks with cross-feature predecessor references
 }
 
 // buildExecutionPlan computes an ordered execution plan from a list of tasks.
 //
 // The plan is built as follows:
-//  1. Tasks whose predecessors reference unknown task IDs are collected into a
-//     final "unresolved" step.
+//  1. Tasks whose predecessors reference unknown task IDs (i.e. cross-feature
+//     references) are collected into a final "cross-feature" step.
 //  2. The remaining tasks are sorted into topological waves: wave 0 contains
 //     tasks with no predecessors; wave k contains tasks whose all predecessors
 //     are in waves 0..k-1.
@@ -28,7 +28,7 @@ type executionStep struct {
 //     in separate worktrees. A single Parallel==true task still gets
 //     Parallel=false on the step because it runs alone with no concurrency.
 //  4. Step numbers are 1-based and contiguous across all waves.
-//  5. The unresolved group (if non-empty) is appended as the final step.
+//  5. The cross-feature group (if non-empty) is appended as the final step.
 func buildExecutionPlan(tasks []parser.Task) []executionStep {
 	if len(tasks) == 0 {
 		return nil
@@ -96,16 +96,16 @@ func buildExecutionPlan(tasks []parser.Task) []executionStep {
 		stepNum++
 	}
 
-	// Append the unresolved group as a final step if there are any.
+	// Append the cross-feature group as a final step if there are any.
 	if len(unresolved) > 0 {
 		ids := make([]string, 0, len(unresolved))
 		for _, t := range unresolved {
 			ids = append(ids, t.ID)
 		}
 		steps = append(steps, executionStep{
-			StepNumber: stepNum,
-			TaskIDs:    ids,
-			Unresolved: true,
+			StepNumber:   stepNum,
+			TaskIDs:      ids,
+			CrossFeature: true,
 		})
 	}
 
