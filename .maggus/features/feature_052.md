@@ -83,15 +83,15 @@ The orchestrator's inner task loop (from TASK-052-001) now checks if tasks are p
 - Orchestrator loop: `run_parallel.go:131-186` (`parallelOrchestrator.run`)
 
 **Acceptance Criteria:**
-- [ ] Task classification splits tasks into parallel and sequential based on metadata
-- [ ] Predecessor tracking determines task eligibility
-- [ ] Parallel tasks run concurrently in isolated git worktrees
-- [ ] Worktrees created before worker call, cleaned up after
-- [ ] Merge serialization via shared mutex
-- [ ] Sequential tasks still run in main repo (no worktree)
-- [ ] Mixed parallel/sequential batches handled correctly
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] Task classification splits tasks into parallel and sequential based on metadata
+- [x] Predecessor tracking determines task eligibility
+- [x] Parallel tasks run concurrently in isolated git worktrees
+- [x] Worktrees created before worker call, cleaned up after
+- [x] Merge serialization via shared mutex
+- [x] Sequential tasks still run in main repo (no worktree)
+- [x] Mixed parallel/sequential batches handled correctly
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-052-003: Add worker snapshot tracking to orchestrator
 **Description:** As a developer, I want the orchestrator to write per-worker snapshots so that the status TUI can display parallel task progress.

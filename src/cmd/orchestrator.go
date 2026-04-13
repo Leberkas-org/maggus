@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -103,11 +104,19 @@ type OrchestratorResult struct {
 	ErrorDetail string
 }
 
-// Orchestrator handles the sequential feature iteration loop.
+// Orchestrator handles the unified feature iteration loop.
 // It processes one feature group at a time, dispatching tasks via RunTaskWorker.
-// Parallel dispatch is added in TASK-052-002; this type handles sequential mode only.
+// Tasks classified as parallel run concurrently in isolated git worktrees;
+// sequential tasks run one at a time in the main repo directory.
 type Orchestrator struct {
 	cfg OrchestratorConfig
+
+	// Per-group parallel state — reset at the start of each runGroupTasks call.
+	// Guarded by mu; also used as MergeMu for parallel workers.
+	mu           sync.Mutex
+	completedIDs map[string]bool // task IDs that have successfully committed
+	failedIDs    map[string]bool // task IDs that failed (excluded from future batches)
+	iteration    int             // monotonically increasing per-worker counter
 }
 
 // NewOrchestrator creates an Orchestrator with the given configuration.
@@ -243,6 +252,11 @@ func (o *Orchestrator) Run() OrchestratorResult {
 // runGroupTasks runs all workable tasks within a single plan group.
 // featureIndex is the 0-based position of this group in the outer loop (used
 // for IterationStartMsg feature progress display).
+//
+// The inner loop classifies tasks each iteration:
+//   - Parallel tasks (Parallel=true with all predecessors complete) run
+//     concurrently in isolated git worktrees via runParallelBatch.
+//   - Sequential tasks run one at a time in the main repo directory.
 func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTotal int) groupTasksResult {
 	var result groupTasksResult
 	cfg := o.cfg
@@ -250,6 +264,19 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	if countWorkable(group.Tasks) == 0 {
 		return result
 	}
+
+	// Initialize per-group parallel state. Pre-populate completedIDs with tasks
+	// that are already done so predecessor tracking works from the start.
+	o.mu.Lock()
+	o.completedIDs = make(map[string]bool)
+	o.failedIDs = make(map[string]bool)
+	o.iteration = 0
+	for _, t := range group.Tasks {
+		if t.IsComplete() {
+			o.completedIDs[t.ID] = true
+		}
+	}
+	o.mu.Unlock()
 
 	// Ensure a stable MaggusID exists in the plan file.
 	if maggusID, err := parser.EnsureMaggusID(group.File); err == nil {
@@ -264,15 +291,15 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	groupTasks := group.Tasks
 	var lastCompletedTaskID string
 
-	for innerI := 0; ; innerI++ {
+	for batchI := 0; ; batchI++ {
 		if cfg.Ctx.Err() != nil {
 			result.stopped = true
 			result.stopReason = StopReasonInterrupted
 			return result
 		}
 
-		// Between-task stop flag check (after the first task completes).
-		if innerI > 0 && cfg.StopFlag != nil && cfg.StopFlag.Load() {
+		// Between-batch stop flag check (after the first batch completes).
+		if batchI > 0 && cfg.StopFlag != nil && cfg.StopFlag.Load() {
 			targetID := ""
 			if cfg.StopAtTaskID != nil {
 				if v := cfg.StopAtTaskID.Load(); v != nil {
@@ -287,19 +314,43 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 			}
 		}
 
-		workableRemaining := countWorkable(groupTasks)
-		if workableRemaining == 0 {
+		// Classify workable tasks: parallel tasks run concurrently in worktrees;
+		// sequential tasks run one at a time in the main repo.
+		par, seq := o.classifyWorkable(groupTasks)
+		if len(par) == 0 && len(seq) == 0 {
 			break
 		}
-		displayCount := innerI + workableRemaining
 
-		next := findNextWorkableTask(groupTasks)
-		if next == nil {
-			break
+		if len(par) > 0 {
+			// -- Parallel batch: run all eligible parallel tasks concurrently --
+			batchResult := o.runParallelBatch(&group, par)
+			result.completed += batchResult.completed
+			result.failed = append(result.failed, batchResult.failed...)
+			result.warnings = append(result.warnings, batchResult.warnings...)
+
+			if batchResult.stopped {
+				result.stopped = true
+				result.stopReason = batchResult.stopReason
+				return result
+			}
+
+			// Re-parse to reflect changes made by parallel workers.
+			if tasks, err := parseAllTasks(cfg.FeatureStore, cfg.BugStore); err == nil {
+				groupTasks = filterTasksBySourceFile(tasks, group.File)
+			}
+			// No between-batch sync after parallel batches; lastCompletedTaskID
+			// stays unchanged (parallel batches don't update the stop-at-task cursor).
+			continue
 		}
+
+		// -- Sequential task: run the first eligible task in the main repo --
+		workableRemaining := countWorkable(groupTasks)
+		displayCount := batchI + workableRemaining
+
+		next := &seq[0]
 
 		// Send iteration-start event to TUI.
-		sendIterationStart(cfg.Program, next, groupTasks, innerI, displayCount,
+		sendIterationStart(cfg.Program, next, groupTasks, batchI, displayCount,
 			featureIndex+1, featureTotal, &group)
 
 		// Update Discord Rich Presence with current task info.
@@ -327,7 +378,7 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 			Model:          cfg.Model,
 			SessionPersist: cfg.SessionPersist,
 			ValidIncludes:  cfg.ValidIncludes,
-			Iteration:      innerI + 1,
+			Iteration:      batchI + 1,
 			RepoDir:        cfg.RepoDir,
 			WorkDir:        cfg.RepoDir,
 			PlanBranch:     cfg.PlanBranch,
@@ -347,6 +398,9 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		if wr.Failed != nil {
 			result.failed = append(result.failed, *wr.Failed)
 			_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
+			o.mu.Lock()
+			o.failedIDs[next.ID] = true
+			o.mu.Unlock()
 			lastCompletedTaskID = next.ID
 			// Re-parse so the loop can continue with the next task.
 			if tasks, err := parseAllTasks(cfg.FeatureStore, cfg.BugStore); err == nil {
@@ -375,6 +429,11 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		}
 		groupTasks = filterTasksBySourceFile(parsedTasks, group.File)
 		lastCompletedTaskID = next.ID
+
+		// Mark sequential task as completed for predecessor tracking.
+		o.mu.Lock()
+		o.completedIDs[next.ID] = true
+		o.mu.Unlock()
 
 		if wr.Warning != "" {
 			result.warnings = append(result.warnings, wr.Warning)
@@ -413,8 +472,8 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		}
 
 		// Update progress bar using refreshed task count.
-		progressTotal := (innerI + 1) + countWorkable(parsedTasks)
-		cfg.Program.Send(ProgressMsg{Current: innerI + 1, Total: progressTotal})
+		progressTotal := (batchI + 1) + countWorkable(parsedTasks)
+		cfg.Program.Send(ProgressMsg{Current: batchI + 1, Total: progressTotal})
 
 		// Between-task sync check: skip when this was the last workable task.
 		if workableRemaining > 1 {

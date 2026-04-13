@@ -1,0 +1,216 @@
+package cmd
+
+import (
+	"fmt"
+	"path/filepath"
+	"sync"
+
+	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/gitworktree"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/parser"
+	"github.com/leberkas-org/maggus/internal/runlog"
+	"golang.org/x/sync/errgroup"
+)
+
+// classifyWorkable splits the given tasks into parallel-workable and
+// sequential-workable lists using the same rules as the parallel orchestrator:
+//   - Complete, blocked, and previously-failed tasks are skipped.
+//   - Tasks whose predecessors have not yet completed are skipped.
+//   - Tasks with Parallel=true go into the parallel list.
+//   - Tasks with Parallel=false go into the sequential list.
+func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequential []parser.Task) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	for _, t := range tasks {
+		if t.IsComplete() || t.IsBlocked() {
+			continue
+		}
+		if o.failedIDs[t.ID] {
+			continue
+		}
+		if !o.predecessorsComplete(t) {
+			continue
+		}
+		if t.Parallel {
+			parallel = append(parallel, t)
+		} else {
+			sequential = append(sequential, t)
+		}
+	}
+	return
+}
+
+// predecessorsComplete reports whether all of t's predecessor task IDs are in
+// o.completedIDs. Caller must hold o.mu.
+func (o *Orchestrator) predecessorsComplete(t parser.Task) bool {
+	for _, predID := range t.Predecessors {
+		if !o.completedIDs[predID] {
+			return false
+		}
+	}
+	return true
+}
+
+// runParallelBatch launches all tasks concurrently, each in its own isolated
+// git worktree. It blocks until all goroutines finish and returns an aggregate
+// result. Workers update o.completedIDs and o.failedIDs as they finish so
+// that subsequent calls to classifyWorkable reflect updated predecessor state.
+func (o *Orchestrator) runParallelBatch(group *parser.Plan, tasks []parser.Task) groupTasksResult {
+	var result groupTasksResult
+	var resultMu sync.Mutex
+
+	cfg := o.cfg
+	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⚡ Launching %d parallel tasks", len(tasks))})
+
+	g, _ := errgroup.WithContext(cfg.Ctx)
+	for _, task := range tasks {
+		g.Go(func() error {
+			wr := o.runWorktreeTask(group, task)
+			resultMu.Lock()
+			result.completed += wr.completed
+			result.failed = append(result.failed, wr.failed...)
+			result.warnings = append(result.warnings, wr.warnings...)
+			if wr.stopped {
+				result.stopped = true
+				result.stopReason = wr.stopReason
+			}
+			resultMu.Unlock()
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	if cfg.Ctx.Err() != nil {
+		result.stopped = true
+		result.stopReason = StopReasonInterrupted
+	}
+	return result
+}
+
+// runWorktreeTask runs a single parallel task in an isolated git worktree.
+// It creates the task branch and worktree before invoking the worker, then
+// removes them after the worker returns (the worker merges the task branch
+// back into PlanBranch before returning). On completion or failure,
+// o.completedIDs or o.failedIDs is updated for predecessor tracking.
+func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) groupTasksResult {
+	var result groupTasksResult
+	cfg := o.cfg
+
+	// Allocate a unique iteration number for this worker's prompt.
+	o.mu.Lock()
+	o.iteration++
+	iter := o.iteration
+	o.mu.Unlock()
+
+	// Open a per-task logger so parallel workers don't share a log handle.
+	workerLogger, logErr := runlog.Open(cfg.RepoDir, 0)
+	if logErr != nil {
+		workerLogger = cfg.Logger
+	}
+	defer func() {
+		if logErr == nil {
+			_ = workerLogger.Close()
+		}
+	}()
+	workerLogger.SetCurrentMaggusID(group.MaggusID)
+
+	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting in worktree", task.ID)})
+
+	// Create the task branch and an isolated worktree for this worker.
+	taskBranch := gitbranch.BranchName(task.ID)
+	worktreePath := filepath.Join(cfg.RepoDir, ".maggus", "worktrees", task.ID)
+
+	if err := gitbranch.CreateBranchFrom(cfg.RepoDir, taskBranch, cfg.PlanBranch); err != nil {
+		o.mu.Lock()
+		o.failedIDs[task.ID] = true
+		o.mu.Unlock()
+		result.failed = append(result.failed, failedTask{
+			ID:     task.ID,
+			Title:  task.Title,
+			Reason: fmt.Sprintf("create branch: %v", err),
+		})
+		return result
+	}
+
+	if err := gitworktree.CreateWorktree(cfg.RepoDir, worktreePath, taskBranch); err != nil {
+		_ = gitbranch.DeleteBranch(cfg.RepoDir, taskBranch)
+		o.mu.Lock()
+		o.failedIDs[task.ID] = true
+		o.mu.Unlock()
+		result.failed = append(result.failed, failedTask{
+			ID:     task.ID,
+			Title:  task.Title,
+			Reason: fmt.Sprintf("create worktree: %v", err),
+		})
+		return result
+	}
+
+	wr := RunTaskWorker(WorkerConfig{
+		Ctx:            cfg.Ctx,
+		Task:           task,
+		PlanFile:       group.File,
+		MaggusID:       group.MaggusID,
+		PlanTitle:      group.Title,
+		Agent:          cfg.Agent,
+		Model:          cfg.Model,
+		SessionPersist: cfg.SessionPersist,
+		ValidIncludes:  cfg.ValidIncludes,
+		Iteration:      iter,
+		RepoDir:        cfg.RepoDir,
+		WorkDir:        worktreePath,
+		PlanBranch:     cfg.PlanBranch,
+		MergeMu:        &o.mu,
+		Logger:         workerLogger,
+		AgentSender:    cfg.Program,
+		EventSender:    cfg.Program,
+		Notifier:       cfg.Notifier,
+	})
+
+	// Remove the worktree after the worker returns. The worker already merged
+	// and deleted the task branch in its merge step.
+	if err := gitworktree.RemoveWorktree(cfg.RepoDir, worktreePath); err != nil {
+		cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", task.ID, err)})
+	}
+
+	if wr.StopReason == StopReasonInterrupted {
+		o.mu.Lock()
+		o.failedIDs[task.ID] = true
+		o.mu.Unlock()
+		result.stopped = true
+		result.stopReason = StopReasonInterrupted
+		return result
+	}
+
+	if wr.Failed != nil {
+		o.mu.Lock()
+		o.failedIDs[task.ID] = true
+		o.mu.Unlock()
+		result.failed = append(result.failed, *wr.Failed)
+		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
+		return result
+	}
+
+	if wr.Blocked {
+		if wr.Warning != "" {
+			result.warnings = append(result.warnings, wr.Warning)
+		}
+		return result
+	}
+
+	if wr.Warning != "" {
+		result.warnings = append(result.warnings, wr.Warning)
+	}
+
+	o.mu.Lock()
+	o.completedIDs[task.ID] = true
+	o.mu.Unlock()
+
+	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("✓ %s: Completed and merged into %s", task.ID, cfg.PlanBranch)})
+	_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
+
+	if wr.Completed {
+		result.completed = 1
+	}
+	return result
+}
