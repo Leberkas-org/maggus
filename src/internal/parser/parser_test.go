@@ -340,6 +340,45 @@ func TestParseFile_Predecessors_AndParallel(t *testing.T) {
 	}
 }
 
+func TestParseFile_Predecessors_NoneWithComment(t *testing.T) {
+	// "none" with trailing text should be treated as no predecessors.
+	const content = `# Feature 001
+
+### TASK-001: None lowercase with parens
+**Predecessors:** none (Feature 005 provides controllers, but middleware is independent)
+
+**Acceptance Criteria:**
+- [ ] Criterion A
+
+### TASK-002: None mixed-case with em-dash
+**Predecessors:** None — explanation text
+
+**Acceptance Criteria:**
+- [ ] Criterion B
+
+### TASK-003: None plain
+**Predecessors:** none
+
+**Acceptance Criteria:**
+- [ ] Criterion C
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+
+	tasks, err := ParseFile(filepath.Join(dir, ".maggus", "features", "feature_001.md"))
+	if err != nil {
+		t.Fatalf("ParseFile error: %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+	for i, task := range tasks {
+		if len(task.Predecessors) != 0 {
+			t.Errorf("task %d: expected 0 predecessors, got %d: %v", i, len(task.Predecessors), task.Predecessors)
+		}
+	}
+}
+
 func TestParseFile_Successors_IgnoredField(t *testing.T) {
 	// **Successors:** is not a task-level field stored in Task — verify it doesn't break parsing.
 	const content = `# Feature 001

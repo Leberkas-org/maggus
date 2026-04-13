@@ -291,7 +291,7 @@ func ParseFile(path string) ([]Task, error) {
 			inDescription = false
 			value := strings.TrimPrefix(line, "**Predecessors:**")
 			value = strings.TrimSpace(value)
-			if strings.ToLower(value) != "none" && value != "" {
+			if !strings.HasPrefix(strings.ToLower(value), "none") && value != "" {
 				for _, part := range strings.Split(value, ",") {
 					part = strings.TrimSpace(part)
 					if part != "" {
