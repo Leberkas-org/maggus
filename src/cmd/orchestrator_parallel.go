@@ -61,6 +61,17 @@ func (o *Orchestrator) runParallelBatch(group *parser.Plan, tasks []parser.Task)
 	var resultMu sync.Mutex
 
 	cfg := o.cfg
+
+	// Register all workers and write the initial workers index so the TUI
+	// can render the split pane before any worker completes.
+	o.mu.Lock()
+	o.ensureWorkerMaps()
+	for _, t := range tasks {
+		o.registerWorker(t.ID, t.Title)
+	}
+	o.updateWorkersIndex(o.buildWorkerEntries())
+	o.mu.Unlock()
+
 	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⚡ Launching %d parallel tasks", len(tasks))})
 
 	g, _ := errgroup.WithContext(cfg.Ctx)
@@ -117,6 +128,10 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 
 	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("▶ %s: Starting in worktree", task.ID)})
 
+	// Create per-worker snapshot writer for TUI split view.
+	// The writer receives agent events and writes to .maggus/runs/state-{taskID}.json.
+	wsw := o.newWorkerSnapshotWriterForTask(task, group)
+
 	// Create the task branch and an isolated worktree for this worker.
 	taskBranch := gitbranch.BranchName(task.ID)
 	worktreePath := filepath.Join(cfg.RepoDir, ".maggus", "worktrees", task.ID)
@@ -125,6 +140,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()
+		o.markWorkerFailed(task.ID, wsw)
 		result.failed = append(result.failed, failedTask{
 			ID:     task.ID,
 			Title:  task.Title,
@@ -138,6 +154,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()
+		o.markWorkerFailed(task.ID, wsw)
 		result.failed = append(result.failed, failedTask{
 			ID:     task.ID,
 			Title:  task.Title,
@@ -162,7 +179,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		PlanBranch:     cfg.PlanBranch,
 		MergeMu:        &o.mu,
 		Logger:         workerLogger,
-		AgentSender:    cfg.Program,
+		AgentSender:    wsw,
 		EventSender:    cfg.Program,
 		Notifier:       cfg.Notifier,
 	})
@@ -177,6 +194,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()
+		o.markWorkerFailed(task.ID, wsw)
 		result.stopped = true
 		result.stopReason = StopReasonInterrupted
 		return result
@@ -186,6 +204,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()
+		o.markWorkerFailed(task.ID, wsw)
 		result.failed = append(result.failed, *wr.Failed)
 		_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksFailed: 1})
 		return result
@@ -195,6 +214,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		if wr.Warning != "" {
 			result.warnings = append(result.warnings, wr.Warning)
 		}
+		o.markWorkerBlocked(task.ID, wsw)
 		return result
 	}
 
@@ -206,6 +226,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 	o.completedIDs[task.ID] = true
 	o.mu.Unlock()
 
+	o.markWorkerDone(task.ID, wsw)
 	cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("✓ %s: Completed and merged into %s", task.ID, cfg.PlanBranch)})
 	_ = globalconfig.IncrementMetrics(globalconfig.Metrics{TasksCompleted: 1})
 

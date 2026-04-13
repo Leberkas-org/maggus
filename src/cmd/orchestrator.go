@@ -117,6 +117,13 @@ type Orchestrator struct {
 	completedIDs map[string]bool // task IDs that have successfully committed
 	failedIDs    map[string]bool // task IDs that failed (excluded from future batches)
 	iteration    int             // monotonically increasing per-worker counter
+
+	// Per-group worker TUI state for split pane view — reset per group.
+	// Guarded by mu.
+	workerOrder     []string          // ordered list of worker task IDs
+	workerStatuses  map[string]string // taskID → "working"/"done"/"failed"/"blocked"
+	workerTitles    map[string]string // taskID → task title
+	workerStartedAt map[string]string // taskID → RFC3339 start time
 }
 
 // NewOrchestrator creates an Orchestrator with the given configuration.
@@ -271,12 +278,20 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 	o.completedIDs = make(map[string]bool)
 	o.failedIDs = make(map[string]bool)
 	o.iteration = 0
+	o.workerOrder = nil
+	o.workerStatuses = nil
+	o.workerTitles = nil
+	o.workerStartedAt = nil
 	for _, t := range group.Tasks {
 		if t.IsComplete() {
 			o.completedIDs[t.ID] = true
 		}
 	}
 	o.mu.Unlock()
+
+	// Clean up worker snapshot files when this group finishes so stale entries
+	// from a previous group never appear in the TUI for the next one.
+	defer cleanupWorkerSnapshots(cfg.RepoDir)
 
 	// Ensure a stable MaggusID exists in the plan file.
 	if maggusID, err := parser.EnsureMaggusID(group.File); err == nil {

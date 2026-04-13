@@ -109,13 +109,13 @@ Move per-worker snapshot tracking from `run_parallel.go` / `run_parallel_tui.go`
 4. **Cleanup** -- `cleanupWorkerSnapshots` after all workers complete (from `run_parallel_tui.go`).
 
 **Acceptance Criteria:**
-- [ ] Per-worker snapshots written for parallel tasks
-- [ ] Workers index maintained with task statuses
-- [ ] Status tracking consistent with current TUI expectations
-- [ ] Snapshot cleanup after orchestrator completes
-- [ ] Status TUI can display parallel task progress (same as current behavior)
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] Per-worker snapshots written for parallel tasks
+- [x] Workers index maintained with task statuses
+- [x] Status tracking consistent with current TUI expectations
+- [x] Snapshot cleanup after orchestrator completes
+- [x] Status TUI can display parallel task progress (same as current behavior)
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-052-004: Simplify worker -- remove mode awareness
 **Description:** As a developer, I want the worker to have no knowledge of execution modes so that it only cares about executing a single task in a given directory.
