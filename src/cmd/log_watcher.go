@@ -66,7 +66,16 @@ func NewLogFileWatcher(dir string) (*LogFileWatcher, error) {
 		done:          make(chan struct{}),
 	}
 
-	// Watch state.json for Write events.
+	// Ensure the runs directory exists and watch it so we catch state.json
+	// creation even when the file doesn't exist at startup (e.g., the daemon
+	// hasn't run yet). On Windows, watcher.Add on a non-existent file fails
+	// silently; watching the parent directory is the reliable fallback.
+	_ = os.MkdirAll(runsDir, 0755)
+	_ = watcher.Add(runsDir)
+
+	// Also try watching state.json directly for more reliable Write events
+	// on platforms where directory-level Write notifications are not always
+	// delivered for existing files.
 	_ = watcher.Add(stateJsonPath)
 
 	go lfw.run()
@@ -133,7 +142,11 @@ func (lfw *LogFileWatcher) handleEvent(event fsnotify.Event) {
 	}
 
 	// Create of a new directory under .maggus/logs/ → add it to the watcher.
-	if event.Has(fsnotify.Create) {
+	// Skip .tmp files: atomic writes (WriteSnapshot) create a .tmp file then
+	// rename it to the real target. The .tmp Create event would fill the
+	// buffered signal channel, causing the subsequent real file event to be
+	// dropped. Filtering .tmp avoids this race.
+	if event.Has(fsnotify.Create) && !strings.HasSuffix(name, ".tmp") {
 		// Add the new path to the watcher so we receive events from inside it.
 		_ = lfw.watcher.Add(name)
 		lfw.signal()

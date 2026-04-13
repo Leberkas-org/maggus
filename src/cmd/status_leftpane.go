@@ -117,6 +117,8 @@ func (m statusModel) renderLeftPane(paneWidth, height int) string {
 					task := leftPaneTruncate(blub, taskMaxW)
 					daemonLine += "  " + mutedStyle.Render(task)
 				}
+			} else {
+				daemonLine += "  " + mutedStyle.Render("Starting…")
 			}
 		} else {
 			daemonLine = mutedStyle.Render("○ Stopped")

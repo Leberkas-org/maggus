@@ -336,6 +336,25 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		}
 	}
 
+	// Write an early "Preparing" snapshot so the status TUI shows which
+	// feature/task the daemon is picking up immediately, before the work
+	// goroutine starts and sends the full IterationStartMsg.
+	if dispatchRepoFlag == "" && len(featureGroups) > 0 {
+		if ft := firstWorkableTask(featureGroups); ft != nil {
+			fg := featureGroups[0]
+			earlySnap := runlog.StateSnapshot{
+				MaggusID:      fg.MaggusID,
+				TaskID:        ft.ID,
+				TaskTitle:     ft.Title,
+				ItemTitle:     parser.ParseFileTitle(fg.File),
+				Status:        "Preparing",
+				RunStartedAt:  setup.startTime.UTC().Format(time.RFC3339),
+				TaskStartedAt: setup.startTime.UTC().Format(time.RFC3339),
+			}
+			_ = runlog.WriteSnapshot(dir, earlySnap)
+		}
+	}
+
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
 		snapshotDir:     dir,

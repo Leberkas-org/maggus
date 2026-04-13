@@ -60,10 +60,10 @@ func (p *Plan) SkippedCount() int {
 	return n
 }
 
-// planIDFromPath extracts the Plan ID from a file path: the base filename with
+// PlanIDFromPath extracts the Plan ID from a file path: the base filename with
 // both the ".md" extension and the "_completed" suffix stripped.
 // For example: ".maggus/features/feature_003_completed.md" → "feature_003"
-func planIDFromPath(path string) string {
+func PlanIDFromPath(path string) string {
 	base := filepath.Base(path)
 	base = strings.TrimSuffix(base, ".md")
 	base = strings.TrimSuffix(base, "_completed")
@@ -97,7 +97,7 @@ func LoadPlans(dir string, includeCompleted bool) ([]Plan, error) {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		plans = append(plans, Plan{
-			ID:        planIDFromPath(f),
+			ID:        PlanIDFromPath(f),
 			MaggusID:  ParseMaggusID(f),
 			File:      f,
 			Title:     ParseFileTitle(f),
@@ -114,7 +114,7 @@ func LoadPlans(dir string, includeCompleted bool) ([]Plan, error) {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		plans = append(plans, Plan{
-			ID:        planIDFromPath(f),
+			ID:        PlanIDFromPath(f),
 			MaggusID:  ParseMaggusID(f),
 			File:      f,
 			Title:     ParseFileTitle(f),

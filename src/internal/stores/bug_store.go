@@ -39,7 +39,7 @@ func (s *FileBugStore) LoadAll(includeCompleted bool) ([]parser.Plan, error) {
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		plans = append(plans, parser.Plan{
-			ID:        planIDFromPath(f),
+			ID:        parser.PlanIDFromPath(f),
 			MaggusID:  parser.ParseMaggusID(f),
 			File:      f,
 			Tasks:     tasks,

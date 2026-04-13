@@ -74,6 +74,17 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isParallelMode() {
 			m.advanceWorkerSpinners()
 		}
+		// Supplementary snapshot poll: every 12th frame (~1s) re-read the
+		// snapshot as a safety net for missed fsnotify events. On Windows,
+		// atomic writes (temp + rename) can race with the channel buffer and
+		// cause the watcher to miss an update.
+		if m.daemon.Running && m.spinnerFrame == 0 {
+			if snap, err := runlog.ReadSnapshot(m.dir); err == nil {
+				m.snapshot = snap
+				m.daemon.CurrentTask = snap.TaskID
+				m.daemon.CurrentFeature = m.planIDForMaggusID(snap.MaggusID)
+			}
+		}
 		// Always keep the tick loop alive so the spinner starts animating
 		// immediately when a new task begins. Rendering code substitutes
 		// static icons (✓/✗/⊘) for terminal statuses, so advancing the

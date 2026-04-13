@@ -2,19 +2,10 @@ package stores
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/leberkas-org/maggus/internal/parser"
 )
-
-// planIDFromPath returns the base filename with .md and _completed suffixes stripped.
-func planIDFromPath(path string) string {
-	base := filepath.Base(path)
-	base = strings.TrimSuffix(base, ".md")
-	base = strings.TrimSuffix(base, "_completed")
-	return base
-}
 
 // FileFeatureStore is a file-backed implementation of FeatureStore that delegates
 // to parser functions operating on .maggus/features/ files.
@@ -44,7 +35,7 @@ func (s *FileFeatureStore) LoadAll(includeCompleted bool) ([]parser.Plan, error)
 			return nil, fmt.Errorf("parse %s: %w", f, err)
 		}
 		plans = append(plans, parser.Plan{
-			ID:        planIDFromPath(f),
+			ID:        parser.PlanIDFromPath(f),
 			MaggusID:  parser.ParseMaggusID(f),
 			File:      f,
 			Tasks:     tasks,

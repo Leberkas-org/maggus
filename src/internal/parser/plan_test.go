@@ -122,7 +122,7 @@ func TestPlanBlockedCount(t *testing.T) {
 	}
 }
 
-// TestPlanIDFromPath verifies planIDFromPath strips .md and _completed correctly.
+// TestPlanIDFromPath verifies PlanIDFromPath strips .md and _completed correctly.
 func TestPlanIDFromPath(t *testing.T) {
 	tests := []struct {
 		path string
@@ -135,9 +135,9 @@ func TestPlanIDFromPath(t *testing.T) {
 		{"bug_001.md", "bug_001"},
 	}
 	for _, tt := range tests {
-		got := planIDFromPath(tt.path)
+		got := PlanIDFromPath(tt.path)
 		if got != tt.want {
-			t.Errorf("planIDFromPath(%q) = %q, want %q", tt.path, got, tt.want)
+			t.Errorf("PlanIDFromPath(%q) = %q, want %q", tt.path, got, tt.want)
 		}
 	}
 }
