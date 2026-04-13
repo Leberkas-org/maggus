@@ -173,14 +173,14 @@ Replace the mode branching in `runOneDaemonCycle` with a single orchestrator cal
 After this task, the old loop functions are dead code (unreachable) but still exist in the source files. Deletion happens in TASK-052-006.
 
 **Acceptance Criteria:**
-- [ ] `runOneDaemonCycle` calls the orchestrator with no mode branching
-- [ ] Orchestrator uses simplified `WorkerConfig` with `WorkDir`
-- [ ] Mode-dependent branch setup removed from `runOneDaemonCycle`
-- [ ] Dispatch-specific setup removed from `runOneDaemonCycle`
-- [ ] Sequential execution works end-to-end
-- [ ] Parallel execution works end-to-end
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./...` passes
+- [x] `runOneDaemonCycle` calls the orchestrator with no mode branching
+- [x] Orchestrator uses simplified `WorkerConfig` with `WorkDir`
+- [x] Mode-dependent branch setup removed from `runOneDaemonCycle`
+- [x] Dispatch-specific setup removed from `runOneDaemonCycle`
+- [x] Sequential execution works end-to-end
+- [x] Parallel execution works end-to-end
+- [x] `go build ./...` succeeds
+- [x] `go test ./...` passes
 
 ### TASK-052-006: Remove old code paths and dispatch mode
 **Description:** As a developer, I want all dead code from the old three-path implementation removed so that the codebase only contains the orchestrator+worker pattern.

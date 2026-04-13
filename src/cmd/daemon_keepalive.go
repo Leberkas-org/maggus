@@ -33,24 +33,11 @@ var errStopAfterTask = errors.New("stop-after-task")
 func runDaemonLoop(cmd printer, wc *runLoopConfig) error {
 	dir := wc.dir
 
-	// Dispatched workers don't write a PID file — the main daemon owns it.
-	if dispatchRepoFlag == "" {
-		if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
-			cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
-		}
-		defer removeDaemonPID(dir)
+	if pidErr := writeDaemonPID(dir, os.Getpid()); pidErr != nil {
+		cmd.Printf("Warning: could not write daemon PID: %v\n", pidErr)
 	}
+	defer removeDaemonPID(dir)
 	defer removeDaemonStopFile(dir)
-
-	// Register in the workers index if this is a dispatched worker.
-	if dispatchRepoFlag != "" && taskFlag != "" {
-		_ = runlog.UpsertWorkerEntry(dispatchRepoFlag, runlog.WorkerIndexEntry{
-			TaskID:    taskFlag,
-			TaskTitle: taskFlag,
-			Status:    "working",
-			StartedAt: time.Now().UTC().Format(time.RFC3339),
-		})
-	}
 
 	// Signal handling — shared across all cycles.
 	sigCtx, sigStop := signal.NotifyContext(context.Background(), shutdownSignals...)
@@ -222,28 +209,11 @@ func waitForChanges(fw *filewatcher.Watcher, ctx context.Context, dir string) (w
 // runOneDaemonCycle runs a single iteration of the daemon work loop.
 // Returns true if work was found and executed, false if no work was available.
 func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *runlog.Logger, workCtx context.Context) (bool, error) {
-	// Use planDir for loading plans/config/approvals (main repo root).
-	// For normal daemon mode, planDir == dir. For dispatched workers, planDir
-	// points to the main repo while dir is the worktree.
-	planDir := wc.planDir
-	if planDir == "" {
-		planDir = dir
-	}
+	// Prune stale worker entries (done/failed/blocked older than 5 min).
+	_ = runlog.PruneStaleWorkerEntries(dir, 5*time.Minute)
 
-	// Prune stale worker entries (done/failed/blocked older than 5 min) at the
-	// start of each cycle. Only the main daemon prunes; dispatched workers must
-	// not modify the shared index beyond their own entry.
-	if dispatchRepoFlag == "" {
-		_ = runlog.PruneStaleWorkerEntries(planDir, 5*time.Minute)
-	}
-
-	// Hot-reload parallel setting from config so changes take effect without daemon restart.
-	if freshCfg, err := loadConfigFn(planDir); err == nil {
-		wc.parallel = freshCfg.IsParallelEnabled() || parallelFlag
-	}
-
-	featureStore := stores.NewFileFeatureStore(planDir)
-	bugStore := stores.NewFileBugStore(planDir)
+	featureStore := stores.NewFileFeatureStore(dir)
+	bugStore := stores.NewFileBugStore(dir)
 
 	// Recovery: detect and fix any dirty state left by a previous interrupted run.
 	// Errors are warnings only — the normal work cycle is attempted regardless.
@@ -256,7 +226,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}
 
 	// Parse tasks and check for work.
-	setup, err := initIteration(cmd, planDir, wc.modelDisplay, 0, featureStore, bugStore)
+	setup, err := initIteration(cmd, dir, wc.modelDisplay, 0, featureStore, bugStore)
 	if err != nil {
 		return false, err
 	}
@@ -265,7 +235,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}
 
 	// Build approved plans with approval filtering.
-	featureGroups, fgErr := buildApprovedPlans(planDir, wc.cfg, featureStore, bugStore)
+	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg, featureStore, bugStore)
 	if fgErr != nil {
 		return false, fmt.Errorf("build approved plans: %w", fgErr)
 	}
@@ -289,57 +259,25 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		branchTask = setup.next
 	}
 
-	var repoDir, workDir string
-	var branchMsg string
-	var planBranch string
-	var existingWorktreePath string
-
-	if dispatchRepoFlag != "" {
-		// Dispatch mode: the current process is a dispatched worker running in a
-		// pre-existing worktree (dir). The main repo is at dispatchRepoFlag. The
-		// task branch and worktree were already created by dispatchTask(); the
-		// unified worker merges the task branch back into dispatchBaseBranchFlag
-		// in the main repo and cleans up when done.
-		repoDir = dispatchRepoFlag
-		workDir = dir
-		planBranch = dispatchBaseBranchFlag
-		existingWorktreePath = dir
-	} else if wc.parallel {
-		repoDir = dir
-		workDir = dir
-		// Parallel mode: set up a plan-level branch (feature/feat-NNN).
-		var planBranchMsg string
+	// Set up the plan-level integration branch. The orchestrator handles
+	// task-level branching and worktree creation for parallel tasks internally.
+	repoDir := dir
+	planBranch := ""
+	branchMsg := ""
+	if wc.cfg.Git.IsAutoBranchEnabled() {
 		var pbErr error
-		planBranch, planBranchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
+		planBranch, branchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
 		if pbErr != nil {
 			return false, fmt.Errorf("setup plan branch: %w", pbErr)
 		}
-		branchMsg = planBranchMsg
 	} else {
-		repoDir = dir
-		workDir = dir
-		// Sequential mode: determine the plan branch for per-task branching via
-		// the unified worker. When auto-branch is enabled, EnsurePlanBranch
-		// creates (or switches to) the plan-level integration branch on protected
-		// branches, or returns the current branch on non-protected branches. The
-		// worker then creates per-task branches from planBranch, commits, merges
-		// back, and cleans up after each task — resolving bug_041.
-		if wc.cfg.Git.IsAutoBranchEnabled() {
-			var pbErr error
-			planBranch, branchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
-			if pbErr != nil {
-				return false, fmt.Errorf("setup plan branch: %w", pbErr)
-			}
-		} else {
-			branchMsg = "Auto-branch disabled, staying on current branch"
-			// planBranch stays "": worker runs without per-task branching.
-		}
+		branchMsg = "Auto-branch disabled, staying on current branch"
 	}
 
 	// Write an early "Preparing" snapshot so the status TUI shows which
 	// feature/task the daemon is picking up immediately, before the work
 	// goroutine starts and sends the full IterationStartMsg.
-	if dispatchRepoFlag == "" && len(featureGroups) > 0 {
+	if len(featureGroups) > 0 {
 		if ft := firstWorkableTask(featureGroups); ft != nil {
 			fg := featureGroups[0]
 			earlySnap := runlog.StateSnapshot{
@@ -357,10 +295,8 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 
 	// Create tea.Program with nullTUIModel for this cycle.
 	dm := nullTUIModel{
-		snapshotDir:     dir,
-		runStartedAt:    setup.startTime,
-		dispatchRepoDir: dispatchRepoFlag,
-		dispatchTaskID:  taskFlag,
+		snapshotDir:  dir,
+		runStartedAt: setup.startTime,
 	}
 	dm.SetOnToolUse(func(taskID, toolType string, params map[string]string) {
 		runLogger.ToolUse(taskID, toolType, params)
@@ -446,49 +382,39 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		}
 	}()
 
-	tc := taskContext{
-		workCtx:              workCtx,
-		p:                    p,
-		activeAgent:          wc.activeAgent,
-		resolvedModel:        wc.resolvedModel,
-		sessionPersistence:   wc.sessionPersistence,
-		notifier:             wc.notifier,
-		validIncludes:        wc.validIncludes,
-		repoDir:              repoDir,
-		workDir:              workDir,
-		onComplete:           wc.cfg.OnComplete,
-		hooks:                wc.cfg.Hooks,
-		logger:               runLogger,
-		featureStore:         featureStore,
-		bugStore:             bugStore,
-		existingWorktreePath: existingWorktreePath,
+	orchCfg := OrchestratorConfig{
+		Ctx:            workCtx,
+		Program:        p,
+		Agent:          wc.activeAgent,
+		Model:          wc.resolvedModel,
+		SessionPersist: wc.sessionPersistence,
+		ValidIncludes:  wc.validIncludes,
+		FeatureStore:   featureStore,
+		BugStore:       bugStore,
+		Logger:         runLogger,
+		Notifier:       wc.notifier,
+		Dir:            dir,
+		RepoDir:        repoDir,
+		PlanBranch:     planBranch,
+		OnComplete:     wc.cfg.OnComplete,
+		Hooks:          wc.cfg.Hooks,
+		FeatureGroups:  featureGroups,
+		AutoContinue:   wc.cfg.IsAutoContinueEnabled(),
+		StopFlag:       stopFlagAtomic,
+		StopAtTaskID:   stopAtTaskIDAtomic,
+		StartTime:      setup.startTime,
+		ModelDisplay:   wc.modelDisplay,
+		StartHash:      captureStartHash(dir),
+		ActiveAgentNm:  wc.activeAgent.Name(),
+		IncludeWarns:   wc.includeWarnings,
+		BranchMsg:      branchMsg,
 	}
 
-	loopParams := runLoopParams{
-		tc:            tc,
-		tasks:         setup.tasks,
-		featureGroups: featureGroups,
-		count:         0,
-		autoContinue:  wc.cfg.IsAutoContinueEnabled(),
-		startTime:     setup.startTime,
-		p:             p,
-		stopFlag:      stopFlagAtomic,
-		stopAtTaskID:  stopAtTaskIDAtomic,
-		branchMsg:     branchMsg,
-		activeAgentNm: wc.activeAgent.Name(),
-		startHash:     captureStartHash(workDir),
-		modelDisplay:  wc.modelDisplay,
-		dir:           dir,
-		featureStore:  featureStore,
-		bugStore:      bugStore,
-		planBranch:    planBranch,
-	}
-
-	if wc.parallel {
-		runParallelWorkGoroutine(loopParams, planBranch)
-	} else {
-		runWorkGoroutine(loopParams)
-	}
+	orch := NewOrchestrator(orchCfg)
+	go func() {
+		orch.Run()
+		p.Send(QuitMsg{})
+	}()
 
 	_, tuiErr := p.Run()
 	if tuiErr != nil {
