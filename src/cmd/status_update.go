@@ -95,7 +95,14 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		prevRunning := m.daemon.Running
 		m.daemon.PID = msg.State.PID
 		m.daemon.Running = msg.State.Running
-		m.daemonStoppingAfterTask = msg.State.StoppingAfterTask
+		if msg.State.StoppingAfterTask {
+			m.daemonStoppingAfterTask = true
+		} else if !msg.State.Running {
+			// Only clear the flag when the daemon has fully exited, not during
+			// the transition window where the sentinel was removed but the
+			// process is still alive.
+			m.daemonStoppingAfterTask = false
+		}
 		if prevRunning && !m.daemon.Running {
 			m.snapshot = nil
 		}

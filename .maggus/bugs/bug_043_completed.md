@@ -51,10 +51,10 @@ The fix is to stop clearing `daemonStoppingAfterTask` on `StoppingAfterTask=fals
 **Description:** As a user, I want the "stopping after task" indicator to remain visible from the moment I send the signal until the daemon process fully exits, so that I'm not confused by a brief flash of "● Running" as the daemon winds down.
 
 **Acceptance Criteria:**
-- [ ] In `status_update.go`, the `daemonCacheUpdateMsg` handler sets `m.daemonStoppingAfterTask = true` when `msg.State.StoppingAfterTask` is true
-- [ ] `m.daemonStoppingAfterTask` is cleared to `false` only when `msg.State.Running == false`
-- [ ] When the daemon is still running but `StoppingAfterTask=false` (transition window between sentinel removal and process exit), `daemonStoppingAfterTask` is left unchanged
-- [ ] The optimistic set (`m.daemonStoppingAfterTask = true`) in `updateStatusDaemonStopOverlay` still takes effect immediately on "s" keypress
-- [ ] Sending "stop after task" and waiting for the daemon to finish shows: "stopping after task" → "not running" with no intermediate "● Running" flash
-- [ ] No regression in the kill-now path (`k` / `ctrl+c`): when the daemon is force-killed, `Running=false` arrives and `daemonStoppingAfterTask` is cleared correctly
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] In `status_update.go`, the `daemonCacheUpdateMsg` handler sets `m.daemonStoppingAfterTask = true` when `msg.State.StoppingAfterTask` is true
+- [x] `m.daemonStoppingAfterTask` is cleared to `false` only when `msg.State.Running == false`
+- [x] When the daemon is still running but `StoppingAfterTask=false` (transition window between sentinel removal and process exit), `daemonStoppingAfterTask` is left unchanged
+- [x] The optimistic set (`m.daemonStoppingAfterTask = true`) in `updateStatusDaemonStopOverlay` still takes effect immediately on "s" keypress
+- [x] Sending "stop after task" and waiting for the daemon to finish shows: "stopping after task" → "not running" with no intermediate "● Running" flash
+- [x] No regression in the kill-now path (`k` / `ctrl+c`): when the daemon is force-killed, `Running=false` arrives and `daemonStoppingAfterTask` is cleared correctly
+- [x] `go vet ./...` and `go test ./...` pass
