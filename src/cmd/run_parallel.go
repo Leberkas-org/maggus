@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -11,7 +12,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
-"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/gitbranch"
+	"github.com/leberkas-org/maggus/internal/globalconfig"
+	"github.com/leberkas-org/maggus/internal/gitworktree"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
@@ -255,7 +258,7 @@ func (o *parallelOrchestrator) runParallelBatch(group parser.Plan, tasks []parse
 
 // runSingleTask runs one task via the unified worker. When useWorktree is true,
 // the task runs in its own worktree on its own branch (parallel mode). When false,
-// it runs in the main worktree sequentially.
+// it runs in the main repo directory sequentially.
 func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task, useWorktree bool) parallelWorkResult {
 	var result parallelWorkResult
 
@@ -305,6 +308,27 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		mergeMu = &o.mu
 	}
 
+	// Determine the working directory. For parallel tasks, create a dedicated
+	// branch and worktree; clean up the worktree after the worker returns.
+	workDir := o.repoDir
+	var worktreePath string
+	if useWorktree {
+		taskBranch := gitbranch.BranchName(task.ID)
+		worktreePath = filepath.Join(o.repoDir, ".maggus", "worktrees", task.ID)
+		if err := gitbranch.CreateBranchFrom(o.repoDir, taskBranch, o.planBranch); err != nil {
+			o.markWorkerFailed(task.ID, wsw)
+			result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: fmt.Sprintf("create branch: %v", err)})
+			return result
+		}
+		if err := gitworktree.CreateWorktree(o.repoDir, worktreePath, taskBranch); err != nil {
+			_ = gitbranch.DeleteBranch(o.repoDir, taskBranch)
+			o.markWorkerFailed(task.ID, wsw)
+			result.failed = append(result.failed, failedTask{ID: task.ID, Title: task.Title, Reason: fmt.Sprintf("create worktree: %v", err)})
+			return result
+		}
+		workDir = worktreePath
+	}
+
 	cfg := WorkerConfig{
 		Ctx:            o.ctx,
 		Task:           task,
@@ -317,8 +341,8 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 		ValidIncludes:  o.validIncludes,
 		Iteration:      iter,
 		RepoDir:        o.repoDir,
+		WorkDir:        workDir,
 		PlanBranch:     o.planBranch,
-		UseWorktree:    useWorktree,
 		MergeMu:        mergeMu,
 		Logger:         workerLogger,
 		AgentSender:    agentSender,
@@ -327,6 +351,14 @@ func (o *parallelOrchestrator) runSingleTask(group parser.Plan, task parser.Task
 	}
 
 	wr := RunTaskWorker(cfg)
+
+	// Best-effort cleanup of the worktree (must happen after worker returns,
+	// which has already merged and deleted the task branch).
+	if worktreePath != "" {
+		if err := gitworktree.RemoveWorktree(o.repoDir, worktreePath); err != nil {
+			o.p.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", task.ID, err)})
+		}
+	}
 
 	// Handle interruption.
 	if wr.StopReason == StopReasonInterrupted {

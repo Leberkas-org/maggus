@@ -377,6 +377,7 @@ func TestWorkerResult_ZeroValue(t *testing.T) {
 
 func TestWorkerConfig_UsableFromSequentialCallSite(t *testing.T) {
 	// Verify the WorkerConfig struct can be populated for sequential mode.
+	// WorkDir == RepoDir (no worktree), no MergeMu needed.
 	cfg := WorkerConfig{
 		Ctx:            context.Background(),
 		Task:           parser.Task{ID: "TASK-020", Title: "Sequential test"},
@@ -386,14 +387,14 @@ func TestWorkerConfig_UsableFromSequentialCallSite(t *testing.T) {
 		Model:          "claude-sonnet-4-6",
 		SessionPersist: false,
 		RepoDir:        "/repo",
-		PlanBranch:     "", // no branching in simple sequential mode
-		UseWorktree:    false,
+		WorkDir:        "/repo", // same as RepoDir in sequential mode
+		PlanBranch:     "",      // no branching in simple sequential mode
 		MergeMu:        nil,
 		AgentSender:    &msgCollector{},
 		EventSender:    &msgCollector{},
 	}
-	if cfg.UseWorktree {
-		t.Error("UseWorktree should be false for sequential mode")
+	if cfg.WorkDir != cfg.RepoDir {
+		t.Error("WorkDir should equal RepoDir for sequential mode")
 	}
 	if cfg.MergeMu != nil {
 		t.Error("MergeMu should be nil for sequential mode")
@@ -402,6 +403,7 @@ func TestWorkerConfig_UsableFromSequentialCallSite(t *testing.T) {
 
 func TestWorkerConfig_UsableFromParallelCallSite(t *testing.T) {
 	// Verify the WorkerConfig struct can be populated for parallel mode.
+	// The caller (orchestrator) creates the worktree and passes WorkDir pointing to it.
 	mu := &sync.Mutex{}
 	cfg := WorkerConfig{
 		Ctx:            context.Background(),
@@ -412,14 +414,14 @@ func TestWorkerConfig_UsableFromParallelCallSite(t *testing.T) {
 		Model:          "claude-opus-4-6",
 		SessionPersist: true,
 		RepoDir:        "/repo",
+		WorkDir:        "/repo/.maggus/worktrees/TASK-021", // worktree created by orchestrator
 		PlanBranch:     "feature/feat-021-plan",
-		UseWorktree:    true,
 		MergeMu:        mu,
 		AgentSender:    &msgCollector{},
 		EventSender:    &msgCollector{},
 	}
-	if !cfg.UseWorktree {
-		t.Error("UseWorktree should be true for parallel worktree mode")
+	if cfg.WorkDir == cfg.RepoDir {
+		t.Error("WorkDir should differ from RepoDir in parallel worktree mode")
 	}
 	if cfg.MergeMu == nil {
 		t.Error("MergeMu should be non-nil for parallel mode")
@@ -431,34 +433,29 @@ func TestWorkerConfig_UsableFromParallelCallSite(t *testing.T) {
 
 func TestWorkerConfig_UsableFromDispatchCallSite(t *testing.T) {
 	// Verify the WorkerConfig struct can be populated for dispatch mode.
-	// In dispatch mode: RepoDir = main repo, ExistingWorktreePath = pre-existing
-	// worktree dir (created by dispatchTask), PlanBranch = base branch to merge into.
+	// RepoDir = main repo for git operations; WorkDir = pre-existing worktree path.
 	cfg := WorkerConfig{
-		Ctx:                  context.Background(),
-		Task:                 parser.Task{ID: "TASK-022", Title: "Dispatch test"},
-		PlanFile:             "/repo/.maggus/features/feature_022.md",
-		MaggusID:             "uuid-022",
-		Agent:                &workerFakeAgent{},
-		Model:                "claude-sonnet-4-6",
-		RepoDir:              "/repo",        // main repo for git operations
-		PlanBranch:           "feature/feat-022-plan", // base branch for merge-back
-		UseWorktree:          false,          // no new worktree creation; use ExistingWorktreePath
-		ExistingWorktreePath: "/repo/.maggus/worktrees/TASK-022-001", // pre-existing worktree
-		MergeMu:              nil,            // single worker, no serialization needed
-		AgentSender:          &msgCollector{},
-		EventSender:          &msgCollector{},
-	}
-	if cfg.UseWorktree {
-		t.Error("UseWorktree should be false for dispatch mode (worktree already exists)")
+		Ctx:        context.Background(),
+		Task:       parser.Task{ID: "TASK-022", Title: "Dispatch test"},
+		PlanFile:   "/repo/.maggus/features/feature_022.md",
+		MaggusID:   "uuid-022",
+		Agent:      &workerFakeAgent{},
+		Model:      "claude-sonnet-4-6",
+		RepoDir:    "/repo",                                    // main repo for git operations
+		WorkDir:    "/repo/.maggus/worktrees/TASK-022-001",     // pre-existing worktree
+		PlanBranch: "feature/feat-022-plan",                    // base branch for merge-back
+		MergeMu:    nil,                                        // single worker, no serialization needed
+		AgentSender: &msgCollector{},
+		EventSender: &msgCollector{},
 	}
 	if cfg.PlanBranch == "" {
 		t.Error("PlanBranch should be set for dispatch mode (for merge-back)")
 	}
-	if cfg.ExistingWorktreePath == "" {
-		t.Error("ExistingWorktreePath should be set for dispatch mode")
+	if cfg.WorkDir == "" {
+		t.Error("WorkDir should be set for dispatch mode")
 	}
-	if cfg.RepoDir == cfg.ExistingWorktreePath {
-		t.Error("RepoDir (main repo) and ExistingWorktreePath (worktree) should differ")
+	if cfg.RepoDir == cfg.WorkDir {
+		t.Error("RepoDir (main repo) and WorkDir (worktree) should differ")
 	}
 }
 
@@ -481,14 +478,6 @@ func TestWorkerMerge_WithMutex_LocksAndUnlocks(t *testing.T) {
 	// If the mutex wasn't unlocked, this would deadlock.
 	mu.Lock()
 	mu.Unlock()
-}
-
-// --- workerCleanupWorktree tests ---
-
-func TestWorkerCleanupWorktree_EmptyPath(t *testing.T) {
-	// Should be a no-op when worktreePath is empty.
-	cfg := WorkerConfig{RepoDir: t.TempDir()}
-	workerCleanupWorktree(cfg, "") // should not panic
 }
 
 // --- Integration: verify workerMarkCriteria handles all criterion states ---

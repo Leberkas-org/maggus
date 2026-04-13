@@ -3,15 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/leberkas-org/maggus/internal/agent"
+	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitcommit"
 	"github.com/leberkas-org/maggus/internal/gitmerge"
-	"github.com/leberkas-org/maggus/internal/gitworktree"
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"github.com/leberkas-org/maggus/internal/notify"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -42,26 +41,17 @@ type WorkerConfig struct {
 	// Repository configuration.
 	RepoDir string // main repository root (always the real repo, not a worktree)
 
+	// WorkDir is the directory the worker runs the agent in and commits from.
+	// May be the main repo root or a worktree path. The caller is responsible
+	// for creating and cleaning up any worktree before and after calling the
+	// worker. Defaults to RepoDir when empty.
+	WorkDir string
+
 	// Branch and merge configuration.
 	// When PlanBranch is non-empty, the worker creates a task branch from it,
 	// merges back after commit, and cleans up the task branch.
 	// When empty, the worker runs in the current directory without branching.
 	PlanBranch string
-
-	// UseWorktree creates a git worktree for task isolation. Only meaningful
-	// when PlanBranch is set. The worktree is created at
-	// .maggus/worktrees/<taskID> inside RepoDir.
-	UseWorktree bool
-
-	// ExistingWorktreePath is the path to a pre-existing worktree directory.
-	// When non-empty, the worker skips branch and worktree creation entirely
-	// and runs the agent in this directory instead of RepoDir. After the task
-	// completes, the worker still merges the task branch back into PlanBranch
-	// (in RepoDir), removes the worktree, and deletes the task branch.
-	//
-	// Used by dispatched workers where the worktree is created by dispatchTask()
-	// before the worker process starts. UseWorktree is ignored when this is set.
-	ExistingWorktreePath string
 
 	// MergeMu serializes merge and criteria-marking operations when multiple
 	// workers run concurrently. Leave nil for sequential (single-worker) mode.
@@ -76,9 +66,8 @@ type WorkerConfig struct {
 	// PreCommit is called after the agent completes successfully but before the
 	// commit. Callers use this to perform pre-commit operations such as marking
 	// completed feature files (renaming/deleting them) and firing lifecycle
-	// hooks. The workDir argument is the directory where the agent ran (may
-	// differ from RepoDir when UseWorktree is true). Leave nil for no
-	// pre-commit operations.
+	// hooks. The workDir argument is the directory where the agent ran (WorkDir
+	// field value). Leave nil for no pre-commit operations.
 	PreCommit func(workDir string)
 }
 
@@ -112,42 +101,43 @@ type WorkerResult struct {
 //
 //  1. Create task branch from PlanBranch (when set)
 //  2. Build prompt with bootstrap context + task details
-//  3. Run agent subprocess
-//  4. Commit changes via COMMIT.md
+//  3. Run agent subprocess in WorkDir (defaults to RepoDir)
+//  4. Commit changes via COMMIT.md in WorkDir
 //  5. Merge task branch back into PlanBranch (when set)
-//  6. Delete task branch and worktree (best-effort cleanup)
+//  6. Delete task branch (best-effort cleanup)
 //
-// The function is designed to be called from sequential, parallel, and
-// dispatched execution modes. Callers control concurrency and TUI
-// coordination; the worker owns only the task lifecycle.
+// Callers are responsible for creating and cleaning up any git worktree
+// before and after calling this function. The worker never creates or removes
+// worktrees — it only cares about executing the task in the given directory.
 func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 	var result WorkerResult
+
+	// Re-check approval before starting work so mid-run revocations take effect.
+	if freshCfg, cfgErr := loadConfigFn(cfg.RepoDir); cfgErr == nil {
+		if approvals, aErr := approval.Load(cfg.RepoDir); aErr == nil {
+			approvalKey := cfg.MaggusID
+			if approvalKey == "" && cfg.PlanFile != "" {
+				approvalKey = parser.PlanIDFromPath(cfg.PlanFile)
+			}
+			if approvalKey != "" && !approval.IsApproved(approvals, approvalKey, freshCfg.IsApprovalRequired()) {
+				cfg.Logger.Info(fmt.Sprintf("feature %s unapproved, skipping task %s", approvalKey, cfg.Task.ID))
+				result.StopReason = StopReasonUserStop
+				return result
+			}
+		}
+	}
+
 	taskBranch := gitbranch.BranchName(cfg.Task.ID)
 
-	workDir := cfg.RepoDir
-	var worktreePath string
+	workDir := cfg.WorkDir
+	if workDir == "" {
+		workDir = cfg.RepoDir
+	}
 
-	// --- Step 1: Branch and worktree setup ---
-	if cfg.ExistingWorktreePath != "" {
-		// Dispatch mode: branch and worktree already created by the dispatcher
-		// (dispatchTask). Run the agent in the pre-existing worktree; merge and
-		// cleanup still happen in RepoDir after the task completes.
-		worktreePath = cfg.ExistingWorktreePath
-		workDir = cfg.ExistingWorktreePath
-	} else if cfg.PlanBranch != "" {
-		if cfg.UseWorktree {
-			worktreePath = filepath.Join(cfg.RepoDir, ".maggus", "worktrees", cfg.Task.ID)
-			if err := gitbranch.CreateBranchFrom(cfg.RepoDir, taskBranch, cfg.PlanBranch); err != nil {
-				return workerFail(&result, cfg, fmt.Sprintf("create branch: %v", err))
-			}
-			if err := gitworktree.CreateWorktree(cfg.RepoDir, worktreePath, taskBranch); err != nil {
-				return workerFail(&result, cfg, fmt.Sprintf("create worktree: %v", err))
-			}
-			workDir = worktreePath
-		} else {
-			if _, _, err := gitbranch.EnsureTaskBranchFromBase(cfg.RepoDir, cfg.Task.ID, cfg.PlanBranch); err != nil {
-				return workerFail(&result, cfg, fmt.Sprintf("create task branch: %v", err))
-			}
+	// --- Step 1: Branch setup ---
+	if cfg.PlanBranch != "" {
+		if _, _, err := gitbranch.EnsureTaskBranchFromBase(cfg.RepoDir, cfg.Task.ID, cfg.PlanBranch); err != nil {
+			return workerFail(&result, cfg, fmt.Sprintf("create task branch: %v", err))
 		}
 	}
 
@@ -161,7 +151,6 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 	if err := cfg.Agent.Run(cfg.Ctx, builtPrompt, model, cfg.SessionPersist, cfg.AgentSender); err != nil {
 		if cfg.Ctx.Err() != nil {
 			result.StopReason = StopReasonInterrupted
-			workerCleanupWorktree(cfg, worktreePath)
 			return result
 		}
 		cfg.Notifier.PlayError()
@@ -170,7 +159,6 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 		cfg.Logger.TaskFailed(cfg.Task.ID, reason)
 		sendEvent(cfg.EventSender, InfoMsg{Text: fmt.Sprintf("✗ %s failed: %s", cfg.Task.ID, reason)})
 		result.Failed = &failedTask{ID: cfg.Task.ID, Title: cfg.Task.Title, Reason: reason}
-		workerCleanupWorktree(cfg, worktreePath)
 		return result
 	}
 
@@ -186,7 +174,6 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 		cfg.Logger.TaskFailed(cfg.Task.ID, reason)
 		sendEvent(cfg.EventSender, InfoMsg{Text: fmt.Sprintf("✗ %s commit failed: %s", cfg.Task.ID, reason)})
 		result.Failed = &failedTask{ID: cfg.Task.ID, Title: cfg.Task.Title, Reason: reason}
-		workerCleanupWorktree(cfg, worktreePath)
 		return result
 	}
 
@@ -213,12 +200,7 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 			return workerHandleMergeErr(&result, cfg, mergeErr)
 		}
 
-		// Best-effort cleanup: remove worktree first (must precede branch deletion).
-		if worktreePath != "" {
-			if err := gitworktree.RemoveWorktree(cfg.RepoDir, worktreePath); err != nil {
-				sendEvent(cfg.EventSender, InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", cfg.Task.ID, err)})
-			}
-		}
+		// Best-effort cleanup: delete task branch.
 		if err := gitbranch.DeleteBranch(cfg.RepoDir, taskBranch); err != nil {
 			sendEvent(cfg.EventSender, InfoMsg{Text: fmt.Sprintf("⚠ %s: branch cleanup failed: %v", cfg.Task.ID, err)})
 		}
@@ -292,13 +274,6 @@ func workerHandleMergeErr(result *WorkerResult, cfg WorkerConfig, err error) Wor
 		result.Failed = &failedTask{ID: cfg.Task.ID, Title: cfg.Task.Title, Reason: reason}
 	}
 	return *result
-}
-
-// workerCleanupWorktree removes a worktree on failure (best-effort).
-func workerCleanupWorktree(cfg WorkerConfig, worktreePath string) {
-	if worktreePath != "" {
-		_ = gitworktree.RemoveWorktree(cfg.RepoDir, worktreePath)
-	}
 }
 
 // sendEvent sends a tea.Msg through an agent.MessageSender (nil-safe).

@@ -127,28 +127,34 @@ func runTask(tc taskContext, tasks []parser.Task, i, count, maxCount int) taskRe
 		planTitle = tc.currentPlan.Title
 	}
 
+	// Determine the effective work directory: use an existing worktree path when
+	// set (dispatch mode), otherwise use the main repo directory.
+	workerWorkDir := tc.repoDir
+	if tc.existingWorktreePath != "" {
+		workerWorkDir = tc.existingWorktreePath
+	}
+
 	// Run the unified task worker. The worker owns the complete lifecycle:
 	// branch creation → agent → pre-commit callback → commit → merge-back → cleanup.
 	wr := RunTaskWorker(WorkerConfig{
-		Ctx:                  tc.workCtx,
-		Task:                 *next,
-		PlanFile:             planFile,
-		MaggusID:             maggusID,
-		PlanTitle:            planTitle,
-		Agent:                tc.activeAgent,
-		Model:                tc.resolvedModel,
-		SessionPersist:       tc.sessionPersistence,
-		ValidIncludes:        tc.validIncludes,
-		Iteration:            i + 1,
-		RepoDir:              tc.repoDir,
-		PlanBranch:           tc.planBranch,
-		UseWorktree:          false,
-		ExistingWorktreePath: tc.existingWorktreePath,
-		Logger:               tc.logger,
-		AgentSender:          tc.p,
-		EventSender:          tc.p,
-		Notifier:             tc.notifier,
-		PreCommit:            buildPreCommitFn(tc),
+		Ctx:            tc.workCtx,
+		Task:           *next,
+		PlanFile:       planFile,
+		MaggusID:       maggusID,
+		PlanTitle:      planTitle,
+		Agent:          tc.activeAgent,
+		Model:          tc.resolvedModel,
+		SessionPersist: tc.sessionPersistence,
+		ValidIncludes:  tc.validIncludes,
+		Iteration:      i + 1,
+		RepoDir:        tc.repoDir,
+		WorkDir:        workerWorkDir,
+		PlanBranch:     tc.planBranch,
+		Logger:         tc.logger,
+		AgentSender:    tc.p,
+		EventSender:    tc.p,
+		Notifier:       tc.notifier,
+		PreCommit:      buildPreCommitFn(tc),
 	})
 
 	// Handle interruption.
