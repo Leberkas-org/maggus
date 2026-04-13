@@ -279,13 +279,15 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 		Notifier:       cfg.Notifier,
 	})
 
-	// Remove the worktree after the worker returns. The worker already merged
-	// and deleted the task branch in its merge step.
+	// Remove the worktree after the worker returns. On the success path the worker
+	// already merged and deleted the task branch. On failure paths below we delete
+	// the branch explicitly to avoid orphaned refs from the previous failed cycle.
 	if err := gitworktree.RemoveWorktree(cfg.RepoDir, worktreePath); err != nil {
 		cfg.Program.Send(InfoMsg{Text: fmt.Sprintf("⚠ %s: worktree cleanup failed: %v", task.ID, err)})
 	}
 
 	if wr.StopReason == StopReasonInterrupted {
+		_ = gitbranch.DeleteBranch(cfg.RepoDir, taskBranch)
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()
@@ -296,6 +298,7 @@ func (o *Orchestrator) runWorktreeTask(group *parser.Plan, task parser.Task) gro
 	}
 
 	if wr.Failed != nil {
+		_ = gitbranch.DeleteBranch(cfg.RepoDir, taskBranch)
 		o.mu.Lock()
 		o.failedIDs[task.ID] = true
 		o.mu.Unlock()

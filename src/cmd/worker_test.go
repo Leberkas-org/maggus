@@ -528,6 +528,79 @@ func TestSendEvent_CommitMsg(t *testing.T) {
 	}
 }
 
+// --- Worktree mode: EnsureTaskBranchFromBase must be skipped ---
+
+// TestRunTaskWorker_WorktreeMode_SkipsEnsureTaskBranch verifies that when
+// WorkDir != RepoDir (parallel worktree mode), RunTaskWorker does NOT call
+// EnsureTaskBranchFromBase. Without the fix, the call would fail with a
+// "create task branch" error (non-git temp dir) before reaching the agent.
+func TestRunTaskWorker_WorktreeMode_SkipsEnsureTaskBranch(t *testing.T) {
+	repoDir := t.TempDir()
+	workDir := t.TempDir() // different from repoDir — simulates a git worktree
+	events := &msgCollector{}
+	logger := newTestLogger(t)
+	agentErr := errors.New("agent intentionally failed")
+
+	cfg := WorkerConfig{
+		Ctx:         context.Background(),
+		Task:        parser.Task{ID: "TASK-040", Title: "Worktree skip test"},
+		Agent:       &workerFakeAgent{runErr: agentErr},
+		RepoDir:     repoDir,
+		WorkDir:     workDir, // different → worktree mode
+		PlanBranch:  "feature/feat-040-plan",
+		Logger:      logger,
+		AgentSender: events,
+		EventSender: events,
+		Notifier:    newTestNotifier(),
+	}
+
+	result := RunTaskWorker(cfg)
+
+	// Must fail with agent error, not with "create task branch" (git checkout error).
+	if result.Failed == nil {
+		t.Fatal("expected failure (agent error)")
+	}
+	if strings.Contains(result.Failed.Reason, "create task branch") {
+		t.Errorf("EnsureTaskBranchFromBase was called in worktree mode: got reason %q", result.Failed.Reason)
+	}
+	if result.Failed.Reason != agentErr.Error() {
+		t.Errorf("expected agent error %q, got %q", agentErr.Error(), result.Failed.Reason)
+	}
+}
+
+// TestRunTaskWorker_SequentialMode_StillCallsEnsureTaskBranch guards against
+// regression: when WorkDir == RepoDir (sequential mode), EnsureTaskBranchFromBase
+// must still be called. In a non-git temp dir, the call fails with "create task
+// branch", confirming it was invoked.
+func TestRunTaskWorker_SequentialMode_StillCallsEnsureTaskBranch(t *testing.T) {
+	dir := t.TempDir()
+	events := &msgCollector{}
+	logger := newTestLogger(t)
+
+	cfg := WorkerConfig{
+		Ctx:         context.Background(),
+		Task:        parser.Task{ID: "TASK-041", Title: "Sequential non-regression"},
+		Agent:       &workerFakeAgent{},
+		RepoDir:     dir,
+		WorkDir:     dir, // same as RepoDir → sequential mode
+		PlanBranch:  "feature/feat-041-plan",
+		Logger:      logger,
+		AgentSender: events,
+		EventSender: events,
+		Notifier:    newTestNotifier(),
+	}
+
+	result := RunTaskWorker(cfg)
+
+	// EnsureTaskBranchFromBase is called → fails on non-git dir with "create task branch".
+	if result.Failed == nil {
+		t.Fatal("expected failure (EnsureTaskBranchFromBase on non-git dir)")
+	}
+	if !strings.Contains(result.Failed.Reason, "create task branch") {
+		t.Errorf("expected 'create task branch' failure, got %q", result.Failed.Reason)
+	}
+}
+
 // --- Verify worker produces correct result fields ---
 
 func TestRunTaskWorker_ResultFieldsOnAgentError(t *testing.T) {

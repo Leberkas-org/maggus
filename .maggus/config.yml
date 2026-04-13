@@ -1,7 +1,7 @@
 agent: claude
 model: sonnet
 include: []
-approval_mode: opt-out
+approval_mode: opt-in
 auto_continue: null
 session_persistence: null
 parallel: null

@@ -135,7 +135,11 @@ func RunTaskWorker(cfg WorkerConfig) WorkerResult {
 	}
 
 	// --- Step 1: Branch setup ---
-	if cfg.PlanBranch != "" {
+	// Skip when running inside a git worktree (WorkDir != RepoDir). The orchestrator
+	// already created the task branch and checked it out in the worktree before calling
+	// this function. Calling EnsureTaskBranchFromBase from the main repo would fail with
+	// "already checked out at <worktree path>".
+	if cfg.PlanBranch != "" && workDir == cfg.RepoDir {
 		if _, _, err := gitbranch.EnsureTaskBranchFromBase(cfg.RepoDir, cfg.Task.ID, cfg.PlanBranch); err != nil {
 			return workerFail(&result, cfg, fmt.Sprintf("create task branch: %v", err))
 		}
