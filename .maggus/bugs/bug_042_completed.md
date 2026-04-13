@@ -56,10 +56,10 @@ Result: the TUI optimistically sets `daemonStoppingAfterTask = true` when the us
 **Description:** As a user, I want the "(stopping after task)" indicator to stay visible until the daemon actually stops, so I have confidence my stop request was received.
 
 **Acceptance Criteria:**
-- [ ] The polling goroutine in `runOneDaemonCycle` (`src/cmd/daemon_keepalive.go`) does **not** call `removeStopAfterTaskFile` — it only sets `stopFlagAtomic.Store(true)` and returns
-- [ ] `removeStopAfterTaskFile` is called after the orchestrator finishes and before returning `errStopAfterTask` (i.e. just before `return true, errStopAfterTask` at line 443)
-- [ ] `DaemonStateCache` continues to report `StoppingAfterTask = true` for the entire duration the task is running after the stop was requested
-- [ ] The TUI left pane shows "● Running (stopping after task)" continuously from the moment the user confirms stop until the daemon process exits
-- [ ] The existing idle-path cleanup (`runDaemonLoop` and `waitForChanges`) is not changed — those paths remove the file before the daemon returns, which is correct
-- [ ] Stale leftover file is still cleaned up at daemon startup (`removeStopAfterTaskFile` call at `daemon_keepalive.go:58`)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The polling goroutine in `runOneDaemonCycle` (`src/cmd/daemon_keepalive.go`) does **not** call `removeStopAfterTaskFile` — it only sets `stopFlagAtomic.Store(true)` and returns
+- [x] `removeStopAfterTaskFile` is called after the orchestrator finishes and before returning `errStopAfterTask` (i.e. just before `return true, errStopAfterTask` at line 443)
+- [x] `DaemonStateCache` continues to report `StoppingAfterTask = true` for the entire duration the task is running after the stop was requested
+- [x] The TUI left pane shows "● Running (stopping after task)" continuously from the moment the user confirms stop until the daemon process exits
+- [x] The existing idle-path cleanup (`runDaemonLoop` and `waitForChanges`) is not changed — those paths remove the file before the daemon returns, which is correct
+- [x] Stale leftover file is still cleaned up at daemon startup (`removeStopAfterTaskFile` call at `daemon_keepalive.go:58`)
+- [x] `go vet ./...` and `go test ./...` pass

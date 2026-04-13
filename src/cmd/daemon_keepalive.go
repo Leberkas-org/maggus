@@ -392,7 +392,6 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 				return
 			case <-ticker.C:
 				if _, err := os.Stat(stopAfterTaskFile); err == nil {
-					removeStopAfterTaskFile(dir)
 					stopFlagAtomic.Store(true)
 					return
 				}
@@ -440,6 +439,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}
 
 	if stopFlagAtomic.Load() {
+		removeStopAfterTaskFile(dir)
 		return true, errStopAfterTask
 	}
 
