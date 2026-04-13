@@ -175,10 +175,14 @@ func (t *Task) IsWorkable() bool {
 }
 
 // PredecessorsSatisfied reports whether all predecessor task IDs appear in
-// completedIDs or skippedOrBlockedIDs. Nil maps are treated as empty:
-// tasks with no predecessors always return true; tasks with any predecessors
-// return false when both maps are nil or do not contain the predecessor ID.
+// completedIDs or skippedOrBlockedIDs. When both maps are nil, no predecessor
+// context is available and the function returns true immediately, degrading
+// gracefully to IsWorkable() behaviour. Non-nil empty maps still enforce
+// predecessor order (no predecessor ID will be found in them).
 func (t *Task) PredecessorsSatisfied(completedIDs, skippedOrBlockedIDs map[string]bool) bool {
+	if completedIDs == nil && skippedOrBlockedIDs == nil {
+		return true
+	}
 	for _, predID := range t.Predecessors {
 		if !completedIDs[predID] && !skippedOrBlockedIDs[predID] {
 			return false

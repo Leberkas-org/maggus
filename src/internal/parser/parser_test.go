@@ -1789,11 +1789,22 @@ func TestPredecessorsSatisfied_PredInSkippedOrBlocked(t *testing.T) {
 
 func TestPredecessorsSatisfied_PredUnsatisfied(t *testing.T) {
 	task := Task{ID: "T2", Predecessors: []string{"T1"}}
-	if task.PredecessorsSatisfied(nil, nil) {
-		t.Error("expected false when predecessor is in neither map")
-	}
+	// Non-nil maps that don't contain the predecessor → unsatisfied.
 	if task.PredecessorsSatisfied(map[string]bool{"T9": true}, map[string]bool{}) {
 		t.Error("expected false when predecessor is not the one in the map")
+	}
+	if task.PredecessorsSatisfied(map[string]bool{}, map[string]bool{}) {
+		t.Error("expected false when predecessor is in neither non-nil map")
+	}
+}
+
+func TestPredecessorsSatisfied_NilMapsDegrade(t *testing.T) {
+	// When both maps are nil, no predecessor context is available.
+	// PredecessorsSatisfied must return true regardless of Predecessors length,
+	// degrading gracefully to IsWorkable() behaviour.
+	task := Task{ID: "T2", Predecessors: []string{"T1"}}
+	if !task.PredecessorsSatisfied(nil, nil) {
+		t.Error("expected true when both maps are nil (no predecessor context)")
 	}
 }
 
@@ -1851,20 +1862,28 @@ func TestIsRunnable_WorkableWithUnsatisfiedPredecessor(t *testing.T) {
 		Predecessors: []string{"T1"},
 		Criteria:     []Criterion{{Text: "Do it", Checked: false}},
 	}
-	// T1 is not in either map.
-	if task.IsRunnable(nil, nil) {
-		t.Error("expected false when predecessor not satisfied")
+	// T1 is not in either non-nil map → unsatisfied.
+	if task.IsRunnable(map[string]bool{}, map[string]bool{}) {
+		t.Error("expected false when predecessor not in non-nil maps")
+	}
+	if task.IsRunnable(map[string]bool{"T9": true}, nil) {
+		t.Error("expected false when predecessor not the one in completedIDs")
 	}
 }
 
 func TestIsRunnable_DegradesToIsWorkableWhenNilMaps(t *testing.T) {
-	// A task with no predecessors should behave identically to IsWorkable() when
-	// nil maps are passed — this is the "graceful degradation" guarantee.
+	// IsRunnable(nil, nil) must behave identically to IsWorkable() for all task
+	// states, including tasks that have predecessors — this is the "graceful
+	// degradation" guarantee used by the daemon pre-check.
 	tasks := []Task{
-		{ID: "A", Criteria: []Criterion{{Checked: false}}},                    // workable
-		{ID: "B", Criteria: []Criterion{{Checked: true}}},                     // complete
-		{ID: "C", Criteria: []Criterion{{Blocked: true, Checked: false}}},     // blocked
-		{ID: "D", Criteria: []Criterion{{Skipped: true, Checked: false}}},     // skipped
+		{ID: "A", Criteria: []Criterion{{Checked: false}}},                                                          // workable, no predecessors
+		{ID: "B", Criteria: []Criterion{{Checked: true}}},                                                           // complete, no predecessors
+		{ID: "C", Criteria: []Criterion{{Blocked: true, Checked: false}}},                                           // blocked, no predecessors
+		{ID: "D", Criteria: []Criterion{{Skipped: true, Checked: false}}},                                           // skipped, no predecessors
+		{ID: "E", Predecessors: []string{"A"}, Criteria: []Criterion{{Checked: false}}},                             // workable, with predecessor
+		{ID: "F", Predecessors: []string{"A"}, Criteria: []Criterion{{Checked: true}}},                              // complete, with predecessor
+		{ID: "G", Predecessors: []string{"A"}, Criteria: []Criterion{{Blocked: true, Checked: false}}},              // blocked, with predecessor
+		{ID: "H", Predecessors: []string{"A", "B"}, Criteria: []Criterion{{Skipped: true, Checked: false}}},         // skipped, with multiple predecessors
 	}
 	for _, tc := range tasks {
 		want := tc.IsWorkable()
