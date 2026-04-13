@@ -281,11 +281,11 @@ Replace the old subprocess dispatch (Alt+R in status TUI) with file-based signal
    - Remove references to dispatch mode, parallel vs sequential mode flags
 
 **Acceptance Criteria:**
-- [ ] ARCHITECTURE.md reflects orchestrator+worker design
-- [ ] Three-mode table and dispatch mode references removed
-- [ ] Work Loop diagram updated
-- [ ] CLAUDE.md architecture table updated
-- [ ] No stale references to `UseWorktree`, `ExistingWorktreePath`, dispatch flags
+- [x] ARCHITECTURE.md reflects orchestrator+worker design
+- [x] Three-mode table and dispatch mode references removed
+- [x] Work Loop diagram updated
+- [x] CLAUDE.md architecture table updated
+- [x] No stale references to `UseWorktree`, `ExistingWorktreePath`, dispatch flags
 
 ## Task Dependency Graph
 

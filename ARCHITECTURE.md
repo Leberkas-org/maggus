@@ -32,8 +32,8 @@ no HTTP server.
 | Component | Package(s) | Responsibility |
 |---|---|---|
 | **Screen Router** | `cmd/` (`appModel`) | Single Bubble Tea program; routes between sub-models via `navigateToMsg`/`navigateBackMsg`; eliminates alt-screen flicker |
-| **Work Loop** | `cmd/run.go` | Orchestrates the full parse → prompt → invoke → commit → repeat cycle |
-| **Unified Task Worker** | `cmd/worker.go` | Single `RunTaskWorker` function that owns the complete per-task lifecycle for all execution modes (sequential, parallel, dispatched): branch creation → worktree → prompt → agent → commit → merge-back → cleanup |
+| **Orchestrator** | `cmd/orchestrator.go` + related | Feature iteration, task classification, worktree lifecycle, concurrent dispatch, approval/stop checks, between-task sync, dispatch signaling, worker snapshot tracking |
+| **Task Worker** | `cmd/worker.go` | Single `RunTaskWorker` function that executes a task in a given directory: create task branch → build prompt → run agent → commit → merge back → cleanup. No knowledge of execution modes. |
 | **Parser** | `internal/parser` | Reads `.maggus/features/feature_*.md` and `.maggus/bugs/bug_*.md`; extracts tasks, checkboxes, blocked criteria, UUIDs |
 | **Prompt Builder** | `internal/prompt` | Assembles per-task prompts: bootstrap context files + run metadata + task details + behavioral instructions |
 | **Agent Interface** | `internal/agent` | Pluggable agent backend abstraction: `Run()` (streaming + TUI), `RunOnce()` (text), `Validate()` |
@@ -61,12 +61,15 @@ All runtime state is stored in the `.maggus/` directory. No database.
 | `.maggus/bugs/bug_*.md` | Bug plan files |
 | `.maggus/feature_approvals.yml` | Approval state, keyed by stable UUID |
 | `.maggus/runs/state.json` | Live daemon state snapshot (active feature, task, token counts) for TUI display |
-| `.maggus/runs/state-<worker>.json` | Per-worker state snapshots for parallel task execution |
+| `.maggus/runs/state-<taskID>.json` | Per-worker state snapshot for parallel or dispatched task `<taskID>` |
+| `.maggus/runs/state-workers.json` | Workers index with status per task (working/done/failed/blocked) |
 | `.maggus/logs/<maggus_id>/<pid>.log` | JSONL streaming events per feature/bug GUID; `<maggus_id>` is the feature UUID, `<pid>` is the writer's OS process ID |
 | `.maggus/MEMORY.md` | Cross-task architectural learnings; included in every prompt bootstrap (gitignored) |
 | `.maggus/daemon.pid` | PID of the running daemon process |
 | `.maggus/daemon.stop` | Sentinel: immediate daemon stop |
 | `.maggus/daemon.stop-after-task` | Sentinel: graceful daemon stop after current task |
+| `.maggus/dispatch-<taskID>` | Sentinel: dispatch request for task `<taskID>` (presence = signal; consumed by orchestrator) |
+| `.maggus/worktrees/<taskID>` | Git worktree directory for parallel or dispatched task `<taskID>` |
 | `COMMIT.md` | Written by agent; read by Maggus to commit; never staged itself |
 
 ## Session Locking
@@ -80,8 +83,14 @@ Only one daemon may run per project at a time:
 
 ## Work Loop (Detailed Flow)
 
+The daemon's main cycle invokes the orchestrator, which handles all task
+scheduling, classification, and sequencing:
+
 ```
-start
+daemon cycle
+  │
+  ▼
+Orchestrator.Run()
   │
   ▼
 load config → validate includes → resolve model alias
@@ -93,74 +102,141 @@ ensure .gitignore entries
 parse all active plans (bugs first, then features)
   │
   ▼
-find next workable task
-  (incomplete + not blocked + approved)
-  │
-  ├── none found → done / blocked → exit
+build approved feature groups (in priority order)
   │
   ▼
-create plan branch if on protected branch
-  (feature/feat-NNN for features, fix/bug-NNN for bugs)
-  no branch created when already on a non-protected branch
+for each feature group:
+  │
+  ├── re-check approval state
   │
   ▼
-build prompt
-  (bootstrap context + run metadata + task details + instructions)
+  for each task in feature:
   │
-  ▼
-invoke agent subprocess (streaming JSON)
+  ├── check stop flags and context cancellation
+  ├── check for dispatch requests (.maggus/dispatch-* files)
   │
-  ├── TUI: live spinner, tool list, token usage, elapsed time
+  ├── classify task: parallel-eligible or sequential
   │
-  ▼
-agent writes COMMIT.md, checks off criteria, stages files
+  ├── if parallel:
+  │   ├── create worktree (.maggus/worktrees/{taskID})
+  │   └── RunTaskWorker (concurrent batch via errgroup)
   │
-  ▼
-maggus reads COMMIT.md → git commit -F
+  ├── if sequential:
+  │   └── RunTaskWorker (main repo)
   │
-  ▼
-rename completed plans (feature_N.md → feature_N_completed.md)
+  ├── check remote divergence between tasks
   │
-  ▼
-loop back to "parse all active plans"
+  └── continue to next task
+  │
+  └── return results (completed, failed, warnings, stop reason)
 ```
 
-## Unified Task Worker
+Each `RunTaskWorker` invocation:
+- Creates task branch (in RepoDir) if PlanBranch is set
+- Builds prompt with bootstrap context
+- Invokes agent subprocess (streaming JSON)
+- Marks completed criteria
+- Commits changes (in WorkDir)
+- Merges task branch back (in RepoDir, serialized by MergeMu if concurrent)
+- Cleans up task branch (best-effort)
 
-All three execution modes — sequential, parallel, and dispatched — share a single
-`RunTaskWorker` function in `cmd/worker.go`. This eliminates duplicated
-branch/commit/merge logic that previously lived in three separate code paths.
+## Orchestrator + Worker
+
+The work loop is split into two responsibilities:
+
+- **Orchestrator** (`cmd/orchestrator.go` and related files) — owns feature
+  iteration, task classification, worktree lifecycle, concurrency, approval/stop
+  checks, between-task sync, and dispatch signaling.
+- **Worker** (`cmd/worker.go`) — receives a work directory and executes a single
+  task: create task branch → build prompt → run agent → commit → merge back →
+  cleanup. The worker has no knowledge of execution modes or worktree creation.
+
+### Orchestrator Responsibilities
+
+```
+Orchestrator.Run()
+  │
+  ▼
+load config, parse features/bugs, build approved feature groups
+  │
+  ▼
+for each feature group:
+  │
+  ├── check approval state (re-check between features)
+  │
+  ▼
+  for each task in feature:
+  │
+  ├── check stop flag and stop-at-task signal
+  ├── check for dispatch requests (file-based signaling)
+  │
+  ├── classify task as parallel or sequential (based on metadata + predecessors)
+  │
+  ├── if parallel-eligible:
+  │   ├── create task branch + git worktree (.maggus/worktrees/{taskID})
+  │   ├── launch RunTaskWorker in parallel batch (via errgroup)
+  │   └── remove worktree + delete branch after worker completes
+  │
+  ├── if sequential:
+  │   └── run RunTaskWorker in main repo
+  │
+  ├── check for remote divergence between tasks
+  │
+  └── loop back to next task
+  │
+  └── loop back to next feature
+```
+
+**Key orchestrator patterns:**
+
+- **Task classification** — inspects `Parallel: yes/no` metadata and predecessor
+  completion status to determine if a task can run concurrently
+- **Worktree management** — creates isolated `.maggus/worktrees/{taskID}`
+  directory before launching parallel workers; removes after completion
+- **Parallel batch dispatch** — uses `errgroup` to run eligible tasks
+  concurrently with merge serialization via shared `sync.Mutex` on `WorkerConfig`
+- **Dispatch signaling** — checks for `.maggus/dispatch-{taskID}` sentinel files
+  at the start of each task iteration; runs dispatched tasks ahead of the normal
+  queue
+- **Worker snapshots** — for parallel and dispatched tasks, writes per-worker
+  progress to `.maggus/runs/state-{taskID}.json` for TUI display
+
+### Worker Responsibilities
+
+The worker always:
 
 ```
 RunTaskWorker(WorkerConfig)
   │
-  ├── ExistingWorktreePath set?
-  │     yes → skip branch creation, run agent in provided directory
-  │     no  → UseWorktree?
-  │             yes → create task branch + git worktree (parallel mode)
-  │             no  → create task branch in-place (sequential mode)
+  ├── check approval (if required)
+  │
+  ├── create task branch from PlanBranch (in RepoDir)
+  │   when PlanBranch is non-empty
   │
   ├── build prompt
-  ├── invoke agent subprocess
-  ├── run pre-commit operations (mark completed, fire hooks)
-  ├── git commit from COMMIT.md
-  ├── merge task branch → plan branch (if applicable)
-  └── remove worktree + delete task branch
+  ├── invoke agent subprocess (streaming JSON)
+  │
+  ├── pre-commit callback (mark completed, fire hooks)
+  │
+  ├── git commit from COMMIT.md (in WorkDir)
+  │
+  ├── merge task branch → PlanBranch (in RepoDir, serialized by MergeMu)
+  │
+  └── delete task branch (best-effort)
 ```
 
-### WorkerConfig fields that drive mode selection
+**Key worker fields:**
 
-| Field | Sequential | Parallel | Dispatched |
-|---|---|---|---|
-| `UseWorktree` | `false` | `true` | `false` |
-| `ExistingWorktreePath` | `""` | `""` | worktree path |
-| `RepoDir` | main repo | main repo | main repo (from `--dispatch-repo`) |
-| `MergeMu` | `nil` | `&o.mu` | `nil` |
-
-In **dispatch mode** the worker process runs inside a pre-created git worktree.
-`ExistingWorktreePath` tells the worker to skip branch/worktree creation and run
-the agent directly in that directory. `RepoDir` is set to the main repository so
-merge and cleanup git operations target the correct git object store.
+- `WorkDir` — the directory the worker runs the agent in and commits from. May
+  be the main repo root or a worktree path. The caller (orchestrator) is
+  responsible for creating and cleaning up any worktree before and after calling
+  the worker.
+- `RepoDir` — always the main repository root. Used for branch creation, merge,
+  and cleanup operations.
+- `PlanBranch` — when set, worker creates task branch from this, merges back
+  after commit, and deletes the task branch. When empty, no branching.
+- `MergeMu` — shared mutex (from orchestrator) for serializing merge operations
+  when multiple workers run concurrently. `nil` for sequential mode.
 
 ## Agent Abstraction
 

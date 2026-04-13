@@ -51,12 +51,12 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 |---|---|
 | **parser** | Parses `.maggus/features/feature_*.md` and bug files. Extracts tasks (`### TASK-NNN: Title`), acceptance criteria (checkboxes), and blocked status (`BLOCKED:` prefix). Skips `_completed.md` files. |
 | **prompt** | Assembles the prompt sent to the agent: bootstrap context files (CLAUDE.md, AGENTS.md, etc.), run metadata, task details, and behavioral instructions. Includes files specified in config. |
-| **agent** | Defines the `Agent` interface for AI backend adapters (Claude Code, OpenCode, etc.). The work loop uses this to invoke whichever backend is configured without knowing its CLI specifics. |
+| **agent** | Defines the `Agent` interface for AI backend adapters (Claude Code, OpenCode, etc.). Orchestrator and worker use this to invoke whichever backend is configured without knowing its CLI specifics. |
 | **config** | Parses `.maggus/config.yml`. Resolves model aliases (sonnet→claude-sonnet-4-6, opus→claude-opus-4-6, haiku→claude-haiku-4-5-20251001), validates include file paths, and holds notification settings. |
 | **globalconfig** | Manages global Maggus settings in `~/.maggus/`: repository list, user preferences, lifetime metrics, and binary update state. |
 | **approval** | Manages feature approval state in `.maggus/feature_approvals.yml`. Supports opt-in (explicit approval required) and opt-out (approved by default) modes. |
 | **runlog** | Writes structured JSONL events to `.maggus/logs/<maggus_id>/<pid>.log`, organized by feature/bug GUID. Tracks per-task token usage and cost; prunes old log files per feature directory. Manages daemon state snapshots in `.maggus/runs/` (`state.json`, `state-*.json`). |
-| **stores** | File-backed and in-memory repository implementations for features and bugs. Wraps parser operations for consistent use by the work loop and TUI. |
+| **stores** | File-backed and in-memory repository implementations for features and bugs. Wraps parser operations for consistent use by the orchestrator and TUI. |
 | **gitbranch** | Creates hierarchical branches when starting work on a protected branch (main/master/dev). On protected branches, creates a plan branch (`feature/feat-NNN` for features, `fix/bug-NNN` for bugs); on non-protected branches, stays on the current branch. Task branches: `feature/maggus-NNN/task-MMM` (features), `bugfix/maggus-bug-NNN/task-MMM` (bugs). |
 | **gitcommit** | Reads COMMIT.md written by the agent, strips Co-Authored-By lines, and runs `git commit -F`. |
 | **gitignore** | Ensures required entries exist in `.gitignore`. |
@@ -69,20 +69,29 @@ CI runs `go build ./...` and `go test ./...` in the `src/` directory on PRs to m
 
 ### Run Loop Flow (cmd/run.go)
 
+The daemon invokes the orchestrator once per cycle:
+
 1. Load config → validate includes → resolve model alias
 2. Ensure .gitignore entries
-3. Parse all active feature files → find next workable (incomplete + not blocked + approved) task
-4. Delegate to `RunTaskWorker` (`cmd/worker.go`) for the full per-task lifecycle:
-   - Create task branch (and worktree in parallel mode)
-   - Build prompt with bootstrap context + task details
-   - Run agent subprocess with streaming output
-   - Agent writes COMMIT.md → Maggus commits all changes
-   - Merge task branch → plan branch; remove worktree
-5. Rename completed features (`feature_N.md` → `feature_N_completed.md`)
-6. Loop back to step 3
+3. Create `OrchestratorConfig` with approved feature groups, agent, stores, etc.
+4. Call `Orchestrator.Run()`:
+   - Parse all active feature files → build approved feature groups
+   - For each feature group (bugs first, then features):
+     - Re-check approval state between features
+     - For each task in feature:
+       - Check stop flags and dispatch requests
+       - Classify task as parallel-eligible or sequential
+       - If parallel: create worktree, launch `RunTaskWorker` concurrently
+       - If sequential: call `RunTaskWorker` in main repo
+       - Check remote divergence between tasks
+     - Rename completed features (`feature_N.md` → `feature_N_completed.md`)
+5. Return results to daemon (completed count, failed tasks, stop reason)
 
-`RunTaskWorker` is shared by sequential, parallel, and dispatched execution modes.
-Dispatched workers pass `ExistingWorktreePath` to skip branch/worktree creation.
+`RunTaskWorker` is a unified function used by both sequential and parallel
+execution paths. The orchestrator decides which directory the worker runs in
+(main repo or worktree) and whether to parallelize. The worker has no knowledge
+of execution modes — it simply takes a `WorkDir`, executes the task, and commits
+the result.
 
 ### Platform-Specific Code
 
