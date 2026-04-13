@@ -375,6 +375,26 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		}
 
 		if len(par) > 0 {
+			// Before running the parallel batch, if there is a pending sequential
+			// task, update the main snapshot from "Preparing" to "Waiting for X"
+			// so the user can tell the sequential task is queued, not starting.
+			if len(seq) > 0 {
+				parIDs := make([]string, len(par))
+				for i, t := range par {
+					parIDs[i] = t.ID
+				}
+				waitSnap := runlog.StateSnapshot{
+					MaggusID:      group.MaggusID,
+					TaskID:        seq[0].ID,
+					TaskTitle:     seq[0].Title,
+					ItemTitle:     parser.ParseFileTitle(group.File),
+					Status:        "Waiting for " + strings.Join(parIDs, ", "),
+					RunStartedAt:  cfg.StartTime.UTC().Format(time.RFC3339),
+					TaskStartedAt: cfg.StartTime.UTC().Format(time.RFC3339),
+				}
+				_ = runlog.WriteSnapshot(cfg.Dir, waitSnap)
+			}
+
 			// -- Parallel batch: run all eligible parallel tasks concurrently --
 			batchResult := o.runParallelBatch(&group, par)
 			result.completed += batchResult.completed
