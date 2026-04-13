@@ -74,15 +74,15 @@ A cosmetic companion fix: the "Task Details" tab is renamed to "Details" for con
    - Update the test `"activeTab is 0 by default"` (line 1017) to verify `activeTabFeature == 0 && activeTabTask == 0`.
 
 **Acceptance Criteria:**
-- [ ] `activeTab int` field removed from `statusModel`
-- [ ] `activeTabFeature int` and `activeTabTask int` fields added, both initialized to 0
-- [ ] `activeTabIndex()` and `setActiveTabIndex()` methods added
-- [ ] `activeTabKey()`, `clampActiveTab()`, `updateTabsForSelectionChange()`, number key handler, and rightpane render all updated to use the new methods
-- [ ] Navigating between two tasks preserves the task tab position
-- [ ] Navigating between two feature rows preserves the feature tab position
-- [ ] Navigating from a task to a feature (or vice versa) does not affect the other tracker's position
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./cmd/...` passes
+- [x] `activeTab int` field removed from `statusModel`
+- [x] `activeTabFeature int` and `activeTabTask int` fields added, both initialized to 0
+- [x] `activeTabIndex()` and `setActiveTabIndex()` methods added
+- [x] `activeTabKey()`, `clampActiveTab()`, `updateTabsForSelectionChange()`, number key handler, and rightpane render all updated to use the new methods
+- [x] Navigating between two tasks preserves the task tab position
+- [x] Navigating between two feature rows preserves the feature tab position
+- [x] Navigating from a task to a feature (or vice versa) does not affect the other tracker's position
+- [x] `go build ./...` succeeds
+- [x] `go test ./cmd/...` passes
 
 ### TASK-053-002: Rename "Task Details" tab display name to "Details"
 **Description:** As a user, I want the task tab labeled "Details" (matching the feature row's "Details" tab) so the naming is consistent across contexts.

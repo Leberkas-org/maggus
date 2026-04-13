@@ -569,7 +569,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if idx >= len(tabs) {
 			return m, nil // key beyond available tab count — ignore
 		}
-		m.activeTab = idx
+		m.setActiveTabIndex(idx)
 		if tabs[idx].key == "output" {
 			m.logAutoScroll = true
 			m.logScroll = m.maxLogScroll()
@@ -750,7 +750,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// Switch to Details tab if available in current context.
 				for i, td := range m.availableTabs() {
 					if td.key == "details" {
-						m.activeTab = i
+						m.setActiveTabIndex(i)
 						break
 					}
 				}

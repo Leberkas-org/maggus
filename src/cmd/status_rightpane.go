@@ -23,11 +23,12 @@ func (m statusModel) renderRightPaneTabBar() string {
 	inactiveStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
 	tabs := m.availableTabs()
+	activeIdx := m.activeTabIndex()
 	var parts []string
 	for i, td := range tabs {
 		numStr := dimStyle.Render(fmt.Sprintf("[%d]", i+1))
 		var nameStr string
-		if i == m.activeTab {
+		if i == activeIdx {
 			nameStr = activeStyle.Render(td.name)
 		} else {
 			nameStr = inactiveStyle.Render(td.name)
@@ -54,8 +55,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 
 	tabs := m.availableTabs()
 	tabKey := ""
-	if m.activeTab >= 0 && m.activeTab < len(tabs) {
-		tabKey = tabs[m.activeTab].key
+	if activeIdx := m.activeTabIndex(); activeIdx >= 0 && activeIdx < len(tabs) {
+		tabKey = tabs[activeIdx].key
 	}
 	// When a task detail is open (entered via tree), render it regardless of active tab.
 	var content string

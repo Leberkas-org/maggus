@@ -61,8 +61,9 @@ type statusModel struct {
 	planCursor       int
 	treeCursor       int             // primary navigation index into buildTreeItems(); replaces planCursor
 	treeScrollOffset int             // scroll offset for left pane tree view
-	expandedPlans map[string]bool // keyed by plan.ID; starts empty (all collapsed)
-	activeTab     int            // index into availableTabs()
+	expandedPlans    map[string]bool // keyed by plan.ID; starts empty (all collapsed)
+	activeTabFeature int             // remembered tab index when a feature/bug plan row is selected
+	activeTabTask    int             // remembered tab index when a task row is selected
 
 	// Right-pane tab 3 viewport
 	currentTaskViewport viewport.Model
@@ -166,7 +167,6 @@ func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFi
 		featureStore:     featureStore,
 		bugStore:         bugStore,
 		logAutoScroll: true,
-		activeTab:     0,
 	}
 	// Query actual terminal dimensions before the first render so View() always
 	// has a non-zero size and the split-pane is visible on the first frame
@@ -346,26 +346,56 @@ func (m statusModel) availableTabs() []tabDef {
 	}
 }
 
+// activeTabIndex returns the tab index for the current selection context.
+// selFeature reads activeTabFeature; selRunningTask/selCompletedTask read activeTabTask;
+// selNone always returns 0.
+func (m statusModel) activeTabIndex() int {
+	switch m.selectionCtx() {
+	case selFeature:
+		return m.activeTabFeature
+	case selRunningTask, selCompletedTask:
+		return m.activeTabTask
+	default: // selNone
+		return 0
+	}
+}
+
+// setActiveTabIndex sets the tab index for the current selection context.
+// selFeature writes activeTabFeature; selRunningTask/selCompletedTask write activeTabTask;
+// selNone is a no-op.
+func (m *statusModel) setActiveTabIndex(idx int) {
+	switch m.selectionCtx() {
+	case selFeature:
+		m.activeTabFeature = idx
+	case selRunningTask, selCompletedTask:
+		m.activeTabTask = idx
+	// selNone: no-op
+	}
+}
+
 // activeTabKey returns the key of the currently active tab, or "" if none.
 func (m statusModel) activeTabKey() string {
 	tabs := m.availableTabs()
-	if m.activeTab >= 0 && m.activeTab < len(tabs) {
-		return tabs[m.activeTab].key
+	idx := m.activeTabIndex()
+	if idx >= 0 && idx < len(tabs) {
+		return tabs[idx].key
 	}
 	return ""
 }
 
-// clampActiveTab ensures activeTab is within the bounds of the current
-// available tabs. Call this after any action that might change the tab set
-// (e.g. cursor movement in the left pane).
+// clampActiveTab ensures the active tab tracker for the current context is within
+// the bounds of the available tabs. Call this after any action that might change the
+// tab set (e.g. cursor movement in the left pane).
 func (m *statusModel) clampActiveTab() {
 	tabs := m.availableTabs()
-	if m.activeTab >= len(tabs) {
-		m.activeTab = len(tabs) - 1
+	idx := m.activeTabIndex()
+	if idx >= len(tabs) {
+		idx = len(tabs) - 1
 	}
-	if m.activeTab < 0 {
-		m.activeTab = 0
+	if idx < 0 {
+		idx = 0
 	}
+	m.setActiveTabIndex(idx)
 }
 
 // rebuildForSelectedPlan rebuilds the selectable tasks and resets the cursor
@@ -427,13 +457,13 @@ func (m *statusModel) syncPlanCursorFromTreeCursor() {
 	}
 }
 
-// updateTabsForSelectionChange checks whether the selection context changed
-// relative to prevCtx and resets activeTab to 0 if so. In all cases it clamps
-// activeTab to the bounds of the current available tabs. Pre-loads completed
-// task output when navigating to a completed task.
+// updateTabsForSelectionChange clamps the active tab tracker for the current context
+// to valid bounds when the selection changes. Resets log scroll state when moving
+// between contexts. Pre-loads completed task output when navigating to a completed task.
+// Each context type (feature vs task) has its own independent tab tracker, so no reset
+// is performed on context-type transitions — each tracker remembers its last position.
 func (m *statusModel) updateTabsForSelectionChange(prevCtx selectionContext) {
 	if m.selectionCtx() != prevCtx {
-		m.activeTab = 0
 		m.logScroll = 0
 		m.logAutoScroll = true
 	}

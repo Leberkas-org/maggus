@@ -645,7 +645,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = false
 		m.width = 120
 		m.height = 40
-		m.activeTab = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
+		m.activeTabFeature = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
 		if !strings.Contains(view, "Details") {
@@ -661,7 +661,7 @@ func TestStatusModel_ViewBorderColor(t *testing.T) {
 		m.isNerfed = true
 		m.width = 120
 		m.height = 40
-		m.activeTab = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
+		m.activeTabFeature = 2 // Details tab shows task list (selFeature context: Summary, Plan, Details, Metrics)
 		m.rebuildForSelectedPlan()
 		view := m.View()
 		if !strings.Contains(view, "Details") {
@@ -928,7 +928,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTab = 1 // Feature Details tab shows task list
+		m.activeTabFeature = 1 // Feature Details tab shows task list (Plan tab in selFeature context)
 		m.planCursor = 1
 		m.rebuildForSelectedPlan()
 		view := m.View()
@@ -1013,10 +1013,13 @@ func TestNewStatusModel_Defaults(t *testing.T) {
 		}},
 	}
 
-	t.Run("activeTab is 0 by default", func(t *testing.T) {
+	t.Run("activeTabFeature and activeTabTask are 0 by default", func(t *testing.T) {
 		m := newStatusModel(plans, false, "TASK-001", "plan_1.md", "claude", "/tmp", false, false, nil, nil, nil)
-		if m.activeTab != 0 {
-			t.Errorf("activeTab = %d, want 0", m.activeTab)
+		if m.activeTabFeature != 0 {
+			t.Errorf("activeTabFeature = %d, want 0", m.activeTabFeature)
+		}
+		if m.activeTabTask != 0 {
+			t.Errorf("activeTabTask = %d, want 0", m.activeTabTask)
 		}
 	})
 
@@ -1216,7 +1219,7 @@ func TestRenderCurrentTaskTab_Tab3Active(t *testing.T) {
 			expandedPlans: map[string]bool{"plan_1": true},
 			treeCursor:    1, // task row (plan at 0, task at 1)
 			showAll:       true,
-			activeTab:     2, // taskdetails in selCompletedTask context
+			activeTabTask: 2, // taskdetails in selCompletedTask context (index 2)
 			nextTaskID:    "",
 			nextTaskFile:  "",
 			width:         120,
@@ -1337,11 +1340,11 @@ func TestStatusModel_LeftPaneUpDownNavigation(t *testing.T) {
 		}
 	})
 
-	t.Run("up always navigates tree regardless of activeTab", func(t *testing.T) {
+	t.Run("up always navigates tree regardless of activeTabFeature", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTab = 0
+		m.activeTabFeature = 0
 		m.planCursor = 1
 		m.treeCursor = 1
 
@@ -1473,11 +1476,11 @@ func TestStatusModel_TreeExpandCollapse(t *testing.T) {
 		}
 	})
 
-	t.Run("right always expands regardless of activeTab", func(t *testing.T) {
+	t.Run("right always expands regardless of activeTabFeature", func(t *testing.T) {
 		m := newStatusModel(plans, true, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTab = 0
+		m.activeTabFeature = 0
 		m.treeCursor = 0
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
@@ -1500,8 +1503,8 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTab != 2 {
-			t.Errorf("activeTab = %d, want 2 (Details)", got.activeTab)
+		if got.activeTabFeature != 2 {
+			t.Errorf("activeTabFeature = %d, want 2 (Details)", got.activeTabFeature)
 		}
 	})
 
@@ -1509,12 +1512,12 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTab = 3 // currently on metrics
+		m.activeTabFeature = 3 // currently on metrics
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTab != 2 {
-			t.Errorf("activeTab = %d, want 2 after enter on plan row", got.activeTab)
+		if got.activeTabFeature != 2 {
+			t.Errorf("activeTabFeature = %d, want 2 after enter on plan row", got.activeTabFeature)
 		}
 	})
 }
@@ -1524,15 +1527,15 @@ func TestStatusModel_TabKeyIsNoOp(t *testing.T) {
 		{ID: "plan_1", File: "plan_1.md", Tasks: []parser.Task{{ID: "T1"}}},
 	}
 
-	t.Run("tab key does not change activeTab", func(t *testing.T) {
+	t.Run("tab key does not change activeTabFeature", func(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		got := result.(statusModel)
-		if got.activeTab != m.activeTab {
-			t.Errorf("activeTab changed from %d to %d after tab key", m.activeTab, got.activeTab)
+		if got.activeTabFeature != m.activeTabFeature {
+			t.Errorf("activeTabFeature changed from %d to %d after tab key", m.activeTabFeature, got.activeTabFeature)
 		}
 	})
 }
@@ -1553,14 +1556,14 @@ func TestRenderLeftPane_LineCount(t *testing.T) {
 
 // TestRenderRightPane_LineCount verifies that renderRightPane(w, h) returns exactly
 // h+1 lines when h is large enough that tab content fits within contentH = h-2.
-// Uses a selFeature context (activeTab=0 → Summary tab). Heights must be large enough
+// Uses a selFeature context (activeTabFeature=0 → Summary tab). Heights must be large enough
 // that contentH (h-2) accommodates the ~10-line feature summary content.
 func TestRenderRightPane_LineCount(t *testing.T) {
 	m := statusModel{
-		plans:     []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
-		width:     120,
-		height:    40,
-		activeTab: 0, // Summary tab
+		plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+		width:            120,
+		height:           40,
+		activeTabFeature: 0, // Summary tab
 	}
 	for _, h := range []int{20, 34} {
 		out := m.renderRightPane(80, h)
@@ -2259,46 +2262,46 @@ func TestAvailableTabs(t *testing.T) {
 }
 
 func TestClampActiveTab(t *testing.T) {
-	t.Run("clamps above max", func(t *testing.T) {
+	t.Run("clamps above max for selFeature", func(t *testing.T) {
 		m := statusModel{
-			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
-			treeCursor: 0,
-			activeTab:  10,
+			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor:       0,
+			activeTabFeature: 10,
 		}
 		m.clampActiveTab()
 		tabs := m.availableTabs() // selFeature: 4 tabs
-		if m.activeTab != len(tabs)-1 {
-			t.Errorf("activeTab = %d, want %d", m.activeTab, len(tabs)-1)
+		if m.activeTabFeature != len(tabs)-1 {
+			t.Errorf("activeTabFeature = %d, want %d", m.activeTabFeature, len(tabs)-1)
 		}
 	})
 
-	t.Run("keeps valid index", func(t *testing.T) {
+	t.Run("keeps valid index for selFeature", func(t *testing.T) {
 		m := statusModel{
-			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
-			treeCursor: 0,
-			activeTab:  1,
+			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor:       0,
+			activeTabFeature: 1,
 		}
 		m.clampActiveTab()
-		if m.activeTab != 1 {
-			t.Errorf("activeTab = %d, want 1", m.activeTab)
+		if m.activeTabFeature != 1 {
+			t.Errorf("activeTabFeature = %d, want 1", m.activeTabFeature)
 		}
 	})
 
-	t.Run("clamps negative to 0", func(t *testing.T) {
+	t.Run("clamps negative to 0 for selFeature", func(t *testing.T) {
 		m := statusModel{
-			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
-			treeCursor: 0,
-			activeTab:  -1,
+			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor:       0,
+			activeTabFeature: -1,
 		}
 		m.clampActiveTab()
-		if m.activeTab != 0 {
-			t.Errorf("activeTab = %d, want 0", m.activeTab)
+		if m.activeTabFeature != 0 {
+			t.Errorf("activeTabFeature = %d, want 0", m.activeTabFeature)
 		}
 	})
 }
 
 func TestUpdateTabsForSelectionChange(t *testing.T) {
-	t.Run("resets to 0 when context changes", func(t *testing.T) {
+	t.Run("does not reset task tracker when transitioning feature→task", func(t *testing.T) {
 		completedTask := parser.Task{
 			ID:       "TASK-001",
 			Criteria: []parser.Criterion{{Checked: true}},
@@ -2312,37 +2315,41 @@ func TestUpdateTabsForSelectionChange(t *testing.T) {
 			expandedPlans: map[string]bool{"plan_1": true},
 			treeCursor:    1, // task row → selCompletedTask
 			showAll:       true,
-			activeTab:     2,
+			activeTabTask: 2, // task tracker at Task Details (index 2; valid in 4-tab selCompletedTask set)
 		}
 		// Simulate moving from selFeature (prevCtx) to selCompletedTask (current)
 		m.updateTabsForSelectionChange(selFeature)
-		if m.activeTab != 0 {
-			t.Errorf("activeTab = %d, want 0 (should reset on context change)", m.activeTab)
+		// Task tracker should be preserved (clamped only if out of bounds, which 2 is not in 4-tab set)
+		if m.activeTabTask != 2 {
+			t.Errorf("activeTabTask = %d, want 2 (independent trackers — task tab preserved)", m.activeTabTask)
 		}
 	})
 
-	t.Run("preserves activeTab when context stays the same", func(t *testing.T) {
+	t.Run("preserves activeTabFeature when context stays selFeature", func(t *testing.T) {
 		m := statusModel{
-			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}, {ID: "plan_2", File: "plan_2.md"}},
-			treeCursor: 0, // plan row → selFeature
-			activeTab:  2,
+			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}, {ID: "plan_2", File: "plan_2.md"}},
+			treeCursor:       0, // plan row → selFeature
+			activeTabFeature: 2,
 		}
 		// Same context (selFeature → selFeature)
 		m.updateTabsForSelectionChange(selFeature)
-		if m.activeTab != 2 {
-			t.Errorf("activeTab = %d, want 2 (should preserve when context unchanged)", m.activeTab)
+		if m.activeTabFeature != 2 {
+			t.Errorf("activeTabFeature = %d, want 2 (should preserve when context unchanged)", m.activeTabFeature)
 		}
 	})
 
 	t.Run("clamps when same context but out of range", func(t *testing.T) {
+		// selNone has 1 tab; any tracker value > 0 should clamp to 0.
+		// Since selNone returns 0 from activeTabIndex() (no-op on set), use selFeature with out-of-range value.
 		m := statusModel{
-			plans:      nil, // empty → selNone (1 tab: Metrics)
-			treeCursor: 0,
-			activeTab:  5,
+			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
+			treeCursor:       0, // selFeature: 4 tabs
+			activeTabFeature: 10,
 		}
-		m.updateTabsForSelectionChange(selNone)
-		if m.activeTab != 0 {
-			t.Errorf("activeTab = %d, want 0 (should clamp to max index)", m.activeTab)
+		m.updateTabsForSelectionChange(selFeature)
+		tabs := m.availableTabs() // 4 tabs for selFeature
+		if m.activeTabFeature != len(tabs)-1 {
+			t.Errorf("activeTabFeature = %d, want %d (should clamp to max index)", m.activeTabFeature, len(tabs)-1)
 		}
 	})
 }
@@ -2914,4 +2921,190 @@ func TestHandleAltRunDispatch_DaemonRunning_AlreadyRunning_NoSentinel(t *testing
 	if _, err := os.Stat(sentinelPath); !os.IsNotExist(err) {
 		t.Error("expected no sentinel file when task already running")
 	}
+}
+
+// ── TestActiveTabIndex_UsesContextAppropriateTracker ─────────────────────────
+
+func TestActiveTabIndex_UsesContextAppropriateTracker(t *testing.T) {
+	t.Run("selFeature reads activeTabFeature", func(t *testing.T) {
+		m := makeModelForCtx(selFeature)
+		m.activeTabFeature = 2
+		m.activeTabTask = 1
+		if got := m.activeTabIndex(); got != 2 {
+			t.Errorf("activeTabIndex() = %d, want 2 (activeTabFeature)", got)
+		}
+	})
+
+	t.Run("selRunningTask reads activeTabTask", func(t *testing.T) {
+		m := makeModelForCtx(selRunningTask)
+		m.activeTabFeature = 2
+		m.activeTabTask = 1
+		if got := m.activeTabIndex(); got != 1 {
+			t.Errorf("activeTabIndex() = %d, want 1 (activeTabTask)", got)
+		}
+	})
+
+	t.Run("selCompletedTask reads activeTabTask", func(t *testing.T) {
+		m := makeModelForCtx(selCompletedTask)
+		m.activeTabFeature = 2
+		m.activeTabTask = 1
+		if got := m.activeTabIndex(); got != 1 {
+			t.Errorf("activeTabIndex() = %d, want 1 (activeTabTask)", got)
+		}
+	})
+
+	t.Run("selNone returns 0 regardless of trackers", func(t *testing.T) {
+		m := makeModelForCtx(selNone)
+		m.activeTabFeature = 2
+		m.activeTabTask = 1
+		if got := m.activeTabIndex(); got != 0 {
+			t.Errorf("activeTabIndex() = %d, want 0 for selNone", got)
+		}
+	})
+}
+
+// ── TestSetActiveTabIndex_UpdatesContextAppropriateTracker ───────────────────
+
+func TestSetActiveTabIndex_UpdatesContextAppropriateTracker(t *testing.T) {
+	t.Run("selFeature sets activeTabFeature", func(t *testing.T) {
+		m := makeModelForCtx(selFeature)
+		m.setActiveTabIndex(3)
+		if m.activeTabFeature != 3 {
+			t.Errorf("activeTabFeature = %d, want 3", m.activeTabFeature)
+		}
+		if m.activeTabTask != 0 {
+			t.Errorf("activeTabTask = %d, want 0 (should not change)", m.activeTabTask)
+		}
+	})
+
+	t.Run("selRunningTask sets activeTabTask", func(t *testing.T) {
+		m := makeModelForCtx(selRunningTask)
+		m.setActiveTabIndex(2)
+		if m.activeTabTask != 2 {
+			t.Errorf("activeTabTask = %d, want 2", m.activeTabTask)
+		}
+		if m.activeTabFeature != 0 {
+			t.Errorf("activeTabFeature = %d, want 0 (should not change)", m.activeTabFeature)
+		}
+	})
+
+	t.Run("selCompletedTask sets activeTabTask", func(t *testing.T) {
+		m := makeModelForCtx(selCompletedTask)
+		m.setActiveTabIndex(1)
+		if m.activeTabTask != 1 {
+			t.Errorf("activeTabTask = %d, want 1", m.activeTabTask)
+		}
+		if m.activeTabFeature != 0 {
+			t.Errorf("activeTabFeature = %d, want 0 (should not change)", m.activeTabFeature)
+		}
+	})
+
+	t.Run("selNone is a no-op", func(t *testing.T) {
+		m := makeModelForCtx(selNone)
+		m.activeTabFeature = 1
+		m.activeTabTask = 2
+		m.setActiveTabIndex(99)
+		if m.activeTabFeature != 1 || m.activeTabTask != 2 {
+			t.Errorf("selNone setActiveTabIndex should be no-op: feature=%d task=%d", m.activeTabFeature, m.activeTabTask)
+		}
+	})
+}
+
+// ── TestNavigationPreservesTabTrackers ───────────────────────────────────────
+
+func TestNavigationPreservesTabTrackers(t *testing.T) {
+	// Two-feature setup for feature↔feature navigation.
+	twoFeaturePlans := []parser.Plan{
+		{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{{ID: "TASK-001", Title: "T1"}}},
+		{ID: "f2", File: "feature_2.md", Tasks: []parser.Task{{ID: "TASK-002", Title: "T2"}}},
+	}
+
+	t.Run("navigating between feature rows preserves activeTabFeature", func(t *testing.T) {
+		m := statusModel{
+			plans:         twoFeaturePlans,
+			expandedPlans: make(map[string]bool),
+			treeCursor:    0, // on f1 → selFeature
+			width:         120,
+			height:        40,
+		}
+		m.activeTabFeature = 2 // set feature tab tracker to Details (index 2)
+
+		// Navigate down to f2 (still selFeature)
+		result := pressKey(m, "j")
+		if result.activeTabFeature != 2 {
+			t.Errorf("activeTabFeature = %d, want 2 after navigating between features", result.activeTabFeature)
+		}
+	})
+
+	// Two-task setup: expand plan so both task rows are visible.
+	twoTaskPlan := []parser.Plan{
+		{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{
+			{ID: "TASK-001", Title: "T1", Criteria: []parser.Criterion{{Checked: true, Text: "done"}}},
+			{ID: "TASK-002", Title: "T2", Criteria: []parser.Criterion{{Checked: true, Text: "done"}}},
+		}},
+	}
+
+	t.Run("navigating between task rows preserves activeTabTask", func(t *testing.T) {
+		m := statusModel{
+			plans:         twoTaskPlan,
+			expandedPlans: map[string]bool{"f1": true},
+			treeCursor:    1, // task row TASK-001 → selCompletedTask
+			showAll:       true,
+			width:         120,
+			height:        40,
+		}
+		m.activeTabTask = 2 // task tab tracker at index 2 (Task Details)
+
+		// Navigate down to TASK-002 (still selCompletedTask)
+		result := pressKey(m, "j")
+		if result.activeTabTask != 2 {
+			t.Errorf("activeTabTask = %d, want 2 after navigating between tasks", result.activeTabTask)
+		}
+	})
+
+	t.Run("navigating from feature to task does not reset activeTabFeature", func(t *testing.T) {
+		m := statusModel{
+			plans: []parser.Plan{
+				{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{
+					{ID: "TASK-001", Title: "T1", Criteria: []parser.Criterion{{Checked: true, Text: "done"}}},
+				}},
+			},
+			expandedPlans: map[string]bool{"f1": true},
+			treeCursor:    0, // plan row → selFeature
+			showAll:       true,
+			width:         120,
+			height:        40,
+		}
+		m.activeTabFeature = 2 // feature tracker at Details
+
+		// Navigate down to the task row → selCompletedTask
+		result := pressKey(m, "j")
+		// Feature tracker must be undisturbed
+		if result.activeTabFeature != 2 {
+			t.Errorf("activeTabFeature = %d, want 2 (should not be reset when entering task context)", result.activeTabFeature)
+		}
+	})
+
+	t.Run("navigating from task to feature does not reset activeTabTask", func(t *testing.T) {
+		m := statusModel{
+			plans: []parser.Plan{
+				{ID: "f1", File: "feature_1.md", Tasks: []parser.Task{
+					{ID: "TASK-001", Title: "T1", Criteria: []parser.Criterion{{Checked: true, Text: "done"}}},
+				}},
+			},
+			expandedPlans: map[string]bool{"f1": true},
+			treeCursor:    1, // task row → selCompletedTask
+			showAll:       true,
+			width:         120,
+			height:        40,
+		}
+		m.activeTabTask = 1 // task tracker at Output
+
+		// Navigate up to the plan row → selFeature
+		result := pressKey(m, "k")
+		// Task tracker must be undisturbed
+		if result.activeTabTask != 1 {
+			t.Errorf("activeTabTask = %d, want 1 (should not be reset when entering feature context)", result.activeTabTask)
+		}
+	})
 }

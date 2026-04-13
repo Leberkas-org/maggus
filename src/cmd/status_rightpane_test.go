@@ -151,7 +151,7 @@ func TestRenderRightPaneTabBar_NumberLabelsStartAt1(t *testing.T) {
 func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 	t.Run("selNone dispatches Metrics tab", func(t *testing.T) {
 		m := makeModelForCtx(selNone)
-		m.activeTab = 0 // Metrics
+		// selNone always uses index 0 (Metrics) regardless of tracker values
 		out := m.renderRightPane(80, 20)
 		// Summary placeholder should not appear; no "coming soon"
 		if strings.Contains(out, "coming soon") {
@@ -161,7 +161,7 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 	t.Run("selFeature tab 0 dispatches Summary tab", func(t *testing.T) {
 		m := makeModelForCtx(selFeature)
-		m.activeTab = 0 // Summary
+		m.activeTabFeature = 0 // Summary
 		out := m.renderRightPane(80, 20)
 		// Summary tab now renders real feature content; verify the plan ID appears.
 		if !strings.Contains(out, "f1") {
@@ -174,7 +174,7 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 	t.Run("selFeature tab 1 dispatches Plan tab", func(t *testing.T) {
 		m := makeModelForCtx(selFeature)
-		m.activeTab = 1 // Plan
+		m.activeTabFeature = 1 // Plan
 		out := m.renderRightPane(80, 20)
 		// Plan tab renders execution steps; Summary placeholder must not appear
 		if strings.Contains(out, "coming soon") {
@@ -184,7 +184,7 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 	t.Run("selFeature tab 2 dispatches Details tab", func(t *testing.T) {
 		m := makeModelForCtx(selFeature)
-		m.activeTab = 2 // Details
+		m.activeTabFeature = 2 // Details
 		out := m.renderRightPane(80, 20)
 		// Details renders the task list; Summary placeholder must not appear
 		if strings.Contains(out, "coming soon") {
@@ -194,7 +194,7 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 	t.Run("selRunningTask tab 0 dispatches Output tab", func(t *testing.T) {
 		m := makeModelForCtx(selRunningTask)
-		m.activeTab = 0 // Output
+		m.activeTabTask = 0 // Output
 		out := m.renderRightPane(80, 20)
 		// Daemon running but no snapshot → "Waiting for agent output..."
 		if !strings.Contains(out, "Waiting for agent output") {
@@ -204,12 +204,12 @@ func TestRenderRightPane_DispatchesCorrectTab(t *testing.T) {
 
 	t.Run("different tabs produce different output", func(t *testing.T) {
 		m := makeModelForCtx(selFeature)
-		m.activeTab = 0 // Summary
+		m.activeTabFeature = 0 // Summary
 		out0 := m.renderRightPane(80, 20)
-		m.activeTab = 1 // Details
+		m.activeTabFeature = 1 // Plan
 		out1 := m.renderRightPane(80, 20)
 		if out0 == out1 {
-			t.Error("Summary and Details tabs should render different content")
+			t.Error("Summary and Plan tabs should render different content")
 		}
 	})
 }
@@ -238,10 +238,10 @@ func TestUpdateList_NumberKeysMappedPositionally(t *testing.T) {
 		name := fmt.Sprintf("ctx=%d key=%s → tab %d", tt.ctx, tt.key, tt.wantTab)
 		t.Run(name, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.activeTab = 0
+			// Both trackers start at 0 (zero value)
 			result := pressKey(m, tt.key)
-			if result.activeTab != tt.wantTab {
-				t.Errorf("activeTab = %d, want %d", result.activeTab, tt.wantTab)
+			if got := result.activeTabIndex(); got != tt.wantTab {
+				t.Errorf("activeTabIndex() = %d, want %d", got, tt.wantTab)
 			}
 		})
 	}
@@ -268,11 +268,11 @@ func TestUpdateList_KeysBeyondTabCountIgnored(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.activeTab = 0
+			// Both trackers start at 0 (zero value)
 			result := pressKey(m, tt.key)
-			// Active tab should be unchanged
-			if result.activeTab != 0 {
-				t.Errorf("activeTab should remain 0 (key ignored), but got %d", result.activeTab)
+			// Active tab should be unchanged (still 0)
+			if got := result.activeTabIndex(); got != 0 {
+				t.Errorf("activeTabIndex() should remain 0 (key ignored), but got %d", got)
 			}
 		})
 	}
@@ -396,7 +396,7 @@ func TestRenderRightPane_TaskDetails_DoesNotOverflowHeight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.activeTab = tt.tabIdx
+			m.activeTabTask = tt.tabIdx // both selRunningTask and selCompletedTask use task tracker
 
 			width := 80
 			height := 20
@@ -444,8 +444,8 @@ func pressSpecialKey(m statusModel, keyType tea.KeyType) statusModel {
 // with a live snapshot containing n tool entries.
 func makeOutputModel(n int) statusModel {
 	m := makeModelForCtx(selRunningTask)
-	// Switch to the Output tab (index 0 for selRunningTask).
-	m.activeTab = 0
+	// Switch to the Output tab (index 0 for selRunningTask, which uses activeTabTask).
+	m.activeTabTask = 0
 	// Build a snapshot with n tool entries.
 	entries := make([]runlog.SnapshotToolEntry, n)
 	for i := range entries {
@@ -551,7 +551,7 @@ func TestScrollKeys_NoopOnNonScrollableTabs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			m := makeModelForCtx(tt.ctx)
-			m.activeTab = tt.tab
+			m.setActiveTabIndex(tt.tab) // writes to the context-appropriate tracker
 			m.logScroll = 3
 			m.logAutoScroll = false
 
