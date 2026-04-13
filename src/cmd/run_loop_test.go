@@ -1022,3 +1022,68 @@ func TestBuildApprovedPlans_CompletedFileExcluded(t *testing.T) {
 		t.Errorf("expected 0 groups (completed file excluded), got %d", len(groups))
 	}
 }
+
+// TestBuildApprovedPlans_ApprovalModeSwitch verifies that switching the config
+// from opt-in to opt-out causes a previously unapproved feature to be included.
+// This simulates the behaviour of runOneDaemonCycle loading a fresh config each
+// cycle: after the user edits approval_required in config.yml, the next cycle
+// picks up the feature without a daemon restart.
+func TestBuildApprovedPlans_ApprovalModeSwitch(t *testing.T) {
+	dir := setupCleanDir(t)
+	writeFeatureFile(t, dir, "feature_001.md", incompleteTaskContent("TASK-001-001", "Add feature"))
+	// No approval entry written — feature is unapproved under opt-in mode.
+
+	featureStore := stores.NewFileFeatureStore(dir)
+	bugStore := stores.NewFileBugStore(dir)
+
+	// Cycle 1: opt-in mode, no approval → feature is excluded.
+	optInCfg := config.Config{ApprovalMode: config.ApprovalModeOptIn}
+	groups, err := buildApprovedPlans(dir, optInCfg, featureStore, bugStore)
+	if err != nil {
+		t.Fatalf("cycle 1 unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("cycle 1 (opt-in, no approval): expected 0 groups, got %d", len(groups))
+	}
+
+	// User edits config.yml to switch to opt-out (auto-approve) mode.
+	// The daemon reloads config at the start of the next cycle.
+	optOutCfg := config.Config{ApprovalMode: config.ApprovalModeOptOut}
+	groups, err = buildApprovedPlans(dir, optOutCfg, featureStore, bugStore)
+	if err != nil {
+		t.Fatalf("cycle 2 unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Errorf("cycle 2 (opt-out): expected 1 group, got %d", len(groups))
+	}
+}
+
+// TestRunOneDaemonCycle_LoadsFreshConfigViaInjection verifies that
+// runOneDaemonCycle calls loadConfigFn on each invocation, enabling
+// config changes to take effect without a daemon restart.
+func TestRunOneDaemonCycle_LoadsFreshConfigViaInjection(t *testing.T) {
+	orig := loadConfigFn
+	defer func() { loadConfigFn = orig }()
+
+	callCount := 0
+	loadConfigFn = func(dir string) (config.Config, error) {
+		callCount++
+		return config.Config{ApprovalMode: config.ApprovalModeOptOut}, nil
+	}
+
+	// Use a temp dir with no feature/bug files so the cycle returns immediately
+	// after the config load (returns false, nil — no work found).
+	dir := setupCleanDir(t)
+
+	wc := &runLoopConfig{
+		cfg: config.Config{ApprovalMode: config.ApprovalModeOptIn},
+		dir: dir,
+	}
+
+	mp := &mockPrinter{}
+	_, _ = runOneDaemonCycle(mp, wc, dir, nil, t.Context())
+
+	if callCount == 0 {
+		t.Error("expected loadConfigFn to be called at least once per cycle")
+	}
+}

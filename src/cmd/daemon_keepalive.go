@@ -221,12 +221,21 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	// Prune stale worker entries (done/failed/blocked older than 5 min).
 	_ = runlog.PruneStaleWorkerEntries(dir, 5*time.Minute)
 
+	// Load a fresh config at the start of each cycle so changes to config.yml
+	// (e.g. approval_required) take effect without a daemon restart.
+	cycleCfg := wc.cfg
+	if freshCfg, cfgErr := loadConfigFn(dir); cfgErr == nil {
+		cycleCfg = freshCfg
+	} else {
+		cmd.Printf("Warning: could not reload config, using cached config: %v\n", cfgErr)
+	}
+
 	featureStore := stores.NewFileFeatureStore(dir)
 	bugStore := stores.NewFileBugStore(dir)
 
 	// Recovery: detect and fix any dirty state left by a previous interrupted run.
 	// Errors are warnings only — the normal work cycle is attempted regardless.
-	recoveryLogs, recoveryErr := gitrecover.RecoverDirtyState(dir, wc.cfg, featureStore, bugStore)
+	recoveryLogs, recoveryErr := gitrecover.RecoverDirtyState(dir, cycleCfg, featureStore, bugStore)
 	for _, msg := range recoveryLogs {
 		cmd.Println(msg)
 	}
@@ -244,7 +253,7 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	}
 
 	// Build approved plans with approval filtering.
-	featureGroups, fgErr := buildApprovedPlans(dir, wc.cfg, featureStore, bugStore)
+	featureGroups, fgErr := buildApprovedPlans(dir, cycleCfg, featureStore, bugStore)
 	if fgErr != nil {
 		return false, fmt.Errorf("build approved plans: %w", fgErr)
 	}
@@ -273,9 +282,9 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 	repoDir := dir
 	planBranch := ""
 	branchMsg := ""
-	if wc.cfg.Git.IsAutoBranchEnabled() {
+	if cycleCfg.Git.IsAutoBranchEnabled() {
 		var pbErr error
-		planBranch, branchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, wc.cfg.Git.ProtectedBranchList())
+		planBranch, branchMsg, pbErr = gitbranch.EnsurePlanBranch(repoDir, branchTask.ID, cycleCfg.Git.ProtectedBranchList())
 		if pbErr != nil {
 			return false, fmt.Errorf("setup plan branch: %w", pbErr)
 		}
@@ -405,10 +414,10 @@ func runOneDaemonCycle(cmd printer, wc *runLoopConfig, dir string, runLogger *ru
 		Dir:            dir,
 		RepoDir:        repoDir,
 		PlanBranch:     planBranch,
-		OnComplete:     wc.cfg.OnComplete,
-		Hooks:          wc.cfg.Hooks,
+		OnComplete:     cycleCfg.OnComplete,
+		Hooks:          cycleCfg.Hooks,
 		FeatureGroups:  featureGroups,
-		AutoContinue:   wc.cfg.IsAutoContinueEnabled(),
+		AutoContinue:   cycleCfg.IsAutoContinueEnabled(),
 		StopFlag:       stopFlagAtomic,
 		StopAtTaskID:   stopAtTaskIDAtomic,
 		StartTime:      setup.startTime,
