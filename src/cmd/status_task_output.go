@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leberkas-org/maggus/internal/parser"
 	"github.com/leberkas-org/maggus/internal/runlog"
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
@@ -200,6 +201,44 @@ func (m *statusModel) ensureCompletedTaskOutput() {
 	m.logAutoScroll = true
 	m.cachedTaskOutputID = task.ID
 	m.cachedTaskOutput = loadCompletedTaskOutput(m.dir, m.maggusIDForSelectedTask(), task.ID)
+}
+
+// loadFeatureOutput loads output snapshots for all tasks of a feature.
+// It calls loadCompletedTaskOutput for each task and returns a slice with one entry per task.
+// Tasks with no log data have a nil entry. If maggusID is empty, all entries are nil.
+func loadFeatureOutput(dir, maggusID string, tasks []parser.Task) []*runlog.StateSnapshot {
+	result := make([]*runlog.StateSnapshot, len(tasks))
+	if maggusID == "" {
+		return result
+	}
+	for i, task := range tasks {
+		result[i] = loadCompletedTaskOutput(dir, maggusID, task.ID)
+	}
+	return result
+}
+
+// ensureFeatureOutput loads the feature-level output cache for the selected plan
+// if the cache doesn't already hold data for the current plan's MaggusID.
+// Resets logScroll and logAutoScroll when the cache is invalidated.
+func (m *statusModel) ensureFeatureOutput() {
+	plan := m.selectedPlan()
+	if plan.MaggusID == "" {
+		if m.cachedFeatureOutputID != "" {
+			m.cachedFeatureOutput = nil
+			m.cachedFeatureOutputID = ""
+			m.logScroll = 0
+			m.logAutoScroll = true
+		}
+		return
+	}
+	if m.cachedFeatureOutputID == plan.MaggusID {
+		return // cache is valid
+	}
+	// Plan changed: reset scroll state and reload.
+	m.logScroll = 0
+	m.logAutoScroll = true
+	m.cachedFeatureOutputID = plan.MaggusID
+	m.cachedFeatureOutput = loadFeatureOutput(m.dir, plan.MaggusID, plan.Tasks)
 }
 
 // loadCompletedTaskOutput scans run log JSONL files in .maggus/logs/<maggusID>/ for

@@ -928,7 +928,7 @@ func TestStatusModel_ViewWithBugs(t *testing.T) {
 		m := newStatusModel(items, false, "BUG-001-001", "bug_001.md", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTabFeature = 1 // Feature Details tab shows task list (Plan tab in selFeature context)
+		m.activeTabFeature = 2 // Plan tab shows task execution order with IDs (selFeature context: Output, Summary, Plan, Details, Metrics)
 		m.planCursor = 1
 		m.rebuildForSelectedPlan()
 		view := m.View()
@@ -1503,8 +1503,8 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTabFeature != 2 {
-			t.Errorf("activeTabFeature = %d, want 2 (Details)", got.activeTabFeature)
+		if got.activeTabFeature != 3 {
+			t.Errorf("activeTabFeature = %d, want 3 (Details)", got.activeTabFeature)
 		}
 	})
 
@@ -1512,12 +1512,12 @@ func TestStatusModel_EnterOnPlanSwitchesToDetailsTab(t *testing.T) {
 		m := newStatusModel(plans, false, "", "", "claude", "/tmp", false, false, nil, nil, nil)
 		m.width = 120
 		m.height = 40
-		m.activeTabFeature = 3 // currently on metrics
+		m.activeTabFeature = 4 // currently on metrics
 
 		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		got := result.(statusModel)
-		if got.activeTabFeature != 2 {
-			t.Errorf("activeTabFeature = %d, want 2 after enter on plan row", got.activeTabFeature)
+		if got.activeTabFeature != 3 {
+			t.Errorf("activeTabFeature = %d, want 3 after enter on plan row", got.activeTabFeature)
 		}
 	})
 }
@@ -2166,16 +2166,17 @@ func TestAvailableTabs(t *testing.T) {
 		}
 	})
 
-	t.Run("selFeature returns Summary, Plan, Details, Metrics", func(t *testing.T) {
+	t.Run("selFeature returns Output, Summary, Plan, Details, Metrics", func(t *testing.T) {
 		m := statusModel{
 			plans:      []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
 			treeCursor: 0,
 		}
 		tabs := m.availableTabs()
-		if len(tabs) != 4 {
-			t.Fatalf("len(availableTabs) = %d, want 4", len(tabs))
+		if len(tabs) != 5 {
+			t.Fatalf("len(availableTabs) = %d, want 5", len(tabs))
 		}
 		expected := []struct{ key, name string }{
+			{"featureoutput", "Output"},
 			{"summary", "Summary"},
 			{"plan", "Plan"},
 			{"details", "Details"},
@@ -2269,7 +2270,7 @@ func TestClampActiveTab(t *testing.T) {
 			activeTabFeature: 10,
 		}
 		m.clampActiveTab()
-		tabs := m.availableTabs() // selFeature: 4 tabs
+		tabs := m.availableTabs() // selFeature: 5 tabs
 		if m.activeTabFeature != len(tabs)-1 {
 			t.Errorf("activeTabFeature = %d, want %d", m.activeTabFeature, len(tabs)-1)
 		}
@@ -2343,11 +2344,11 @@ func TestUpdateTabsForSelectionChange(t *testing.T) {
 		// Since selNone returns 0 from activeTabIndex() (no-op on set), use selFeature with out-of-range value.
 		m := statusModel{
 			plans:            []parser.Plan{{ID: "plan_1", File: "plan_1.md"}},
-			treeCursor:       0, // selFeature: 4 tabs
+			treeCursor:       0, // selFeature: 5 tabs
 			activeTabFeature: 10,
 		}
 		m.updateTabsForSelectionChange(selFeature)
-		tabs := m.availableTabs() // 4 tabs for selFeature
+		tabs := m.availableTabs() // 5 tabs for selFeature
 		if m.activeTabFeature != len(tabs)-1 {
 			t.Errorf("activeTabFeature = %d, want %d (should clamp to max index)", m.activeTabFeature, len(tabs)-1)
 		}
@@ -3027,7 +3028,7 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 			width:         120,
 			height:        40,
 		}
-		m.activeTabFeature = 2 // set feature tab tracker to Details (index 2)
+		m.activeTabFeature = 2 // set feature tab tracker to Plan (index 2)
 
 		// Navigate down to f2 (still selFeature)
 		result := pressKey(m, "j")
@@ -3075,7 +3076,7 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 			width:         120,
 			height:        40,
 		}
-		m.activeTabFeature = 2 // feature tracker at Details
+		m.activeTabFeature = 2 // feature tracker at Plan
 
 		// Navigate down to the task row → selCompletedTask
 		result := pressKey(m, "j")

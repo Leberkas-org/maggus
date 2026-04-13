@@ -29,12 +29,12 @@ Add an Output tab to the `selFeature` context in the status TUI. When a feature 
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `statusModel` has two new fields: `cachedFeatureOutput []*runlog.StateSnapshot` and `cachedFeatureOutputID string`
-- [ ] `loadFeatureOutput(dir, maggusID string, tasks []parser.Task) []*runlog.StateSnapshot` is added to `status_task_output.go`; it calls `loadCompletedTaskOutput` for each task and returns a slice (one entry per task, nil entries for tasks with no log data)
-- [ ] `ensureFeatureOutput()` method is added to `statusModel`; it checks the cache ID against the selected plan's MaggusID, reloads on mismatch, and resets `logScroll = 0` + `logAutoScroll = true` on cache invalidation
-- [ ] `availableTabs()` for `selFeature` is updated to `[{Output, featureoutput}, {Summary, summary}, {Plan, plan}, {Details, details}, {Metrics, metrics}]`
-- [ ] `updateTabsForSelectionChange` calls `ensureFeatureOutput()` when `selectionCtx() == selFeature`
-- [ ] All existing tests pass (`cd src && go test ./...`)
+- [x] `statusModel` has two new fields: `cachedFeatureOutput []*runlog.StateSnapshot` and `cachedFeatureOutputID string`
+- [x] `loadFeatureOutput(dir, maggusID string, tasks []parser.Task) []*runlog.StateSnapshot` is added to `status_task_output.go`; it calls `loadCompletedTaskOutput` for each task and returns a slice (one entry per task, nil entries for tasks with no log data)
+- [x] `ensureFeatureOutput()` method is added to `statusModel`; it checks the cache ID against the selected plan's MaggusID, reloads on mismatch, and resets `logScroll = 0` + `logAutoScroll = true` on cache invalidation
+- [x] `availableTabs()` for `selFeature` is updated to `[{Output, featureoutput}, {Summary, summary}, {Plan, plan}, {Details, details}, {Metrics, metrics}]`
+- [x] `updateTabsForSelectionChange` calls `ensureFeatureOutput()` when `selectionCtx() == selFeature`
+- [x] All existing tests pass (`cd src && go test ./...`)
 
 ### TASK-054-002: Render the feature output tab
 **Description:** As a developer, I want the feature Output tab to render task-grouped tool history so that I can see what every task in the feature did in one view.

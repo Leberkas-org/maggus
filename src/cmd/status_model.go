@@ -146,6 +146,10 @@ type statusModel struct {
 	// Cached per-task output for completed tasks (loaded from run log JSONL).
 	cachedTaskOutput   *runlog.StateSnapshot // synthetic snapshot built from JSONL
 	cachedTaskOutputID string               // task ID for which the cache is valid
+
+	// Cached feature-level output for the selected feature (loaded from run log JSONL).
+	cachedFeatureOutput   []*runlog.StateSnapshot // one entry per task; nil entries for tasks with no log data
+	cachedFeatureOutputID string                 // MaggusID of the plan for which the cache is valid
 }
 
 func newStatusModel(features []parser.Plan, showAll bool, nextTaskID, nextTaskFile, agentName, dir string, showLog bool, approvalRequired bool, approvals approval.Approvals, featureStore stores.FeatureStore, bugStore stores.BugStore) statusModel {
@@ -321,6 +325,7 @@ func (m statusModel) availableTabs() []tabDef {
 	switch m.selectionCtx() {
 	case selFeature:
 		return []tabDef{
+			{name: "Output", key: "featureoutput"},
 			{name: "Summary", key: "summary"},
 			{name: "Plan", key: "plan"},
 			{name: "Details", key: "details"},
@@ -470,6 +475,9 @@ func (m *statusModel) updateTabsForSelectionChange(prevCtx selectionContext) {
 	m.clampActiveTab()
 	if m.selectionCtx() == selCompletedTask {
 		m.ensureCompletedTaskOutput()
+	}
+	if m.selectionCtx() == selFeature {
+		m.ensureFeatureOutput()
 	}
 }
 
