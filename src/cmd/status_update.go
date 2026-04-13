@@ -210,6 +210,18 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case tea.KeyMsg:
+		// F1 help modal — handled before any other key processing.
+		// F1 toggles the popup; Esc closes it; all other keys are consumed while it is open.
+		if msg.String() == "f1" {
+			m.showHelp = !m.showHelp
+			return m, nil
+		}
+		if m.showHelp {
+			if msg.String() == "esc" {
+				m.showHelp = false
+			}
+			return m, nil
+		}
 		if m.daemonStopOverlay {
 			return m.updateStatusDaemonStopOverlay(msg)
 		}
@@ -500,6 +512,7 @@ func (m statusModel) shouldPromptOnExit() bool {
 // handleQuitRequest either shows the exit daemon overlay or quits immediately,
 // depending on whether the daemon is running with auto-start disabled.
 func (m statusModel) handleQuitRequest() (statusModel, tea.Cmd) {
+	m.showHelp = false
 	if m.shouldPromptOnExit() {
 		m.exitDaemonOverlay = true
 		return m, nil

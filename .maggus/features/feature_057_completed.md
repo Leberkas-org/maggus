@@ -92,17 +92,17 @@ The implementation requires three pieces:
 **Parallel:** no
 
 **Acceptance Criteria:**
-- [ ] `statusModel` has a new field `showHelp bool`
-- [ ] In `statusModel.Update()`, before all other key handling: if `key == "f1"` toggle `m.showHelp`; if `m.showHelp` is true, consume all other keys (return without further processing) except `"esc"` which sets `m.showHelp = false`
-- [ ] In `statusModel.View()`, after building the normal view string `bg`:
+- [x] `statusModel` has a new field `showHelp bool`
+- [x] In `statusModel.Update()`, before all other key handling: if `key == "f1"` toggle `m.showHelp`; if `m.showHelp` is true, consume all other keys (return without further processing) except `"esc"` which sets `m.showHelp = false`
+- [x] In `statusModel.View()`, after building the normal view string `bg`:
   - If `m.showHelp` is false: return `bg` as normal (no change to existing render path)
   - If `m.showHelp` is true:
     1. Apply `lipgloss.NewStyle().Faint(true).Render(bg)` to dim the background
     2. Call `buildHelpModal(m.width, m.height)` to produce the modal string
     3. Return `styles.OverlayCenter(dimmedBg, modal, m.width, m.height)`
-- [ ] `showHelp` is reset to `false` whenever `statusModel` navigates away (e.g. on `navigateBackMsg` or screen switch), so the popup does not persist across navigation
-- [ ] The status footer adds `F1: help` to its hint text; existing hints that are now covered by the popup can be shortened
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] `showHelp` is reset to `false` whenever `statusModel` navigates away (e.g. on `navigateBackMsg` or screen switch), so the popup does not persist across navigation
+- [x] The status footer adds `F1: help` to its hint text; existing hints that are now covered by the popup can be shortened
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 

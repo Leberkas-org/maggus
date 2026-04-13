@@ -100,6 +100,9 @@ type statusModel struct {
 	// Exit daemon prompt overlay (shown when daemon is running and auto-start is disabled)
 	exitDaemonOverlay bool
 
+	// showHelp is true while the F1 keyboard shortcut help popup is visible.
+	showHelp bool
+
 	// daemonStoppingAfterTask is true after the user has sent the stop-after-task signal.
 	// It is cleared when the daemon process exits (daemon cache reports Running: false).
 	daemonStoppingAfterTask bool

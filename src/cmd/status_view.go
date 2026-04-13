@@ -134,7 +134,13 @@ func (m statusModel) renderTabBar() string {
 func (m statusModel) viewStatus() string {
 	// Split-pane layout when terminal dimensions are known.
 	if m.width > 0 && m.height > 0 {
-		return m.viewStatusSplit()
+		bg := m.viewStatusSplit()
+		if m.showHelp {
+			dimmedBg := lipgloss.NewStyle().Faint(true).Render(bg)
+			modal := buildHelpModal(m.width, m.height)
+			return styles.OverlayCenter(dimmedBg, modal, m.width, m.height)
+		}
+		return bg
 	}
 	// Dimensions not yet known (before first WindowSizeMsg) — render empty frame.
 	return ""
@@ -222,6 +228,7 @@ func (m statusModel) statusSplitFooter() string {
 	}
 	parts = append(parts, "alt+d: delete")
 	parts = append(parts, daemonHint)
+	parts = append(parts, "F1: help")
 	parts = append(parts, "q: exit")
 	footer := strings.Join(parts, "  ")
 	if m.hasCompletedPlans() {
