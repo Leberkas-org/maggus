@@ -95,17 +95,17 @@ This feature makes cross-feature predecessor references first-class: they are pa
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] The orchestrator's `classifyWorkable` (or equivalent) calls `task.CrossFeaturePredecessorsSatisfied(featureDir)` as an additional gate; a task whose cross-feature deps are unsatisfied is classified as not runnable for this cycle
-- [ ] The `featureDir` (the `.maggus/features/` path) is available in the orchestrator context and passed through correctly
-- [ ] The existing workaround in `orchestrator.go` that adds unknown predecessor IDs to `skippedOrBlockedIDs` is **not** applied to cross-feature refs (they no longer appear in `Predecessors []string`, so no change is needed — just verify and confirm in a comment)
-- [ ] `countWorkable` and `firstWorkableTask` (used in `daemon_keepalive.go` pre-check) also respect cross-feature blocking — pass `featureDir` if needed, or update to call `CrossFeaturePredecessorsSatisfied`
-- [ ] When the orchestrator determines that the next task(s) to run are all blocked on cross-feature deps, it writes a snapshot status:
+- [x] The orchestrator's `classifyWorkable` (or equivalent) calls `task.CrossFeaturePredecessorsSatisfied(featureDir)` as an additional gate; a task whose cross-feature deps are unsatisfied is classified as not runnable for this cycle
+- [x] The `featureDir` (the `.maggus/features/` path) is available in the orchestrator context and passed through correctly
+- [x] The existing workaround in `orchestrator.go` that adds unknown predecessor IDs to `skippedOrBlockedIDs` is **not** applied to cross-feature refs (they no longer appear in `Predecessors []string`, so no change is needed — just verify and confirm in a comment)
+- [x] `countWorkable` and `firstWorkableTask` (used in `daemon_keepalive.go` pre-check) also respect cross-feature blocking — pass `featureDir` if needed, or update to call `CrossFeaturePredecessorsSatisfied`
+- [x] When the orchestrator determines that the next task(s) to run are all blocked on cross-feature deps, it writes a snapshot status:
   - Single cross-feature ref: `"Waiting for Feature 006 (DTOs)"`
   - Multiple refs: `"Waiting for Feature 006 (DTOs), Features 004-013 (all RMC features)"`
   - This replaces the "Preparing" status that would otherwise persist for the entire waiting period (same mechanism as BUG-049)
-- [ ] When cross-feature deps become satisfied (referenced feature completes between daemon cycles), the task is picked up normally on the next cycle
-- [ ] Sequential-only features with no cross-feature deps are unaffected
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] When cross-feature deps become satisfied (referenced feature completes between daemon cycles), the task is picked up normally on the next cycle
+- [x] Sequential-only features with no cross-feature deps are unaffected
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 
@@ -119,15 +119,15 @@ This feature makes cross-feature predecessor references first-class: they are pa
 **Parallel:** yes — can run alongside TASK-055-003
 
 **Acceptance Criteria:**
-- [ ] `buildExecutionPlan` in `status_execution.go` accepts `featureDir string` and calls `IsFeatureComplete` for each task's cross-feature deps:
+- [x] `buildExecutionPlan` in `status_execution.go` accepts `featureDir string` and calls `IsFeatureComplete` for each task's cross-feature deps:
   - If all cross-feature deps are satisfied: task appears in its normal phase (no longer in the cross-feature group)
   - If any cross-feature dep is unsatisfied: task stays in the cross-feature group
-- [ ] In `status_plantab.go`, cross-feature group tasks render the `DisplayText` of each unsatisfied `CrossFeatureRef` as an annotation:
+- [x] In `status_plantab.go`, cross-feature group tasks render the `DisplayText` of each unsatisfied `CrossFeatureRef` as an annotation:
   - e.g. `TASK-014-002  ← depends on Feature 006 (DTOs)` (exact formatting at implementor's discretion, but must be visually distinct and reference the feature name/label)
-- [ ] If a task has multiple unsatisfied cross-feature refs, all are shown (one per line, or comma-separated — implementor's choice)
-- [ ] The `(cross-feature)` group heading remains as-is (bug_050 already renamed it from `(unresolved)`)
-- [ ] `status_execution.go` and related callers compile; `featureDir` is threaded correctly from the TUI's working directory context
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] If a task has multiple unsatisfied cross-feature refs, all are shown (one per line, or comma-separated — implementor's choice)
+- [x] The `(cross-feature)` group heading remains as-is (bug_050 already renamed it from `(unresolved)`)
+- [x] `status_execution.go` and related callers compile; `featureDir` is threaded correctly from the TUI's working directory context
+- [x] `go vet ./...` and `go test ./...` pass
 
 ---
 

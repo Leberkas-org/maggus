@@ -143,7 +143,9 @@ func capCount(tasks []parser.Task, count int) int {
 	if taskFlag != "" {
 		return 1
 	}
-	workable := countWorkable(tasks, nil, nil)
+	// No featureDir context here — cross-feature blocking is enforced by the
+	// orchestrator at runtime; the cap count only needs a rough upper bound.
+	workable := countWorkable(tasks, nil, nil, "")
 	if count <= 0 || workable < count {
 		return workable
 	}
@@ -153,12 +155,18 @@ func capCount(tasks []parser.Task, count int) int {
 // countWorkable returns the number of runnable tasks. completedIDs and
 // skippedOrBlockedIDs provide predecessor context; nil maps are safe and
 // degrade to IsWorkable() behaviour for tasks with no predecessors.
-func countWorkable(tasks []parser.Task, completedIDs, skippedOrBlockedIDs map[string]bool) int {
+// featureDir is the path to the .maggus/features/ directory; when non-empty,
+// tasks whose cross-feature predecessors are not yet satisfied are excluded.
+func countWorkable(tasks []parser.Task, completedIDs, skippedOrBlockedIDs map[string]bool, featureDir string) int {
 	n := 0
 	for i := range tasks {
-		if tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
-			n++
+		if !tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
+			continue
 		}
+		if featureDir != "" && !tasks[i].CrossFeaturePredecessorsSatisfied(featureDir) {
+			continue
+		}
+		n++
 	}
 	return n
 }
@@ -214,12 +222,18 @@ func findGroupForTask(plans []parser.Plan, taskID string) *parser.Plan {
 
 // firstWorkableTask returns the first runnable task from the first plan that has one.
 // completedIDs and skippedOrBlockedIDs provide predecessor context; nil maps are safe.
-func firstWorkableTask(plans []parser.Plan, completedIDs, skippedOrBlockedIDs map[string]bool) *parser.Task {
+// featureDir is the path to the .maggus/features/ directory; when non-empty,
+// tasks whose cross-feature predecessors are not yet satisfied are skipped.
+func firstWorkableTask(plans []parser.Plan, completedIDs, skippedOrBlockedIDs map[string]bool, featureDir string) *parser.Task {
 	for _, p := range plans {
 		for i := range p.Tasks {
-			if p.Tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
-				return &p.Tasks[i]
+			if !p.Tasks[i].IsRunnable(completedIDs, skippedOrBlockedIDs) {
+				continue
 			}
+			if featureDir != "" && !p.Tasks[i].CrossFeaturePredecessorsSatisfied(featureDir) {
+				continue
+			}
+			return &p.Tasks[i]
 		}
 	}
 	return nil

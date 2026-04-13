@@ -16,9 +16,17 @@ type executionStep struct {
 
 // buildExecutionPlan computes an ordered execution plan from a list of tasks.
 //
+// featureDir is the path to the directory containing feature_*.md files (e.g.
+// ".maggus/features/"). When non-empty, cross-feature predecessor completion is
+// checked via IsFeatureComplete; tasks whose cross-feature deps are not yet
+// complete are placed in the cross-feature group regardless of same-feature
+// predecessor state. When featureDir is empty the cross-feature check is
+// skipped and only same-feature unknown predecessors drive the grouping.
+//
 // The plan is built as follows:
 //  1. Tasks whose predecessors reference unknown task IDs (i.e. cross-feature
-//     references) are collected into a final "cross-feature" step.
+//     references) or whose cross-feature deps are not yet satisfied are
+//     collected into a final "cross-feature" step.
 //  2. The remaining tasks are sorted into topological waves: wave 0 contains
 //     tasks with no predecessors; wave k contains tasks whose all predecessors
 //     are in waves 0..k-1.
@@ -29,7 +37,7 @@ type executionStep struct {
 //     Parallel=false on the step because it runs alone with no concurrency.
 //  4. Step numbers are 1-based and contiguous across all waves.
 //  5. The cross-feature group (if non-empty) is appended as the final step.
-func buildExecutionPlan(tasks []parser.Task) []executionStep {
+func buildExecutionPlan(tasks []parser.Task, featureDir string) []executionStep {
 	if len(tasks) == 0 {
 		return nil
 	}
@@ -41,14 +49,19 @@ func buildExecutionPlan(tasks []parser.Task) []executionStep {
 	}
 
 	// Separate tasks into "resolved" (all predecessors known) and "unresolved".
-	// A task is unresolved when at least one of its predecessor IDs does not
-	// appear in the set of known task IDs for this plan (treating all known
-	// tasks as satisfied). Uses PredecessorsSatisfied — the same logic as the
-	// runtime scheduler — instead of a separate hasUnknownPredecessor check.
+	// A task is unresolved when:
+	//   (a) at least one same-feature predecessor ID is not in the known task
+	//       set (unknown cross-feature task reference), OR
+	//   (b) featureDir is non-empty and at least one cross-feature predecessor
+	//       feature is not yet complete (checked via IsFeatureComplete).
+	// Uses PredecessorsSatisfied — the same logic as the runtime scheduler —
+	// instead of a separate hasUnknownPredecessor check.
 	var resolved []parser.Task
 	var unresolved []parser.Task
 	for _, t := range tasks {
-		if !t.PredecessorsSatisfied(knownIDs, knownIDs) {
+		sameFeatureUnresolved := !t.PredecessorsSatisfied(knownIDs, knownIDs)
+		crossFeatureUnresolved := featureDir != "" && !t.CrossFeaturePredecessorsSatisfied(featureDir)
+		if sameFeatureUnresolved || crossFeatureUnresolved {
 			unresolved = append(unresolved, t)
 		} else {
 			resolved = append(resolved, t)

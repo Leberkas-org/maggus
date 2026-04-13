@@ -26,12 +26,12 @@ func makeCompleteTask(id string, parallel bool, predecessors ...string) parser.T
 }
 
 func TestBuildExecutionPlan_NoTasks(t *testing.T) {
-	steps := buildExecutionPlan(nil)
+	steps := buildExecutionPlan(nil, "")
 	if len(steps) != 0 {
 		t.Errorf("expected 0 steps for nil input, got %d", len(steps))
 	}
 
-	steps = buildExecutionPlan([]parser.Task{})
+	steps = buildExecutionPlan([]parser.Task{}, "")
 	if len(steps) != 0 {
 		t.Errorf("expected 0 steps for empty input, got %d", len(steps))
 	}
@@ -39,7 +39,7 @@ func TestBuildExecutionPlan_NoTasks(t *testing.T) {
 
 func TestBuildExecutionPlan_SingleTask(t *testing.T) {
 	tasks := []parser.Task{makeTask("T1", false)}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 step, got %d", len(steps))
@@ -66,7 +66,7 @@ func TestBuildExecutionPlan_AllParallel(t *testing.T) {
 		makeTask("T2", true),
 		makeTask("T3", true),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 step for all-parallel tasks, got %d", len(steps))
@@ -90,7 +90,7 @@ func TestBuildExecutionPlan_AllSequential(t *testing.T) {
 		makeTask("T2", false),
 		makeTask("T3", false),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 step (all in same wave), got %d", len(steps))
@@ -114,7 +114,7 @@ func TestBuildExecutionPlan_LinearChain(t *testing.T) {
 		makeTask("T2", false, "T1"),
 		makeTask("T3", false, "T2"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 3 {
 		t.Fatalf("expected 3 steps, got %d", len(steps))
@@ -139,7 +139,7 @@ func TestBuildExecutionPlan_DiamondDependency(t *testing.T) {
 		makeTask("C", true, "A"),
 		makeTask("D", false, "B", "C"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 3 {
 		t.Fatalf("expected 3 steps for diamond, got %d: %v", len(steps), stepsDebug(steps))
@@ -178,7 +178,7 @@ func TestBuildExecutionPlan_UnresolvablePredecessors(t *testing.T) {
 		makeTask("T2", false),
 		makeTask("T1", false, "GHOST"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 2 {
 		t.Fatalf("expected 2 steps (1 normal + 1 unresolved), got %d: %v", len(steps), stepsDebug(steps))
@@ -207,7 +207,7 @@ func TestBuildExecutionPlan_AllUnresolved(t *testing.T) {
 		makeTask("T1", false, "GHOST"),
 		makeTask("T2", false, "GHOST2"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 unresolved step, got %d", len(steps))
@@ -226,7 +226,7 @@ func TestBuildExecutionPlan_CompletedTasksIncluded(t *testing.T) {
 		makeCompleteTask("T1", false),
 		makeTask("T2", false, "T1"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 2 {
 		t.Fatalf("expected 2 steps, got %d", len(steps))
@@ -247,7 +247,7 @@ func TestBuildExecutionPlan_MixedParallelAndSequential(t *testing.T) {
 		makeTask("P2", true),
 		makeTask("S1", false),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 step (all same wave), got %d: %v", len(steps), stepsDebug(steps))
@@ -280,7 +280,7 @@ func TestBuildExecutionPlan_MixedSingleParallelAndSequential(t *testing.T) {
 		makeTask("P1", true, "T0"),
 		makeTask("S1", false, "T0"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 2 {
 		t.Fatalf("expected 2 steps, got %d: %v", len(steps), stepsDebug(steps))
@@ -307,7 +307,7 @@ func TestBuildExecutionPlan_StepNumbers(t *testing.T) {
 		makeTask("T3", true),
 		makeTask("T4", false, "T1"),
 	}
-	steps := buildExecutionPlan(tasks)
+	steps := buildExecutionPlan(tasks, "")
 
 	if len(steps) != 2 {
 		t.Fatalf("expected 2 steps, got %d: %v", len(steps), stepsDebug(steps))

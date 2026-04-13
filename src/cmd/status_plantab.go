@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -31,7 +32,8 @@ func (m statusModel) renderPlanTab(width, height int) string {
 		return lipgloss.NewStyle().Width(width).Height(height).Render(msg)
 	}
 
-	steps := buildExecutionPlan(plan.Tasks)
+	featureDir := filepath.Join(m.dir, ".maggus", "features")
+	steps := buildExecutionPlan(plan.Tasks, featureDir)
 
 	// Build a task lookup map.
 	taskByID := make(map[string]parser.Task, len(plan.Tasks))
@@ -69,6 +71,28 @@ func (m statusModel) renderPlanTab(width, height int) string {
 			}
 			row := fmt.Sprintf("   %s  %s  %s%s", icon, taskID, statusDimStyle.Render(title), wtBadge)
 			lines = append(lines, row)
+
+			// For tasks in the cross-feature group, show which features are still
+			// blocking them (unsatisfied CrossFeatureRef annotations).
+			if step.CrossFeature && len(t.CrossFeaturePredecessors) > 0 {
+				var waiting []string
+				for _, ref := range t.CrossFeaturePredecessors {
+					satisfied := true
+					for _, num := range ref.FeatureNums {
+						if !parser.IsFeatureComplete(featureDir, fmt.Sprintf("%03d", num)) {
+							satisfied = false
+							break
+						}
+					}
+					if !satisfied {
+						waiting = append(waiting, ref.DisplayText())
+					}
+				}
+				if len(waiting) > 0 {
+					annotation := "        ← depends on " + strings.Join(waiting, ", ")
+					lines = append(lines, statusDimStyle.Render(annotation))
+				}
+			}
 		}
 
 		// Blank separator between steps.

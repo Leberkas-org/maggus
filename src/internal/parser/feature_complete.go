@@ -57,3 +57,20 @@ func (t *Task) CrossFeaturePredecessorsSatisfied(featureDir string) bool {
 	}
 	return true
 }
+
+// UnsatisfiedCrossFeatureRefs returns the DisplayText of each CrossFeatureRef
+// that has at least one incomplete feature. The result is used by the
+// orchestrator to build "Waiting for Feature NNN" snapshot status messages.
+// Returns nil when all cross-feature predecessors are satisfied (or none exist).
+func (t *Task) UnsatisfiedCrossFeatureRefs(featureDir string) []string {
+	var unsatisfied []string
+	for _, ref := range t.CrossFeaturePredecessors {
+		for _, num := range ref.FeatureNums {
+			if !IsFeatureComplete(featureDir, fmt.Sprintf("%03d", num)) {
+				unsatisfied = append(unsatisfied, ref.DisplayText())
+				break // one incomplete feature in this ref is enough
+			}
+		}
+	}
+	return unsatisfied
+}

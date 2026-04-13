@@ -310,6 +310,12 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		// Any predecessor ID not present in this group will never enter
 		// completedIDs or skippedOrBlockedIDs through normal execution, so
 		// pre-add it now so PredecessorsSatisfied treats it as resolved.
+		//
+		// NOTE: Cross-feature references (e.g. "Feature 006 (DTOs)") are
+		// parsed into Task.CrossFeaturePredecessors, not Task.Predecessors,
+		// so this workaround does not interact with them. Cross-feature
+		// blocking is handled separately by CrossFeaturePredecessorsSatisfied
+		// in classifyWorkable, countWorkable, and firstWorkableTask.
 		for _, predID := range t.Predecessors {
 			if !knownTaskIDs[predID] {
 				o.skippedOrBlockedIDs[predID] = true
@@ -371,6 +377,22 @@ func (o *Orchestrator) runGroupTasks(group parser.Plan, featureIndex, featureTot
 		// sequential tasks run one at a time in the main repo.
 		par, seq := o.classifyWorkable(groupTasks)
 		if len(par) == 0 && len(seq) == 0 {
+			// Before breaking, check if any tasks are runnable by same-feature
+			// predecessor logic but blocked on cross-feature deps. If so, write
+			// a "Waiting for Feature NNN" snapshot so the status TUI shows why
+			// the daemon is idle instead of the stale "Preparing" status.
+			if waitStatus, waitTask := o.crossFeatureWaitStatus(groupTasks); waitTask != nil {
+				waitSnap := runlog.StateSnapshot{
+					MaggusID:      group.MaggusID,
+					TaskID:        waitTask.ID,
+					TaskTitle:     waitTask.Title,
+					ItemTitle:     parser.ParseFileTitle(group.File),
+					Status:        waitStatus,
+					RunStartedAt:  cfg.StartTime.UTC().Format(time.RFC3339),
+					TaskStartedAt: cfg.StartTime.UTC().Format(time.RFC3339),
+				}
+				_ = runlog.WriteSnapshot(cfg.Dir, waitSnap)
+			}
 			break
 		}
 

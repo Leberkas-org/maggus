@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/leberkas-org/maggus/internal/gitbranch"
@@ -108,13 +109,21 @@ func (o *Orchestrator) runDispatchRequests() {
 	}
 }
 
+// featureDir returns the path to the directory containing feature_*.md files.
+// This is used by cross-feature predecessor checks throughout the orchestrator.
+func (o *Orchestrator) featureDir() string {
+	return filepath.Join(o.cfg.Dir, ".maggus", "features")
+}
+
 // classifyWorkable splits the given tasks into parallel-workable and
 // sequential-workable lists using the same rules as the parallel orchestrator:
 //   - Tasks that are not runnable (IsRunnable returns false) are skipped.
 //   - Previously-failed tasks are also skipped.
+//   - Tasks whose cross-feature predecessors are not yet satisfied are skipped.
 //   - Tasks with Parallel=true go into the parallel list.
 //   - Tasks with Parallel=false go into the sequential list.
 func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequential []parser.Task) {
+	featureDir := o.featureDir()
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range tasks {
@@ -122,6 +131,11 @@ func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequenti
 			continue
 		}
 		if !t.IsRunnable(o.completedIDs, o.skippedOrBlockedIDs) {
+			continue
+		}
+		// Cross-feature predecessor gate: tasks waiting on incomplete
+		// features from other plans are not runnable this cycle.
+		if !t.CrossFeaturePredecessorsSatisfied(featureDir) {
 			continue
 		}
 		if t.Parallel {
@@ -134,12 +148,58 @@ func (o *Orchestrator) classifyWorkable(tasks []parser.Task) (parallel, sequenti
 }
 
 // countRunnable returns the number of currently runnable tasks in tasks,
-// taking predecessor state into account. It acquires o.mu to safely read
-// the predecessor maps alongside any concurrent dispatch goroutines.
+// taking predecessor state and cross-feature blocking into account. It
+// acquires o.mu to safely read the predecessor maps alongside any concurrent
+// dispatch goroutines.
 func (o *Orchestrator) countRunnable(tasks []parser.Task) int {
+	featureDir := o.featureDir()
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return countWorkable(tasks, o.completedIDs, o.skippedOrBlockedIDs)
+	return countWorkable(tasks, o.completedIDs, o.skippedOrBlockedIDs, featureDir)
+}
+
+// crossFeatureWaitStatus checks whether any tasks in the list are runnable by
+// same-feature predecessor logic but blocked solely on cross-feature deps. If
+// so, it returns a "Waiting for Feature NNN (Label)" status string and the
+// first such task. Returns empty string and nil when no tasks are cross-feature
+// blocked.
+func (o *Orchestrator) crossFeatureWaitStatus(tasks []parser.Task) (status string, blockedTask *parser.Task) {
+	featureDir := o.featureDir()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// Collect unique unsatisfied display texts across all cross-feature-blocked tasks.
+	seen := make(map[string]bool)
+	var displayTexts []string
+
+	for i := range tasks {
+		t := &tasks[i]
+		if o.failedIDs[t.ID] {
+			continue
+		}
+		if !t.IsRunnable(o.completedIDs, o.skippedOrBlockedIDs) {
+			continue
+		}
+		// Task passes same-feature checks — see if cross-feature blocks it.
+		refs := t.UnsatisfiedCrossFeatureRefs(featureDir)
+		if len(refs) == 0 {
+			continue
+		}
+		if blockedTask == nil {
+			blockedTask = t
+		}
+		for _, r := range refs {
+			if !seen[r] {
+				seen[r] = true
+				displayTexts = append(displayTexts, r)
+			}
+		}
+	}
+
+	if len(displayTexts) == 0 {
+		return "", nil
+	}
+	return "Waiting for " + strings.Join(displayTexts, ", "), blockedTask
 }
 
 // runParallelBatch launches all tasks concurrently, each in its own isolated

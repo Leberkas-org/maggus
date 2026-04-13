@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 )
@@ -21,6 +22,24 @@ var crossFeatureSingularRe = regexp.MustCompile(`(?i)^feature\s+(\d+)(?:\s+\(([^
 // crossFeatureRangeRe matches "Features NNN-MMM" or "Features NNN-MMM (label)" (case-insensitive).
 // Capture groups: (1) from number, (2) to number, (3) label (empty string when absent).
 var crossFeatureRangeRe = regexp.MustCompile(`(?i)^features\s+(\d+)-(\d+)(?:\s+\(([^)]*)\))?$`)
+
+// DisplayText returns a human-readable representation of the cross-feature
+// reference suitable for display in the TUI. Single-feature refs are formatted
+// as "Feature NNN" or "Feature NNN (label)"; range refs as "Features NNN-MMM"
+// or "Features NNN-MMM (label)". Feature numbers are zero-padded to three digits
+// to match the file naming convention.
+func (r CrossFeatureRef) DisplayText() string {
+	var base string
+	if len(r.FeatureNums) == 1 {
+		base = fmt.Sprintf("Feature %03d", r.FeatureNums[0])
+	} else {
+		base = fmt.Sprintf("Features %03d-%03d", r.FeatureNums[0], r.FeatureNums[len(r.FeatureNums)-1])
+	}
+	if r.Label != "" {
+		return base + " (" + r.Label + ")"
+	}
+	return base
+}
 
 // parseCrossFeatureToken attempts to parse a single predecessor token as a
 // cross-feature reference. Returns the CrossFeatureRef and true on success, or

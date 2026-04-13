@@ -391,13 +391,13 @@ func TestCountWorkable(t *testing.T) {
 		{ID: "TASK-001-002", Title: "Block", Criteria: []parser.Criterion{{Text: "BLOCKED: dep", Checked: false, Blocked: true}}}, // blocked
 	}
 
-	got := countWorkable(tasks, nil, nil)
+	got := countWorkable(tasks, nil, nil, "")
 	if got != 2 {
 		t.Errorf("countWorkable = %d, want 2", got)
 	}
 
 	// Empty list.
-	if countWorkable(nil, nil, nil) != 0 {
+	if countWorkable(nil, nil, nil, "") != 0 {
 		t.Errorf("countWorkable(nil) != 0")
 	}
 }
@@ -417,7 +417,7 @@ func TestProgressTotal_UnlimitedMode(t *testing.T) {
 	i := 0        // first iteration (0-based)
 	maxCount := 0 // unlimited
 
-	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil)
+	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil, "")
 	if maxCount > 0 && progressTotal > maxCount {
 		progressTotal = maxCount
 	}
@@ -443,7 +443,7 @@ func TestProgressTotal_NewFilesAdded(t *testing.T) {
 	oldDisplayCount := 2 // what count was before runTask (stale)
 	maxCount := 0        // unlimited
 
-	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil)
+	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil, "")
 	if maxCount > 0 && progressTotal > maxCount {
 		progressTotal = maxCount
 	}
@@ -469,7 +469,7 @@ func TestProgressTotal_BoundedModeCap(t *testing.T) {
 	i := 0
 	maxCount := 2 // user requested only 2 tasks
 
-	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil)
+	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil, "")
 	if maxCount > 0 && progressTotal > maxCount {
 		progressTotal = maxCount
 	}
@@ -491,7 +491,7 @@ func TestProgressTotal_BoundedModeNoCap(t *testing.T) {
 	i := 0
 	maxCount := 3
 
-	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil)
+	progressTotal := (i + 1) + countWorkable(parsedTasks, nil, nil, "")
 	if maxCount > 0 && progressTotal > maxCount {
 		progressTotal = maxCount
 	}
@@ -545,8 +545,8 @@ func TestParseAllTasksPicksUpNewFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAllTasks error: %v", err)
 	}
-	if countWorkable(tasks, nil, nil) != 0 {
-		t.Fatalf("expected 0 workable tasks before new file, got %d", countWorkable(tasks, nil, nil))
+	if countWorkable(tasks, nil, nil, "") != 0 {
+		t.Fatalf("expected 0 workable tasks before new file, got %d", countWorkable(tasks, nil, nil, ""))
 	}
 
 	// Simulate user adding a new feature file mid-run.
@@ -565,8 +565,8 @@ func TestParseAllTasksPicksUpNewFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseAllTasks (fresh) error: %v", err)
 	}
-	if countWorkable(freshTasks, nil, nil) != 1 {
-		t.Fatalf("expected 1 workable task after new file added, got %d", countWorkable(freshTasks, nil, nil))
+	if countWorkable(freshTasks, nil, nil, "") != 1 {
+		t.Fatalf("expected 1 workable task after new file added, got %d", countWorkable(freshTasks, nil, nil, ""))
 	}
 	if freshTasks[len(freshTasks)-1].ID != "TASK-002-001" {
 		t.Errorf("expected new task TASK-002-001, got %s", freshTasks[len(freshTasks)-1].ID)
@@ -582,7 +582,7 @@ func TestUnlimitedModeReparseSentinel(t *testing.T) {
 	exhausted := []parser.Task{
 		{ID: "TASK-001-001", Title: "Done", Criteria: []parser.Criterion{{Text: "A", Checked: true}}},
 	}
-	if countWorkable(exhausted, nil, nil) != 0 {
+	if countWorkable(exhausted, nil, nil, "") != 0 {
 		t.Fatalf("pre-condition: expected 0 workable tasks in exhausted list")
 	}
 
@@ -593,14 +593,14 @@ func TestUnlimitedModeReparseSentinel(t *testing.T) {
 	}
 
 	// Decision: if fresh re-parse has workable tasks, we should continue (not break).
-	shouldContinue := countWorkable(freshTasks, nil, nil) > 0
+	shouldContinue := countWorkable(freshTasks, nil, nil, "") > 0
 	if !shouldContinue {
 		t.Error("expected shouldContinue=true when fresh re-parse finds workable tasks")
 	}
 
 	// Verify remaining is updated after adopting fresh tasks.
 	tasks := freshTasks
-	remaining := countWorkable(tasks, nil, nil)
+	remaining := countWorkable(tasks, nil, nil, "")
 	if remaining != 1 {
 		t.Errorf("expected remaining=1 after fresh re-parse, got %d", remaining)
 	}
@@ -621,7 +621,7 @@ func TestUnlimitedModeReparseNoNewTasks(t *testing.T) {
 	_ = exhausted // both lists exhausted
 
 	// Decision: if fresh re-parse has no workable tasks, we should break.
-	shouldContinue := countWorkable(freshTasks, nil, nil) > 0
+	shouldContinue := countWorkable(freshTasks, nil, nil, "") > 0
 	if shouldContinue {
 		t.Error("expected shouldContinue=false when fresh re-parse also finds no workable tasks")
 	}
@@ -852,7 +852,7 @@ func TestFirstWorkableTask_Found(t *testing.T) {
 		},
 	}
 
-	got := firstWorkableTask(groups, nil, nil)
+	got := firstWorkableTask(groups, nil, nil, "")
 	if got == nil {
 		t.Fatal("expected non-nil task")
 	}
@@ -872,7 +872,7 @@ func TestFirstWorkableTask_Empty(t *testing.T) {
 		},
 	}
 
-	got := firstWorkableTask(groups, nil, nil)
+	got := firstWorkableTask(groups, nil, nil, "")
 	if got != nil {
 		t.Errorf("expected nil, got %+v", got)
 	}
