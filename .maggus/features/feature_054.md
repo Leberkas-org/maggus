@@ -45,19 +45,19 @@ Add an Output tab to the `selFeature` context in the status TUI. When a feature 
 **Parallel:** yes — can run alongside TASK-054-003
 
 **Acceptance Criteria:**
-- [ ] `renderFeatureOutputTab(width, contentH int) string` is added to `status_rightpane.go`
-- [ ] `case "featureoutput":` is wired in `renderRightPane`'s tab dispatch
-- [ ] Each task renders a separator header line: `─── TASK-NNN-MMM: Title <icon> [tokens] [cost] [duration] ───`
+- [x] `renderFeatureOutputTab(width, contentH int) string` is added to `status_rightpane.go`
+- [x] `case "featureoutput":` is wired in `renderRightPane`'s tab dispatch
+- [x] Each task renders a separator header line: `─── TASK-NNN-MMM: Title <icon> [tokens] [cost] [duration] ───`
   - Status icon: `✓` (green) for done, `▶` (yellow) for running, `○` (dim) for pending/blocked
   - Token count and cost are only shown when non-zero; duration only shown for completed tasks
   - Running task header uses `statusCyanStyle` or warning color to distinguish it
-- [ ] Tool entries from `cachedFeatureOutput` are rendered below each header, indented 2 spaces, using `buildToolLines` + `renderScrollableToolList` (reuses existing shared helpers)
-- [ ] For the currently running task: live snapshot from `workerSnapshots[taskID]` or main `snapshot` (same logic as `snapshotForSelectedTask` but for the feature) is used instead of the cache entry; latest tool entry gets the spinner character
-- [ ] Pending/blocked tasks with no log data show the header only (no tool lines)
-- [ ] The single `logScroll` offset applies to the combined flat list of all rendered lines across all tasks
-- [ ] When no tasks have any output and none is running, shows `"  No output history"` placeholder
-- [ ] `status_rightpane.go` stays under 500 lines; split into a helper file if needed
-- [ ] All existing tests pass (`cd src && go test ./...`)
+- [x] Tool entries from `cachedFeatureOutput` are rendered below each header, indented 2 spaces, using `buildToolLines` + `renderScrollableToolList` (reuses existing shared helpers)
+- [x] For the currently running task: live snapshot from `workerSnapshots[taskID]` or main `snapshot` (same logic as `snapshotForSelectedTask` but for the feature) is used instead of the cache entry; latest tool entry gets the spinner character
+- [x] Pending/blocked tasks with no log data show the header only (no tool lines)
+- [x] The single `logScroll` offset applies to the combined flat list of all rendered lines across all tasks
+- [x] When no tasks have any output and none is running, shows `"  No output history"` placeholder
+- [x] `status_rightpane.go` stays under 500 lines; split into a helper file if needed
+- [x] All existing tests pass (`cd src && go test ./...`)
 
 ### TASK-054-003: Wire live updates for feature output tab
 **Description:** As a developer, I want the feature output tab to refresh on every log tick when active so that the running task's tool feed stays live.
@@ -68,10 +68,10 @@ Add an Output tab to the `selFeature` context in the status TUI. When a feature 
 **Parallel:** yes — can run alongside TASK-054-002
 
 **Acceptance Criteria:**
-- [ ] In `status_update.go`, the `logFileUpdateMsg` handler calls `ensureFeatureOutput()` when `selectionCtx() == selFeature` and `activeTabKey() == "featureoutput"`
-- [ ] Auto-scroll advances when a task in the feature is running and `logAutoScroll` is true (the existing scroll advance logic is reused; no new mechanism needed)
-- [ ] Navigating from one feature to a different feature resets `logScroll` and `logAutoScroll` (verified via `ensureFeatureOutput`'s cache ID check)
-- [ ] All existing tests pass (`cd src && go test ./...`)
+- [x] In `status_update.go`, the `logFileUpdateMsg` handler calls `ensureFeatureOutput()` when `selectionCtx() == selFeature` and `activeTabKey() == "featureoutput"`
+- [x] Auto-scroll advances when a task in the feature is running and `logAutoScroll` is true (the existing scroll advance logic is reused; no new mechanism needed)
+- [x] Navigating from one feature to a different feature resets `logScroll` and `logAutoScroll` (verified via `ensureFeatureOutput`'s cache ID check)
+- [x] All existing tests pass (`cd src && go test ./...`)
 
 ## Task Dependency Graph
 

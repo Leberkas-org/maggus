@@ -146,6 +146,10 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.selectionCtx() == selCompletedTask {
 			m.ensureCompletedTaskOutput()
 		}
+		// Refresh feature output cache when viewing the feature output tab.
+		if m.selectionCtx() == selFeature && m.activeTabKey() == "featureoutput" {
+			m.ensureFeatureOutput()
+		}
 
 		newSnapStatus := ""
 		if m.snapshot != nil {
@@ -321,6 +325,7 @@ func (m *statusModel) maxLogScroll() int {
 // logItemCount returns the number of scrollable items in the log panel.
 // For running tasks, uses the appropriate live snapshot (main or per-worker).
 // For completed tasks, uses the cached JSONL-loaded output.
+// For feature output tab, sums cached completed entries plus any live running task entries.
 func (m *statusModel) logItemCount() int {
 	ctx := m.selectionCtx()
 	if ctx == selRunningTask {
@@ -332,6 +337,27 @@ func (m *statusModel) logItemCount() int {
 	}
 	if ctx == selCompletedTask && m.cachedTaskOutput != nil {
 		return len(m.cachedTaskOutput.ToolEntries)
+	}
+	if ctx == selFeature && m.activeTabKey() == "featureoutput" {
+		count := 0
+		for _, snap := range m.cachedFeatureOutput {
+			if snap != nil {
+				count += len(snap.ToolEntries)
+			}
+		}
+		// Add live entries for any running task in the selected feature.
+		plan := m.selectedPlan()
+		for _, task := range plan.Tasks {
+			if m.isTaskRunning(task.ID) {
+				if ws, ok := m.workerSnapshots[task.ID]; ok {
+					count += len(ws.ToolEntries)
+				} else if m.snapshot != nil && m.snapshot.TaskID == task.ID {
+					count += len(m.snapshot.ToolEntries)
+				}
+				break
+			}
+		}
+		return count
 	}
 	return 0
 }

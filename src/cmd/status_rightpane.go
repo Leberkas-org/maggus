@@ -67,6 +67,8 @@ func (m statusModel) renderRightPane(width, height int) string {
 		switch tabKey {
 		case "output":
 			content = m.renderOutputTab(width, contentH)
+		case "featureoutput":
+			content = m.renderFeatureOutputTab(width, contentH)
 		case "summary":
 			content = m.renderSummaryTab(width, contentH)
 		case "plan":
