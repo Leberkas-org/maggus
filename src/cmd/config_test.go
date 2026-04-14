@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,6 +11,50 @@ import (
 	"github.com/leberkas-org/maggus/internal/globalconfig"
 	"gopkg.in/yaml.v3"
 )
+
+// ── resolveEditor tests ────────────────────────────────────────────────────────
+
+func TestResolveEditor_UsesEditorFirst(t *testing.T) {
+	t.Setenv("EDITOR", "myeditor")
+	t.Setenv("VISUAL", "")
+	got := resolveEditor()
+	if got != "myeditor" {
+		t.Errorf("resolveEditor() = %q, want %q", got, "myeditor")
+	}
+}
+
+func TestResolveEditor_FallsBackToVisual(t *testing.T) {
+	t.Setenv("EDITOR", "")
+	t.Setenv("VISUAL", "myvisual")
+	got := resolveEditor()
+	if got != "myvisual" {
+		t.Errorf("resolveEditor() = %q, want %q", got, "myvisual")
+	}
+}
+
+func TestResolveEditor_EditorTakesPrecedenceOverVisual(t *testing.T) {
+	t.Setenv("EDITOR", "editor-choice")
+	t.Setenv("VISUAL", "visual-choice")
+	got := resolveEditor()
+	if got != "editor-choice" {
+		t.Errorf("resolveEditor() = %q, want %q", got, "editor-choice")
+	}
+}
+
+func TestResolveEditor_PlatformFallbackWhenNeitherSet(t *testing.T) {
+	t.Setenv("EDITOR", "")
+	t.Setenv("VISUAL", "")
+	got := resolveEditor()
+	var want string
+	if runtime.GOOS == "windows" {
+		want = "notepad"
+	} else {
+		want = "vi"
+	}
+	if got != want {
+		t.Errorf("resolveEditor() = %q, want platform fallback %q", got, want)
+	}
+}
 
 // optionRows returns only the setting rows (not action buttons) from both slices.
 func optionRows(m configModel) []configRow {

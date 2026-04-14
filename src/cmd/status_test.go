@@ -3274,3 +3274,112 @@ func TestStatusSplitFooter_BUnblockHint_NonBlockedTask(t *testing.T) {
 		t.Errorf("expected no 'b: unblock' hint when task has no blocked criteria, got: %q", footer)
 	}
 }
+
+// ── BUG-052-002: `e` shortcut to open plan file in $EDITOR ────────────────────
+
+func TestUpdateList_EKey_TaskRow_ReturnsCmdWhenEditorSet(t *testing.T) {
+	t.Setenv("EDITOR", "vi")
+	t.Setenv("VISUAL", "")
+
+	task := parser.Task{
+		ID:         "TASK-001",
+		Title:      "Some task",
+		SourceFile: "feature_001.md",
+		Criteria:   []parser.Criterion{{Text: "do it", Checked: false}},
+	}
+	plan := parser.Plan{
+		ID:    "feature_001",
+		File:  "feature_001.md",
+		Tasks: []parser.Task{task},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row (0=plan, 1=task)
+	}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")}
+	_, cmd := m.updateList(msg)
+	if cmd == nil {
+		t.Error("expected non-nil cmd when editor is configured and task row selected")
+	}
+}
+
+func TestUpdateList_EKey_PlanRow_ReturnsCmdWhenEditorSet(t *testing.T) {
+	t.Setenv("EDITOR", "vi")
+	t.Setenv("VISUAL", "")
+
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{ID: "TASK-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Text: "do it"}}},
+		},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{},
+		treeCursor:    0, // plan row
+	}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")}
+	_, cmd := m.updateList(msg)
+	if cmd == nil {
+		t.Error("expected non-nil cmd when editor is configured and plan row selected")
+	}
+}
+
+func TestUpdateList_EKey_EmptyTree_IsNoop(t *testing.T) {
+	t.Setenv("EDITOR", "vi")
+	m := statusModel{
+		plans: []parser.Plan{},
+	}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")}
+	result, cmd := m.updateList(msg)
+	if cmd != nil {
+		t.Error("expected nil cmd when tree is empty")
+	}
+	updated := result.(statusModel)
+	if updated.statusNote != "" {
+		t.Errorf("expected no status note for empty tree, got: %q", updated.statusNote)
+	}
+}
+
+func TestStatusSplitFooter_EditFileHint_TaskSelected(t *testing.T) {
+	task := parser.Task{
+		ID:         "TASK-001",
+		Title:      "Some task",
+		SourceFile: "feature_001.md",
+		Criteria:   []parser.Criterion{{Text: "do it", Checked: false}},
+	}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "e: edit file") {
+		t.Errorf("expected 'e: edit file' hint when task is selected, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_EditFileHint_PlanSelected(t *testing.T) {
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{ID: "TASK-001", SourceFile: "feature_001.md", Criteria: []parser.Criterion{{Text: "do it"}}},
+		},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{},
+		treeCursor:    0, // plan row
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "e: edit file") {
+		t.Errorf("expected 'e: edit file' hint when plan is selected, got: %q", footer)
+	}
+}

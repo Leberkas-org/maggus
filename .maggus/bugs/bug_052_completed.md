@@ -54,10 +54,10 @@ In the current split-pane status view, there is no accessible shortcut to unbloc
 **Description:** As a user, I want to press `e` on any plan or task row in the tree so that the feature/bug file opens in my configured editor for manual changes.
 
 **Acceptance Criteria:**
-- [ ] In `updateList`, pressing `e` opens the plan file for the selected item in `$EDITOR` (falling back to `$VISUAL`, then `notepad.exe` on Windows, then `vi` on Unix) using `tea.ExecProcess` (or `exec.Command` outside the TUI alt-screen, similar to how `alt+r` spawns the agent)
-- [ ] When a task row is selected, the file opened is the task's `SourceFile` (the plan file containing that task)
-- [ ] When a plan row is selected, the file opened is the plan's `File` field
-- [ ] After the editor exits, the TUI resumes and triggers a plan reload (filewatcher debounce or explicit `reloadPlans`)
-- [ ] If no editor is found/configured, a brief status note is shown (e.g. "set $EDITOR to enable")
-- [ ] The hint bar shows `e: edit file` when any plan or task is selected
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] In `updateList`, pressing `e` opens the plan file for the selected item in `$EDITOR` (falling back to `$VISUAL`, then `notepad.exe` on Windows, then `vi` on Unix) using `tea.ExecProcess` (or `exec.Command` outside the TUI alt-screen, similar to how `alt+r` spawns the agent)
+- [x] When a task row is selected, the file opened is the task's `SourceFile` (the plan file containing that task)
+- [x] When a plan row is selected, the file opened is the plan's `File` field
+- [x] After the editor exits, the TUI resumes and triggers a plan reload (filewatcher debounce or explicit `reloadPlans`)
+- [x] If no editor is found/configured, a brief status note is shown (e.g. "set $EDITOR to enable")
+- [x] The hint bar shows `e: edit file` when any plan or task is selected
+- [x] `go vet ./...` and `go test ./...` pass

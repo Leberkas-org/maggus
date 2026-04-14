@@ -15,6 +15,10 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
+// editorDoneMsg is sent back to the Update loop after the external editor exits.
+// It triggers a plan reload so the TUI reflects any file changes made in the editor.
+type editorDoneMsg struct{}
+
 func (m statusModel) Init() tea.Cmd {
 	if m.presence != nil {
 		_ = m.presence.Update(discord.PresenceState{
@@ -178,6 +182,11 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, listenForLogFileUpdate(m.logWatcherCh)
 		}
 		return m, logPollTick()
+
+	case editorDoneMsg:
+		// Reload plans after the external editor exits so the TUI reflects any changes.
+		m.reloadPlans()
+		return m, nil
 
 	case featureSummaryUpdateMsg:
 		// Preserve selected feature, cursor, and scroll across reload
@@ -896,6 +905,18 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskListComponent.refreshDetailViewport()
 		}
 		return m, nil
+	case "e":
+		filePath := m.treeSelectedFilePath()
+		if filePath == "" {
+			return m, nil
+		}
+		editor := resolveEditor()
+		return m, func() tea.Msg {
+			return execProcessMsg{
+				cmd:    exec.Command(editor, filePath),
+				onDone: func(_ error) tea.Msg { return editorDoneMsg{} },
+			}
+		}
 	case "alt+d":
 		visible := m.visiblePlans()
 		if len(visible) > 0 && m.planCursor < len(visible) && !m.ConfirmDelete {

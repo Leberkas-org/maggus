@@ -220,6 +220,9 @@ func (m statusModel) statusSplitFooter() string {
 			parts = append(parts, "b: unblock")
 		}
 	}
+	if m.treeSelectedFilePath() != "" {
+		parts = append(parts, "e: edit file")
+	}
 	parts = append(parts, "F1: help")
 	parts = append(parts, "q: exit")
 	footer := strings.Join(parts, "  ")

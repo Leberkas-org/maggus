@@ -527,6 +527,22 @@ func buildEditorCmd(path string) (*exec.Cmd, error) {
 	return exec.Command(editor, path), nil
 }
 
+// resolveEditor returns the editor binary to use when opening files.
+// Preference order: $EDITOR, $VISUAL, then the platform fallback (notepad on
+// Windows, vi on other platforms). Never returns an empty string.
+func resolveEditor() string {
+	if e := os.Getenv("EDITOR"); e != "" {
+		return e
+	}
+	if v := os.Getenv("VISUAL"); v != "" {
+		return v
+	}
+	if runtime.GOOS == "windows" {
+		return "notepad"
+	}
+	return "vi"
+}
+
 func indexOf(values []string, target string) int {
 	for i, v := range values {
 		if v == target {

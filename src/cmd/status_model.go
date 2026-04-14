@@ -543,6 +543,26 @@ func (m statusModel) featureFilePath(p parser.Plan) string {
 	return p.File
 }
 
+// treeSelectedFilePath returns the file path for the currently selected tree row.
+// For task rows it returns the task's SourceFile; for plan rows it returns the plan's File.
+// Returns "" when nothing is selected or the tree is empty.
+func (m statusModel) treeSelectedFilePath() string {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return ""
+	}
+	item := items[m.treeCursor]
+	switch item.kind {
+	case treeItemKindTask:
+		if item.task != nil {
+			return item.task.SourceFile
+		}
+	case treeItemKindPlan:
+		return item.plan.File
+	}
+	return ""
+}
+
 // buildProgressBar renders a colored progress bar.
 func buildProgressBar(done, total int) string {
 	return styles.ProgressBar(done, total, progressBarWidth)
