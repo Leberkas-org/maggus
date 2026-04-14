@@ -192,52 +192,20 @@ func (m statusModel) statusSplitFooter() string {
 			}
 			return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · q: back"
 		}
-		scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
-		var parts []string
-		if scrollable {
-			parts = append(parts, "↑/↓: scroll")
-		}
-		parts = append(parts, "pgup/pgdn: prev/next task")
-		parts = append(parts, "tab: manage blocked")
-		parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
-		return strings.Join(parts, " · ")
+		return "↑/↓: scroll  pgup/pgdn: prev/next task  F1: help  q: back"
 	}
 
-	tabRange := fmt.Sprintf("1-%d: tabs", len(m.availableTabs()))
-	daemonHint := "s: start"
-	if m.daemon.Running {
-		daemonHint = "s: stop"
-	}
 	var parts []string
-	parts = append(parts, tabRange)
-	parts = append(parts, "tab: switch tab")
 	parts = append(parts, "↑/↓: navigate")
+	parts = append(parts, "tab: switch tab")
 	activeKey := m.activeTabKey()
 	if activeKey == "output" || activeKey == "featureoutput" || activeKey == "taskdetails" {
 		parts = append(parts, "shift+↑/↓: scroll")
-		parts = append(parts, "g: top  G: bottom")
 	}
 	parts = append(parts, "pgup/pgdn: prev/next feature")
-	parts = append(parts, "enter: details")
-	if m.approvalRequired {
-		parts = append(parts, "a: approve")
-	}
-	if m.selectedTask() != nil {
-		parts = append(parts, "x: skip/unskip")
-		parts = append(parts, "alt+r: run")
-	}
-	parts = append(parts, "alt+d: delete")
-	parts = append(parts, daemonHint)
 	parts = append(parts, "F1: help")
 	parts = append(parts, "q: exit")
 	footer := strings.Join(parts, "  ")
-	if m.hasCompletedPlans() {
-		if m.showAll {
-			footer += "  alt+a: hide done"
-		} else {
-			footer += "  alt+a: show done"
-		}
-	}
 	// Show status note briefly after an action (cleared on the next key press).
 	if m.statusNote != "" {
 		noteStyle := lipgloss.NewStyle().Foreground(styles.Success)
