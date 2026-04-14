@@ -3153,3 +3153,124 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 		}
 	})
 }
+
+// ── BUG-052: `b` shortcut to open criteria/unblock mode from tree ─────────────
+
+func TestUpdateList_BKey_BlockedTask_OpensDetailInCriteriaMode(t *testing.T) {
+	task := parser.Task{
+		ID:    "TASK-001",
+		Title: "Blocked task",
+		Criteria: []parser.Criterion{
+			{Text: "BLOCKED: waiting for API", Checked: false, Blocked: true},
+		},
+	}
+	plan := parser.Plan{
+		ID:    "feature_001",
+		File:  "feature_001.md",
+		Tasks: []parser.Task{task},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row (0 = plan row, 1 = first task row)
+	}
+	m.taskListComponent.Tasks = []parser.Task{task}
+
+	result := pressKey(m, "b")
+
+	if !result.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should be true after pressing b on a blocked task")
+	}
+	if !result.taskListComponent.Detail.criteriaMode {
+		t.Error("criteriaMode should be true after pressing b on a blocked task")
+	}
+}
+
+func TestUpdateList_BKey_NoBlockedCriteria_IsNoop(t *testing.T) {
+	task := parser.Task{
+		ID:    "TASK-001",
+		Title: "Normal task",
+		Criteria: []parser.Criterion{
+			{Text: "Do the thing", Checked: false, Blocked: false},
+		},
+	}
+	plan := parser.Plan{
+		ID:    "feature_001",
+		File:  "feature_001.md",
+		Tasks: []parser.Task{task},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+	}
+	m.taskListComponent.Tasks = []parser.Task{task}
+
+	result := pressKey(m, "b")
+
+	if result.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should remain false when task has no blocked criteria")
+	}
+}
+
+func TestUpdateList_BKey_PlanRow_IsNoop(t *testing.T) {
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{ID: "TASK-001", Criteria: []parser.Criterion{{Blocked: true}}},
+		},
+	}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{}, // not expanded; cursor 0 = plan row
+		treeCursor:    0,
+	}
+	m.taskListComponent.Tasks = []parser.Task{}
+
+	result := pressKey(m, "b")
+
+	if result.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should remain false when a plan row is selected")
+	}
+}
+
+func TestStatusSplitFooter_BUnblockHint_BlockedTask(t *testing.T) {
+	task := parser.Task{
+		ID:    "TASK-001",
+		Title: "Blocked task",
+		Criteria: []parser.Criterion{
+			{Text: "BLOCKED: waiting", Checked: false, Blocked: true},
+		},
+	}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+	}
+	footer := m.statusSplitFooter()
+	if !strings.Contains(footer, "b: unblock") {
+		t.Errorf("expected 'b: unblock' hint when blocked task selected, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_BUnblockHint_NonBlockedTask(t *testing.T) {
+	task := parser.Task{
+		ID:    "TASK-001",
+		Title: "Normal task",
+		Criteria: []parser.Criterion{
+			{Text: "Do the thing", Checked: false, Blocked: false},
+		},
+	}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+	}
+	footer := m.statusSplitFooter()
+	if strings.Contains(footer, "b: unblock") {
+		t.Errorf("expected no 'b: unblock' hint when task has no blocked criteria, got: %q", footer)
+	}
+}

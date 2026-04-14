@@ -872,6 +872,30 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleApproveToggle()
 	case "x":
 		return m.handleSkipToggle()
+	case "b":
+		task := m.selectedTask()
+		if task == nil {
+			return m, nil
+		}
+		found := false
+		for i, t := range m.taskListComponent.Tasks {
+			if t.ID == task.ID {
+				m.taskListComponent.Cursor = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			return m, nil
+		}
+		m.taskListComponent.openDetail()
+		m.resizeTab2DetailViewport()
+		if !m.taskListComponent.Detail.initCriteriaMode(*task) {
+			m.taskListComponent.closeDetail()
+		} else {
+			m.taskListComponent.refreshDetailViewport()
+		}
+		return m, nil
 	case "alt+d":
 		visible := m.visiblePlans()
 		if len(visible) > 0 && m.planCursor < len(visible) && !m.ConfirmDelete {
