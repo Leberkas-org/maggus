@@ -160,6 +160,24 @@ func (w *Watcher) loop() {
 				}
 				continue
 			}
+			// If a previously-absent watched directory is now being created,
+			// register it with fsnotify and trigger the debounce so the TUI
+			// refreshes even before any file appears inside it.
+			if event.Op&fsnotify.Create != 0 {
+				for _, d := range w.dirs {
+					if d == event.Name {
+						_ = w.fsw.Add(event.Name)
+						hasCreate = true
+						if timer == nil {
+							timer = time.NewTimer(w.debounce)
+							timerC = timer.C
+						} else {
+							timer.Reset(w.debounce)
+						}
+						break
+					}
+				}
+			}
 			if !isRelevantEvent(event) {
 				continue
 			}

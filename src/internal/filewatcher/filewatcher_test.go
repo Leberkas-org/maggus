@@ -543,6 +543,137 @@ func TestWatcherConfigFileWakesDaemon(t *testing.T) {
 	}
 }
 
+func TestWatcherNewBugsDirCreatedDynamically(t *testing.T) {
+	baseDir := t.TempDir()
+	// Only .maggus/ exists — .maggus/bugs/ is absent at startup.
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Create the bugs directory (this is what the OS does when a user creates
+	// the first bug file via a tool that creates parent dirs).
+	bugDir := filepath.Join(maggusDir, "bugs")
+	if err := os.MkdirAll(bugDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for debounce window to expire.
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg when bugs/ dir created dynamically, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when bugs/ dir is newly created")
+		}
+	}
+}
+
+func TestWatcherNewFeaturesDirCreatedDynamically(t *testing.T) {
+	baseDir := t.TempDir()
+	// Only .maggus/ exists — .maggus/features/ is absent at startup.
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Create the features directory dynamically.
+	featDir := filepath.Join(maggusDir, "features")
+	if err := os.MkdirAll(featDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for debounce window to expire.
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg when features/ dir created dynamically, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when features/ dir is newly created")
+		}
+	}
+}
+
+func TestWatcherBugFileInDynamicallyCreatedDir(t *testing.T) {
+	baseDir := t.TempDir()
+	// Only .maggus/ exists — .maggus/bugs/ is absent at startup.
+	maggusDir := filepath.Join(baseDir, ".maggus")
+	if err := os.MkdirAll(maggusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var count atomic.Int32
+	var lastMsg atomic.Value
+	send := func(msg any) {
+		count.Add(1)
+		lastMsg.Store(msg)
+	}
+
+	w, err := New(baseDir, send, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	defer w.Close()
+
+	// Simulate the user creating their first bug file: OS creates bugs/ first,
+	// then writes bug_001.md inside it.
+	bugDir := filepath.Join(maggusDir, "bugs")
+	if err := os.MkdirAll(bugDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Small gap to let the loop process the directory-creation event and
+	// register the new watcher before the file appears.
+	time.Sleep(30 * time.Millisecond)
+
+	file := filepath.Join(bugDir, "bug_001.md")
+	if err := os.WriteFile(file, []byte("# Bug 1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for debounce window to expire.
+	time.Sleep(200 * time.Millisecond)
+
+	if count.Load() < 1 {
+		t.Errorf("expected at least 1 UpdateMsg for bug file in newly-created bugs dir, got %d", count.Load())
+	}
+	if msg, ok := lastMsg.Load().(UpdateMsg); ok {
+		if !msg.HasNewFile {
+			t.Error("expected HasNewFile = true when creating bug_001.md in newly-created bugs dir")
+		}
+	}
+}
+
 func TestWatcherCloseNoLeak(t *testing.T) {
 	baseDir := t.TempDir()
 	featDir := filepath.Join(baseDir, ".maggus", "features")
