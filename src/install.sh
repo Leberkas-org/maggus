@@ -6,4 +6,5 @@ cd "$dir"
 
 echo "Compile to /usr/local/bin/maggus"
 
-go build -o /usr/local/bin/maggus .
+go build -o /tmp/maggus .
+sudo mv /tmp/maggus /usr/local/bin/maggus
