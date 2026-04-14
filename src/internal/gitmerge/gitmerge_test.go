@@ -209,6 +209,42 @@ func TestMergeTaskBranch_Conflict(t *testing.T) {
 	}
 }
 
+func TestMergeTaskBranch_WorktreeAlreadyCheckedOut(t *testing.T) {
+	repo := initRepo(t)
+
+	// Create the plan (feature) branch.
+	// We use "feature/plan-055" (not "feature/maggus-055") to avoid the git ref
+	// hierarchy conflict: refs/heads/feature/maggus-055 (file) cannot coexist with
+	// refs/heads/feature/maggus-055/task-001 (inside a directory).
+	run(t, repo, "git", "checkout", "-b", "feature/plan-055")
+
+	// Create task branch off the plan branch with a commit.
+	taskBranch := "feature/maggus-055/task-001"
+	run(t, repo, "git", "checkout", "-b", taskBranch)
+	writeFile(t, filepath.Join(repo, "task.txt"), "task content")
+	run(t, repo, "git", "add", ".")
+	run(t, repo, "git", "commit", "-m", "task commit")
+
+	// Switch back to the plan branch in the main repo.
+	run(t, repo, "git", "checkout", "feature/plan-055")
+
+	// Simulate parallel execution: check out the task branch in a worktree.
+	// This is what the orchestrator does before launching the agent.
+	wtPath := filepath.Join(t.TempDir(), "worktree")
+	run(t, repo, "git", "worktree", "add", wtPath, taskBranch)
+
+	// MergeTaskBranch must succeed even though taskBranch is already checked out
+	// in the worktree. Without the fix this returns "already checked out" exit 128.
+	if err := MergeTaskBranch(repo, "feature/plan-055", taskBranch); err != nil {
+		t.Fatalf("MergeTaskBranch: %v", err)
+	}
+
+	// The task file should now exist on the plan branch in the main repo.
+	if _, err := os.Stat(filepath.Join(repo, "task.txt")); err != nil {
+		t.Errorf("task.txt should exist on plan branch after merge: %v", err)
+	}
+}
+
 // --- unit tests for helper functions ---
 
 func TestTaskIDFromBranch(t *testing.T) {

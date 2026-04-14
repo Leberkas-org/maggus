@@ -9,6 +9,7 @@ import (
 
 	"github.com/leberkas-org/maggus/internal/gitbranch"
 	"github.com/leberkas-org/maggus/internal/gitutil"
+	"github.com/leberkas-org/maggus/internal/gitworktree"
 )
 
 // MergeConflictError is returned when merging a task branch encounters conflicts.
@@ -31,16 +32,33 @@ func (e *MergeConflictError) Error() string {
 // task's plan file, and a *MergeConflictError is returned. The worktree is
 // preserved so the developer can inspect the changes.
 func MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error {
+	// Determine where to run the rebase. For parallel tasks the task branch is
+	// already checked out in a worktree; trying to check it out again in the main
+	// repo triggers "already checked out" from git. Instead, detect the worktree
+	// and run the rebase there.
+	workDir := repoRoot
+	if worktrees, err := gitworktree.ListWorktrees(repoRoot); err == nil {
+		for _, wt := range worktrees {
+			if wt.Branch == taskBranch {
+				workDir = wt.Path
+				break
+			}
+		}
+	}
+
 	// Step 1: Rebase task branch onto feature branch.
-	if err := checkout(repoRoot, taskBranch); err != nil {
-		return err
+	if workDir == repoRoot {
+		// Task branch not in a worktree — check it out in the main repo.
+		if err := checkout(repoRoot, taskBranch); err != nil {
+			return err
+		}
 	}
 
 	rebaseCmd := gitutil.Command("rebase", featureBranch)
-	rebaseCmd.Dir = repoRoot
+	rebaseCmd.Dir = workDir
 	out, err := rebaseCmd.CombinedOutput()
 	if err != nil {
-		return handleRebaseFailure(repoRoot, featureBranch, taskBranch, out, err)
+		return handleRebaseFailure(workDir, repoRoot, featureBranch, taskBranch, out, err)
 	}
 
 	// Step 2: Fast-forward feature branch to the rebased task branch tip.
@@ -67,22 +85,26 @@ func checkout(repoRoot, branch string) error {
 	return nil
 }
 
-func handleRebaseFailure(repoRoot, featureBranch, taskBranch string, rebaseOutput []byte, rebaseErr error) error {
+// handleRebaseFailure is called when the rebase step in MergeTaskBranch fails.
+// workDir is where the rebase ran (either repoRoot or a worktree path); it is
+// used for REBASE_HEAD detection and abort. repoRoot is always the main repo
+// and is used for the feature-branch checkout and plan-file injection.
+func handleRebaseFailure(workDir, repoRoot, featureBranch, taskBranch string, rebaseOutput []byte, rebaseErr error) error {
 	// Check whether a rebase conflict is in progress (REBASE_HEAD exists).
 	// If not, this was a non-conflict failure (e.g. branch not found).
 	checkCmd := gitutil.Command("rev-parse", "-q", "--verify", "REBASE_HEAD")
-	checkCmd.Dir = repoRoot
+	checkCmd.Dir = workDir
 	if checkCmd.Run() != nil {
 		return fmt.Errorf("rebase %s onto %s: %w: %s",
 			taskBranch, featureBranch, rebaseErr, strings.TrimSpace(string(rebaseOutput)))
 	}
 
-	// Conflict — abort the rebase.
+	// Conflict — abort the rebase in the directory where it ran.
 	abortCmd := gitutil.Command("rebase", "--abort")
-	abortCmd.Dir = repoRoot
+	abortCmd.Dir = workDir
 	_ = abortCmd.Run()
 
-	// Switch back to the feature branch so the repo is in the expected state.
+	// Switch back to the feature branch so the main repo is in the expected state.
 	_ = checkout(repoRoot, featureBranch)
 
 	// Best-effort: inject a BLOCKED criterion into the task's plan file.
