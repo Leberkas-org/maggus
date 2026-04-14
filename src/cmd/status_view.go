@@ -136,9 +136,8 @@ func (m statusModel) viewStatus() string {
 	if m.width > 0 && m.height > 0 {
 		bg := m.viewStatusSplit()
 		if m.showHelp {
-			dimmedBg := lipgloss.NewStyle().Faint(true).Render(bg)
 			modal := buildHelpModal(m.width, m.height)
-			return styles.OverlayCenter(dimmedBg, modal, m.width, m.height)
+			return styles.OverlayCenter(bg, modal, m.width, m.height)
 		}
 		return bg
 	}
