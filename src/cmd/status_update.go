@@ -890,10 +890,12 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		editor := resolveEditor()
 		return m, func() tea.Msg {
-			return execProcessMsg{
-				cmd:    exec.Command(editor, filePath),
-				onDone: func(_ error) tea.Msg { return editorDoneMsg{} },
+			editorCmd := exec.Command(editor, filePath)
+			if err := editorCmd.Start(); err != nil {
+				return editorDoneMsg{}
 			}
+			_ = editorCmd.Wait()
+			return editorDoneMsg{}
 		}
 	case "alt+d":
 		visible := m.visiblePlans()

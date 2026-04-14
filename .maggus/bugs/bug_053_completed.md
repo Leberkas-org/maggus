@@ -108,7 +108,7 @@ The `e` key handler (`src/cmd/status_update.go:908`) returns an `execProcessMsg`
 **Description:** As a user, I want pressing `e` to open my editor without suspending the status view.
 
 **Acceptance Criteria:**
-- [ ] The `e` key handler in `src/cmd/status_update.go` launches the editor with `cmd.Start()` (non-blocking) instead of returning an `execProcessMsg`
-- [ ] The status TUI remains interactive while the editor is open
-- [ ] No zombie processes or resource leaks (fire-and-forget is acceptable; the editor process owns its own lifecycle)
-- [ ] `go vet ./...` and `go test ./...` pass
+- [x] The `e` key handler in `src/cmd/status_update.go` launches the editor with `cmd.Start()` (non-blocking) instead of returning an `execProcessMsg`
+- [x] The status TUI remains interactive while the editor is open
+- [x] No zombie processes or resource leaks (fire-and-forget is acceptable; the editor process owns its own lifecycle)
+- [x] `go vet ./...` and `go test ./...` pass
