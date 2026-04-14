@@ -259,7 +259,7 @@ func renderCurrentTaskContent(taskID, taskFile string) string {
 	if t == nil {
 		return ""
 	}
-	return renderDetailContent(*t, nil)
+	return renderDetailContent(*t)
 }
 
 // loadCurrentTaskDetail loads the selected task (or fallback to next workable) into the currentTaskViewport.

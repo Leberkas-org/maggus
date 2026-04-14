@@ -172,11 +172,11 @@ func (m statusModel) viewStatusSplit() string {
 func (m statusModel) statusSplitFooter() string {
 	if m.exitDaemonOverlay {
 		hint := lipgloss.NewStyle().Foreground(styles.Warning)
-		return hint.Render("Exiting... Daemon is running:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
+		return hint.Render("Daemon is running:  [s] stop after task  [k / ctrl+c] kill  [esc] cancel")
 	}
 	if m.daemonStopOverlay {
 		hint := lipgloss.NewStyle().Foreground(styles.Warning)
-		return hint.Render("Stop daemon:  [s] stop after task  [k / ctrl+c] kill now  [esc] cancel")
+		return hint.Render("Stop daemon:  [s] stop after task  [k / ctrl+c] kill  [esc] cancel")
 	}
 	if m.daemonStoppingAfterTask {
 		stoppingStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
@@ -185,52 +185,36 @@ func (m statusModel) statusSplitFooter() string {
 	// When a task detail view is open, show detail-specific hints.
 	c := &m.taskListComponent
 	if c.ShowDetail {
-		ds := &c.Detail
-		if ds.criteriaMode {
-			if ds.showActionPicker {
-				return "↑/↓: navigate/scroll · enter: confirm · esc: cancel"
-			}
-			return "↑/↓: navigate/scroll · enter: action · tab: scroll mode · q: back"
-		}
 		var detailParts []string
-		detailParts = append(detailParts, "↑/↓: scroll")
-		detailParts = append(detailParts, "pgup/pgdn: prev/next task")
-		detailParts = append(detailParts, "tab: manage blocked")
+		detailParts = append(detailParts, "↑/↓")
+		detailParts = append(detailParts, "pgup/dn: task")
 		detailParts = append(detailParts, "alt+r: run · alt+bksp: delete · q: back")
 		return strings.Join(detailParts, "  ")
 	}
 
-	tabRange := fmt.Sprintf("1-%d: tabs", len(m.availableTabs()))
 	var parts []string
-	parts = append(parts, tabRange)
-	parts = append(parts, "tab: switch tab")
-	parts = append(parts, "↑/↓: navigate")
-	activeKey := m.activeTabKey()
-	if activeKey == "output" || activeKey == "featureoutput" || activeKey == "taskdetails" {
-		parts = append(parts, "shift+↑/↓: scroll")
-	}
-	parts = append(parts, "pgup/pgdn: prev/next feature")
+	parts = append(parts, "tab")
+	parts = append(parts, "↑/↓")
 	if m.approvalRequired {
 		parts = append(parts, "a: approve")
 	}
 	if task := m.selectedTask(); task != nil {
-		parts = append(parts, "x: skip/unskip")
 		parts = append(parts, "alt+r: run")
 		if task.IsBlocked() {
 			parts = append(parts, "b: unblock")
 		}
 	}
 	if m.treeSelectedFilePath() != "" {
-		parts = append(parts, "e: edit file")
+		parts = append(parts, "e: edit")
 	}
-	parts = append(parts, "F1: help")
-	parts = append(parts, "q: exit")
+	parts = append(parts, "F1")
+	parts = append(parts, "q")
 	footer := strings.Join(parts, "  ")
 	if m.hasCompletedPlans() {
 		if m.showAll {
-			footer += "  alt+a: hide done"
+			footer += "  alt+a: hide"
 		} else {
-			footer += "  alt+a: show done"
+			footer += "  alt+a: show"
 		}
 	}
 	// Show status note briefly after an action (cleared on the next key press).

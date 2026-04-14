@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/leberkas-org/maggus/internal/approval"
 	"github.com/leberkas-org/maggus/internal/claude2x"
 	"github.com/leberkas-org/maggus/internal/parser"
@@ -1937,8 +1938,8 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 			showAll: false,
 		}
 		footer := m.statusSplitFooter()
-		if !strings.Contains(footer, "alt+a: show done") {
-			t.Errorf("expected 'alt+a: show done' hint, got: %q", footer)
+		if !strings.Contains(footer, "alt+a: show") {
+			t.Errorf("expected 'alt+a: show' hint, got: %q", footer)
 		}
 	})
 
@@ -1948,8 +1949,8 @@ func TestStatusSplitFooter_AltAHint(t *testing.T) {
 			showAll: true,
 		}
 		footer := m.statusSplitFooter()
-		if !strings.Contains(footer, "alt+a: hide done") {
-			t.Errorf("expected 'alt+a: hide done' hint, got: %q", footer)
+		if !strings.Contains(footer, "alt+a: hide") {
+			t.Errorf("expected 'alt+a: hide' hint, got: %q", footer)
 		}
 	})
 }
@@ -2591,31 +2592,6 @@ func TestStatusSplitFooter_ShowsStatusNote(t *testing.T) {
 	}
 }
 
-func TestStatusSplitFooter_ContainsSkipHint(t *testing.T) {
-	// Skip hint should appear when a task row is selected.
-	task := parser.Task{ID: "TASK-001-001", Title: "Test task",
-		Criteria: []parser.Criterion{{Text: "do something", Checked: false}}}
-	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
-	m := statusModel{
-		plans:         []parser.Plan{plan},
-		expandedPlans: map[string]bool{"feature_001": true},
-		treeCursor:    1, // task row (0 = plan row, 1 = first task)
-	}
-	footer := m.statusSplitFooter()
-	if !strings.Contains(footer, "x: skip") {
-		t.Errorf("expected footer to contain 'x: skip/unskip' hint when task selected, got: %q", footer)
-	}
-
-	// Skip hint should NOT appear when a plan row is selected.
-	mPlan := statusModel{
-		plans:      []parser.Plan{plan},
-		treeCursor: 0, // plan row
-	}
-	footerPlan := mPlan.statusSplitFooter()
-	if strings.Contains(footerPlan, "x: skip") {
-		t.Errorf("expected footer to NOT contain 'x: skip/unskip' hint when plan row selected, got: %q", footerPlan)
-	}
-}
 
 // ── handleAltRunDispatch tests ────────────────────────────────────────────────
 
@@ -3154,14 +3130,84 @@ func TestNavigationPreservesTabTrackers(t *testing.T) {
 	})
 }
 
-// ── BUG-052: `b` shortcut to open criteria/unblock mode from tree ─────────────
+// ── BUG-053: `b` shortcut directly unblocks all blocked criteria ──────────────
 
-func TestUpdateList_BKey_BlockedTask_OpensDetailInCriteriaMode(t *testing.T) {
+func TestHandleUnblockAll_UnblocksAllBlockedCriteria(t *testing.T) {
+	dir := setupApproveDir(t)
+
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+		Tasks: []parser.Task{
+			{
+				ID:         "TASK-001-001",
+				Title:      "Blocked task",
+				SourceFile: filepath.Join(dir, ".maggus", "features", "feature_001.md"),
+				Criteria: []parser.Criterion{
+					{Text: "BLOCKED: waiting for API", Checked: false, Blocked: true},
+					{Text: "BLOCKED: also blocked", Checked: false, Blocked: true},
+					{Text: "normal criterion", Checked: false, Blocked: false},
+				},
+			},
+		},
+	}
+
+	fs := stores.NewMemFeatureStore([]parser.Plan{plan})
+	bs := stores.NewMemBugStore(nil)
+
+	m := statusModel{
+		taskListComponent: taskListComponent{
+			featureStore: fs,
+			bugStore:     bs,
+		},
+		dir:           dir,
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{"feature_001": true},
+		treeCursor:    1, // task row
+		featureStore:  fs,
+		bugStore:      bs,
+	}
+
+	result, _ := m.handleUnblockAll()
+	newM := result.(statusModel)
+
+	if newM.statusNote != "task unblocked" {
+		t.Errorf("expected 'task unblocked' note, got: %q", newM.statusNote)
+	}
+	if newM.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should remain false — b no longer opens detail view")
+	}
+}
+
+func TestHandleUnblockAll_PlanRowIsNoop(t *testing.T) {
+	plan := parser.Plan{
+		ID:   "feature_001",
+		File: "feature_001.md",
+		Tasks: []parser.Task{
+			{ID: "TASK-001-001", Criteria: []parser.Criterion{{Blocked: true}}},
+		},
+	}
+
+	m := statusModel{
+		plans:         []parser.Plan{plan},
+		expandedPlans: map[string]bool{}, // not expanded; cursor 0 = plan row
+		treeCursor:    0,
+	}
+
+	result, _ := m.handleUnblockAll()
+	newM := result.(statusModel)
+
+	if newM.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should remain false for plan row")
+	}
+}
+
+func TestHandleUnblockAll_NoBlockedCriteriaIsNoop(t *testing.T) {
 	task := parser.Task{
-		ID:    "TASK-001",
-		Title: "Blocked task",
+		ID:    "TASK-001-001",
+		Title: "Normal task",
 		Criteria: []parser.Criterion{
-			{Text: "BLOCKED: waiting for API", Checked: false, Blocked: true},
+			{Text: "Do the thing", Checked: false, Blocked: false},
 		},
 	}
 	plan := parser.Plan{
@@ -3172,17 +3218,17 @@ func TestUpdateList_BKey_BlockedTask_OpensDetailInCriteriaMode(t *testing.T) {
 	m := statusModel{
 		plans:         []parser.Plan{plan},
 		expandedPlans: map[string]bool{"feature_001": true},
-		treeCursor:    1, // task row (0 = plan row, 1 = first task row)
+		treeCursor:    1, // task row
 	}
-	m.taskListComponent.Tasks = []parser.Task{task}
 
-	result := pressKey(m, "b")
+	result, _ := m.handleUnblockAll()
+	newM := result.(statusModel)
 
-	if !result.taskListComponent.ShowDetail {
-		t.Error("ShowDetail should be true after pressing b on a blocked task")
+	if newM.taskListComponent.ShowDetail {
+		t.Error("ShowDetail should remain false when task has no blocked criteria")
 	}
-	if !result.taskListComponent.Detail.criteriaMode {
-		t.Error("criteriaMode should be true after pressing b on a blocked task")
+	if newM.statusNote != "" {
+		t.Errorf("statusNote should be empty for no-op, got: %q", newM.statusNote)
 	}
 }
 
@@ -3360,8 +3406,8 @@ func TestStatusSplitFooter_EditFileHint_TaskSelected(t *testing.T) {
 		treeCursor:    1, // task row
 	}
 	footer := m.statusSplitFooter()
-	if !strings.Contains(footer, "e: edit file") {
-		t.Errorf("expected 'e: edit file' hint when task is selected, got: %q", footer)
+	if !strings.Contains(footer, "e: edit") {
+		t.Errorf("expected 'e: edit' hint when task is selected, got: %q", footer)
 	}
 }
 
@@ -3379,7 +3425,36 @@ func TestStatusSplitFooter_EditFileHint_PlanSelected(t *testing.T) {
 		treeCursor:    0, // plan row
 	}
 	footer := m.statusSplitFooter()
-	if !strings.Contains(footer, "e: edit file") {
-		t.Errorf("expected 'e: edit file' hint when plan is selected, got: %q", footer)
+	if !strings.Contains(footer, "e: edit") {
+		t.Errorf("expected 'e: edit' hint when plan is selected, got: %q", footer)
+	}
+}
+
+func TestStatusSplitFooter_FitsIn80Columns(t *testing.T) {
+	// Worst case: approval required + blocked task selected + file path available + completed plans.
+	// At 80-column terminal the inner content width is 76 (80 - 2 border - 2 padding).
+	const innerWidthAt80Cols = 76
+
+	task := parser.Task{
+		ID:         "TASK-001",
+		Title:      "Blocked task",
+		SourceFile: "feature_001.md",
+		Criteria:   []parser.Criterion{{Text: "BLOCKED: waiting", Checked: false, Blocked: true}},
+	}
+	completedPlan := parser.Plan{ID: "feature_002", Completed: true, Tasks: []parser.Task{
+		{ID: "TASK-002", Criteria: []parser.Criterion{{Text: "done", Checked: true}}},
+	}}
+	plan := parser.Plan{ID: "feature_001", File: "feature_001.md", Tasks: []parser.Task{task}}
+	m := statusModel{
+		plans:            []parser.Plan{plan, completedPlan},
+		expandedPlans:    map[string]bool{"feature_001": true},
+		treeCursor:       1, // task row
+		showAll:          true,
+		approvalRequired: true,
+	}
+	footer := m.statusSplitFooter()
+	w := lipgloss.Width(footer)
+	if w > innerWidthAt80Cols {
+		t.Errorf("footer width %d exceeds %d (inner width at 80-col terminal), footer: %q", w, innerWidthAt80Cols, footer)
 	}
 }

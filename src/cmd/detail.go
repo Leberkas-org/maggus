@@ -10,143 +10,12 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-// planMutationStore is the subset of FeatureStore/BugStore used for criterion mutations.
-type planMutationStore interface {
-	UnblockCriterion(filePath string, c parser.Criterion) error
-	ResolveCriterion(filePath string, c parser.Criterion) error
-	DeleteCriterion(filePath string, c parser.Criterion) error
-	SkipCriterion(filePath string, c parser.Criterion) error
-	UnskipCriterion(filePath string, c parser.Criterion) error
-}
+// detailState holds auxiliary state for the task detail view.
+// Reserved for future use; criteria mode has been removed.
+type detailState struct{}
 
-// criteriaAction represents the user's choice for a blocked or skipped criterion.
-type criteriaAction int
-
-const (
-	criteriaActionUnblock  criteriaAction = iota
-	criteriaActionResolve
-	criteriaActionDelete
-	criteriaActionSkipTask
-	criteriaActionSkip
-)
-
-var criteriaActions = []criteriaAction{criteriaActionUnblock, criteriaActionResolve, criteriaActionDelete, criteriaActionSkipTask, criteriaActionSkip}
-
-func (a criteriaAction) String() string {
-	switch a {
-	case criteriaActionUnblock:
-		return "Unblock"
-	case criteriaActionResolve:
-		return "Resolve"
-	case criteriaActionDelete:
-		return "Delete"
-	case criteriaActionSkipTask:
-		return "Skip Task"
-	case criteriaActionSkip:
-		return "Skip"
-	}
-	return ""
-}
-
-func (a criteriaAction) Description() string {
-	switch a {
-	case criteriaActionUnblock:
-		return "Remove BLOCKED: prefix, keep unchecked"
-	case criteriaActionResolve:
-		return "Mark as done (remove block + check)"
-	case criteriaActionDelete:
-		return "Remove criterion entirely"
-	case criteriaActionSkipTask:
-		return "Mark as skipped (won't be worked on)"
-	case criteriaActionSkip:
-		return "Do nothing"
-	}
-	return ""
-}
-
-// detailState holds the state for criteria mode in the task detail view.
-type detailState struct {
-	criteriaMode     bool
-	criteriaCursor   int
-	blockedIndices   []int // indices into task.Criteria that are blocked or skipped
-	showActionPicker bool
-	actionCursor     int
-	noBlockedMsg     bool // briefly show "no blocked criteria" message
-}
-
-// initCriteriaMode sets up criteria mode for the given task.
-// Returns false if the task has no blocked or skipped criteria.
-func (d *detailState) initCriteriaMode(task parser.Task) bool {
-	d.blockedIndices = nil
-	for i, c := range task.Criteria {
-		if c.Blocked || c.Skipped {
-			d.blockedIndices = append(d.blockedIndices, i)
-		}
-	}
-	if len(d.blockedIndices) == 0 {
-		return false
-	}
-	d.criteriaMode = true
-	d.criteriaCursor = 0
-	d.showActionPicker = false
-	d.actionCursor = 0
-	return true
-}
-
-// exitCriteriaMode returns to scroll mode.
-func (d *detailState) exitCriteriaMode() {
-	d.criteriaMode = false
-	d.criteriaCursor = 0
-	d.showActionPicker = false
-	d.actionCursor = 0
-	d.blockedIndices = nil
-}
-
-// performAction executes the selected action on the blocked or skipped criterion.
-// Returns true if the plan file was modified (needs refresh).
-func (d *detailState) performAction(task parser.Task, action criteriaAction, store planMutationStore) (modified bool, err error) {
-	if d.criteriaCursor >= len(d.blockedIndices) {
-		return false, nil
-	}
-	criterionIdx := d.blockedIndices[d.criteriaCursor]
-	c := task.Criteria[criterionIdx]
-
-	switch action {
-	case criteriaActionUnblock:
-		if err := store.UnblockCriterion(task.SourceFile, c); err != nil {
-			return false, err
-		}
-		return true, nil
-	case criteriaActionResolve:
-		if err := store.ResolveCriterion(task.SourceFile, c); err != nil {
-			return false, err
-		}
-		return true, nil
-	case criteriaActionDelete:
-		if err := store.DeleteCriterion(task.SourceFile, c); err != nil {
-			return false, err
-		}
-		return true, nil
-	case criteriaActionSkipTask:
-		if c.Skipped {
-			if err := store.UnskipCriterion(task.SourceFile, c); err != nil {
-				return false, err
-			}
-		} else {
-			if err := store.SkipCriterion(task.SourceFile, c); err != nil {
-				return false, err
-			}
-		}
-		return true, nil
-	case criteriaActionSkip:
-		return false, nil
-	}
-	return false, nil
-}
-
-// renderDetailContent builds the detail view content for a task, with optional
-// criteria mode highlighting.
-func renderDetailContent(t parser.Task, ds *detailState) string {
+// renderDetailContent builds the detail view content for a task.
+func renderDetailContent(t parser.Task) string {
 	var sb strings.Builder
 
 	titleStyle := styles.Title
@@ -211,7 +80,7 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 		sb.WriteString("\n")
 		sb.WriteString(styles.Subtitle.Render("Acceptance Criteria"))
 		sb.WriteString("\n")
-		for i, c := range t.Criteria {
+		for _, c := range t.Criteria {
 			var checkbox string
 			if c.Blocked {
 				// Blocked takes priority over Checked — [~] criteria are both
@@ -224,85 +93,10 @@ func renderDetailContent(t parser.Task, ds *detailState) string {
 			} else {
 				checkbox = mutedStyle.Render("○")
 			}
-
-			// In criteria mode, highlight the selected blocked or skipped criterion
-			if ds != nil && ds.criteriaMode && (c.Blocked || c.Skipped) {
-				blockedIdx := -1
-				for bi, idx := range ds.blockedIndices {
-					if idx == i {
-						blockedIdx = bi
-						break
-					}
-				}
-				if blockedIdx == ds.criteriaCursor {
-					if ds.showActionPicker {
-						// Show action picker inline below this criterion
-						sb.WriteString(fmt.Sprintf("  %s %s\n", warningStyle.Render("▸"), lipgloss.NewStyle().Bold(true).Foreground(styles.Warning).Render(c.Text)))
-						sb.WriteString(renderInlineActionPicker(ds.actionCursor, c))
-					} else {
-						sb.WriteString(fmt.Sprintf("  %s %s\n", warningStyle.Render("▸"), lipgloss.NewStyle().Bold(true).Foreground(styles.Warning).Render(c.Text)))
-					}
-				} else {
-					sb.WriteString(fmt.Sprintf("  %s %s\n", checkbox, c.Text))
-				}
-			} else {
-				sb.WriteString(fmt.Sprintf("  %s %s\n", checkbox, c.Text))
-			}
+			sb.WriteString(fmt.Sprintf("  %s %s\n", checkbox, c.Text))
 		}
 	}
 
-	// Show no-blocked message if applicable
-	if ds != nil && ds.noBlockedMsg {
-		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("  %s\n", mutedStyle.Render("No blocked criteria to manage")))
-	}
-
-	return sb.String()
-}
-
-// renderInlineActionPicker renders the action picker inline.
-// c is the currently selected criterion; it is used to show "Unskip" instead of
-// "Skip Task" when the criterion already has the SKIPPED: prefix.
-func renderInlineActionPicker(cursor int, c parser.Criterion) string {
-	successStyle := lipgloss.NewStyle().Foreground(styles.Success)
-	warningStyle := lipgloss.NewStyle().Foreground(styles.Warning)
-	errorStyle := lipgloss.NewStyle().Foreground(styles.Error)
-	mutedStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	primaryStyle := lipgloss.NewStyle().Foreground(styles.Primary)
-
-	var sb strings.Builder
-	for i, a := range criteriaActions {
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
-		var label string
-		var descText string
-		switch a {
-		case criteriaActionUnblock:
-			label = successStyle.Render(a.String())
-			descText = a.Description()
-		case criteriaActionResolve:
-			label = warningStyle.Render(a.String())
-			descText = a.Description()
-		case criteriaActionDelete:
-			label = errorStyle.Render(a.String())
-			descText = a.Description()
-		case criteriaActionSkipTask:
-			if c.Skipped {
-				label = successStyle.Render("Unskip")
-				descText = "Restore to workable state"
-			} else {
-				label = primaryStyle.Render(a.String())
-				descText = a.Description()
-			}
-		default:
-			label = mutedStyle.Render(a.String())
-			descText = a.Description()
-		}
-		desc := mutedStyle.Render(" " + descText)
-		sb.WriteString(fmt.Sprintf("      %s%s%s\n", prefix, label, desc))
-	}
 	return sb.String()
 }
 
@@ -322,20 +116,12 @@ func reloadTask(sourceFile, taskID string) *parser.Task {
 }
 
 // detailFooter returns the appropriate footer for the detail view state.
-func detailFooter(ds *detailState, scrollable bool) string {
-	if ds != nil && ds.criteriaMode {
-		if ds.showActionPicker {
-			return styles.StatusBar.Render("↑/↓: select action · enter: confirm · esc: cancel")
-		}
-		return styles.StatusBar.Render("↑/↓: navigate blocked · enter: action · tab: scroll mode · q: back")
-	}
-
+func detailFooter(scrollable bool) string {
 	var parts []string
 	if scrollable {
 		parts = append(parts, "↑/↓: scroll")
 	}
 	parts = append(parts, "pgup/pgdn: prev/next task")
-	parts = append(parts, "tab: manage blocked")
 	parts = append(parts, "alt+r: run · alt+bksp: delete · q: back")
 	return styles.StatusBar.Render(strings.Join(parts, " · "))
 }

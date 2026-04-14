@@ -118,7 +118,7 @@ func (c *taskListComponent) refreshDetailViewport() {
 	if len(c.Tasks) == 0 || c.Cursor >= len(c.Tasks) {
 		return
 	}
-	content := renderDetailContent(c.Tasks[c.Cursor], &c.Detail)
+	content := renderDetailContent(c.Tasks[c.Cursor])
 	if c.DetailSuffix != "" {
 		content += c.DetailSuffix
 	}
@@ -132,7 +132,7 @@ func (c *taskListComponent) openDetail() {
 	}
 	c.ShowDetail = true
 	c.Detail = detailState{}
-	content := renderDetailContent(c.Tasks[c.Cursor], &c.Detail)
+	content := renderDetailContent(c.Tasks[c.Cursor])
 	if c.DetailSuffix != "" {
 		content += c.DetailSuffix
 	}
@@ -146,7 +146,7 @@ func (c *taskListComponent) openDetail() {
 func (c *taskListComponent) closeDetail() {
 	c.ShowDetail = false
 	c.detailReady = false
-	c.Detail.exitCriteriaMode()
+	c.Detail = detailState{}
 }
 
 // HandleResize updates the viewport dimensions when the window size changes.
@@ -230,16 +230,6 @@ func (c *taskListComponent) updateListNav(msg tea.KeyMsg) (tea.Cmd, taskListActi
 // updateDetail handles keys in the detail view.
 // Returns taskListUnhandled for keys the parent should handle.
 func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	// Handle action picker mode
-	if c.Detail.showActionPicker {
-		return c.updateActionPicker(msg)
-	}
-
-	// Handle criteria mode
-	if c.Detail.criteriaMode {
-		return c.updateCriteriaMode(msg)
-	}
-
 	switch normalizeKey(msg) {
 	case "alt+r":
 		if len(c.Tasks) > 0 {
@@ -254,26 +244,15 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 	case "q", "backspace":
 		c.closeDetail()
 		return nil, taskListNone
-	case "tab", "b":
-		c.Detail.noBlockedMsg = false
-		if !c.Detail.initCriteriaMode(c.Tasks[c.Cursor]) {
-			c.Detail.noBlockedMsg = true
-			c.refreshDetailViewport()
-			return nil, taskListNone
-		}
-		c.refreshDetailViewport()
-		return nil, taskListNone
 	case "pgdown":
 		if c.Cursor < len(c.Tasks)-1 {
 			c.Cursor++
-			c.Detail.exitCriteriaMode()
 			c.refreshDetailViewport()
 		}
 		return nil, taskListNone
 	case "pgup":
 		if c.Cursor > 0 {
 			c.Cursor--
-			c.Detail.exitCriteriaMode()
 			c.refreshDetailViewport()
 		}
 		return nil, taskListNone
@@ -296,58 +275,6 @@ func (c *taskListComponent) updateDetail(msg tea.KeyMsg) (tea.Cmd, taskListActio
 		return cmd, taskListNone
 	}
 	return nil, taskListUnhandled
-}
-
-func (c *taskListComponent) updateCriteriaMode(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch normalizeKey(msg) {
-	case "up", "k":
-		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor-1, len(c.Detail.blockedIndices))
-		c.refreshDetailViewport()
-	case "down", "j":
-		c.Detail.criteriaCursor = styles.ClampCursor(c.Detail.criteriaCursor+1, len(c.Detail.blockedIndices))
-		c.refreshDetailViewport()
-	case "enter":
-		c.Detail.showActionPicker = true
-		c.Detail.actionCursor = 0
-		c.refreshDetailViewport()
-	case "tab":
-		c.Detail.exitCriteriaMode()
-		c.refreshDetailViewport()
-	case "q", "backspace":
-		c.closeDetail()
-		return nil, taskListNone
-	}
-	return nil, taskListNone
-}
-
-func (c *taskListComponent) updateActionPicker(msg tea.KeyMsg) (tea.Cmd, taskListAction) {
-	switch normalizeKey(msg) {
-	case "up", "k":
-		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor-1, len(criteriaActions))
-		c.refreshDetailViewport()
-	case "down", "j":
-		c.Detail.actionCursor = styles.ClampCursor(c.Detail.actionCursor+1, len(criteriaActions))
-		c.refreshDetailViewport()
-	case "enter":
-		action := criteriaActions[c.Detail.actionCursor]
-		modified, _ := c.Detail.performAction(c.Tasks[c.Cursor], action, c.storeForFile(c.Tasks[c.Cursor].SourceFile))
-		c.Detail.showActionPicker = false
-		if modified {
-			// Reload task from disk
-			if updated := reloadTask(c.Tasks[c.Cursor].SourceFile, c.Tasks[c.Cursor].ID); updated != nil {
-				c.Tasks[c.Cursor] = *updated
-			}
-			// Re-init criteria mode with updated task
-			if !c.Detail.initCriteriaMode(c.Tasks[c.Cursor]) {
-				c.Detail.exitCriteriaMode()
-			}
-		}
-		c.refreshDetailViewport()
-	case "esc":
-		c.Detail.showActionPicker = false
-		c.refreshDetailViewport()
-	}
-	return nil, taskListNone
 }
 
 // updateConfirmDelete handles keys in the delete confirmation dialog.
@@ -399,7 +326,7 @@ func (c *taskListComponent) viewDetail() string {
 	}
 
 	scrollable := c.detailViewport.TotalLineCount() > c.detailViewport.Height
-	footer := detailFooter(&c.Detail, scrollable)
+	footer := detailFooter(scrollable)
 
 	bc := c.effectiveBorderColor()
 	if c.Width > 0 && c.Height > 0 {

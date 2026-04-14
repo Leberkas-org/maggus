@@ -290,33 +290,6 @@ func TestUpdateList_KeysBeyondTabCountIgnored(t *testing.T) {
 	}
 }
 
-// ── TestStatusSplitFooter_DynamicTabRange ─────────────────────────────────────
-
-func TestStatusSplitFooter_DynamicTabRange(t *testing.T) {
-	tests := []struct {
-		ctx       selectionContext
-		wantRange string
-	}{
-		// selNone: 1 tab → key range is 1-1
-		{ctx: selNone, wantRange: "1-1: tabs"},
-		// selFeature: 5 tabs → key range is 1-5
-		{ctx: selFeature, wantRange: "1-5: tabs"},
-		// selRunningTask: 3 tabs → key range is 1-3
-		{ctx: selRunningTask, wantRange: "1-3: tabs"},
-		// selCompletedTask: 4 tabs → key range is 1-4
-		{ctx: selCompletedTask, wantRange: "1-4: tabs"},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("context %d", tt.ctx), func(t *testing.T) {
-			m := makeModelForCtx(tt.ctx)
-			footer := m.statusSplitFooter()
-			if !strings.Contains(footer, tt.wantRange) {
-				t.Errorf("footer should contain %q; got: %q", tt.wantRange, footer)
-			}
-		})
-	}
-}
 
 func TestRenderSnapshotInPane_TruncatesLongTaskTitle(t *testing.T) {
 	tests := []struct {

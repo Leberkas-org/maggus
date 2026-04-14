@@ -55,6 +55,8 @@ var statusHelpSections = []helpSection{
 			{"a", "Approve / unapprove feature"},
 			{"alt+d", "Delete feature"},
 			{"x", "Skip / unskip task"},
+			{"b", "Unblock all blocked criteria"},
+			{"e", "Open plan file in editor"},
 			{"alt+r", "Run task now"},
 			{"alt+a", "Toggle completed features"},
 			{"alt+s", "Stop daemon after current task"},

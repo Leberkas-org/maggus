@@ -233,7 +233,6 @@ func TestTaskListComponent_OpenDetail(t *testing.T) {
 func TestTaskListComponent_CloseDetail(t *testing.T) {
 	c := newTestComponent(sampleTasks(3))
 	c.openDetail()
-	c.Detail.criteriaMode = true
 
 	c.closeDetail()
 
@@ -242,9 +241,6 @@ func TestTaskListComponent_CloseDetail(t *testing.T) {
 	}
 	if c.detailReady {
 		t.Error("detailReady should be false after closeDetail")
-	}
-	if c.Detail.criteriaMode {
-		t.Error("criteriaMode should be false after closeDetail")
 	}
 }
 
@@ -294,129 +290,6 @@ func TestTaskListComponent_EnterOnEmptyTasks_NoDetail(t *testing.T) {
 
 	if c.ShowDetail {
 		t.Error("Enter on empty task list should not open detail")
-	}
-}
-
-// --- Criteria mode enter/exit lifecycle ---
-
-func TestTaskListComponent_CriteriaMode_EnterExit(t *testing.T) {
-	tasks := []parser.Task{
-		{
-			ID:    "TASK-001",
-			Title: "Test",
-			Criteria: []parser.Criterion{
-				{Text: "BLOCKED: something", Blocked: true},
-				{Text: "normal"},
-			},
-		},
-	}
-	c := newTestComponent(tasks)
-	c.openDetail()
-
-	// Press tab to enter criteria mode
-	tabKey := tea.KeyMsg{Type: tea.KeyTab}
-	c.Update(tabKey)
-
-	if !c.Detail.criteriaMode {
-		t.Error("Tab should enter criteria mode when blocked criteria exist")
-	}
-	if len(c.Detail.blockedIndices) != 1 {
-		t.Errorf("blockedIndices len = %d, want 1", len(c.Detail.blockedIndices))
-	}
-
-	// Press tab again to exit criteria mode
-	c.Update(tabKey)
-
-	if c.Detail.criteriaMode {
-		t.Error("Tab should exit criteria mode")
-	}
-}
-
-func TestTaskListComponent_CriteriaMode_NoBlockedCriteria(t *testing.T) {
-	tasks := []parser.Task{
-		{
-			ID:    "TASK-001",
-			Title: "Test",
-			Criteria: []parser.Criterion{
-				{Text: "normal"},
-			},
-		},
-	}
-	c := newTestComponent(tasks)
-	c.openDetail()
-
-	tabKey := tea.KeyMsg{Type: tea.KeyTab}
-	c.Update(tabKey)
-
-	if c.Detail.criteriaMode {
-		t.Error("Should not enter criteria mode when no blocked criteria")
-	}
-	if !c.Detail.noBlockedMsg {
-		t.Error("noBlockedMsg should be true when no blocked criteria")
-	}
-}
-
-func TestTaskListComponent_CriteriaMode_Navigation(t *testing.T) {
-	tasks := []parser.Task{
-		{
-			ID:    "TASK-001",
-			Title: "Test",
-			Criteria: []parser.Criterion{
-				{Text: "BLOCKED: first", Blocked: true},
-				{Text: "normal"},
-				{Text: "BLOCKED: second", Blocked: true},
-			},
-		},
-	}
-	c := newTestComponent(tasks)
-	c.openDetail()
-
-	// Enter criteria mode
-	tabKey := tea.KeyMsg{Type: tea.KeyTab}
-	c.Update(tabKey)
-
-	if c.Detail.criteriaCursor != 0 {
-		t.Fatalf("criteriaCursor = %d, want 0", c.Detail.criteriaCursor)
-	}
-
-	// Move down
-	downKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
-	c.Update(downKey)
-
-	if c.Detail.criteriaCursor != 1 {
-		t.Errorf("criteriaCursor = %d, want 1 after down", c.Detail.criteriaCursor)
-	}
-
-	// Move up
-	upKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
-	c.Update(upKey)
-
-	if c.Detail.criteriaCursor != 0 {
-		t.Errorf("criteriaCursor = %d, want 0 after up", c.Detail.criteriaCursor)
-	}
-}
-
-func TestTaskListComponent_CriteriaMode_EscDoesNotCloseDetail(t *testing.T) {
-	tasks := []parser.Task{
-		{
-			ID:    "TASK-001",
-			Title: "Test",
-			Criteria: []parser.Criterion{
-				{Text: "BLOCKED: something", Blocked: true},
-			},
-		},
-	}
-	c := newTestComponent(tasks)
-	c.openDetail()
-
-	tabKey := tea.KeyMsg{Type: tea.KeyTab}
-	c.Update(tabKey)
-
-	escKey := tea.KeyMsg{Type: tea.KeyEsc}
-	c.Update(escKey)
-
-	if !c.ShowDetail {
-		t.Error("Esc in criteria mode should not close detail view")
 	}
 }
 

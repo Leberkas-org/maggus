@@ -882,29 +882,7 @@ func (m statusModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "x":
 		return m.handleSkipToggle()
 	case "b":
-		task := m.selectedTask()
-		if task == nil {
-			return m, nil
-		}
-		found := false
-		for i, t := range m.taskListComponent.Tasks {
-			if t.ID == task.ID {
-				m.taskListComponent.Cursor = i
-				found = true
-				break
-			}
-		}
-		if !found {
-			return m, nil
-		}
-		m.taskListComponent.openDetail()
-		m.resizeTab2DetailViewport()
-		if !m.taskListComponent.Detail.initCriteriaMode(*task) {
-			m.taskListComponent.closeDetail()
-		} else {
-			m.taskListComponent.refreshDetailViewport()
-		}
-		return m, nil
+		return m.handleUnblockAll()
 	case "e":
 		filePath := m.treeSelectedFilePath()
 		if filePath == "" {
@@ -1055,6 +1033,52 @@ func (m statusModel) handleSkipToggle() (tea.Model, tea.Cmd) {
 		m.statusNote = "error: " + err.Error()
 		return m, nil
 	}
+
+	// Preserve cursor position across reload so the user stays on the task row.
+	prevTreeCursor := m.treeCursor
+	m.reloadPlans()
+	newItems := m.buildTreeItems()
+	if prevTreeCursor < len(newItems) {
+		m.treeCursor = prevTreeCursor
+	}
+	m.syncPlanCursorFromTreeCursor()
+	m.syncDetailSuffix()
+	return m, nil
+}
+
+// handleUnblockAll removes the BLOCKED: prefix from every blocked criterion on the
+// currently selected task row. It is a no-op when no task is selected or the task
+// has no blocked criteria.
+func (m statusModel) handleUnblockAll() (tea.Model, tea.Cmd) {
+	items := m.buildTreeItems()
+	if m.treeCursor < 0 || m.treeCursor >= len(items) {
+		return m, nil
+	}
+	item := items[m.treeCursor]
+	if item.kind != treeItemKindTask || item.task == nil {
+		return m, nil
+	}
+	task := item.task
+
+	// Collect all blocked criteria.
+	var blocked []parser.Criterion
+	for _, c := range task.Criteria {
+		if c.Blocked {
+			blocked = append(blocked, c)
+		}
+	}
+	if len(blocked) == 0 {
+		return m, nil // no-op
+	}
+
+	store := m.storeForFile(task.SourceFile)
+	for _, c := range blocked {
+		if err := store.UnblockCriterion(task.SourceFile, c); err != nil {
+			m.statusNote = "error: " + err.Error()
+			return m, nil
+		}
+	}
+	m.statusNote = "task unblocked"
 
 	// Preserve cursor position across reload so the user stays on the task row.
 	prevTreeCursor := m.treeCursor
