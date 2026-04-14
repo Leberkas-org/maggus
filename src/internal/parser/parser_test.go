@@ -2195,3 +2195,80 @@ func TestIsRunnable_DegradesToIsWorkableWhenNilMaps(t *testing.T) {
 		}
 	}
 }
+
+func TestUnblockCriterion_TildeCheckbox(t *testing.T) {
+	const content = `# Feature 001: Test
+
+### TASK-001-001: A task
+**Acceptance Criteria:**
+- [~] ⚠️ BLOCKED: some criterion — needs manual verification
+- [ ] normal criterion
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+	filePath := filepath.Join(dir, ".maggus", "features", "feature_001.md")
+
+	c := Criterion{
+		Text:    "⚠️ BLOCKED: some criterion — needs manual verification",
+		Checked: true,
+		Blocked: true,
+	}
+
+	if err := UnblockCriterion(filePath, c); err != nil {
+		t.Fatalf("UnblockCriterion: %v", err)
+	}
+
+	tasks, err := ParseFile(filePath)
+	if err != nil {
+		t.Fatalf("ParseFile after unblock: %v", err)
+	}
+	if tasks[0].IsBlocked() {
+		t.Error("task should not be blocked after UnblockCriterion")
+	}
+	found := false
+	for _, cr := range tasks[0].Criteria {
+		if cr.Text == "some criterion — needs manual verification" && !cr.Checked && !cr.Blocked {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected unblocked criterion with stripped text, got %+v", tasks[0].Criteria)
+	}
+}
+
+func TestResolveCriterion_TildeCheckbox(t *testing.T) {
+	const content = `# Feature 001: Test
+
+### TASK-001-001: A task
+**Acceptance Criteria:**
+- [~] ⚠️ BLOCKED: some criterion — needs manual verification
+- [ ] normal criterion
+`
+	dir := t.TempDir()
+	writeTempFeature(t, dir, "feature_001.md", content)
+	filePath := filepath.Join(dir, ".maggus", "features", "feature_001.md")
+
+	c := Criterion{
+		Text:    "⚠️ BLOCKED: some criterion — needs manual verification",
+		Checked: true,
+		Blocked: true,
+	}
+
+	if err := ResolveCriterion(filePath, c); err != nil {
+		t.Fatalf("ResolveCriterion: %v", err)
+	}
+
+	tasks, err := ParseFile(filePath)
+	if err != nil {
+		t.Fatalf("ParseFile after resolve: %v", err)
+	}
+	found := false
+	for _, cr := range tasks[0].Criteria {
+		if cr.Text == "some criterion — needs manual verification" && cr.Checked && !cr.Blocked {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected resolved criterion with text stripped and checked, got %+v", tasks[0].Criteria)
+	}
+}

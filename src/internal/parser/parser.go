@@ -606,13 +606,16 @@ func DeleteTask(filePath string, taskID string) error {
 // UnblockCriterion reads the feature file, removes the "BLOCKED: " prefix from the
 // matching criterion line, and writes the file back. Returns an error if the
 // exact line cannot be found.
+//
+// Searches for both "- [ ] " + c.Text (legacy blocked style) and
+// "- [~] " + c.Text (agent-blocked style). In both cases the replacement
+// is "- [ ] " + newText so the criterion becomes a normal unchecked item.
 func UnblockCriterion(filePath string, c Criterion) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("read feature file: %w", err)
 	}
 
-	oldLine := "- [ ] " + c.Text
 	// Remove "BLOCKED: " or "⚠️ BLOCKED: " prefix from criterion text
 	newText := c.Text
 	if strings.HasPrefix(newText, "⚠️ BLOCKED: ") {
@@ -623,23 +626,34 @@ func UnblockCriterion(filePath string, c Criterion) error {
 	newLine := "- [ ] " + newText
 
 	content := string(data)
-	if !strings.Contains(content, oldLine) {
-		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+
+	// Try legacy unchecked form first: "- [ ] BLOCKED: ..."
+	if oldLine := "- [ ] " + c.Text; strings.Contains(content, oldLine) {
+		content = strings.Replace(content, oldLine, newLine, 1)
+		return os.WriteFile(filePath, []byte(content), 0o644)
 	}
 
-	content = strings.Replace(content, oldLine, newLine, 1)
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	// Try agent-blocked form: "- [~] ⚠️ BLOCKED: ..."
+	if oldLine := "- [~] " + c.Text; strings.Contains(content, oldLine) {
+		content = strings.Replace(content, oldLine, newLine, 1)
+		return os.WriteFile(filePath, []byte(content), 0o644)
+	}
+
+	return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
 }
 
 // ResolveCriterion removes the BLOCKED: prefix from a criterion and marks it
 // as checked (- [x]). This indicates the user has resolved the blocker themselves.
+//
+// Searches for both "- [ ] " + c.Text (legacy blocked style) and
+// "- [~] " + c.Text (agent-blocked style). In both cases the replacement
+// is "- [x] " + newText so the criterion becomes a completed item.
 func ResolveCriterion(filePath string, c Criterion) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("read feature file: %w", err)
 	}
 
-	oldLine := "- [ ] " + c.Text
 	// Remove "BLOCKED: " or "⚠️ BLOCKED: " prefix from criterion text
 	newText := c.Text
 	if strings.HasPrefix(newText, "⚠️ BLOCKED: ") {
@@ -650,12 +664,20 @@ func ResolveCriterion(filePath string, c Criterion) error {
 	newLine := "- [x] " + newText
 
 	content := string(data)
-	if !strings.Contains(content, oldLine) {
-		return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
+
+	// Try legacy unchecked form first: "- [ ] BLOCKED: ..."
+	if oldLine := "- [ ] " + c.Text; strings.Contains(content, oldLine) {
+		content = strings.Replace(content, oldLine, newLine, 1)
+		return os.WriteFile(filePath, []byte(content), 0o644)
 	}
 
-	content = strings.Replace(content, oldLine, newLine, 1)
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	// Try agent-blocked form: "- [~] ⚠️ BLOCKED: ..."
+	if oldLine := "- [~] " + c.Text; strings.Contains(content, oldLine) {
+		content = strings.Replace(content, oldLine, newLine, 1)
+		return os.WriteFile(filePath, []byte(content), 0o644)
+	}
+
+	return fmt.Errorf("criterion line not found in %s: %s", filepath.Base(filePath), c.Text)
 }
 
 // DeleteCriterion reads the feature file, removes the entire criterion line,
