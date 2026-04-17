@@ -1976,6 +1976,24 @@ func TestShouldPromptOnExit(t *testing.T) {
 			t.Error("shouldPromptOnExit() = false, want true when daemon is running with active task")
 		}
 	})
+
+	t.Run("returns false when daemon is running but already stopping after task", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: true, StoppingAfterTask: true}}
+		if m.shouldPromptOnExit() {
+			t.Error("shouldPromptOnExit() = true, want false when daemon is already set to stop after task")
+		}
+	})
+
+	t.Run("handleQuitRequest skips overlay when daemon is already stopping after task", func(t *testing.T) {
+		m := statusModel{daemon: daemonStatus{Running: true, StoppingAfterTask: true}}
+		updated, cmd := m.handleQuitRequest()
+		if updated.exitDaemonOverlay {
+			t.Error("exitDaemonOverlay should not be shown when daemon is already stopping after task")
+		}
+		if cmd == nil {
+			t.Error("handleQuitRequest should return a navigateBackMsg cmd when skipping the overlay")
+		}
+	})
 }
 
 // --- Selection context and dynamic tab mapping tests ---
@@ -3428,6 +3446,66 @@ func TestStatusSplitFooter_EditFileHint_PlanSelected(t *testing.T) {
 	if !strings.Contains(footer, "e: edit") {
 		t.Errorf("expected 'e: edit' hint when plan is selected, got: %q", footer)
 	}
+}
+
+// TestCtrlC_GlobalKill verifies that Ctrl+C is a global hard-stop that works
+// from any TUI state — no overlay or prior S press required.
+// BUG-001-002
+func TestCtrlC_GlobalKill(t *testing.T) {
+	t.Run("navigates back when daemon is running without any overlay", func(t *testing.T) {
+		m := statusModel{
+			daemon:                  daemonStatus{Running: true, PID: 9999},
+			daemonStoppingAfterTask: false,
+		}
+		updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		sm, ok := updated.(statusModel)
+		if !ok {
+			t.Fatal("expected statusModel back from Update")
+		}
+		if sm.exitDaemonOverlay {
+			t.Error("exitDaemonOverlay must not be shown — Ctrl+C is a direct kill, not a prompt")
+		}
+		if sm.daemonStopOverlay {
+			t.Error("daemonStopOverlay must not be shown — Ctrl+C is a direct kill, not a prompt")
+		}
+		if cmd == nil {
+			t.Error("expected non-nil cmd (navigate back) after Ctrl+C with running daemon")
+		}
+	})
+
+	t.Run("navigates back when daemon is not running", func(t *testing.T) {
+		m := statusModel{
+			daemon: daemonStatus{Running: false},
+		}
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		if cmd == nil {
+			t.Error("expected non-nil cmd (navigate back) after Ctrl+C even when daemon is not running")
+		}
+	})
+
+	t.Run("works from initial state before S is pressed", func(t *testing.T) {
+		// Core regression case: daemon running, user never pressed S.
+		// Previously Ctrl+C was silently ignored in this state.
+		m := statusModel{
+			daemon:                  daemonStatus{Running: true, PID: 42},
+			daemonStoppingAfterTask: false,
+		}
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		if cmd == nil {
+			t.Error("Ctrl+C must produce a navigate-back cmd before S is ever pressed")
+		}
+	})
+
+	t.Run("works while help modal is open", func(t *testing.T) {
+		m := statusModel{
+			daemon:   daemonStatus{Running: true, PID: 42},
+			showHelp: true,
+		}
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		if cmd == nil {
+			t.Error("Ctrl+C must produce a navigate-back cmd even while help modal is open")
+		}
+	})
 }
 
 func TestStatusSplitFooter_FitsIn80Columns(t *testing.T) {

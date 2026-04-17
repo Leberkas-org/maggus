@@ -98,7 +98,7 @@ func newConfigModel(cfg config.Config, dir string) configModel {
 	agentValues := []string{"claude", "opencode"}
 	agentIdx := indexOf(agentValues, cfg.Agent)
 
-	modelValues := []string{"(default)", "sonnet", "opus", "haiku"}
+	modelValues := []string{"(default)", "sonnet", "opus", "opus-4-7", "haiku"}
 	modelIdx := indexOf(modelValues, cfg.Model)
 
 	autoApproveValues := []string{"disabled", "enabled"}

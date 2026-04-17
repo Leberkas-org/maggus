@@ -219,6 +219,15 @@ func (m statusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listenForWatcherUpdate(m.watcherCh)
 
 	case tea.KeyMsg:
+		// Global hard-stop: Ctrl+C kills the daemon immediately and exits from any
+		// TUI state — no overlay or prior S press required (BUG-001-002).
+		if normalizeKey(msg) == "ctrl+c" {
+			if m.daemon.Running {
+				_ = forceKill(m.daemon.PID)
+				removeDaemonPID(m.dir)
+			}
+			return m, func() tea.Msg { return navigateBackMsg{} }
+		}
 		// F1 help modal — handled before any other key processing.
 		// F1 toggles the popup; Esc closes it; all other keys are consumed while it is open.
 		if msg.String() == "f1" {
@@ -512,9 +521,14 @@ func (m statusModel) updateExitDaemonOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
-// shouldPromptOnExit returns true when the daemon is running, so the user is
-// always asked before exiting to prevent orphaned daemon processes.
+// shouldPromptOnExit returns true when the daemon is running and not already
+// configured to stop after the current task. If the daemon is already in
+// stop-after-task mode the user has already expressed their intent, so the
+// prompt would be redundant.
 func (m statusModel) shouldPromptOnExit() bool {
+	if m.daemon.StoppingAfterTask {
+		return false
+	}
 	return m.daemon.Running
 }
 

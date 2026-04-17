@@ -218,9 +218,10 @@ func DefaultAgent() string {
 
 // modelAliases maps short alias names to full model IDs.
 var modelAliases = map[string]string{
-	"sonnet": "claude-sonnet-4-6",
-	"opus":   "claude-opus-4-6",
-	"haiku":  "claude-haiku-4-5-20251001",
+	"sonnet":   "claude-sonnet-4-6",
+	"opus":     "claude-opus-4-6",
+	"opus-4-7": "claude-opus-4-7",
+	"haiku":    "claude-haiku-4-5-20251001",
 }
 
 // ResolveModel resolves a model specification to its canonical provider/model format.
