@@ -44,7 +44,7 @@ Bryan (C# gRPC backend) is an **optional** enhancement for distributed coordinat
 
 ```
 1. User creates plan file in <repo>/.maggus/tasks/
-2. Daemon detects new file (fsnotify/polling)
+2. Daemon detects new file (fsnotify)
 3. Parser reads plan → extracts feature context + tasks
 4. If auto_approve: items go straight to "ready" queue
    If not: items appear as "pending" in TUI, user approves/reorders

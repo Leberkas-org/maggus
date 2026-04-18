@@ -1,0 +1,512 @@
+// Maggus Architecture — Full System Overview
+// Covers standalone operation, Bryan integration, and all internal flows.
+
+specification {
+  element actor
+  element system
+  element service
+  element component
+  element storage {
+    style { shape storage }
+  }
+  element process {
+    style { shape rectangle }
+  }
+  element external
+}
+
+model {
+
+  // ── Actors ──────────────────────────────────────────────────────────────
+
+  user = actor 'Developer' {
+    description 'Creates plan files, approves tasks, monitors progress in TUI'
+  }
+
+  operator = actor 'Bryan Operator' {
+    description 'Manages agents and reviews tasks via Bryan web UI (optional)'
+  }
+
+  // ── Maggus System ───────────────────────────────────────────────────────
+
+  maggus = system 'Maggus' {
+    description 'AI agent orchestrator — standalone binary, optionally enhanced by Bryan'
+
+    daemon = service 'Daemon' {
+      description 'Background process: watches files, manages queue, dispatches work'
+
+      fileWatcher = component 'File Watcher' {
+        description 'fsnotify on <repo>/.maggus/tasks/ directories'
+      }
+      importer = component 'Importer' {
+        description 'Parses plan files, assigns GUID, splits into context + tasks'
+      }
+      queue = component 'Task Queue' {
+        description 'Pending → Ready → Active → Done/Failed'
+      }
+      dispatcher = component 'Dispatcher' {
+        description 'Picks ready items, creates workers, respects max_workers'
+      }
+      workerPool = component 'Worker Pool' {
+        description 'Manages concurrent task workers as goroutines'
+      }
+      stateWriter = component 'State Writer' {
+        description 'Writes DaemonSnapshot to ~/.maggus/state.json atomically'
+      }
+
+      fileWatcher -> importer 'new plan file detected'
+      importer -> queue 'enqueue work item'
+      dispatcher -> workerPool 'submit task worker'
+      queue -> dispatcher 'next ready item'
+      workerPool -> stateWriter 'state changes'
+    }
+
+    tui = service 'TUI' {
+      description 'Terminal UI — separate process, reads daemon state via fsnotify'
+
+      leftPane = component 'Left Pane' {
+        description 'Navigation tree: repos → items → tasks'
+      }
+      rightPane = component 'Right Pane' {
+        description 'Tabbed content: Output, Plan, Log, Metrics, Summary'
+      }
+      footer = component 'Footer' {
+        description 'Status bar + keybind hints'
+      }
+    }
+
+    gitOps = component 'Git Operations' {
+      description 'Branch, worktree, commit, rebase, merge, cleanup, recovery'
+    }
+
+    otel = component 'OTel SDK' {
+      description 'Traces + metrics — only active when Bryan connected'
+    }
+
+    promptBuilder = component 'Prompt Builder' {
+      description 'Assembles context + task + MEMORY.md into agent prompt'
+    }
+
+    logWriter = component 'Log Writer' {
+      description 'Writes JSON-per-line log files to <repo>/.maggus/logs/'
+    }
+  }
+
+  // ── External: AI Agents ─────────────────────────────────────────────────
+
+  agents = external 'AI Agents' {
+    description 'Claude Code, OpenCode — invoked as subprocesses'
+
+    claude = component 'Claude Code' {
+      description 'claude CLI with --output-format stream-json'
+    }
+    opencode = component 'OpenCode' {
+      description 'opencode CLI'
+    }
+  }
+
+  // ── External: Filesystem ────────────────────────────────────────────────
+
+  filesystem = storage 'Filesystem' {
+    description 'Plan files, logs, state, config'
+
+    planFiles = component 'Plan Files' {
+      description '<repo>/.maggus/tasks/*.md'
+    }
+    taskDir = component 'Task Directory' {
+      description '<repo>/.maggus/tasks/<item_id>/'
+    }
+    stateJson = component 'state.json' {
+      description '~/.maggus/state.json — daemon state snapshot'
+    }
+    logFiles = component 'Log Files' {
+      description '<repo>/.maggus/logs/<item_id>/<pid>.log'
+    }
+    config = component 'Config' {
+      description '~/.maggus/config.yml + <repo>/.maggus/config.yml'
+    }
+  }
+
+  // ── External: Bryan (Optional) ──────────────────────────────────────────
+
+  bryan = system 'Bryan (Optional)' {
+    description 'C# gRPC backend — adds distributed coordination, dashboards, memory sync'
+
+    connect = component 'Connect RPC' {
+      description 'Bidirectional stream — registration, auth, task dispatch, notifications'
+    }
+    logRpc = component 'Log RPC' {
+      description 'Client-streaming — real-time log entries'
+    }
+    reportUsage = component 'ReportUsage RPC' {
+      description 'Unary — token counts, cost, model breakdown'
+    }
+    otelCollector = component 'OTLP Collector' {
+      description 'Receives traces + metrics from maggus OTel SDK'
+    }
+    frontend = component 'Web Frontend' {
+      description 'Live dashboard, task management, metrics'
+    }
+    restApi = component 'REST API' {
+      description 'Operator actions: approve agents, review tasks'
+    }
+    memoryStore = component 'Memory Store' {
+      description 'Stores MEMORY.md per repo for cross-machine sync'
+    }
+
+    logRpc -> frontend 'relays live entries'
+    otelCollector -> frontend 'powers dashboards'
+  }
+
+  // ── Top-Level Relationships ─────────────────────────────────────────────
+
+  user -> filesystem.planFiles 'drops plan files'
+  user -> maggus.tui 'monitors and controls'
+  operator -> bryan.restApi 'manages agents, reviews tasks'
+
+  maggus.daemon.fileWatcher -> filesystem.planFiles 'watches via fsnotify'
+  maggus.daemon.importer -> filesystem.taskDir 'creates item directory'
+  maggus.daemon.stateWriter -> filesystem.stateJson 'atomic JSON write'
+  maggus.tui -> filesystem.stateJson 'watches via fsnotify'
+  maggus.tui -> filesystem.logFiles 'watches via fsnotify'
+  maggus.logWriter -> filesystem.logFiles 'writes JSON-per-line'
+
+  maggus.daemon.workerPool -> maggus.gitOps 'branch, worktree, merge'
+  maggus.daemon.workerPool -> maggus.promptBuilder 'build task prompt'
+  maggus.daemon.workerPool -> agents 'invokes subprocess'
+  maggus.daemon.workerPool -> maggus.logWriter 'streams agent output'
+
+  maggus.daemon -> bryan.connect 'optional: Connect stream'
+  maggus.logWriter -> bryan.logRpc 'optional: stream logs'
+  maggus.daemon -> bryan.reportUsage 'optional: report usage'
+  maggus.otel -> bryan.otelCollector 'optional: traces + metrics'
+  maggus.daemon -> bryan.memoryStore 'optional: sync MEMORY.md'
+}
+
+views {
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SYSTEM OVERVIEW
+  // ═══════════════════════════════════════════════════════════════════════
+
+  view index {
+    title 'Maggus — System Landscape'
+    include *
+  }
+
+  view of maggus {
+    title 'Maggus Internals'
+    include *
+  }
+
+  view of maggus.daemon {
+    title 'Daemon Internals'
+    include *
+  }
+
+  view of bryan {
+    title 'Bryan Internals (Optional)'
+    include *
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // STANDALONE FLOWS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Plan Import ───────────────────────────────────────────────────────
+
+  dynamic view planImportFlow {
+    title 'Plan File Import'
+
+    user -> filesystem.planFiles 'drops plan .md file' {
+      notes 'User creates a plan file in `<repo>/.maggus/tasks/` via skill, editor, or CLI.'
+    }
+    maggus.daemon.fileWatcher -> filesystem.planFiles 'detects new file (fsnotify)' {
+      notes 'No polling. File watcher triggers on create events.'
+    }
+    maggus.daemon.fileWatcher -> maggus.daemon.importer 'trigger import' {
+      notes 'Passes the file path to the importer.'
+    }
+    maggus.daemon.importer -> filesystem.taskDir 'create item directory' {
+      notes 'Assigns UUID, parses plan into context.md + task-NNN.md files + item.yaml. Moves original to source.md.'
+    }
+    maggus.daemon.importer -> maggus.daemon.queue 'enqueue work item' {
+      notes 'Status = **pending** (if auto_approve off) or **ready** (if auto_approve on).'
+    }
+  }
+
+  // ── Approval Flow ─────────────────────────────────────────────────────
+
+  dynamic view approvalFlow {
+    title 'Task Approval (TUI)'
+
+    maggus.daemon.stateWriter -> filesystem.stateJson 'write snapshot with pending items' {
+      notes 'Queue state is part of DaemonSnapshot.'
+    }
+    maggus.tui -> filesystem.stateJson 'fsnotify: state changed' {
+      notes 'TUI picks up new pending items immediately.'
+    }
+    user -> maggus.tui 'approve / reorder / skip item' {
+      notes 'User presses **a** to approve, **x** to skip, or reorders priority.'
+    }
+    maggus.tui -> filesystem.stateJson 'write command sentinel' {
+      notes 'Writes `~/.maggus/cmd.approve.<item_id>` sentinel file.'
+    }
+    maggus.daemon.fileWatcher -> maggus.daemon.queue 'process command' {
+      notes 'Daemon picks up sentinel, moves item from **pending** → **ready**.'
+    }
+  }
+
+  // ── Standalone Task Lifecycle ─────────────────────────────────────────
+
+  dynamic view standaloneTaskLifecycle {
+    title 'Task Lifecycle (Standalone)'
+
+    maggus.daemon.dispatcher -> maggus.daemon.queue 'pick next ready item' {
+      notes 'Respects priority order. Only picks if worker pool has capacity.'
+    }
+    maggus.daemon.dispatcher -> maggus.daemon.workerPool 'submit task worker' {
+      notes 'Creates a TaskWorker goroutine for the next task in the item.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps 'create branch + worktree' {
+      notes 'Feature branch from default branch, task branch from feature branch. Worktree at `<repo>/.maggus/worktrees/<task_id>/`.'
+    }
+    maggus.daemon.workerPool -> maggus.promptBuilder 'build prompt' {
+      notes 'Assembles: context.md + task-NNN.md + MEMORY.md + bootstrap files (CLAUDE.md, AGENTS.md).'
+    }
+    maggus.daemon.workerPool -> agents 'invoke agent subprocess' {
+      notes 'Runs Claude Code or OpenCode in the worktree directory. Streams JSON output.'
+    }
+    maggus.daemon.workerPool -> maggus.logWriter 'stream output to log' {
+      notes 'Writes JSON-per-line to `<repo>/.maggus/logs/<item_id>/<pid>.log`.'
+    }
+    maggus.daemon.workerPool -> maggus.daemon.stateWriter 'update worker state' {
+      notes 'TUI sees live progress via state.json updates.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps 'commit + rebase + merge' {
+      notes 'Auto-commit if uncommitted changes. Rebase task branch onto feature branch. Fast-forward merge. Serialized per feature branch.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps 'cleanup worktree + branch' {
+      notes 'Remove worktree, delete task branch. Update item.yaml status.'
+    }
+  }
+
+  // ── Worker Lifecycle Detail ───────────────────────────────────────────
+
+  dynamic view workerLifecycle {
+    title 'Task Worker Lifecycle (Detail)'
+
+    maggus.daemon.workerPool -> maggus.gitOps '1. Create feature branch' {
+      notes 'From default branch (main/master). Skipped if already exists.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps '2. Create task branch + worktree' {
+      notes '`git branch <task_branch> <feature_branch>` then `git worktree add`.'
+    }
+    maggus.daemon.workerPool -> maggus.promptBuilder '3. Build prompt' {
+      notes 'context.md + task-NNN.md + MEMORY.md + CLAUDE.md/AGENTS.md.'
+    }
+    maggus.daemon.workerPool -> agents '4. Run agent' {
+      notes 'Long-running subprocess. Output streamed to log + state.'
+    }
+    agents -> maggus.daemon.workerPool '5. Agent completes' {
+      notes 'Exit code 0 = success. Non-zero = failure.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps '6. Auto-commit if needed' {
+      notes 'If uncommitted changes remain. Uses COMMIT.md as message if present.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps '7. Rebase onto feature branch' {
+      notes 'If conflict: abort rebase, fall back to merge commit, mark for review.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps '8. Fast-forward merge' {
+      notes 'Merge task branch into feature branch. Serialized per feature.'
+    }
+    maggus.daemon.workerPool -> maggus.gitOps '9. Cleanup' {
+      notes 'Remove worktree, delete task branch, prune.'
+    }
+  }
+
+  // ── TUI Live Updates ──────────────────────────────────────────────────
+
+  dynamic view tuiLiveUpdates {
+    title 'TUI Real-Time Updates'
+
+    maggus.daemon.stateWriter -> filesystem.stateJson 'daemon writes state' {
+      notes 'Atomic JSON write on every meaningful state change (task start, progress, completion).'
+    }
+    maggus.tui -> filesystem.stateJson 'fsnotify: state.json changed' {
+      notes 'TUI reads new snapshot, updates left pane tree + footer.'
+    }
+    maggus.logWriter -> filesystem.logFiles 'daemon writes log entries' {
+      notes 'JSON-per-line appended to `<repo>/.maggus/logs/<item_id>/<pid>.log`.'
+    }
+    maggus.tui -> filesystem.logFiles 'fsnotify: log file updated' {
+      notes 'TUI reads new lines, updates Output + Log tabs in real-time.'
+    }
+  }
+
+  // ── Git Recovery ──────────────────────────────────────────────────────
+
+  dynamic view gitRecovery {
+    title 'Git Recovery on Daemon Start'
+
+    maggus.daemon -> maggus.gitOps '1. Recover uncommitted changes' {
+      notes 'For each worktree: check for uncommitted changes, auto-commit with COMMIT.md or fallback message.'
+    }
+    maggus.daemon -> maggus.gitOps '2. Consolidate orphaned branches' {
+      notes 'Task branches with commits ahead of feature branch: attempt rebase + merge. On conflict: leave for review.'
+    }
+    maggus.daemon -> maggus.gitOps '3. Clean orphaned worktrees' {
+      notes 'Worktrees with no active worker: remove worktree, prune. Also clean dirs not in `git worktree list`.'
+    }
+    maggus.daemon -> maggus.gitOps '4. Prune stale refs' {
+      notes '`git worktree prune` + `git remote prune origin`.'
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BRYAN INTEGRATION FLOWS (OPTIONAL)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Fresh Registration ────────────────────────────────────────────────
+
+  dynamic view bryanRegistration {
+    title 'Bryan: Fresh Registration (Connect stream)'
+
+    maggus.daemon -> bryan.connect 'RegisterRequest (machine_id + repos)' {
+      notes 'First message on the stream. Must be RegisterRequest for new agents.'
+    }
+    bryan.connect -> maggus.daemon 'RegistrationCode (6-char code, 10-min TTL)' {
+      notes 'Agent displays the code to the operator.'
+    }
+    operator -> bryan.restApi 'POST /agents/{code}/approve' {
+      notes 'Operator approves the agent via REST API.'
+    }
+    bryan.connect -> maggus.daemon 'RegistrationApproved (agent_id + Bryan RSA public key)' {
+      notes 'Bryan assigns an agent_id and shares its public key.'
+    }
+    maggus.daemon -> bryan.connect 'PublicKeyExchange (agent RSA public key)' {
+      notes 'Key exchange complete. Agent is now **Online**.'
+    }
+  }
+
+  // ── Reconnect Authentication ──────────────────────────────────────────
+
+  dynamic view bryanReconnect {
+    title 'Bryan: Reconnect Authentication (Connect stream)'
+
+    maggus.daemon -> bryan.connect 'AuthenticateRequest (machine_id only)' {
+      notes 'Phase 1: initiate reconnect. Challenge fields empty.'
+    }
+    bryan.connect -> maggus.daemon 'AuthenticationChallenge (random nonce)' {
+      notes 'Bryan sends a cryptographic nonce.'
+    }
+    maggus.daemon -> bryan.connect 'AuthenticateRequest (machine_id + signed nonce)' {
+      notes 'Phase 2: agent signs nonce with RSA private key (PKCS1v15, SHA-256).'
+    }
+    bryan.connect -> maggus.daemon 'AuthenticationResult (success + agent_id)' {
+      notes 'On success, agent is **Online** and may receive tasks.'
+    }
+    maggus.daemon -> bryan.connect 'ReportRepositories (current repo list)' {
+      notes 'Syncs repos after reconnect. Bryan adds new, disables removed.'
+    }
+    bryan.connect -> maggus.daemon 'MemorySync (per-repo MEMORY.md)' {
+      notes 'Bryan sends stored memory for each of the agents repos.'
+    }
+  }
+
+  // ── Bryan Task Lifecycle ──────────────────────────────────────────────
+
+  dynamic view bryanTaskLifecycle {
+    title 'Bryan: Task Lifecycle (Connect stream)'
+
+    bryan.connect -> maggus.daemon 'TaskAssignment (task details)' {
+      notes 'Bryan dispatches highest-priority READY task. Coexists with local plan file items in the queue.'
+    }
+    maggus.daemon -> bryan.connect 'TaskStatusUpdate (IN_PROGRESS)' {
+      notes 'Must wait for TaskStatusAck before starting work.'
+    }
+    bryan.connect -> maggus.daemon 'TaskStatusAck (IN_PROGRESS)' {
+      notes 'Bryan confirms the status transition.'
+    }
+    maggus.daemon -> bryan.connect 'CheckAcceptanceCriteria (indices)' {
+      notes 'Agent checks off acceptance criteria as they are satisfied.'
+    }
+    maggus.daemon -> bryan.connect 'TaskStatusUpdate (REVIEW)' {
+      notes 'Agent finished work, awaiting human review.'
+    }
+    bryan.connect -> maggus.daemon 'TaskStatusAck (REVIEW)' {
+      notes 'Bryan confirms. Operator reviews via REST API.'
+    }
+  }
+
+  // ── Bryan Logging ─────────────────────────────────────────────────────
+
+  dynamic view bryanLogging {
+    title 'Bryan: Log Streaming'
+
+    maggus.logWriter -> filesystem.logFiles 'write locally (always)' {
+      notes 'Local logs are always written. TUI depends on them.'
+    }
+    maggus.logWriter -> bryan.logRpc 'stream to Bryan (when connected)' {
+      notes 'LoggingMessage with LiveLogBatch or AgentLog payloads.'
+    }
+    bryan.logRpc -> bryan.frontend 'relay to web frontend' {
+      notes 'Bryan persists logs and relays to frontend for real-time display.'
+    }
+  }
+
+  // ── Bryan Observability ───────────────────────────────────────────────
+
+  dynamic view bryanObservability {
+    title 'Bryan: Observability (OTel + Usage)'
+
+    maggus.otel -> bryan.otelCollector 'OTLP traces + metrics' {
+      notes 'Spans: work_item → task → agent steps. Metrics: tokens, cost, durations, queue depth. Only active when Bryan connected.'
+    }
+    maggus.daemon -> bryan.reportUsage 'ReportUsageRequest (unary)' {
+      notes 'Per-run usage: kind (work/plan/bug/...), tokens, cost, model breakdown, time range.'
+    }
+    bryan.otelCollector -> bryan.frontend 'powers dashboards' {
+      notes 'Task timelines, cost tracking, anomaly detection.'
+    }
+  }
+
+  // ── Bryan Memory Sync ─────────────────────────────────────────────────
+
+  dynamic view bryanMemorySync {
+    title 'Bryan: Memory Sync'
+
+    bryan.connect -> maggus.daemon 'MemorySync (pull on connect)' {
+      notes 'Bryan sends stored MEMORY.md content for each of the agents repos.'
+    }
+    maggus.daemon -> bryan.connect 'MemorySync (push on session end)' {
+      notes 'Agent sends updated MEMORY.md back to Bryan. Last-write-wins. Bryan stores per-repo.'
+    }
+    bryan.connect -> bryan.memoryStore 'persist' {
+      notes 'Bryan stores memory so other machines can pull it on connect.'
+    }
+  }
+
+  // ── Bryan Lifecycle Notifications ─────────────────────────────────────
+
+  dynamic view bryanLifecycleNotifications {
+    title 'Bryan: Lifecycle Notifications (server-initiated)'
+
+    operator -> bryan.restApi 'Pause/Resume/Terminate agent'
+    bryan.connect -> maggus.daemon 'PauseNotification' {
+      notes 'Stop accepting new tasks. May finish current work.'
+    }
+    bryan.connect -> maggus.daemon 'ResumeNotification' {
+      notes 'Resume accepting tasks after a pause.'
+    }
+    bryan.connect -> maggus.daemon 'TerminateNotification (reason)' {
+      notes 'Disconnect immediately. Agent should close the stream gracefully.'
+    }
+    bryan.connect -> maggus.daemon 'UnlinkRepositoryNotification (repo URL)' {
+      notes 'Repository removed from agent scope. Stop working on its tasks.'
+    }
+    bryan.connect -> maggus.daemon 'RelinkRepositoryApproved (repo URL)' {
+      notes 'Repository re-added after operator approval.'
+    }
+  }
+}

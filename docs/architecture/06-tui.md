@@ -223,7 +223,7 @@ When user presses q/Ctrl+C:
 
 ## TUI ↔ Daemon Communication
 
-**Reading state:** TUI polls `~/.maggus/state.json` every 500ms (or uses fsnotify).
+**Reading state:** TUI watches `~/.maggus/state.json` via fsnotify. No polling.
 
 **Sending commands:** TUI writes sentinel files:
 - Approve item: `~/.maggus/cmd.approve.<item_id>`

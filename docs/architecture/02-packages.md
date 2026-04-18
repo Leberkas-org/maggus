@@ -49,7 +49,7 @@ src/
 │   ├── ipc/
 │   │   ├── ipc.go                     # StateWriter / StateReader / CommandWriter interfaces
 │   │   ├── state_file.go              # Atomic JSON writes + reads (~/.maggus/state.json)
-│   │   └── subscriber.go              # File watcher / polling for TUI
+│   │   └── subscriber.go              # fsnotify watcher for TUI state updates
 │   │
 │   ├── tui/
 │   │   ├── app.go                     # Top-level bubbletea model — owns panes, layout
