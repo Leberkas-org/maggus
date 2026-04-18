@@ -1,0 +1,279 @@
+// server.proto — Server → Client messages (Bryan → Agent).
+//
+// Contains the BryanMessage envelope and all payload messages that Bryan
+// sends to agents over the bidirectional Connect stream.
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+package bryan;
+
+import "common.proto";
+
+// BryanMessage is the top-level server→client envelope. Exactly one payload
+// variant must be set per message.
+message BryanMessage {
+  oneof payload {
+    // registration_code — sent in response to RegisterRequest. Contains a
+    // short-lived approval code that an operator must confirm via REST API.
+    RegistrationCode registration_code = 1;
+
+    // registration_approved — sent after an operator approves the agent.
+    // Contains the assigned agent_id and Bryan's RSA public key for the
+    // agent to store for future authentication.
+    RegistrationApproved registration_approved = 2;
+
+    // task_assignment — sent when Bryan dispatches a task to this agent.
+    // Only sent to Online, non-paused agents.
+    TaskAssignment task_assignment = 3;
+
+    // pause_notification — sent when an operator pauses the agent via REST.
+    // The agent should stop accepting new tasks but may finish current work.
+    PauseNotification pause_notification = 4;
+
+    // resume_notification — sent when an operator resumes a paused agent.
+    // The agent should begin accepting tasks again.
+    ResumeNotification resume_notification = 5;
+
+    // terminate_notification — sent when the agent is being deleted or must
+    // disconnect. The agent should close the stream gracefully after receiving.
+    TerminateNotification terminate_notification = 6;
+
+    // unlink_repository_notification — sent when a repository is removed from
+    // the agent's scope by an operator. The agent should stop working on tasks
+    // for this repository.
+    UnlinkRepositoryNotification unlink_repository_notification = 7;
+
+    // relink_repository_approved — sent after an operator approves a pending
+    // relink request. The agent may resume working on tasks for this repository.
+    RelinkRepositoryApproved relink_repository_approved = 8;
+
+    // task_status_ack — sent after Bryan successfully processes a TaskStatusUpdate.
+    // The agent MUST wait for this acknowledgment before proceeding with work
+    // (e.g., only start work after IN_PROGRESS is acked).
+    TaskStatusAck task_status_ack = 11;
+
+    // no_task_available — sent in response to RequestNextTask when no
+    // matching Ready task is available for this agent.
+    NoTaskAvailable no_task_available = 13;
+
+    // authentication_challenge — sent in response to an AuthenticateRequest
+    // (phase 1) containing only machine_id. The agent must sign the nonce and
+    // send it back in a second AuthenticateRequest (phase 2).
+    AuthenticationChallenge authentication_challenge = 9;
+
+    // authentication_result — sent after Bryan verifies (or rejects) the
+    // signed challenge in AuthenticateRequest phase 2. On success, the agent
+    // is Online and may receive tasks.
+    AuthenticationResult authentication_result = 10;
+
+    // feature_context — sent in response to a GetFeatureRequest. Contains the
+    // full feature context that agents need when working on tasks within a feature.
+    FeatureContext feature_context = 12;
+  }
+}
+
+// AuthenticationChallenge is sent by Bryan during reconnect authentication
+// (phase 1). The agent must sign the nonce to prove it holds the private key.
+message AuthenticationChallenge {
+  // nonce — required. A cryptographically random value (at least 32 bytes,
+  // base64-encoded). The agent must sign this with its RSA private key using
+  // PKCS1v15 with SHA-256 and return the signature in AuthenticateRequest.
+  string nonce = 1;
+}
+
+// AuthenticationResult is sent by Bryan after evaluating the signed challenge
+// (phase 2 of reconnect authentication).
+message AuthenticationResult {
+  // success — true if the signature was valid and the agent is now Online.
+  bool success = 1;
+
+  // agent_id — populated on success. The agent's assigned ID (same as
+  // received during original registration in RegistrationApproved.agent_id).
+  string agent_id = 2;
+
+  // reason — populated on failure. Human-readable explanation of why
+  // authentication failed (e.g., "unknown machine ID", "invalid signature",
+  // "key exchange not completed").
+  string reason = 3;
+}
+
+// RegistrationCode is sent in response to a RegisterRequest. The code must be
+// presented to an operator who approves it via the REST API.
+message RegistrationCode {
+  // code — required. A 6-character uppercase alphanumeric approval code.
+  // The operator enters this at POST /agents/{code}/approve.
+  string code = 1;
+
+  // expires_at_unix_seconds — required. Unix timestamp (seconds since epoch)
+  // after which the code is no longer valid. Typically 10 minutes from issuance.
+  int64 expires_at_unix_seconds = 2;
+}
+
+// RegistrationApproved is sent after an operator approves the agent's
+// registration code. This message triggers the key exchange phase.
+message RegistrationApproved {
+  // agent_id — required. The unique identifier assigned to this agent by Bryan.
+  // The agent should persist this for use in future reconnect authentication.
+  string agent_id = 1;
+
+  // bryan_public_key_pem — required. Bryan's RSA 2048-bit public key in PEM
+  // format. The agent should persist this for future use (currently informational;
+  // authentication uses the agent's key, not Bryan's).
+  string bryan_public_key_pem = 2;
+}
+
+// TaskAssignment delivers a task to an agent for execution. The agent should
+// begin work and report progress via TaskStatusUpdate messages.
+message TaskAssignment {
+  // task_id — required. Unique identifier for the task. Use this in all
+  // subsequent TaskStatusUpdate messages.
+  string task_id = 1;
+
+  // repository_origin_url — required. The git origin URL of the repository
+  // this task applies to. Must match one of the agent's registered repositories.
+  string repository_origin_url = 2;
+
+  // description — required. Human-readable description of what needs to be done.
+  string description = 3;
+
+  // context — optional. Additional context or background information for the
+  // task (e.g., related issues, design notes, constraints).
+  string context = 4;
+
+  // priority — optional. Priority level as a string: "P1" (critical) through
+  // "P4" (low). Default is "P3" if not specified. Bryan dispatches
+  // highest-priority READY tasks first.
+  string priority = 5;
+
+  // predecessors — optional. List of task IDs that must complete before this
+  // task can begin. Informational for the agent; Bryan enforces ordering.
+  repeated string predecessors = 6;
+
+  // successors — optional. List of task IDs that depend on this task
+  // completing. Informational for the agent.
+  repeated string successors = 7;
+
+  // feature_id — optional. The parent feature ID (e.g. "F-12"). Agents use
+  // this to lazy-load feature context via GetFeatureRequest if not cached.
+  string feature_id = 8;
+
+  // title — optional. The task title for display purposes.
+  string title = 9;
+
+  // task_number — optional. The sequential task number within the feature.
+  int32 task_number = 10;
+
+  // acceptance_criteria — optional. List of acceptance criteria text strings
+  // that the agent should satisfy before marking the task as Review.
+  repeated string acceptance_criteria = 11;
+
+  // branch_name — optional. The git branch name for this task (e.g.
+  // "feature/F-12/TASK-003"). The agent should create/checkout this branch.
+  string branch_name = 12;
+}
+
+// PauseNotification tells the agent to stop accepting new tasks. The agent
+// may finish any currently in-progress work. No fields — the message itself
+// is the signal.
+message PauseNotification {
+}
+
+// ResumeNotification tells a paused agent to start accepting tasks again.
+// No fields — the message itself is the signal.
+message ResumeNotification {
+}
+
+// TerminateNotification tells the agent to disconnect. The agent should
+// close the gRPC stream gracefully after receiving this message.
+message TerminateNotification {
+  // reason — optional. Human-readable explanation of why the agent is being
+  // terminated (e.g., "agent deleted by operator").
+  string reason = 1;
+}
+
+// UnlinkRepositoryNotification tells the agent that a repository has been
+// removed from its scope by an operator. The agent should stop working on
+// tasks for this repository.
+message UnlinkRepositoryNotification {
+  // repository_url — required. The git origin URL of the repository that was
+  // unlinked from this agent.
+  string repository_url = 1;
+}
+
+// TaskStatusAck acknowledges that Bryan has successfully persisted a status
+// change. The agent MUST wait for this before proceeding. For example, after
+// sending IN_PROGRESS, the agent should not begin work until it receives the
+// ack. This prevents race conditions where the agent completes work before
+// Bryan has recorded the start.
+message TaskStatusAck {
+  // task_id — required. The task whose status was acknowledged.
+  string task_id = 1;
+
+  // status — required. The status that was acknowledged.
+  TaskStatus status = 2;
+
+  // success — true if the status change was accepted.
+  bool success = 3;
+
+  // reason — populated on failure. Explanation of why the status change
+  // was rejected (e.g., invalid transition).
+  string reason = 4;
+}
+
+// NoTaskAvailable is sent in response to RequestNextTask when no matching
+// Ready task is available for this agent. The agent should wait for a
+// server-pushed TaskAssignment instead of polling.
+message NoTaskAvailable {
+}
+
+// RelinkRepositoryApproved is sent by Bryan after an operator approves a
+// pending relink request. The agent may resume working on tasks for this
+// repository.
+message RelinkRepositoryApproved {
+  // repository_url — required. The git origin URL of the repository that was
+  // re-linked to this agent.
+  string repository_url = 1;
+}
+
+// FeatureContext contains the full context of a feature, sent in response to
+// a GetFeatureRequest. Agents should cache this for the duration of the
+// feature's tasks to avoid repeated requests.
+message FeatureContext {
+  // feature_id — required. The feature identifier (e.g. "F-12").
+  string feature_id = 1;
+
+  // title — required. The human-readable feature title.
+  string title = 2;
+
+  // introduction — optional. A text description providing context and
+  // background for the feature.
+  string introduction = 3;
+
+  // goals — optional. List of goals that this feature aims to achieve.
+  repeated string goals = 4;
+
+  // functional_requirements — optional. List of functional requirements
+  // that define what the feature must do.
+  repeated string functional_requirements = 5;
+
+  // non_goals — optional. List of things explicitly out of scope.
+  repeated string non_goals = 6;
+
+  // technical_considerations — optional. List of technical notes, constraints,
+  // or implementation guidance.
+  repeated string technical_considerations = 7;
+
+  // success_metrics — optional. List of criteria for measuring success.
+  repeated string success_metrics = 8;
+
+  // worktree_path — optional. If set, the agent should use this worktree
+  // path instead of the default repo checkout.
+  string worktree_path = 9;
+
+  // branch_prefix — optional. The branch prefix for tasks in this feature
+  // (e.g. "feature/F-12"). Individual task branches are derived from this.
+  string branch_prefix = 10;
+}

@@ -1,26 +1,15 @@
 package cmd
 
 import (
-	"bufio"
-	"fmt"
 	"os"
-	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
-	"github.com/leberkas-org/maggus/internal/capabilities"
-	"github.com/leberkas-org/maggus/internal/discord"
-	"github.com/leberkas-org/maggus/internal/globalconfig"
-	"github.com/leberkas-org/maggus/internal/resolver"
 	"github.com/spf13/cobra"
 )
 
-// Version is set at build time via -ldflags.
-// For dev builds, use: go build -ldflags "-X github.com/leberkas-org/maggus/cmd.BuildTime=$(date +%H%M%S)"
 var Version = "dev"
 
-// BuildTime is set at build time via -ldflags for dev build counters.
 var BuildTime = ""
 
 func init() {
@@ -30,173 +19,21 @@ func init() {
 	rootCmd.Version = Version
 }
 
-// caps holds the detected tool capabilities for this run.
-var caps capabilities.Capabilities
-
-// daemonCache is a package-level cache for the daemon's PID/running state,
-// shared across menu iterations within a single runMenu invocation.
-var daemonCache *DaemonStateCache
-
-// sharedPresence holds a Discord Presence instance created by the root menu
-// and shared with subcommands (prompt, work). When non-nil, subcommands use
-// this instead of creating their own connection.
-var sharedPresence *discord.Presence
-
 var rootCmd = &cobra.Command{
-	Use:     "maggus",
-	Short:   "Your best and worst co-worker — a junior dev that just works",
-	Version: Version,
-	Long: `Maggus reads feature files and works through tasks one-by-one
-by prompting an AI agent (Claude Code). Provide a feature and let Maggus work.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if err := globalconfig.IncrementMetrics(globalconfig.Metrics{StartupCount: 1}); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to update metrics: %v\n", err)
+	Use:   "maggus",
+	Short: "Your best and worst co-worker — a junior dev that just works",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !term.IsTerminal(os.Stdout.Fd()) {
+			return cmd.Help()
 		}
+		m := newMainModel()
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		_, err := p.Run()
+		return err
 	},
 }
 
-func init() {
-	rootCmd.RunE = runMenu
-}
-
-func runMenu(cmd *cobra.Command, args []string) error {
-	if !term.IsTerminal(os.Stdout.Fd()) {
-		return cmd.Help()
-	}
-
-	// Initialise Discord Rich Presence for the menu if enabled.
-	// Connect in the background so the TUI renders instantly.
-	var presence *discord.Presence
-	var presenceReady <-chan struct{}
-	if gs, err := globalconfig.LoadSettings(); err == nil && gs.DiscordPresence {
-		presence = &discord.Presence{}
-		ch := make(chan struct{})
-		presenceReady = ch
-		menuStart := time.Now()
-		go func() {
-			_ = presence.Connect()
-			close(ch)
-			// Send the initial "In Main Menu" update that the main
-			// goroutine may have skipped while we were connecting.
-			_ = presence.Update(discord.PresenceState{
-				FeatureTitle: "In Main Menu",
-				StartTime:    menuStart,
-			})
-		}()
-	}
-	defer func() {
-		if presence != nil {
-			<-presenceReady // wait for Connect to finish before closing
-			_ = presence.Close()
-		}
-	}()
-
-	// Initialise the daemon state cache for the current working directory.
-	// It may be recreated later by refreshGlobalDaemonCache() if the user
-	// switches repos. The defer cleans up whichever cache is active at exit.
-	cwd, _ := os.Getwd()
-	if cache, err := NewDaemonStateCache(cwd); err == nil {
-		daemonCache = cache
-	}
-	defer func() {
-		if daemonCache != nil {
-			daemonCache.Stop()
-			daemonCache = nil
-		}
-	}()
-
-	// Show idle presence while in the main menu.
-	if presence != nil {
-		select {
-		case <-presenceReady:
-			sharedPresence = presence
-			_ = presence.Update(discord.PresenceState{
-				FeatureTitle: "In Main Menu",
-				StartTime:    time.Now(),
-			})
-		default:
-			// Still connecting in background; the goroutine will
-			// send the initial update once connected.
-		}
-	}
-
-	// Run the app model — it handles all TUI navigation internally via
-	// navigateToMsg / navigateBackMsg / execProcessMsg. The for {} loop is
-	// no longer needed for sub-command dispatch.
-	app := newAppModel()
-	p := tea.NewProgram(app, tea.WithAltScreen())
-	result, err := p.Run()
-
-	// Tear down any resources on the active screen (watchers, daemon subscriptions).
-	if am, ok := result.(appModel); ok {
-		am.teardownScreen(am.active)
-	}
-
-	sharedPresence = nil
-
-	return err
-}
-
-// resolveWorkingDirectory runs the startup directory resolution logic.
-// It determines which repository to work in based on global config,
-// current directory, and user input.
-var resolveWorkingDirectory = func() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return
-	}
-
-	deps := resolver.DefaultDeps()
-	// Only prompt when running in an interactive terminal.
-	if term.IsTerminal(os.Stdin.Fd()) {
-		deps.Prompt = promptYesNo
-	}
-
-	result, err := resolver.Resolve(cwd, deps)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: directory resolution failed: %v\n", err)
-		return
-	}
-
-	if result.Changed {
-		fmt.Fprintf(os.Stderr, "Switched to repository: %s\n", result.Dir)
-	}
-}
-
-// promptYesNo asks a yes/no question on stdin and returns true for yes.
-func promptYesNo(question string) bool {
-	fmt.Fprintf(os.Stderr, "%s [y/N] ", question)
-	reader := bufio.NewReader(os.Stdin)
-	answer, _ := reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-	return answer == "y" || answer == "yes"
-}
-
-// shouldSkipResolver returns true for subcommands that must operate on the
-// literal current directory (e.g. start, stop) rather than the resolved
-// repository. This prevents the resolver from silently changing to
-// last_opened and making per-directory guards ineffective.
-func shouldSkipResolver() bool {
-	if len(os.Args) < 2 {
-		return false
-	}
-	switch os.Args[1] {
-	case "start", "stop", "run":
-		return true
-	}
-	return false
-}
-
 func Execute() {
-	// Detect and cache available CLI tools on startup.
-	caps = capabilities.Detect()
-
-	// Resolve working directory based on global repository config.
-	// Skip resolution for commands that should operate on the literal cwd.
-	if !shouldSkipResolver() {
-		resolveWorkingDirectory()
-	}
-
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

@@ -1,0 +1,179 @@
+// agent.proto — Client → Server messages (Agent → Bryan).
+//
+// Contains the AgentMessage envelope and all payload messages that agents
+// send to Bryan over the bidirectional Connect stream.
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+import "common.proto";
+
+package bryan;
+
+// AgentMessage is the top-level client→server envelope. Exactly one payload
+// variant must be set per message.
+message AgentMessage {
+  oneof payload {
+    // register_request — sent as the FIRST message to start the registration
+    // flow for a new (unregistered) agent.
+    RegisterRequest register_request = 1;
+
+    // public_key_exchange — sent after receiving RegistrationApproved to
+    // complete the key exchange. Contains the agent's RSA public key.
+    PublicKeyExchange public_key_exchange = 2;
+
+    // task_status_update — sent any time the agent wants to report progress
+    // on an assigned task (e.g., started, review, done, failed).
+    TaskStatusUpdate task_status_update = 3;
+
+    // heartbeat — sent periodically to keep the stream alive. Bryan does not
+    // respond to heartbeats; they simply reset idle timers.
+    Heartbeat heartbeat = 4;
+
+    // relink_repository_request — sent to request re-linking a previously
+    // unlinked repository. Requires operator approval before taking effect.
+    RelinkRepositoryRequest relink_repository_request = 5;
+
+    // authenticate_request — sent as the FIRST message (with only machine_id)
+    // to initiate reconnect auth, then sent AGAIN with the signed challenge
+    // after receiving AuthenticationChallenge.
+    AuthenticateRequest authenticate_request = 6;
+
+    // report_repositories — sent after successful authentication (reconnect)
+    // to sync the agent's current repository list. Bryan will add new repos
+    // and disable repos no longer reported.
+    ReportRepositories report_repositories = 7;
+
+    // get_feature_request — sent by the agent to request full feature context
+    // for a given feature_id. Bryan responds with FeatureContext. Agents
+    // typically send this when they receive a TaskAssignment for an unknown
+    // feature (lazy loading).
+    GetFeatureRequest get_feature_request = 8;
+
+    // check_acceptance_criteria — sent by the agent to check (mark as done)
+    // one or more acceptance criteria on a task. Bryan persists the checks
+    // so the task can transition to Review.
+    CheckAcceptanceCriteria check_acceptance_criteria = 9;
+
+    // request_next_task — sent by the agent to pull the next available Ready
+    // task. Bryan responds with a TaskAssignment if one is available, or
+    // NoTaskAvailable if the queue is empty.
+    RequestNextTask request_next_task = 10;
+  }
+}
+
+// RequestNextTask is sent by the agent to request the next available task.
+// Bryan finds the highest-priority Ready task matching the agent's repos
+// and dispatches it. If no task is available, Bryan responds with
+// NoTaskAvailable.
+message RequestNextTask {
+}
+
+// CheckAcceptanceCriteria is sent by the agent to mark acceptance criteria
+// as checked on a task. All specified indices are checked; unspecified ones
+// are left unchanged.
+message CheckAcceptanceCriteria {
+  // task_id — required. The task whose criteria are being checked.
+  string task_id = 1;
+
+  // indices — required. Zero-based indices of the criteria to check.
+  repeated int32 indices = 2;
+}
+
+// ReportRepositories is sent by the agent after connecting to report its
+// current set of available repositories. Bryan syncs the agent's repo list:
+// new repos are added (linked), repos not in this list are disabled (unlinked).
+message ReportRepositories {
+  // repositories — required. The full list of normalized git origin URLs
+  // currently available on this agent.
+  repeated string repositories = 1;
+}
+
+// AuthenticateRequest is used in the two-phase reconnect authentication flow.
+//
+// Phase 1 (initiate): Agent sends machine_id only; signed_challenge and
+//   challenge_nonce are empty. Bryan looks up the agent and replies with
+//   AuthenticationChallenge containing a random nonce.
+//
+// Phase 2 (respond): Agent signs the nonce with its RSA private key
+//   (PKCS1v15, SHA-256 digest) and sends all three fields. Bryan verifies the
+//   signature against the stored agent public key.
+message AuthenticateRequest {
+  // machine_id — required. The stable machine identifier (UUID) that was used
+  // during original registration. Must match an existing approved agent.
+  string machine_id = 1;
+
+  // signed_challenge — required in phase 2, empty in phase 1. RSA-PKCS1v15
+  // signature (SHA-256) of the nonce bytes, produced with the agent's private key.
+  bytes signed_challenge = 2;
+
+  // challenge_nonce — required in phase 2, empty in phase 1. The exact nonce
+  // string received in AuthenticationChallenge, echoed back for correlation.
+  string challenge_nonce = 3;
+}
+
+// RegisterRequest initiates the registration flow for a new agent. Must be
+// the first message on the stream for unregistered agents.
+message RegisterRequest {
+  // machine_id — required. A stable UUID identifying this machine. Must be
+  // unique across all agents; Bryan uses it as the agent's identity key.
+  string machine_id = 1;
+
+  // repositories — required (at least one). List of git origin URLs that this
+  // agent is willing to work on. Bryan uses these to match tasks to agents.
+  repeated string repositories = 2;
+}
+
+// PublicKeyExchange delivers the agent's RSA public key to Bryan after
+// registration approval. This completes the key exchange and transitions the
+// agent to Online status.
+message PublicKeyExchange {
+  // agent_public_key_pem — required. The agent's RSA 2048-bit public key in
+  // PEM format (PKCS#1 or SPKI). Bryan stores this for future authentication.
+  string agent_public_key_pem = 1;
+}
+
+// TaskStatusUpdate reports progress on an assigned task. Agents should send
+// status updates as they transition through the task lifecycle.
+//
+// Valid agent transitions: IN_PROGRESS → REVIEW, or IN_PROGRESS → FAILED.
+// DONE can only be set by a user via the REST API (after reviewing the work).
+// Other transitions will be rejected by Bryan.
+message TaskStatusUpdate {
+  // task_id — required. The ID of the task being updated, as received in
+  // TaskAssignment.task_id.
+  string task_id = 1;
+
+  // status — required. The new status for the task. See TaskStatus enum for
+  // valid values and transition rules.
+  TaskStatus status = 2;
+
+  // message — optional. A human-readable description of what happened (e.g.,
+  // error details on failure, summary of work on completion).
+  string message = 3;
+}
+
+// Heartbeat is an empty keep-alive message. The agent should send heartbeats
+// periodically to prevent the stream from being closed due to inactivity.
+// Bryan does not send a response to heartbeats.
+message Heartbeat {
+}
+
+// GetFeatureRequest is sent by the agent to request full context for a feature.
+// Bryan responds with a FeatureContext message. Agents use this to lazy-load
+// feature details when they receive a TaskAssignment for an unknown feature.
+message GetFeatureRequest {
+  // feature_id — required. The feature identifier (e.g. "F-12").
+  string feature_id = 1;
+}
+
+// RelinkRepositoryRequest is sent by the agent to ask Bryan to re-add a
+// previously unlinked repository. This requires operator approval — the agent
+// will receive RelinkRepositoryApproved if the request is granted.
+message RelinkRepositoryRequest {
+  // repository_url — required. The git origin URL of the repository to relink.
+  // Must be a repository that was previously registered and then unlinked.
+  string repository_url = 1;
+}

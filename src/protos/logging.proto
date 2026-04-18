@@ -1,0 +1,84 @@
+// logging.proto — Client → Server messages (Agent → Bryan).
+//
+// Contains the LoggingMessage envelope and all payload messages that agents
+// send to Bryan over the Logging stream.
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+package bryan;
+
+import "common.proto";
+
+// LoggingMessage is the top-level client→server envelope for the Logging RPC.
+// Exactly one payload variant must be set per message.
+message LoggingMessage {
+  oneof payload {
+    // live_log_batch — sent any time to report structured activity log entries.
+    // Bryan persists these and relays them to the frontend for real-time display.
+    LiveLogBatch live_log_batch = 1;
+
+    // agent_log — sent any time to report a structured log entry for
+    // observability. Bryan persists these to the agent_logs collection.
+    AgentLog agent_log = 2;
+  }
+}
+
+// AgentLog is a structured log entry sent by the agent for observability.
+// Bryan persists these to the agent_logs collection, associated with the
+// agent's current task (or an explicit task_id if provided).
+message AgentLog {
+  // tool — required. The tool or action that produced this log entry
+  // (e.g., "bash", "edit", "read", "search").
+  string tool = 1;
+
+  // title — required. A human-readable summary of what happened.
+  string title = 2;
+
+  // details — optional. Structured key-value pairs with additional context.
+  repeated LogKeyValuePair details = 3;
+
+  // timestamp — required. Unix timestamp in milliseconds when the log was created.
+  int64 timestamp = 4;
+
+  // agent_version — optional. Version string of the agent (e.g., "zebi/1.0").
+  string agent_version = 5;
+
+  // task_id — optional. If omitted, Bryan uses the agent's currently assigned task.
+  string task_id = 6;
+}
+
+// LiveLogEntry is a structured activity log entry from an agent session.
+// Agents send these in batches via LiveLogBatch on the Log stream.
+message LiveLogEntry {
+  int64 timestamp = 1;
+  string level = 2;
+  string event = 3;
+
+  // item_id — required. The ID of the item this log belongs to (feature or task).
+  string item_id = 4;
+
+  string task_id = 5;
+  string title = 6;
+  string tool = 7;
+  string input_json = 8;
+  string text = 9;
+  string commit = 10;
+  string reason = 11;
+
+  // task_usage fields (present only on "task_usage" events)
+  int64 input_tokens = 12;
+  int64 output_tokens = 13;
+  int64 cache_creation_input_tokens = 14;
+  int64 cache_read_input_tokens = 15;
+  double cost_usd = 16;
+  map<string, ModelUsageEntryProto> model_usage = 17;
+}
+
+// LiveLogBatch groups multiple LiveLogEntry messages for efficient transmission.
+// Agents should batch entries and send periodically (e.g., every 500ms or 20 entries).
+message LiveLogBatch {
+  repeated LiveLogEntry entries = 1;
+}

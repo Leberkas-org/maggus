@@ -1,0 +1,84 @@
+// service.proto — gRPC service definition for Bryan ↔ Agent communication.
+//
+// Consumers:
+//   - Bryan (C#): src/Bryan.Api/Protos/ — auto-generated via Grpc.Tools (compiled by Bryan.Core)
+//   - Zebi  (Go): tools/zebi/proto/   — generated via `make proto` in tools/zebi/
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+// MESSAGE FLOW OVERVIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// The Connect RPC is a single bidirectional stream. The first client message
+// determines the connection mode:
+//
+// ── Fresh Registration Flow ──────────────────────────────────────────────────
+//   1. Agent → RegisterRequest          (machine_id + repos)
+//   2. Bryan → RegistrationCode         (6-char approval code, 10-min TTL)
+//   3.          ... operator approves via REST POST /agents/{code}/approve ...
+//   4. Bryan → RegistrationApproved     (agent_id + Bryan's RSA public key)
+//   5. Agent → PublicKeyExchange        (agent's RSA public key)
+//   6.          ... agent is now Online; Bryan may send tasks ...
+//
+// ── Reconnect Authentication Flow ────────────────────────────────────────────
+//   1. Agent → AuthenticateRequest      (machine_id only, challenge fields empty)
+//   2. Bryan → AuthenticationChallenge  (random nonce)
+//   3. Agent → AuthenticateRequest      (machine_id + signed nonce + nonce)
+//   4. Bryan → AuthenticationResult     (success/failure + agent_id)
+//   5.          ... if success, agent is Online; Bryan may send tasks ...
+//
+// ── Task Lifecycle ───────────────────────────────────────────────────────────
+//   1. Bryan → TaskAssignment           (task details sent to agent)
+//   2. Agent → TaskStatusUpdate         (IN_PROGRESS — agent started work)
+//   3. Agent → TaskStatusUpdate         (REVIEW — agent finished, awaiting review)
+//   4. Agent → TaskStatusUpdate         (DONE or FAILED — final outcome)
+//
+// ── Logging (Log RPC — client-streaming) ─────────────────────────────────
+//   Agent streams LoggingMessage frames containing either:
+//   - LiveLogBatch                      (batched structured activity log entries)
+//   - AgentLog                          (structured log entry for observability)
+//
+// ── Feature Context Lazy Loading ──────────────────────────────────────────
+//   1. Agent → GetFeatureRequest        (request feature context by ID)
+//   2. Bryan → FeatureContext           (full feature context response)
+//
+// ── Agent Lifecycle Notifications (server → client, any time after Online) ──
+//   - PauseNotification                 (stop accepting tasks)
+//   - ResumeNotification                (resume accepting tasks)
+//   - TerminateNotification             (disconnect immediately)
+//   - UnlinkRepositoryNotification      (repo removed from agent's scope)
+//   - RelinkRepositoryApproved          (repo re-added after relink approval)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+package bryan;
+
+import "agent.proto";
+import "logging.proto";
+import "server.proto";
+import "usage.proto";
+import "google/protobuf/empty.proto";
+
+// BryanAgentService is the sole gRPC service for agent ↔ backend communication.
+// All interaction happens over a single bidirectional stream per agent connection.
+service BryanAgentService {
+  // Connect opens a bidirectional stream between an agent and Bryan.
+  // The agent sends AgentMessage frames; Bryan responds with BryanMessage frames.
+  // The first AgentMessage must be either RegisterRequest (new agent) or
+  // AuthenticateRequest (returning agent). Sending any other message first is
+  // a protocol error and Bryan will close the stream.
+  rpc Connect(stream AgentMessage) returns (stream BryanMessage);
+
+  // ReportUsage reports usage data for any completed run. The kind field
+  // discriminates between work, prompt, bugreport, plan, vision, and
+  // architecture runs.
+  rpc ReportUsage(ReportUsageRequest) returns (ReportUsageResponse);
+
+  // Log opens a bidirectional stream for the agent to send structured
+  // log entries (LiveLogBatch, AgentLog) during a session. Bryan persists
+  // them and relays live entries to the frontend.
+  rpc Log(stream LoggingMessage) returns (google.protobuf.Empty);
+}

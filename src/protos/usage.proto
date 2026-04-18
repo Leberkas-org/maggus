@@ -1,0 +1,52 @@
+// usage.proto — Usage reporting RPC request/response messages.
+//
+// Contains the unified ReportUsage RPC messages. All usage reports use a
+// single message type with a UsageReportKind discriminator.
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+package bryan;
+
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+// UsageReportKind identifies the type of work being reported.
+enum UsageReportKind {
+  USAGE_REPORT_KIND_UNSPECIFIED = 0;
+  USAGE_REPORT_KIND_WORK = 1;
+  USAGE_REPORT_KIND_PROMPT = 2;
+  USAGE_REPORT_KIND_BUGREPORT = 3;
+  USAGE_REPORT_KIND_PLAN = 4;
+  USAGE_REPORT_KIND_VISION = 5;
+  USAGE_REPORT_KIND_ARCHITECTURE = 6;
+}
+
+// ReportUsageRequest is sent by an agent to report usage data for a completed
+// run. The server computes elapsed duration from end_time - start_time.
+// If cost_usd is 0 or missing, the server calculates it via ModelPricingTable.
+message ReportUsageRequest {
+  string agent_id = 1;
+  string pid = 2;
+  string repository = 3;
+  UsageReportKind kind = 4;
+  string item_id = 5;
+  string model = 6;
+  string agent = 7;
+  int64 input_tokens = 8;
+  int64 output_tokens = 9;
+  int64 cache_creation_input_tokens = 10;
+  int64 cache_read_input_tokens = 11;
+  double cost_usd = 12;
+  map<string, ModelUsageEntryProto> model_usage = 13;
+  google.protobuf.Timestamp start_time = 14;
+  google.protobuf.Timestamp end_time = 15;
+}
+
+// ReportUsageResponse indicates whether the usage report was stored successfully.
+message ReportUsageResponse {
+  bool success = 1;
+  string error = 2;
+}

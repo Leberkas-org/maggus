@@ -1,0 +1,208 @@
+// Bryan Agent Service — gRPC Protocol Flow
+// Generated from service.proto, agent.proto, server.proto, logging.proto, usage.proto
+
+specification {
+  element actor
+  element system
+  element service
+  element component
+}
+
+model {
+  operator = actor 'Operator' {
+    description 'Human operator who approves agents and reviews tasks'
+  }
+
+  agent = service 'Agent' {
+    description 'Maggus or other gRPC agent'
+  }
+
+  bryan = system 'Bryan' {
+    description 'Backend server (C#)'
+
+    connect = component 'Connect' {
+      description 'Bidirectional stream — AgentMessage / BryanMessage'
+    }
+    log = component 'Log' {
+      description 'Client-streaming — LoggingMessage'
+    }
+    reportUsage = component 'ReportUsage' {
+      description 'Unary — ReportUsageRequest / ReportUsageResponse'
+    }
+    frontend = component 'Frontend' {
+      description 'Web UI for live logs and task management'
+    }
+    restApi = component 'REST API' {
+      description 'Operator actions (approve, pause, resume, terminate)'
+    }
+
+    log -> frontend 'relays live entries'
+  }
+
+  operator -> bryan.restApi 'approves agents, reviews tasks'
+  agent -> bryan.connect 'Connect stream'
+  agent -> bryan.log 'Log stream'
+  agent -> bryan.reportUsage 'ReportUsage unary'
+}
+
+views {
+
+  // ── Overview ──────────────────────────────────────────────────────────────
+
+  view index {
+    title 'Bryan Agent Service — Overview'
+    include *
+  }
+
+  view of bryan {
+    title 'Bryan Internals'
+    include *
+  }
+
+  // ── Fresh Registration Flow ───────────────────────────────────────────────
+
+  dynamic view registrationFlow {
+    title 'Fresh Registration Flow (Connect stream)'
+
+    agent -> bryan.connect 'RegisterRequest (machine_id + repos)' {
+      notes 'First message on the stream. Must be RegisterRequest for new agents.'
+    }
+    bryan.connect -> agent 'RegistrationCode (6-char code, 10-min TTL)' {
+      notes 'Agent displays the code to the operator.'
+    }
+    operator -> bryan.restApi 'POST /agents/{code}/approve' {
+      notes 'Operator approves the agent via REST API.'
+    }
+    bryan.connect -> agent 'RegistrationApproved (agent_id + Bryan RSA public key)' {
+      notes 'Bryan assigns an agent_id and shares its public key.'
+    }
+    agent -> bryan.connect 'PublicKeyExchange (agent RSA public key)' {
+      notes 'Key exchange complete. Agent is now **Online**.'
+    }
+  }
+
+  // ── Reconnect Authentication Flow ─────────────────────────────────────────
+
+  dynamic view reconnectFlow {
+    title 'Reconnect Authentication Flow (Connect stream)'
+
+    agent -> bryan.connect 'AuthenticateRequest (machine_id only)' {
+      notes 'Phase 1: initiate reconnect. Challenge fields empty.'
+    }
+    bryan.connect -> agent 'AuthenticationChallenge (random nonce)' {
+      notes 'Bryan sends a cryptographic nonce.'
+    }
+    agent -> bryan.connect 'AuthenticateRequest (machine_id + signed nonce)' {
+      notes 'Phase 2: agent signs nonce with RSA private key (PKCS1v15, SHA-256).'
+    }
+    bryan.connect -> agent 'AuthenticationResult (success + agent_id)' {
+      notes 'On success, agent is **Online** and may receive tasks.'
+    }
+    agent -> bryan.connect 'ReportRepositories (current repo list)' {
+      notes 'Syncs repos after reconnect. Bryan adds new, disables removed.'
+    }
+  }
+
+  // ── Task Lifecycle ────────────────────────────────────────────────────────
+
+  dynamic view taskLifecycle {
+    title 'Task Lifecycle (Connect stream)'
+
+    bryan.connect -> agent 'TaskAssignment (task details)' {
+      notes 'Bryan dispatches highest-priority READY task.'
+    }
+    agent -> bryan.connect 'TaskStatusUpdate (IN_PROGRESS)' {
+      notes 'Agent must wait for TaskStatusAck before starting work.'
+    }
+    bryan.connect -> agent 'TaskStatusAck (IN_PROGRESS)' {
+      notes 'Bryan confirms the status transition.'
+    }
+    agent -> bryan.connect 'CheckAcceptanceCriteria (indices)' {
+      notes 'Agent checks off acceptance criteria as they are satisfied.'
+    }
+    agent -> bryan.connect 'TaskStatusUpdate (REVIEW)' {
+      notes 'Agent finished work, awaiting human review.'
+    }
+    bryan.connect -> agent 'TaskStatusAck (REVIEW)' {
+      notes 'Bryan confirms. Operator reviews via REST API.'
+    }
+  }
+
+  // ── Task Pull ─────────────────────────────────────────────────────────────
+
+  dynamic view taskPull {
+    title 'Agent-Initiated Task Pull (Connect stream)'
+
+    agent -> bryan.connect 'RequestNextTask' {
+      notes 'Agent requests the next available Ready task.'
+    }
+    bryan.connect -> agent 'TaskAssignment or NoTaskAvailable' {
+      notes 'Bryan responds with a task if one matches, otherwise NoTaskAvailable.'
+    }
+  }
+
+  // ── Feature Context Lazy Loading ──────────────────────────────────────────
+
+  dynamic view featureContext {
+    title 'Feature Context Lazy Loading (Connect stream)'
+
+    agent -> bryan.connect 'GetFeatureRequest (feature_id)' {
+      notes 'Agent requests full feature context for an unknown feature.'
+    }
+    bryan.connect -> agent 'FeatureContext (title, requirements, goals, ...)' {
+      notes 'Agent caches this for the duration of the feature.'
+    }
+  }
+
+  // ── Logging ───────────────────────────────────────────────────────────────
+
+  dynamic view loggingFlow {
+    title 'Logging (Log RPC — client-streaming)'
+
+    agent -> bryan.log 'LoggingMessage (LiveLogBatch)' {
+      notes 'Batched activity log entries. Sent periodically (e.g., every 500ms or 20 entries).'
+    }
+    bryan.log -> bryan.frontend 'Relay live entries' {
+      notes 'Bryan persists logs and relays them to the frontend for real-time display.'
+    }
+    agent -> bryan.log 'LoggingMessage (AgentLog)' {
+      notes 'Structured observability log entry. Bryan persists to agent_logs collection.'
+    }
+  }
+
+  // ── Usage Reporting ───────────────────────────────────────────────────────
+
+  dynamic view usageReporting {
+    title 'Usage Reporting (ReportUsage RPC — unary)'
+
+    agent -> bryan.reportUsage 'ReportUsageRequest' {
+      notes 'Reports usage for a completed run. Kind: work, prompt, bugreport, plan, vision, architecture. Includes token counts, cost, model_usage breakdown, and time range.'
+    }
+    bryan.reportUsage -> agent 'ReportUsageResponse' {
+      notes 'success + optional error.'
+    }
+  }
+
+  // ── Agent Lifecycle Notifications ─────────────────────────────────────────
+
+  dynamic view lifecycleNotifications {
+    title 'Agent Lifecycle Notifications (Connect stream — server-initiated)'
+
+    operator -> bryan.restApi 'Pause/Resume/Terminate agent'
+    bryan.connect -> agent 'PauseNotification' {
+      notes 'Stop accepting new tasks. May finish current work.'
+    }
+    bryan.connect -> agent 'ResumeNotification' {
+      notes 'Resume accepting tasks after a pause.'
+    }
+    bryan.connect -> agent 'TerminateNotification (reason)' {
+      notes 'Disconnect immediately. Agent should close the stream gracefully.'
+    }
+    bryan.connect -> agent 'UnlinkRepositoryNotification (repo URL)' {
+      notes 'Repository removed from agent scope. Stop working on its tasks.'
+    }
+    bryan.connect -> agent 'RelinkRepositoryApproved (repo URL)' {
+      notes 'Repository re-added after operator approval.'
+    }
+  }
+}

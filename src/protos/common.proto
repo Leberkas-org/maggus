@@ -1,0 +1,75 @@
+// common.proto — Shared types used across multiple proto files.
+//
+// This file contains enums and messages that are imported by agent.proto,
+// server.proto, and usage.proto to avoid circular dependencies.
+
+syntax = "proto3";
+
+option csharp_namespace = "Bryan.Core.Protos";
+option go_package = "zebi/proto";
+
+package bryan;
+
+// TaskStatus represents the lifecycle states of a task.
+//
+// Lifecycle: NEW → READY → IN_PROGRESS → REVIEW → DONE
+//                                      ↘ FAILED
+//
+// Agents may only transition: IN_PROGRESS → REVIEW → DONE, or
+// IN_PROGRESS → FAILED. All other transitions require operator (user) action
+// via the REST API.
+enum TaskStatus {
+  // TASK_STATUS_UNSPECIFIED — default/zero value. Never used intentionally;
+  // indicates a missing or unpopulated status field.
+  TASK_STATUS_UNSPECIFIED = 0;
+
+  // STARTED — legacy value, equivalent to IN_PROGRESS. Kept for backward
+  // compatibility with older agents. New agents should use IN_PROGRESS.
+  STARTED = 1;
+
+  // COMPLETED — legacy value, equivalent to DONE. Kept for backward
+  // compatibility with older agents. New agents should use DONE.
+  COMPLETED = 2;
+
+  // FAILED — the agent was unable to complete the task. Terminal state.
+  // The task may be retried by an operator reassigning it.
+  FAILED = 3;
+
+  // NEW — task has been created but is not yet ready for assignment.
+  // Set by Bryan when a task is first created via the REST API.
+  NEW = 4;
+
+  // READY — task is ready to be assigned to an agent. Bryan picks the
+  // highest-priority READY task when dispatching work.
+  READY = 5;
+
+  // IN_PROGRESS — an agent is actively working on this task. The agent
+  // should send this status immediately after receiving a TaskAssignment.
+  IN_PROGRESS = 6;
+
+  // REVIEW — the agent has finished its work and the result is awaiting
+  // human review. Sent by the agent after completing implementation.
+  REVIEW = 7;
+
+  // DONE — the task is complete and accepted. Terminal state. New agents
+  // should use this instead of the legacy COMPLETED value.
+  DONE = 8;
+}
+
+// ModelUsageEntry represents per-model token usage and cost within a single run.
+message ModelUsageEntryProto {
+  int64 input_tokens = 1;
+  int64 output_tokens = 2;
+  int64 cache_creation_input_tokens = 3;
+  int64 cache_read_input_tokens = 4;
+  double cost_usd = 5;
+}
+
+// LogKeyValuePair is a single key-value pair used in AgentLog.details.
+message LogKeyValuePair {
+  // key — required. The detail key (e.g., "file", "line", "command").
+  string key = 1;
+
+  // value — required. The detail value.
+  string value = 2;
+}

@@ -23,7 +23,10 @@
       "Bash(python3:*)",
       "Bash(powershell:*)",
       "Bash(git log:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(awk '{print $9, $5}')",
+      "Bash(awk '{print $NF}')",
+      "WebFetch(domain:likec4.dev)"
     ]
   }
 }
