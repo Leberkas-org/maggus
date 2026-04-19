@@ -18,7 +18,7 @@ type ParsedTask struct {
 	Content string
 }
 
-var taskHeadingRe = regexp.MustCompile(`(?m)^## Task (\d+):\s*(.+)$`)
+var taskHeadingRe = regexp.MustCompile(`(?m)^#{2,3} Task (\d+):\s*(.+)$`)
 
 func Parse(content string) (*ParsedPlan, error) {
 	plan := &ParsedPlan{}

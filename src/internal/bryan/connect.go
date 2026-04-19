@@ -3,7 +3,7 @@ package bryan
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 )
@@ -34,12 +34,12 @@ func (c *GRPCClient) Connect(ctx context.Context, machineID string, repos []stri
 	c.machineID = machineID
 	// TODO: Establish gRPC connection using generated proto stubs
 	// For now, this is a placeholder that will be wired up when proto generation is configured
-	log.Printf("bryan: connecting to %s as %s with %d repos", c.address, machineID, len(repos))
+	slog.Info("bryan connecting", "address", c.address, "machine_id", machineID, "repos", len(repos))
 	return fmt.Errorf("gRPC connection not yet implemented — proto generation required")
 }
 
 func (c *GRPCClient) UpdateTaskStatus(taskID string, status TaskStatus, msg string) error {
-	log.Printf("bryan: update task %s status=%d msg=%s", taskID, status, msg)
+	slog.Debug("bryan task status update", "task_id", taskID, "status", status, "msg", msg)
 	return nil
 }
 

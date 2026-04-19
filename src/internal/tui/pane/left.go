@@ -24,9 +24,6 @@ func NewLeftPane() *LeftPane {
 func (p *LeftPane) Init() tea.Cmd { return nil }
 
 func (p *LeftPane) Update(msg tea.Msg) (Pane, tea.Cmd) {
-	if !p.Focused {
-		return p, nil
-	}
 	if km, ok := msg.(tea.KeyMsg); ok {
 		switch km.String() {
 		case "up", "k":
@@ -45,14 +42,15 @@ func (p *LeftPane) Update(msg tea.Msg) (Pane, tea.Cmd) {
 }
 
 func (p *LeftPane) View() string {
-	p.tree.Width = p.Width - 2
+	contentW := p.Width - 1 // 1 column for divider
+	p.tree.Width = contentW
 	p.tree.Height = p.Height - 1
 
 	treeView := p.tree.View()
-	sep := styles.Separator(p.Width - 2)
+	sep := styles.Separator(contentW)
 
 	content := lipgloss.NewStyle().
-		Width(p.Width - 2).
+		Width(contentW).
 		Height(p.Height - 1).
 		Render(treeView)
 
@@ -68,44 +66,58 @@ func (p *LeftPane) Selected() *component.TreeNode {
 	return p.tree.Selected()
 }
 
+func (p *LeftPane) SelectedItemID() string {
+	sel := p.tree.Selected()
+	if sel == nil {
+		return ""
+	}
+	// If it's a top-level node (work item), return its ID
+	for _, node := range p.tree.Nodes {
+		if node.ID == sel.ID {
+			return node.ID
+		}
+		// Check if selected is a child (task) of this item
+		for _, child := range node.Children {
+			if child.ID == sel.ID {
+				return node.ID
+			}
+		}
+	}
+	return sel.ID
+}
+
 func (p *LeftPane) UpdateState(snap ipc.DaemonSnapshot) {
+	// Don't replace existing tree with empty data
+	if len(snap.Queue) == 0 && len(p.tree.Nodes) > 0 {
+		return
+	}
+
 	var nodes []*component.TreeNode
 
-	repoMap := make(map[string]*component.TreeNode)
 	for _, q := range snap.Queue {
-		repoNode, ok := repoMap[q.RepoURL]
-		if !ok {
-			repoNode = &component.TreeNode{
-				ID:       q.RepoURL,
-				Label:    q.RepoURL,
-				Expanded: true,
-			}
-			repoMap[q.RepoURL] = repoNode
-			nodes = append(nodes, repoNode)
-		}
-
-		itemIcon := statusIcon(q.Status)
 		itemNode := &component.TreeNode{
 			ID:       q.ID,
 			Label:    q.Title,
-			Icon:     itemIcon,
-			Expanded: q.Status == "active",
+			Icon:     statusIcon(q.Status),
+			Expanded: true,
 		}
-		repoNode.Children = append(repoNode.Children, itemNode)
-	}
 
-	for _, w := range snap.Workers {
-		if repoNode, ok := repoMap[w.RepoURL]; ok {
-			for _, child := range repoNode.Children {
-				if child.ID == w.ItemID {
-					child.Children = append(child.Children, &component.TreeNode{
-						ID:    w.TaskID,
-						Label: w.TaskTitle,
-						Icon:  statusIcon(w.Status),
-					})
+		for _, t := range q.TaskList {
+			taskIcon := statusIcon(t.Status)
+			for _, w := range snap.Workers {
+				if w.TaskID == t.ID {
+					taskIcon = statusIcon(w.Status)
+					break
 				}
 			}
+			itemNode.Children = append(itemNode.Children, &component.TreeNode{
+				ID:    t.ID,
+				Label: t.Title,
+				Icon:  taskIcon,
+			})
 		}
+
+		nodes = append(nodes, itemNode)
 	}
 
 	p.tree.SetNodes(nodes)

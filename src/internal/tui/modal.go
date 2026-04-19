@@ -7,13 +7,16 @@ import (
 	"github.com/leberkas-org/maggus/internal/tui/styles"
 )
 
-type ModalAction int
+type OverlayKind int
 
 const (
-	ModalNone ModalAction = iota
-	ModalStop
-	ModalDetach
-	ModalCancel
+	OverlayNone OverlayKind = iota
+	OverlayMenu
+	OverlayRepoList
+	OverlayAddRepo
+	OverlayBrowseRepo
+	OverlayImportPlan
+	OverlayQuit
 )
 
 type QuitModal struct {
@@ -36,7 +39,5 @@ func (m *QuitModal) View() string {
 	}
 
 	content := title + "\n" + strings.Join(options, "\n")
-	rendered := box.Render(content)
-
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, rendered)
+	return box.Render(content)
 }

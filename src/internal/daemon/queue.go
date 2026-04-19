@@ -26,10 +26,11 @@ type WorkItem struct {
 }
 
 type TaskSpec struct {
-	ID      string
-	Title   string
-	Content string
-	Status  ItemStatus
+	ID           string
+	Title        string
+	Content      string
+	Status       ItemStatus
+	Predecessors []string
 }
 
 type TaskQueue struct {
@@ -51,9 +52,20 @@ func (q *TaskQueue) Approve(id string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for _, item := range q.items {
-		if item.ID == id && item.Status == ItemPending {
-			item.Status = ItemReady
-			return nil
+		if item.ID == id {
+			switch item.Status {
+			case ItemPending, ItemFailed:
+				item.Status = ItemReady
+				// Reset failed tasks so they can be retried
+				for i := range item.Tasks {
+					if item.Tasks[i].Status == ItemFailed {
+						item.Tasks[i].Status = ItemPending
+					}
+				}
+				return nil
+			case ItemReady, ItemActive:
+				return nil // already approved/running
+			}
 		}
 	}
 	return errItemNotFound(id)

@@ -104,6 +104,34 @@ func TestParse_NoHeader(t *testing.T) {
 	}
 }
 
+func TestParse_H3Tasks(t *testing.T) {
+	input := `# My Plan
+
+**Goal:** Do stuff.
+
+### Task 1: Project Scaffolding
+
+Set up the project.
+
+### Task 2: Implementation
+
+Build the thing.
+`
+	plan, err := Parse(input)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(plan.Tasks) != 2 {
+		t.Fatalf("tasks = %d, want 2", len(plan.Tasks))
+	}
+	if plan.Tasks[0].Title != "Project Scaffolding" {
+		t.Errorf("task[0].title = %q", plan.Tasks[0].Title)
+	}
+	if plan.Tasks[1].Title != "Implementation" {
+		t.Errorf("task[1].title = %q", plan.Tasks[1].Title)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && containsStr(s, sub)
 }

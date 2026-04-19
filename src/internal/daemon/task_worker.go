@@ -3,7 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -24,6 +24,7 @@ type TaskWorker struct {
 	agent  agent.Agent
 	pool   *WorkerPool
 	logger *runlog.Logger
+	log    *slog.Logger
 	cancel context.CancelFunc
 	ctx    context.Context
 }
@@ -37,6 +38,7 @@ func NewTaskWorker(
 	ag agent.Agent,
 	pool *WorkerPool,
 	logger *runlog.Logger,
+	log *slog.Logger,
 ) *TaskWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TaskWorker{
@@ -48,6 +50,7 @@ func NewTaskWorker(
 		agent:  ag,
 		pool:   pool,
 		logger: logger,
+		log:    log.With("task_id", task.ID, "item_id", item.ID),
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -68,10 +71,11 @@ func (w *TaskWorker) Run() {
 	defer w.state.RemoveWorker(w.task.ID)
 
 	if err := w.execute(); err != nil {
-		log.Printf("task %s failed: %v", w.task.ID, err)
+		w.log.Error("task failed", "error", err)
 		w.task.Status = ItemFailed
 		w.logEvent("task_failed", err.Error())
 	} else {
+		w.log.Info("task completed")
 		w.task.Status = ItemDone
 		w.logEvent("task_complete", "")
 	}
@@ -81,10 +85,9 @@ func (w *TaskWorker) Run() {
 }
 
 func (w *TaskWorker) execute() error {
-	featureBranch := fmt.Sprintf("feature/%s", w.item.ID)
-	taskBranch := fmt.Sprintf("%s/%s", featureBranch, w.task.ID)
+	featureBranch := fmt.Sprintf("maggus/%s", w.item.ID)
+	taskBranch := fmt.Sprintf("maggus/%s-%s", w.item.ID, w.task.ID)
 
-	// Ensure feature branch exists
 	if !w.gitOps.BranchExists(w.item.RepoPath, featureBranch) {
 		defaultBranch, err := w.gitOps.DefaultBranch(w.item.RepoPath)
 		if err != nil {
@@ -95,28 +98,27 @@ func (w *TaskWorker) execute() error {
 		}
 	}
 
-	// Create task branch from feature branch
+	// Clean up stale task branch from a previous failed run
+	if w.gitOps.BranchExists(w.item.RepoPath, taskBranch) {
+		_ = w.gitOps.DeleteBranch(w.item.RepoPath, taskBranch)
+	}
 	if err := w.gitOps.CreateBranch(w.item.RepoPath, taskBranch, featureBranch); err != nil {
 		return fmt.Errorf("create task branch: %w", err)
 	}
 
-	// Create worktree
 	wtPath := filepath.Join(w.item.RepoPath, ".maggus", "worktrees", w.task.ID)
 	if err := w.gitOps.CreateWorktree(w.item.RepoPath, wtPath, taskBranch); err != nil {
 		return fmt.Errorf("create worktree: %w", err)
 	}
 	defer w.cleanup(wtPath, taskBranch)
 
-	// Build prompt
 	w.state.UpdateWorkerStatus(w.task.ID, "building prompt")
-	contextMD := w.item.Description
 	p := prompt.Build(prompt.BuildOptions{
 		TaskContent:    w.task.Content,
-		FeatureContext: contextMD,
+		FeatureContext: w.item.Description,
 		RepoPath:       w.item.RepoPath,
 	})
 
-	// Run agent
 	w.state.UpdateWorkerStatus(w.task.ID, "running agent")
 	w.logEvent("task_start", w.task.Title)
 
@@ -131,7 +133,6 @@ func (w *TaskWorker) execute() error {
 		return fmt.Errorf("agent run: %w", err)
 	}
 
-	// Post-completion commit
 	w.state.UpdateWorkerStatus(w.task.ID, "committing")
 	if w.gitOps.HasChanges(wtPath) {
 		msg := fmt.Sprintf("chore(%s): auto-commit after agent completion", w.task.ID)
@@ -146,7 +147,6 @@ func (w *TaskWorker) execute() error {
 		}
 	}
 
-	// Merge back (serialized per feature branch)
 	w.state.UpdateWorkerStatus(w.task.ID, "merging")
 	mu := w.pool.MergeMutex(featureBranch)
 	mu.Lock()
@@ -192,7 +192,6 @@ func (w *TaskWorker) logEvent(event, text string) {
 	})
 }
 
-// workerSink adapts OutputSink to update daemon state
 type workerSink struct {
 	worker *TaskWorker
 }

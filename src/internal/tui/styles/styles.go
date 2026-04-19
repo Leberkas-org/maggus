@@ -24,7 +24,7 @@ var (
 	Subtitle  = lipgloss.NewStyle().Foreground(Primary)
 	Label     = lipgloss.NewStyle().Bold(true)
 	Value     = lipgloss.NewStyle().Foreground(Muted)
-	Box       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(Primary).Padding(0, 1)
+	Box       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(Primary)
 	StatusBar = lipgloss.NewStyle().Foreground(Muted)
 )
 
@@ -130,9 +130,8 @@ func FullScreen(content, footer string, width, height int) string {
 		body = content
 	}
 
-	// Box has Padding(0,1) — add 2 to Width so the content area equals innerW.
 	box := Box.
-		Width(innerW + 2).
+		Width(innerW).
 		Height(innerH).
 		Render(body)
 
@@ -165,10 +164,9 @@ func FullScreenLeftColor(content, footer string, width, height int, borderColor 
 		body = content
 	}
 
-	// Box has Padding(0,1) — add 2 to Width so the content area equals innerW.
 	box := Box.
 		BorderForeground(borderColor).
-		Width(innerW + 2).
+		Width(innerW).
 		Height(innerH).
 		Render(body)
 
@@ -197,8 +195,8 @@ func FullScreenInnerSize(width, height int) (int, int) {
 }
 
 func fullScreenInner(width, height int) (int, int) {
-	innerW := width - FullScreenMargin*2 - 2 - 2 // margin + border + padding
-	innerH := height - FullScreenMargin*2 - 2    // margin + border
+	innerW := width - FullScreenMargin*2 - 2 // margin + border
+	innerH := height - FullScreenMargin*2 - 2 // margin + border
 	if innerW < 0 {
 		innerW = 0
 	}
@@ -254,7 +252,7 @@ func FullScreenColor(content, footer string, width, height int, borderColor lipg
 
 	box := Box.
 		BorderForeground(borderColor).
-		Width(innerW + 2).
+		Width(innerW).
 		Height(innerH).
 		Render(body)
 

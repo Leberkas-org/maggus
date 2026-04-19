@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,16 +10,16 @@ import (
 func (o *ops) RecoverDirtyState(repoRoot string) error {
 	worktreesDir := filepath.Join(repoRoot, ".maggus", "worktrees")
 
-	if err := o.recoverUncommitted(repoRoot, worktreesDir); err != nil {
-		log.Printf("recover uncommitted: %v", err)
+	if err := o.recoverUncommitted(worktreesDir); err != nil {
+		o.log.Warn("recover uncommitted failed", "error", err)
 	}
 
 	if err := o.consolidateOrphanedBranches(repoRoot); err != nil {
-		log.Printf("consolidate orphaned branches: %v", err)
+		o.log.Warn("consolidate orphaned branches failed", "error", err)
 	}
 
 	if err := o.cleanOrphanedWorktrees(repoRoot, worktreesDir); err != nil {
-		log.Printf("clean orphaned worktrees: %v", err)
+		o.log.Warn("clean orphaned worktrees failed", "error", err)
 	}
 
 	_ = o.PruneWorktrees(repoRoot)
@@ -31,7 +30,7 @@ func (o *ops) RecoverDirtyState(repoRoot string) error {
 	return nil
 }
 
-func (o *ops) recoverUncommitted(_ string, worktreesDir string) error {
+func (o *ops) recoverUncommitted(worktreesDir string) error {
 	entries, err := os.ReadDir(worktreesDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -55,15 +54,15 @@ func (o *ops) recoverUncommitted(_ string, worktreesDir string) error {
 		}
 
 		if err := o.StageAll(wtPath); err != nil {
-			log.Printf("stage in %s: %v", wtPath, err)
+			o.log.Warn("stage failed during recovery", "worktree", wtPath, "error", err)
 			continue
 		}
 		hash, err := o.Commit(wtPath, msg)
 		if err != nil {
-			log.Printf("commit in %s: %v", wtPath, err)
+			o.log.Warn("commit failed during recovery", "worktree", wtPath, "error", err)
 			continue
 		}
-		log.Printf("recovered commit %s in %s", hash, wtPath)
+		o.log.Info("recovered uncommitted changes", "commit", hash, "worktree", wtPath)
 	}
 	return nil
 }
@@ -80,7 +79,6 @@ func (o *ops) consolidateOrphanedBranches(repoRoot string) error {
 			continue
 		}
 
-		// Task branches contain a "/" after the feature branch prefix
 		parts := strings.SplitN(branch, "/", 3)
 		if len(parts) < 3 {
 			continue
@@ -96,14 +94,14 @@ func (o *ops) consolidateOrphanedBranches(repoRoot string) error {
 			continue
 		}
 		if strings.TrimSpace(ahead) == "0" {
-			log.Printf("deleting orphaned branch %s (no commits ahead)", branch)
+			o.log.Info("deleting orphaned branch", "branch", branch)
 			_ = o.cmd.Run(repoRoot, "branch", "-D", branch)
 			continue
 		}
 
-		log.Printf("merging orphaned branch %s into %s", branch, featureBranch)
+		o.log.Info("merging orphaned branch", "branch", branch, "into", featureBranch)
 		if err := o.MergeTaskBranch(repoRoot, featureBranch, branch); err != nil {
-			log.Printf("merge failed for %s, leaving for manual review: %v", branch, err)
+			o.log.Warn("merge failed, leaving for manual review", "branch", branch, "error", err)
 			continue
 		}
 		_ = o.cmd.Run(repoRoot, "branch", "-d", branch)
@@ -138,12 +136,12 @@ func (o *ops) cleanOrphanedWorktrees(repoRoot, worktreesDir string) error {
 
 		if knownPaths[wtPath] {
 			if err := o.RemoveWorktree(repoRoot, wtPath); err != nil {
-				log.Printf("remove worktree %s: %v", wtPath, err)
+				o.log.Warn("remove worktree failed", "path", wtPath, "error", err)
 			}
 		} else {
-			log.Printf("removing orphaned directory %s", wtPath)
+			o.log.Info("removing orphaned directory", "path", wtPath)
 			if err := os.RemoveAll(wtPath); err != nil {
-				log.Printf("remove dir %s: %v", wtPath, err)
+				o.log.Warn("remove directory failed", "path", wtPath, "error", err)
 			}
 		}
 	}

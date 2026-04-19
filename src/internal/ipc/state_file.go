@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 type FileStateWriter struct {
@@ -61,36 +64,85 @@ func (r *FileStateReader) ReadState() (DaemonSnapshot, error) {
 func (r *FileStateReader) Watch(ctx context.Context) <-chan DaemonSnapshot {
 	ch := make(chan DaemonSnapshot, 1)
 
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		slog.Warn("fsnotify init failed, falling back to polling", "error", err)
+		go r.pollWatch(ctx, ch)
+		return ch
+	}
+
+	dir := filepath.Dir(r.path)
+	if err := watcher.Add(dir); err != nil {
+		slog.Warn("fsnotify watch failed, falling back to polling", "error", err)
+		watcher.Close()
+		go r.pollWatch(ctx, ch)
+		return ch
+	}
+
 	go func() {
 		defer close(ch)
-		var lastMod time.Time
-
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
+		defer watcher.Close()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-				info, err := os.Stat(r.path)
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Name != r.path {
+					continue
+				}
+				if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+					continue
+				}
+				snap, err := r.ReadState()
 				if err != nil {
 					continue
 				}
-				if info.ModTime().After(lastMod) {
-					lastMod = info.ModTime()
-					snap, err := r.ReadState()
-					if err != nil {
-						continue
-					}
-					select {
-					case ch <- snap:
-					default:
-					}
+				select {
+				case ch <- snap:
+				default:
+				}
+			case _, ok := <-watcher.Errors:
+				if !ok {
+					return
 				}
 			}
 		}
 	}()
 
 	return ch
+}
+
+func (r *FileStateReader) pollWatch(ctx context.Context, ch chan<- DaemonSnapshot) {
+	defer close(ch)
+	var lastMod time.Time
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			info, err := os.Stat(r.path)
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(lastMod) {
+				lastMod = info.ModTime()
+				snap, err := r.ReadState()
+				if err != nil {
+					continue
+				}
+				select {
+				case ch <- snap:
+				default:
+				}
+			}
+		}
+	}
 }

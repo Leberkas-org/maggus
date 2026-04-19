@@ -1,7 +1,7 @@
 package daemon
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/leberkas-org/maggus/internal/agent"
 	"github.com/leberkas-org/maggus/internal/config"
@@ -16,9 +16,10 @@ type Dispatcher struct {
 	agents *agent.Registry
 	cfg    config.Config
 	state  *State
+	log    *slog.Logger
 }
 
-func NewDispatcher(queue *TaskQueue, pool *WorkerPool, gitOps git.Operations, agents *agent.Registry, cfg config.Config, state *State) *Dispatcher {
+func NewDispatcher(queue *TaskQueue, pool *WorkerPool, gitOps git.Operations, agents *agent.Registry, cfg config.Config, state *State, logger *slog.Logger) *Dispatcher {
 	return &Dispatcher{
 		queue:  queue,
 		pool:   pool,
@@ -26,6 +27,7 @@ func NewDispatcher(queue *TaskQueue, pool *WorkerPool, gitOps git.Operations, ag
 		agents: agents,
 		cfg:    cfg,
 		state:  state,
+		log:    logger,
 	}
 }
 
@@ -39,13 +41,17 @@ func (d *Dispatcher) Tick() {
 		return
 	}
 
-	// Find next pending task in the item
 	var nextTask *TaskSpec
 	for i := range item.Tasks {
-		if item.Tasks[i].Status == "" || item.Tasks[i].Status == ItemPending {
-			nextTask = &item.Tasks[i]
-			break
+		t := &item.Tasks[i]
+		if t.Status != "" && t.Status != ItemPending {
+			continue
 		}
+		if !predecessorsDone(t, item) {
+			continue
+		}
+		nextTask = t
+		break
 	}
 	if nextTask == nil {
 		return
@@ -53,7 +59,7 @@ func (d *Dispatcher) Tick() {
 
 	ag, err := d.agents.Get(d.cfg.Agent)
 	if err != nil {
-		log.Printf("get agent: %v", err)
+		d.log.Error("get agent failed", "agent", d.cfg.Agent, "error", err)
 		return
 	}
 
@@ -64,18 +70,32 @@ func (d *Dispatcher) Tick() {
 
 	logger, err := runlog.New(logsDir+"/.maggus/logs", item.ID)
 	if err != nil {
-		log.Printf("create logger: %v", err)
+		d.log.Warn("create run logger failed", "item_id", item.ID, "error", err)
 	}
 
 	item.Status = ItemActive
 	nextTask.Status = ItemActive
 
-	worker := NewTaskWorker(item, *nextTask, d.cfg, d.state, d.gitOps, ag, d.pool, logger)
+	worker := NewTaskWorker(item, *nextTask, d.cfg, d.state, d.gitOps, ag, d.pool, logger, d.log)
 	if err := d.pool.Submit(worker); err != nil {
-		log.Printf("submit worker: %v", err)
+		d.log.Warn("submit worker failed", "task_id", nextTask.ID, "error", err)
 		nextTask.Status = ItemPending
 		item.Status = ItemReady
 	}
 
 	_ = d.state.Flush()
+}
+
+func predecessorsDone(task *TaskSpec, item *WorkItem) bool {
+	if len(task.Predecessors) == 0 {
+		return true
+	}
+	for _, predID := range task.Predecessors {
+		for _, t := range item.Tasks {
+			if t.ID == predID && t.Status != ItemDone {
+				return false
+			}
+		}
+	}
+	return true
 }

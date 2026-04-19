@@ -14,7 +14,8 @@ type FooterPane struct {
 
 func NewFooterPane() *FooterPane {
 	return &FooterPane{
-		KeyHints: "tab: switch pane  a: approve  x: skip  q: quit",
+		StatusText: "Daemon starting...",
+		KeyHints:   "esc: menu  q: exit  tab/shift+tab: tabs  a: approve  x: skip",
 	}
 }
 
@@ -25,7 +26,7 @@ func (p *FooterPane) Update(msg tea.Msg) (Pane, tea.Cmd) {
 }
 
 func (p *FooterPane) View() string {
-	status := lipgloss.NewStyle().Foreground(styles.Primary).Render(p.StatusText)
+	status := lipgloss.NewStyle().Foreground(styles.Success).Render(p.StatusText)
 	hints := styles.StatusBar.Render(p.KeyHints)
 
 	left := lipgloss.NewStyle().Width(p.Width / 2).Render(status)

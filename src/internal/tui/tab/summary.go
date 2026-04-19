@@ -1,65 +1,91 @@
 package tab
 
 import (
-	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/leberkas-org/maggus/internal/tui/styles"
+	"github.com/charmbracelet/x/ansi"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/leberkas-org/maggus/internal/tui/component"
 )
 
 type SummaryTab struct {
-	data *SummaryData
-}
-
-type SummaryData struct {
-	Status     string
-	Duration   string
-	CommitHash string
-	TotalCost  float64
-	Tasks      int
-	Done       int
+	viewport *component.Viewport
+	rawMD    string
+	lastW    int
 }
 
 func NewSummaryTab() *SummaryTab {
-	return &SummaryTab{}
+	return &SummaryTab{viewport: component.NewViewport()}
 }
 
 func (t *SummaryTab) Name() string { return "Summary" }
 
 func (t *SummaryTab) Update(msg tea.Msg) (Tab, tea.Cmd) {
+	if km, ok := msg.(tea.KeyMsg); ok {
+		switch km.String() {
+		case "alt+up":
+			t.viewport.ScrollUp(1)
+		case "alt+down":
+			t.viewport.ScrollDown(1)
+		case "pgup":
+			t.viewport.ScrollUp(t.viewport.Height / 2)
+		case "pgdown":
+			t.viewport.ScrollDown(t.viewport.Height / 2)
+		case "home":
+			t.viewport.ScrollToTop()
+		case "end":
+			t.viewport.ScrollToBottom()
+		}
+	}
 	return t, nil
 }
 
 func (t *SummaryTab) View(width, height int) string {
-	if t.data == nil {
-		return lipgloss.NewStyle().Foreground(styles.Muted).Render("  No summary available")
+	if width != t.lastW && t.rawMD != "" {
+		t.lastW = width
+		t.renderMarkdown(width)
 	}
-
-	d := t.data
-	var lines []string
-
-	statusStyle := styles.Title
-	if d.Status == "failed" {
-		statusStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Error)
-	}
-
-	lines = append(lines, statusStyle.Render(fmt.Sprintf("  %s", strings.ToUpper(d.Status))))
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("  Tasks:     %d/%d", d.Done, d.Tasks))
-	lines = append(lines, fmt.Sprintf("  Duration:  %s", d.Duration))
-	if d.CommitHash != "" {
-		lines = append(lines, fmt.Sprintf("  Commit:    %s", d.CommitHash))
-	}
-	lines = append(lines, fmt.Sprintf("  Cost:      $%.4f", d.TotalCost))
-
-	return lipgloss.NewStyle().Width(width).Height(height).
-		Render(strings.Join(lines, "\n"))
+	t.viewport.Width = width
+	t.viewport.Height = height
+	return t.viewport.View()
 }
 
 func (t *SummaryTab) SetData(data any) {
-	if s, ok := data.(*SummaryData); ok {
-		t.data = s
+	if s, ok := data.(string); ok && s != t.rawMD {
+		t.rawMD = s
+		t.lastW = 0
 	}
+}
+
+func (t *SummaryTab) renderMarkdown(width int) {
+	rendered := renderMD(t.rawMD, width)
+	t.viewport.SetContent(rendered)
+}
+
+func renderMD(md string, width int) string {
+	w := max(width-4, 20)
+	r, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(w),
+	)
+	if err != nil {
+		return md
+	}
+	rendered, err := r.Render(md)
+	if err != nil {
+		return md
+	}
+	return clampLines(rendered, width)
+}
+
+func clampLines(s string, maxW int) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	for i, line := range lines {
+		if lipgloss.Width(line) > maxW {
+			lines[i] = ansi.Truncate(line, maxW, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }

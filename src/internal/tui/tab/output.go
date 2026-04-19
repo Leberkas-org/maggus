@@ -18,13 +18,17 @@ func (t *OutputTab) Name() string { return "Output" }
 func (t *OutputTab) Update(msg tea.Msg) (Tab, tea.Cmd) {
 	if km, ok := msg.(tea.KeyMsg); ok {
 		switch km.String() {
-		case "shift+up":
+		case "alt+up":
 			t.viewport.ScrollUp(1)
-		case "shift+down":
+		case "alt+down":
 			t.viewport.ScrollDown(1)
-		case "g":
+		case "pgup":
+			t.viewport.ScrollUp(t.viewport.Height / 2)
+		case "pgdown":
+			t.viewport.ScrollDown(t.viewport.Height / 2)
+		case "home":
 			t.viewport.ScrollToTop()
-		case "G":
+		case "end":
 			t.viewport.ScrollToBottom()
 		}
 	}

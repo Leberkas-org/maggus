@@ -1,9 +1,6 @@
 package git
 
-import (
-	"fmt"
-	"log"
-)
+import "fmt"
 
 func (o *ops) MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error {
 	if err := o.CheckoutBranch(repoRoot, featureBranch); err != nil {
@@ -15,7 +12,7 @@ func (o *ops) MergeTaskBranch(repoRoot, featureBranch, taskBranch string) error 
 	}
 
 	if err := o.RebaseOnto(repoRoot, featureBranch, taskBranch); err != nil {
-		log.Printf("rebase failed, falling back to merge: %v", err)
+		o.log.Warn("rebase failed, falling back to merge", "error", err, "feature", featureBranch, "task", taskBranch)
 		_ = o.AbortRebase(repoRoot)
 
 		if err := o.CheckoutBranch(repoRoot, featureBranch); err != nil {

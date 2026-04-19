@@ -20,13 +20,23 @@ type RepoSnapshot struct {
 }
 
 type QueueItem struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	RepoURL  string `json:"repo_url"`
-	Status   string `json:"status"`
-	Priority int    `json:"priority"`
-	Tasks    int    `json:"tasks"`
-	Done     int    `json:"done"`
+	ID          string          `json:"id"`
+	Title       string          `json:"title"`
+	RepoURL     string          `json:"repo_url"`
+	RepoPath    string          `json:"repo_path"`
+	Status      string          `json:"status"`
+	Priority    int             `json:"priority"`
+	Tasks       int             `json:"tasks"`
+	Done        int             `json:"done"`
+	PlanFile    string          `json:"plan_file,omitempty"`
+	Description string          `json:"description,omitempty"`
+	TaskList    []TaskSnapshot  `json:"task_list,omitempty"`
+}
+
+type TaskSnapshot struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
 }
 
 type WorkerSnapshot struct {
